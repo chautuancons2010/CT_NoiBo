@@ -1,0 +1,2 @@
+-- Prompt 1 does not seed production-like data.
+-- Add development-only roles/users here after Supabase Auth is connected.
