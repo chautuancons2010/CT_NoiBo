@@ -165,10 +165,10 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
 const employeeSectionLabels: Record<string, string> = {
   profile: "Hồ sơ",
   employment: "Công việc",
-  attendance: "Chấm công",
-  leave: "Nghỉ phép",
+  contracts: "Hợp đồng",
   documents: "Tài liệu",
-  history: "Lịch sử"
+  history: "Lịch sử",
+  account: "Tài khoản"
 };
 
 const projectSectionLabels: Record<string, string> = {

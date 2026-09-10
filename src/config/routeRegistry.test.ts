@@ -11,10 +11,10 @@ describe("route registry", () => {
   });
 
   it("builds breadcrumbs for employee route-backed tabs", () => {
-    expect(getBreadcrumbs("/employees/NV001/attendance")).toEqual([
+    expect(getBreadcrumbs("/employees/NV001/contracts")).toEqual([
       { label: "Nhân sự", href: "/employees" },
       { label: "NV001", href: "/employees/NV001/profile" },
-      { label: "Chấm công" }
+      { label: "Hợp đồng" }
     ]);
   });
 });

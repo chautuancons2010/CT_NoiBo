@@ -1,17 +1,9 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { EmployeeListPage } from "@/features/employees";
 
-const meta = routeMetaByPath["/employees"];
-
-export default function Page() {
-  return (
-    <PlaceholderPage
-      description={meta.description}
-      listPattern
-      moduleName="Nhân viên"
-      primaryActionLabel="Tạo hồ sơ"
-      primaryActionPermission="employee.create"
-      title={meta.title}
-    />
-  );
+export default async function Page({
+  searchParams
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return <EmployeeListPage searchParams={await searchParams} />;
 }

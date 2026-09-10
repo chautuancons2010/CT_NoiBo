@@ -1,15 +1,5 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { SettingsPlaceholderPage } from "@/features/settings";
-
-const meta = routeMetaByPath["/settings/users"];
+import { UserAccountsPage } from "@/features/settings";
 
 export default function Page() {
-  return (
-    <SettingsPlaceholderPage
-      activePath="/settings/users"
-      description={meta.description}
-      listPattern
-      title={meta.title}
-    />
-  );
+  return <UserAccountsPage />;
 }
