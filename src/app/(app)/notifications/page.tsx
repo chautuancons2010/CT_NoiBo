@@ -1,8 +1,14 @@
+import { PageHeader } from "@/components/shared/PageHeader";
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { NotificationPanel } from "@/features/foundation";
 
 const meta = routeMetaByPath["/notifications"];
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} moduleName="Thông báo" title={meta.title} />;
+  return (
+    <div className="page-stack">
+      <PageHeader description={meta.description} title={meta.title} />
+      <NotificationPanel />
+    </div>
+  );
 }

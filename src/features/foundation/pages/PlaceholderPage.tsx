@@ -1,12 +1,13 @@
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/shared/Button";
-import { ColumnVisibilityMenu } from "@/components/shared/ColumnVisibilityMenu";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
-import { FilterBar } from "@/components/shared/FilterBar";
-import { SearchInput } from "@/components/shared/FormControls";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Pagination } from "@/components/shared/Pagination";
+import { PermissionGate } from "@/components/shared/PermissionGate";
+import { ListToolbar } from "@/features/foundation/components/ListToolbar";
+import { foundationDemoUser } from "@/lib/auth/currentUser";
+import type { Permission } from "@/lib/auth/permissions";
 
 interface PlaceholderPageProps {
   title: string;
@@ -14,6 +15,8 @@ interface PlaceholderPageProps {
   moduleName: string;
   listPattern?: boolean;
   primaryActionLabel?: string;
+  primaryActionPermission?: Permission;
+  dateRangeFilter?: boolean;
 }
 
 interface PlaceholderRow {
@@ -33,16 +36,20 @@ export function PlaceholderPage({
   description,
   moduleName,
   listPattern = false,
-  primaryActionLabel
+  primaryActionLabel,
+  primaryActionPermission = "settings.view",
+  dateRangeFilter = true
 }: PlaceholderPageProps) {
   return (
     <div className="page-stack">
       <PageHeader
         action={
           primaryActionLabel ? (
-            <Button leftIcon={<Plus aria-hidden="true" size={16} />} variant="primary">
-              {primaryActionLabel}
-            </Button>
+            <PermissionGate permissions={foundationDemoUser.permissions} require={primaryActionPermission}>
+              <Button leftIcon={<Plus aria-hidden="true" size={16} />} variant="primary">
+                {primaryActionLabel}
+              </Button>
+            </PermissionGate>
           ) : null
         }
         description={description}
@@ -50,23 +57,11 @@ export function PlaceholderPage({
       />
       {listPattern ? (
         <>
-          <FilterBar
-            actions={
-              <ColumnVisibilityMenu
-                columns={columns.map((column) => ({
-                  id: column.id,
-                  label: column.header,
-                  visible: true
-                }))}
-              />
-            }
-          >
-            <SearchInput placeholder={`Tìm trong ${moduleName.toLowerCase()}`} />
-          </FilterBar>
+          <ListToolbar columns={columns} dateRange={dateRangeFilter} moduleName={moduleName} />
           <DataTable
             columns={columns}
             data={[]}
-            emptyDescription="Module sẽ được triển khai ở bước tiếp theo."
+            emptyDescription="Dữ liệu sẽ hiển thị tại đây sau khi kết nối nghiệp vụ."
             emptyTitle={`Chưa có dữ liệu ${moduleName.toLowerCase()}`}
           />
           <Pagination page={1} pageCount={1} />
@@ -75,7 +70,7 @@ export function PlaceholderPage({
         <DataTable
           columns={columns}
           data={[]}
-          emptyDescription="Module sẽ được triển khai ở bước tiếp theo."
+          emptyDescription="Nội dung sẽ hiển thị tại đây sau khi kết nối nghiệp vụ."
           emptyTitle={moduleName}
         />
       )}

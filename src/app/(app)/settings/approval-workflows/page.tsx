@@ -1,8 +1,14 @@
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { SettingsPlaceholderPage } from "@/features/settings";
 
 const meta = routeMetaByPath["/settings/approval-workflows"];
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} moduleName="Quy trình duyệt" title={meta.title} />;
+  return (
+    <SettingsPlaceholderPage
+      activePath="/settings/approval-workflows"
+      description={meta.description}
+      title={meta.title}
+    />
+  );
 }

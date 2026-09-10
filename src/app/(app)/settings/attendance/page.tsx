@@ -1,8 +1,8 @@
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { SettingsPlaceholderPage } from "@/features/settings";
 
 const meta = routeMetaByPath["/settings/attendance"];
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} moduleName="Cấu hình chấm công" title={meta.title} />;
+  return <SettingsPlaceholderPage activePath="/settings/attendance" description={meta.description} title={meta.title} />;
 }

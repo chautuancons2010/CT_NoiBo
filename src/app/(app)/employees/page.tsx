@@ -10,6 +10,7 @@ export default function Page() {
       listPattern
       moduleName="Nhân viên"
       primaryActionLabel="Tạo hồ sơ"
+      primaryActionPermission="employee.create"
       title={meta.title}
     />
   );

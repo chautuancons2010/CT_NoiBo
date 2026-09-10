@@ -1,8 +1,15 @@
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { SettingsPlaceholderPage } from "@/features/settings";
 
 const meta = routeMetaByPath["/settings/export-templates"];
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Mẫu xuất dữ liệu" title={meta.title} />;
+  return (
+    <SettingsPlaceholderPage
+      activePath="/settings/export-templates"
+      description={meta.description}
+      listPattern
+      title={meta.title}
+    />
+  );
 }

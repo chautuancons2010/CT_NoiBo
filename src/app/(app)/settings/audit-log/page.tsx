@@ -1,8 +1,15 @@
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { SettingsPlaceholderPage } from "@/features/settings";
 
 const meta = routeMetaByPath["/settings/audit-log"];
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Audit log" title={meta.title} />;
+  return (
+    <SettingsPlaceholderPage
+      activePath="/settings/audit-log"
+      description={meta.description}
+      listPattern
+      title={meta.title}
+    />
+  );
 }

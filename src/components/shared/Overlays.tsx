@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 import { Button, IconButton } from "@/components/shared/Button";
@@ -14,13 +15,36 @@ interface OverlayProps {
 }
 
 export function Modal({ open, title, children, onClose }: OverlayProps) {
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousActiveElement = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousActiveElement?.focus();
+    };
+  }, [onClose, open]);
+
   if (!open) {
     return null;
   }
 
   return (
     <div className="overlay" role="presentation">
-      <section aria-modal="true" className="modal" role="dialog">
+      <section aria-modal="true" className="modal" ref={dialogRef} role="dialog" tabIndex={-1}>
         <header className="overlay__header">
           <h2>{title}</h2>
           <IconButton label="Đóng" onClick={onClose}>
@@ -34,13 +58,36 @@ export function Modal({ open, title, children, onClose }: OverlayProps) {
 }
 
 export function Drawer({ open, title, children, onClose }: OverlayProps) {
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousActiveElement = document.activeElement as HTMLElement | null;
+    drawerRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousActiveElement?.focus();
+    };
+  }, [onClose, open]);
+
   if (!open) {
     return null;
   }
 
   return (
     <div className="overlay overlay--drawer" role="presentation">
-      <aside aria-modal="true" className="drawer" role="dialog">
+      <aside aria-modal="true" className="drawer" ref={drawerRef} role="dialog" tabIndex={-1}>
         <header className="overlay__header">
           <h2>{title}</h2>
           <IconButton label="Đóng" onClick={onClose}>
@@ -90,13 +137,36 @@ export interface LightboxProps extends OverlayProps {
 }
 
 export function Lightbox({ open, title, children, onClose, mediaClassName }: LightboxProps) {
+  const lightboxRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousActiveElement = document.activeElement as HTMLElement | null;
+    lightboxRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousActiveElement?.focus();
+    };
+  }, [onClose, open]);
+
   if (!open) {
     return null;
   }
 
   return (
     <div className="overlay overlay--lightbox" role="presentation">
-      <section aria-modal="true" className="lightbox" role="dialog">
+      <section aria-modal="true" className="lightbox" ref={lightboxRef} role="dialog" tabIndex={-1}>
         <header className="overlay__header">
           <h2>{title}</h2>
           <IconButton label="Đóng" onClick={onClose}>

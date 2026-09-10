@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils/cn";
+import type { ReactNode } from "react";
 
-type StatusTone = "neutral" | "success" | "warning" | "error" | "info";
+export type StatusBadgeTone = "neutral" | "success" | "warning" | "error" | "info";
 
 export interface StatusBadgeProps {
-  children: string;
-  tone?: StatusTone;
+  children: ReactNode;
+  tone?: StatusBadgeTone;
 }
 
 export function StatusBadge({ children, tone = "neutral" }: StatusBadgeProps) {

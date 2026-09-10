@@ -1,8 +1,15 @@
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { SettingsPlaceholderPage } from "@/features/settings";
 
 const meta = routeMetaByPath["/settings/roles"];
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Vai trò" title={meta.title} />;
+  return (
+    <SettingsPlaceholderPage
+      activePath="/settings/roles"
+      description={meta.description}
+      listPattern
+      title={meta.title}
+    />
+  );
 }

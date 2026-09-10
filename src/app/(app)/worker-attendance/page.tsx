@@ -1,8 +1,14 @@
+import { PageHeader } from "@/components/shared/PageHeader";
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
+import { WorkerAttendanceFoundation } from "@/features/worker-attendance";
 
 const meta = routeMetaByPath["/worker-attendance"];
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Điểm danh công nhân" title={meta.title} />;
+  return (
+    <div className="page-stack">
+      <PageHeader description={meta.description} title={meta.title} />
+      <WorkerAttendanceFoundation />
+    </div>
+  );
 }
