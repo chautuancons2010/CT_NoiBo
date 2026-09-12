@@ -42,7 +42,8 @@ import type {
 import type {
   CreateEmployeeInput,
   PatchEmployeeInput,
-  ProvisionAccountInput
+  ProvisionAccountInput,
+  SensitiveProfilePatchInput
 } from "@/features/employees/schemas/employeeSchemas";
 import { assertNoAdminLockout, getEffectivePermissions, resolveRoleNames, roleCatalog } from "@/services/authorization/rbacService";
 
@@ -447,7 +448,7 @@ export function getEmployeeDetail(
       : undefined,
     sensitive: getSensitiveView(employee.id, permissions, dataSet),
     emergencyContacts: dataSet.emergencyContacts.filter((contact) => contact.employeeId === employee.id),
-    account: findAccountForEmployee(employee.id, dataSet)
+    account: can(permissions, "account.view") && findAccountForEmployee(employee.id, dataSet)
       ? toEmployeeAccountView(findAccountForEmployee(employee.id, dataSet) as AppAccountRecord)
       : undefined
   };
@@ -708,6 +709,57 @@ export function createEmployeeRecord(
   };
 }
 
+export function updateEmployeeSensitiveProfile(
+  employee: EmployeeRecord,
+  currentProfile: EmployeeSensitiveProfile | undefined,
+  input: SensitiveProfilePatchInput,
+  actorAccountId: string,
+  dataSet: EmployeeDataSet = defaultEmployeeDataSet
+): { profile: EmployeeSensitiveProfile; historyEvent: EmployeeHistoryEvent } {
+  if (
+    input.nationalIdNumber &&
+    dataSet.sensitiveProfiles.some(
+      (profile) =>
+        profile.employeeId !== employee.id &&
+        profile.nationalIdNumber === input.nationalIdNumber
+    )
+  ) {
+    throw new AppError("CONFLICT", "Số CCCD/CMND đã thuộc hồ sơ khác.");
+  }
+
+  const now = getNow();
+  const profile: EmployeeSensitiveProfile = {
+    employeeId: employee.id,
+    nationalIdNumber: input.nationalIdNumber ?? currentProfile?.nationalIdNumber,
+    nationalIdIssuedDate: input.nationalIdIssuedDate ?? currentProfile?.nationalIdIssuedDate,
+    nationalIdIssuedPlace: input.nationalIdIssuedPlace ?? currentProfile?.nationalIdIssuedPlace,
+    nationalIdExpiryDate: input.nationalIdExpiryDate ?? currentProfile?.nationalIdExpiryDate,
+    nationalIdFrontFileId: currentProfile?.nationalIdFrontFileId,
+    nationalIdBackFileId: currentProfile?.nationalIdBackFileId,
+    bankName: input.bankName ?? currentProfile?.bankName,
+    bankAccountNumber: input.bankAccountNumber ?? currentProfile?.bankAccountNumber,
+    bankAccountHolder: input.bankAccountHolder ?? currentProfile?.bankAccountHolder,
+    bankBranch: input.bankBranch ?? currentProfile?.bankBranch,
+    personalTaxCode: input.personalTaxCode ?? currentProfile?.personalTaxCode,
+    socialInsuranceCode: input.socialInsuranceCode ?? currentProfile?.socialInsuranceCode,
+    updatedBy: actorAccountId,
+    updatedAt: now
+  };
+
+  return {
+    profile,
+    historyEvent: createHistoryEvent({
+      employeeId: employee.id,
+      eventType: "sensitive_updated",
+      eventDate: now.slice(0, 10),
+      actorAccountId,
+      before: { hasNationalId: Boolean(currentProfile?.nationalIdNumber), hasBankAccount: Boolean(currentProfile?.bankAccountNumber) },
+      after: { hasNationalId: Boolean(profile.nationalIdNumber), hasBankAccount: Boolean(profile.bankAccountNumber) },
+      reason: input.reason
+    })
+  };
+}
+
 function historyForChangedField({
   eventType,
   employee,
@@ -759,10 +811,41 @@ export function updateEmployeeProfile(
     throw new AppError("VALIDATION_ERROR", "Nhân viên không thể tự làm quản lý trực tiếp.");
   }
 
+  if (
+    input.employeeCode &&
+    dataSet.employees.some(
+      (item) =>
+        item.id !== employee.id &&
+        item.employeeCode.toLowerCase() === input.employeeCode?.toLowerCase()
+    )
+  ) {
+    throw new AppError("CONFLICT", "Mã nhân viên đã tồn tại.");
+  }
+
+  if (input.managerEmployeeId) {
+    const visited = new Set<string>([employee.id]);
+    let managerId: string | undefined = input.managerEmployeeId;
+
+    while (managerId) {
+      if (visited.has(managerId)) {
+        throw new AppError("VALIDATION_ERROR", "Phân công quản lý tạo thành vòng lặp.");
+      }
+
+      visited.add(managerId);
+      managerId = findEmployee(managerId, dataSet)?.managerEmployeeId;
+    }
+  }
+
   assertEmployeeReferences(input, dataSet);
 
   if (input.terminationDate && input.terminationDate < (input.joinDate ?? employee.joinDate)) {
     throw new AppError("VALIDATION_ERROR", "Ngày nghỉ việc không được trước ngày vào làm.");
+  }
+
+  const nextJoinDate = input.joinDate ?? employee.joinDate;
+  const nextOfficialDate = input.officialDate ?? employee.officialDate;
+  if (nextOfficialDate && nextOfficialDate < nextJoinDate) {
+    throw new AppError("VALIDATION_ERROR", "Ngày chính thức không được trước ngày vào làm.");
   }
 
   const updatedEmployee: EmployeeRecord = {
@@ -1068,6 +1151,48 @@ export function updateAccountStatus(
           reason
         })
       : undefined
+  };
+}
+
+export function updateAccountRoles(
+  accounts: readonly AppAccountRecord[],
+  accountId: string,
+  roleIds: readonly string[]
+): { account: AppAccountRecord; previousRoleIds: string[] } {
+  const account = accounts.find((item) => item.id === accountId);
+  if (!account) {
+    throw new AppError("NOT_FOUND", "Không tìm thấy tài khoản.");
+  }
+
+  const uniqueRoleIds = Array.from(new Set(roleIds));
+  if (uniqueRoleIds.length === 0) {
+    throw new AppError("VALIDATION_ERROR", "Cần chọn ít nhất một vai trò.");
+  }
+
+  const unknownRoleIds = uniqueRoleIds.filter(
+    (roleId) => !roleCatalog.some((role) => role.id === roleId)
+  );
+  if (unknownRoleIds.length > 0) {
+    throw new AppError("VALIDATION_ERROR", "Vai trò không hợp lệ.", { unknownRoleIds });
+  }
+
+  assertNoAdminLockout({
+    accounts: accounts.map((item) => ({
+      accountId: item.id,
+      status: item.status,
+      roleIds: item.roleIds
+    })),
+    targetAccountId: accountId,
+    nextRoleIds: uniqueRoleIds
+  });
+
+  return {
+    account: {
+      ...account,
+      roleIds: uniqueRoleIds,
+      updatedAt: getNow()
+    },
+    previousRoleIds: account.roleIds
   };
 }
 

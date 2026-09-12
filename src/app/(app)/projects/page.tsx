@@ -1,8 +1,6 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
-
-const meta = routeMetaByPath["/projects"];
+import { PageHeader } from "@/components/shared/PageHeader";
+import { ProjectList } from "@/features/projects";
 
 export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Dự án" title={meta.title} />;
+  return <div className="page-stack"><PageHeader title="Dự án / Công trường" /><ProjectList /></div>;
 }

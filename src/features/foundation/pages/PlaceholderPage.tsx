@@ -33,7 +33,6 @@ const columns: DataTableColumn<PlaceholderRow>[] = [
 
 export function PlaceholderPage({
   title,
-  description,
   moduleName,
   listPattern = false,
   primaryActionLabel,
@@ -52,7 +51,6 @@ export function PlaceholderPage({
             </PermissionGate>
           ) : null
         }
-        description={description}
         title={title}
       />
       {listPattern ? (

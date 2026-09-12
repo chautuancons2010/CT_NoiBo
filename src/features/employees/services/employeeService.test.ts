@@ -14,10 +14,14 @@ import {
   listEmployees,
   offboardEmployee,
   provisionAccountForEmployee,
+  updateAccountRoles,
+  updateEmployeeSensitiveProfile,
+  updateEmployeeProfile,
   updateAccountStatus
 } from "@/features/employees/services/employeeService";
 import {
   assertNoAdminLockout,
+  assertAdminAccessRemains,
   getEffectivePermissions
 } from "@/services/authorization/rbacService";
 
@@ -69,6 +73,13 @@ describe("employee domain service", () => {
 
     expect(detail?.sensitive.allowed).toBe(false);
     expect(JSON.stringify(detail)).not.toContain("079092000001");
+  });
+
+  it("does not return account data without account.view", () => {
+    const detail = getEmployeeDetail("40000000-0000-4000-8000-000000000001", basicPermissions);
+
+    expect(detail?.account).toBeUndefined();
+    expect(JSON.stringify(detail)).not.toContain("acct-an");
   });
 
   it("returns sensitive fields and sensitive documents only with permission", () => {
@@ -151,6 +162,36 @@ describe("employee domain service", () => {
     expect(offboard.account?.status).toBe("disabled");
     expect(buildEmployeeSummary(offboard.employee).employeeCode).toBe(employee.employeeCode);
   });
+
+  it("rejects duplicate employee codes and manager cycles when editing", () => {
+    const first = defaultEmployeeDataSet.employees[0];
+    const second = { ...defaultEmployeeDataSet.employees[1], managerEmployeeId: first.id };
+    const dataSet = {
+      ...defaultEmployeeDataSet,
+      employees: [first, second, ...defaultEmployeeDataSet.employees.slice(2)]
+    };
+
+    expect(() =>
+      updateEmployeeProfile(first, { employeeCode: second.employeeCode }, "demo-admin", dataSet)
+    ).toThrow(AppError);
+    expect(() =>
+      updateEmployeeProfile(first, { managerEmployeeId: second.id }, "demo-admin", dataSet)
+    ).toThrow(AppError);
+  });
+
+  it("rejects a CCCD already linked to another employee", () => {
+    const employee = defaultEmployeeDataSet.employees[1];
+    const existingNumber = defaultEmployeeDataSet.sensitiveProfiles[0].nationalIdNumber;
+
+    expect(() =>
+      updateEmployeeSensitiveProfile(
+        employee,
+        undefined,
+        { nationalIdNumber: existingNumber, reason: "Đối chiếu hồ sơ" },
+        "demo-admin"
+      )
+    ).toThrow(AppError);
+  });
 });
 
 describe("rbac foundation", () => {
@@ -173,6 +214,28 @@ describe("rbac foundation", () => {
         ],
         targetAccountId: "demo-admin",
         nextStatus: "disabled"
+      })
+    ).toThrow(AppError);
+  });
+
+  it("updates multiple roles and keeps the last administrator protected", () => {
+    const updated = updateAccountRoles(
+      defaultEmployeeDataSet.accounts,
+      "acct-an",
+      ["role-employee", "role-supervisor"]
+    );
+    expect(updated.account.roleIds).toEqual(["role-employee", "role-supervisor"]);
+
+    expect(() =>
+      updateAccountRoles(defaultEmployeeDataSet.accounts, "demo-admin", ["role-employee"])
+    ).toThrow(AppError);
+  });
+
+  it("prevents removing admin permissions from the last admin-capable role", () => {
+    expect(() =>
+      assertAdminAccessRemains({
+        accounts: [{ accountId: "demo-admin", status: "active", roleIds: ["role-admin"] }],
+        roles: []
       })
     ).toThrow(AppError);
   });

@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BadgeCheck, BriefcaseBusiness, FileText, KeyRound, ShieldCheck, UserPlus } from "lucide-react";
+import { BadgeCheck, BriefcaseBusiness, FileText, ShieldCheck } from "lucide-react";
 
 import { employeeDetailSections } from "@/config/routeRegistry";
 import { Avatar } from "@/components/shared/Avatar";
-import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
 import { EmptyState, PermissionDeniedState } from "@/components/shared/States";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { PermissionGate } from "@/components/shared/PermissionGate";
 import { StatusBadge, type StatusBadgeTone } from "@/components/shared/StatusBadge";
 import { Tabs } from "@/components/shared/Tabs";
 import { can, type AccountStatus, type Permission } from "@/lib/auth/permissions";
 import { buildInternalFileUrl } from "@/services/storage/storageService";
 import { EmployeePicker } from "@/features/employees/components/EmployeePicker";
+import { EmployeeAccountActions } from "@/features/employees/components/EmployeeAccountActions";
+import { EmployeeSensitiveEdit } from "@/features/employees/components/EmployeeSensitiveEdit";
 import {
   contractStatusLabels,
   documentTypeLabels,
@@ -30,6 +30,8 @@ import type { EmployeeDataSet } from "@/features/employees/services/employeeServ
 import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
 import type { EmployeeDetail, EmployeeHistoryEvent } from "@/features/employees/types";
 import { getRequestUser } from "@/services/auth/getRequestUser";
+import { roleCatalog } from "@/services/authorization/rbacService";
+import { EmployeeLeavePanel } from "@/features/leave/components/EmployeeLeavePanel";
 
 export interface EmployeeDetailPageProps {
   employeeId: string;
@@ -37,11 +39,11 @@ export interface EmployeeDetailPageProps {
 }
 
 const accountStatusLabels: Record<AccountStatus, string> = {
-  pending_activation: "Cho kich hoat",
-  active: "Dang hoat dong",
-  disabled: "Vo hieu hoa",
-  locked: "Bi khoa",
-  invited: "Da moi"
+  pending_activation: "Chờ kích hoạt",
+  active: "Đang hoạt động",
+  disabled: "Vô hiệu hóa",
+  locked: "Bị khóa",
+  invited: "Đã mời"
 };
 
 const accountStatusTones: Record<AccountStatus, StatusBadgeTone> = {
@@ -54,7 +56,7 @@ const accountStatusTones: Record<AccountStatus, StatusBadgeTone> = {
 
 function valueOrEmpty(value?: string | number): string {
   if (value === undefined || value === null || value === "") {
-    return "Chua co";
+    return "Chưa có";
   }
 
   return String(value);
@@ -62,7 +64,7 @@ function valueOrEmpty(value?: string | number): string {
 
 function formatDate(value?: string): string {
   if (!value) {
-    return "Chua co";
+    return "Chưa có";
   }
 
   return new Intl.DateTimeFormat("vi-VN").format(new Date(`${value}T00:00:00.000Z`));
@@ -80,7 +82,7 @@ function FieldList({
           <dt>{item.label}</dt>
           <dd>
             {valueOrEmpty(item.value)}
-            {item.sensitive ? <span className="sensitive-dot">Nhay cam</span> : null}
+            {item.sensitive ? <span className="sensitive-dot">Nhạy cảm</span> : null}
           </dd>
         </div>
       ))}
@@ -88,39 +90,39 @@ function FieldList({
   );
 }
 
-function EmployeeProfileTab({ detail }: { detail: EmployeeDetail }) {
+function EmployeeProfileTab({ detail, permissions }: { detail: EmployeeDetail; permissions: readonly Permission[] }) {
   const sensitive = detail.sensitive;
 
   return (
     <div className="content-grid content-grid--two">
       <Card>
-        <h2 className="section-title">Thong tin co ban</h2>
+        <h2 className="section-title">Thông tin cơ bản</h2>
         <FieldList
           items={[
-            { label: "Ma nhan vien", value: detail.profile.employeeCode },
-            { label: "Ho va ten", value: detail.profile.fullName },
-            { label: "Ten hien thi", value: detail.profile.displayName },
-            { label: "Ngay sinh", value: formatDate(detail.profile.dateOfBirth) },
-            { label: "Ho so", value: employeeProfileStatusLabels[detail.profile.profileStatus] },
-            { label: "Hoan thanh", value: `${detail.profile.profileCompleteness}%` }
+            { label: "Mã nhân viên", value: detail.profile.employeeCode },
+            { label: "Họ và tên", value: detail.profile.fullName },
+            { label: "Tên hiển thị", value: detail.profile.displayName },
+            { label: "Ngày sinh", value: formatDate(detail.profile.dateOfBirth) },
+            { label: "Hồ sơ", value: employeeProfileStatusLabels[detail.profile.profileStatus] },
+            { label: "Hoàn thành", value: `${detail.profile.profileCompleteness}%` }
           ]}
         />
-        <div className="profile-completeness" aria-label="Muc do hoan thien ho so">
+        <div className="profile-completeness" aria-label="Mức độ hoàn thiện hồ sơ">
           <span style={{ width: `${detail.profile.profileCompleteness}%` }} />
         </div>
       </Card>
 
       <Card>
-        <h2 className="section-title">Lien he</h2>
+        <h2 className="section-title">Liên hệ</h2>
         <FieldList
           items={[
-            { label: "So dien thoai", value: detail.profile.personalPhone },
-            { label: "Email ca nhan", value: detail.profile.personalEmail },
-            { label: "Email cong ty", value: detail.profile.companyEmail },
-            { label: "Dia chi hien tai", value: detail.profile.currentAddress },
-            { label: "Dia chi thuong tru", value: detail.profile.permanentAddress },
-            { label: "Tinh/Thanh", value: detail.profile.province },
-            { label: "Quoc gia", value: detail.profile.country }
+            { label: "Số điện thoại", value: detail.profile.personalPhone },
+            { label: "Email cá nhân", value: detail.profile.personalEmail },
+            { label: "Email công ty", value: detail.profile.companyEmail },
+            { label: "Địa chỉ hiện tại", value: detail.profile.currentAddress },
+            { label: "Địa chỉ thường trú", value: detail.profile.permanentAddress },
+            { label: "Tỉnh/Thành", value: detail.profile.province },
+            { label: "Quốc gia", value: detail.profile.country }
           ]}
         />
       </Card>
@@ -128,25 +130,28 @@ function EmployeeProfileTab({ detail }: { detail: EmployeeDetail }) {
       <Card>
         <header className="panel-header">
           <div>
-            <h2>CCCD, ngan hang, thue/BHXH</h2>
+            <h2>CCCD, ngân hàng, thuế/BHXH</h2>
           </div>
           <StatusBadge tone={sensitive.allowed ? "success" : "warning"}>
             <ShieldCheck aria-hidden="true" size={14} />
-            {sensitive.allowed ? "Co quyen" : "Bi gioi han"}
+            {sensitive.allowed ? "Có quyền" : "Bị giới hạn"}
           </StatusBadge>
+          {sensitive.allowed && can(permissions, "employee.edit_sensitive") ? (
+            <EmployeeSensitiveEdit employeeId={detail.profile.id} profile={sensitive} />
+          ) : null}
         </header>
         {sensitive.allowed ? (
           <FieldList
             items={[
-              { label: "So CCCD", value: maskSensitiveValue(sensitive.nationalIdNumber), sensitive: true },
-              { label: "Ngay cap", value: formatDate(sensitive.nationalIdIssuedDate), sensitive: true },
-              { label: "Noi cap", value: sensitive.nationalIdIssuedPlace, sensitive: true },
-              { label: "Ngay het han", value: formatDate(sensitive.nationalIdExpiryDate), sensitive: true },
-              { label: "Ngan hang", value: sensitive.bankName, sensitive: true },
-              { label: "So tai khoan", value: maskSensitiveValue(sensitive.bankAccountNumber), sensitive: true },
-              { label: "Chu tai khoan", value: sensitive.bankAccountHolder, sensitive: true },
-              { label: "Ma so thue", value: maskSensitiveValue(sensitive.personalTaxCode), sensitive: true },
-              { label: "Ma BHXH", value: maskSensitiveValue(sensitive.socialInsuranceCode), sensitive: true }
+              { label: "Số CCCD", value: maskSensitiveValue(sensitive.nationalIdNumber), sensitive: true },
+              { label: "Ngày cấp", value: formatDate(sensitive.nationalIdIssuedDate), sensitive: true },
+              { label: "Nơi cấp", value: sensitive.nationalIdIssuedPlace, sensitive: true },
+              { label: "Ngày hết hạn", value: formatDate(sensitive.nationalIdExpiryDate), sensitive: true },
+              { label: "Ngân hàng", value: sensitive.bankName, sensitive: true },
+              { label: "Số tài khoản", value: maskSensitiveValue(sensitive.bankAccountNumber), sensitive: true },
+              { label: "Chủ tài khoản", value: sensitive.bankAccountHolder, sensitive: true },
+              { label: "Mã số thuế", value: maskSensitiveValue(sensitive.personalTaxCode), sensitive: true },
+              { label: "Mã BHXH", value: maskSensitiveValue(sensitive.socialInsuranceCode), sensitive: true }
             ]}
           />
         ) : (
@@ -155,10 +160,10 @@ function EmployeeProfileTab({ detail }: { detail: EmployeeDetail }) {
       </Card>
 
       <Card>
-        <h2 className="section-title">Nguoi lien he khan cap</h2>
+        <h2 className="section-title">Người liên hệ khẩn cấp</h2>
         {detail.emergencyContacts.length === 0 ? (
           <EmptyState
-            title="Chua co lien he khan cap"
+            title="Chưa có liên hệ khẩn cấp"
           />
         ) : (
           <ul className="foundation-list">
@@ -170,7 +175,7 @@ function EmployeeProfileTab({ detail }: { detail: EmployeeDetail }) {
                     {contact.relation} - {contact.phone}
                   </small>
                 </span>
-                {contact.isPrimary ? <StatusBadge tone="info">Chinh</StatusBadge> : null}
+                {contact.isPrimary ? <StatusBadge tone="info">Chính</StatusBadge> : null}
               </li>
             ))}
           </ul>
@@ -184,22 +189,22 @@ function EmployeeEmploymentTab({ detail, dataSet }: { detail: EmployeeDetail; da
   return (
     <div className="content-grid content-grid--two">
       <Card>
-        <h2 className="section-title">Thong tin cong viec</h2>
+        <h2 className="section-title">Thông tin công việc</h2>
         <FieldList
           items={[
-            { label: "Phong ban", value: detail.department.name },
-            { label: "Chuc vu", value: detail.position.name },
-            { label: "Loai nhan su", value: detail.employmentType.name },
-            { label: "Trang thai", value: detail.summary.employmentStatusLabel },
-            { label: "Ngay vao lam", value: formatDate(detail.profile.joinDate) },
-            { label: "Ngay thu viec", value: formatDate(detail.profile.probationStartDate) },
-            { label: "Ngay chinh thuc", value: formatDate(detail.profile.officialDate) },
-            { label: "Ngay nghi viec", value: formatDate(detail.profile.terminationDate) }
+            { label: "Phòng ban", value: detail.department.name },
+            { label: "Chức vụ", value: detail.position.name },
+            { label: "Loại nhân sự", value: detail.employmentType.name },
+            { label: "Trạng thái", value: detail.summary.employmentStatusLabel },
+            { label: "Ngày vào làm", value: formatDate(detail.profile.joinDate) },
+            { label: "Ngày thử việc", value: formatDate(detail.profile.probationStartDate) },
+            { label: "Ngày chính thức", value: formatDate(detail.profile.officialDate) },
+            { label: "Ngày nghỉ việc", value: formatDate(detail.profile.terminationDate) }
           ]}
         />
       </Card>
       <Card>
-        <h2 className="section-title">Quan ly truc tiep</h2>
+        <h2 className="section-title">Quản lý trực tiếp</h2>
         {detail.manager ? (
           <article className="employee-manager-card">
             <Avatar name={detail.manager.fullName} />
@@ -211,25 +216,25 @@ function EmployeeEmploymentTab({ detail, dataSet }: { detail: EmployeeDetail; da
             </span>
           </article>
         ) : (
-          <EmptyState title="Chua co quan ly" />
+          <EmptyState title="Chưa có quản lý" />
         )}
       </Card>
       <Card className="employee-picker-card">
         <header className="panel-header">
           <div>
-            <h2>Employee selector dung lai</h2>
+            <h2>Bộ chọn nhân sự</h2>
           </div>
         </header>
-        <EmployeePicker label="Tim nhan su" options={getEmployeePickerOptions(dataSet, { activeOnly: true })} />
+        <EmployeePicker label="Tìm nhân sự" options={getEmployeePickerOptions(dataSet, { activeOnly: true })} />
       </Card>
       <Card>
-        <h2 className="section-title">Snapshot cho nghiep vu sau</h2>
+        <h2 className="section-title">Thông tin tham chiếu</h2>
         <FieldList
           items={[
             { label: "Database ID", value: detail.profile.id },
             { label: "Business ID", value: detail.profile.employeeCode },
             { label: "Version", value: detail.profile.rowVersion },
-            { label: "Cap nhat", value: detail.profile.updatedAt }
+            { label: "Cập nhật", value: detail.profile.updatedAt }
           ]}
         />
       </Card>
@@ -243,24 +248,24 @@ function EmployeeContractsTab({ employeeId, dataSet }: { employeeId: string; dat
   if (contracts.length === 0) {
     return (
       <EmptyState
-        title="Chua co hop dong"
+        title="Chưa có hợp đồng"
       />
     );
   }
 
   return (
     <Card>
-      <h2 className="section-title">Hop dong lao dong</h2>
+      <h2 className="section-title">Hợp đồng lao động</h2>
       <div className="responsive-simple-table">
         <table>
           <thead>
             <tr>
-              <th>So hop dong</th>
-              <th>Loai</th>
-              <th>Bat dau</th>
-              <th>Ket thuc</th>
-              <th>Trang thai</th>
-              <th>Tai lieu</th>
+              <th>Số hợp đồng</th>
+              <th>Loại</th>
+              <th>Bắt đầu</th>
+              <th>Kết thúc</th>
+              <th>Trạng thái</th>
+              <th>Tài liệu</th>
             </tr>
           </thead>
           <tbody>
@@ -278,10 +283,10 @@ function EmployeeContractsTab({ employeeId, dataSet }: { employeeId: string; dat
                 <td>
                   {contract.attachmentFileId ? (
                     <Link className="private-file-link" href={buildInternalFileUrl(contract.attachmentFileId)}>
-                      Signed access
+                      Xem tài liệu
                     </Link>
                   ) : (
-                    "Chua co"
+                    "Chưa có"
                   )}
                 </td>
               </tr>
@@ -307,14 +312,14 @@ function EmployeeDocumentsTab({
   if (documents.length === 0) {
     return (
       <EmptyState
-        title="Chua co tai lieu kha dung"
+        title="Chưa có tài liệu khả dụng"
       />
     );
   }
 
   return (
     <Card>
-      <h2 className="section-title">Ho so dinh kem</h2>
+      <h2 className="section-title">Hồ sơ đính kèm</h2>
       <ul className="employee-document-list">
         {documents.map((document) => (
           <li key={document.id}>
@@ -322,12 +327,12 @@ function EmployeeDocumentsTab({
             <span>
               <strong>{document.title}</strong>
               <small>
-                {documentTypeLabels[document.documentType]} - tai len {formatDate(document.uploadedAt.slice(0, 10))}
+                {documentTypeLabels[document.documentType]} · tải lên {formatDate(document.uploadedAt.slice(0, 10))}
               </small>
             </span>
-            {document.sensitive ? <StatusBadge tone="warning">Nhay cam</StatusBadge> : <StatusBadge>Private</StatusBadge>}
+            {document.sensitive ? <StatusBadge tone="warning">Nhạy cảm</StatusBadge> : <StatusBadge>Riêng tư</StatusBadge>}
             <Link className="private-file-link" href={buildInternalFileUrl(document.fileId)}>
-              Signed access
+              Xem tài liệu
             </Link>
           </li>
         ))}
@@ -350,19 +355,19 @@ function describeHistoryEvent(event: EmployeeHistoryEvent): string {
       .join(" - ");
   }
 
-  return "Da ghi nhan thay doi.";
+  return "Đã ghi nhận thay đổi.";
 }
 
 function EmployeeHistoryTab({ employeeId, dataSet }: { employeeId: string; dataSet: EmployeeDataSet }) {
   const history = getEmployeeHistory(employeeId, dataSet);
 
   if (history.length === 0) {
-    return <EmptyState title="Chua co lich su" />;
+    return <EmptyState title="Chưa có lịch sử" />;
   }
 
   return (
     <Card className="employee-history-panel">
-      <h2 className="section-title">Qua trinh cong tac</h2>
+      <h2 className="section-title">Quá trình công tác</h2>
       <ol className="employee-history">
         {history.map((event) => (
           <li key={event.id}>
@@ -376,8 +381,8 @@ function EmployeeHistoryTab({ employeeId, dataSet }: { employeeId: string; dataS
               </header>
               <p>{describeHistoryEvent(event)}</p>
               <small>
-                Actor: {event.actorAccountId}
-                {event.reason ? ` - Ly do: ${event.reason}` : ""}
+                Người thực hiện: {event.actorAccountId}
+                {event.reason ? ` · Lý do: ${event.reason}` : ""}
               </small>
             </article>
           </li>
@@ -403,13 +408,13 @@ function EmployeeAccountTab({
       <Card>
         <EmptyState
           action={
-            <PermissionGate permissions={permissions} require="account.create">
-              <Button leftIcon={<UserPlus aria-hidden="true" size={16} />} variant="primary">
-                Cap tai khoan he thong
-              </Button>
-            </PermissionGate>
+            <EmployeeAccountActions
+              employeeId={detail.profile.id}
+              permissions={permissions}
+              roles={roleCatalog}
+            />
           }
-          title="Nhan su chua co tai khoan"
+          title="Nhân sự chưa có tài khoản"
         />
       </Card>
     );
@@ -420,7 +425,7 @@ function EmployeeAccountTab({
       <Card>
         <header className="panel-header">
           <div>
-            <h2>Tai khoan he thong</h2>
+            <h2>Tài khoản hệ thống</h2>
           </div>
           <StatusBadge tone={accountStatusTones[detail.account.status]}>
             {accountStatusLabels[detail.account.status]}
@@ -428,16 +433,16 @@ function EmployeeAccountTab({
         </header>
         <FieldList
           items={[
-            { label: "Email dang nhap", value: detail.account.loginEmail },
-            { label: "So dien thoai", value: detail.account.loginPhone },
-            { label: "Ma nhan vien", value: detail.account.employeeCodeIdentifier },
-            { label: "Ngay kich hoat", value: detail.account.activatedAt },
-            { label: "Dang nhap gan nhat", value: detail.account.lastLoginAt }
+            { label: "Email đăng nhập", value: detail.account.loginEmail },
+            { label: "Số điện thoại", value: detail.account.loginPhone },
+            { label: "Mã nhân viên", value: detail.account.employeeCodeIdentifier },
+            { label: "Ngày kích hoạt", value: detail.account.activatedAt },
+            { label: "Đăng nhập gần nhất", value: detail.account.lastLoginAt }
           ]}
         />
       </Card>
       <Card>
-        <h2 className="section-title">Vai tro</h2>
+        <h2 className="section-title">Vai trò</h2>
         <div className="role-chip-list">
           {detail.account.roleNames.map((roleName) => (
             <StatusBadge key={roleName} tone="info">
@@ -445,16 +450,12 @@ function EmployeeAccountTab({
             </StatusBadge>
           ))}
         </div>
-        <div className="account-action-row">
-          <PermissionGate permissions={permissions} require="account.assign_role">
-            <Button leftIcon={<KeyRound aria-hidden="true" size={16} />} variant="secondary">
-              Quan ly vai tro
-            </Button>
-          </PermissionGate>
-          <PermissionGate permissions={permissions} require="account.disable">
-            <Button variant="danger">Vo hieu hoa</Button>
-          </PermissionGate>
-        </div>
+        <EmployeeAccountActions
+          account={detail.account}
+          employeeId={detail.profile.id}
+          permissions={permissions}
+          roles={roleCatalog}
+        />
       </Card>
     </div>
   );
@@ -484,11 +485,12 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
     <div className="page-stack">
       <PageHeader
         action={
-          <PermissionGate permissions={user.permissions} require="employee.edit">
-            <Button leftIcon={<BriefcaseBusiness aria-hidden="true" size={16} />} variant="secondary">
-              Chinh sua
-            </Button>
-          </PermissionGate>
+          can(user.permissions, "employee.edit") ? (
+            <Link className="button button--secondary button--md" href={`/employees/${employeeId}/edit`}>
+              <span className="button__icon"><BriefcaseBusiness aria-hidden="true" size={16} /></span>
+              <span>Chỉnh sửa</span>
+            </Link>
+          ) : null
         }
         title={detail.summary.fullName}
       />
@@ -510,14 +512,15 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
           href: `/employees/${employeeId}/${item.value}`,
           active: item.value === section
         }))}
-        label="Tab ho so nhan vien"
+        label="Tab hồ sơ nhân viên"
       />
 
-      {section === "profile" ? <EmployeeProfileTab detail={detail} /> : null}
+      {section === "profile" ? <EmployeeProfileTab detail={detail} permissions={user.permissions} /> : null}
       {section === "employment" ? <EmployeeEmploymentTab dataSet={dataSet} detail={detail} /> : null}
       {section === "contracts" ? <EmployeeContractsTab dataSet={dataSet} employeeId={employeeId} /> : null}
       {section === "documents" ? <EmployeeDocumentsTab dataSet={dataSet} employeeId={employeeId} permissions={user.permissions} /> : null}
       {section === "history" ? <EmployeeHistoryTab dataSet={dataSet} employeeId={employeeId} /> : null}
+      {section === "leave" ? <EmployeeLeavePanel employeeId={employeeId} /> : null}
       {section === "account" ? <EmployeeAccountTab detail={detail} permissions={user.permissions} /> : null}
     </div>
   );

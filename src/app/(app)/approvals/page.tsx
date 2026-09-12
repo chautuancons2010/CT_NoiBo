@@ -1,8 +1,1 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
-
-const meta = routeMetaByPath["/approvals"];
-
-export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Phê duyệt" title={meta.title} />;
-}
+import Link from "next/link";import { Card } from "@/components/shared/Card";import { PageHeader } from "@/components/shared/PageHeader";export default function Page(){return <div className="page-stack"><PageHeader title="Phê duyệt"/><Card><Link className="button button--primary button--md" href="/approvals/leave">Đơn nghỉ phép</Link></Card></div>}

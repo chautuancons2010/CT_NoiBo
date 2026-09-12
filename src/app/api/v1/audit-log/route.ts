@@ -5,7 +5,8 @@ import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
 import { nowServerReceivedAt } from "@/lib/time/timezone";
-import { recordAuditLog } from "@/services/audit/auditLog";
+import { getLocalAuditLogs, recordAuditLog } from "@/services/audit/auditLog";
+import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 
@@ -24,10 +25,18 @@ export async function GET() {
     const user = await getRequestUser();
     requirePermission(user, "audit.view");
 
-    return successResponse({
-      entries: [],
-      note: "Audit storage sẽ đọc từ database sau khi migration được áp dụng."
-    });
+    const client = getSupabaseServiceClient();
+    if (client) {
+      const { data, error } = await client
+        .from("audit_logs")
+        .select("id,actor_account_id,action,entity_type,entity_id,happened_at,before_data,after_data,reason,metadata")
+        .order("happened_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return successResponse({ entries: data ?? [] });
+    }
+
+    return successResponse({ entries: getLocalAuditLogs() });
   } catch (error) {
     logger.error("api.audit_log.read_failed");
     return errorResponse(error);

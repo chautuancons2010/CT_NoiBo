@@ -18,6 +18,7 @@ import {
 } from "@/features/employees/services/employeeRepository";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
+import { recordAuditLog } from "@/services/audit/auditLog";
 
 export async function GET(request: Request) {
   try {
@@ -52,6 +53,19 @@ export async function POST(request: Request) {
     const input = parseWithSchema(createEmployeeSchema, await request.json());
     const result = createEmployeeInRepository(input, authorizedUser.id);
     const dataSet = getEmployeeDataSet();
+
+    await recordAuditLog({
+      actorId: authorizedUser.id,
+      action: "employee.created",
+      entityType: "employee",
+      entityId: result.employee.id,
+      after: {
+        employeeCode: result.employee.employeeCode,
+        departmentId: result.employee.departmentId,
+        positionId: result.employee.positionId,
+        employmentStatus: result.employee.employmentStatus
+      }
+    });
 
     return successResponse(
       {

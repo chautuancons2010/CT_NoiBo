@@ -281,6 +281,96 @@ export const permissionCatalog: PermissionDefinition[] = [
     description: "Truy cập cấu hình hệ thống."
   },
   {
+    key: "system_admin.access",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Truy cập Trung tâm quản trị",
+    description: "Truy cập khu vực cấu hình hệ thống."
+  },
+  {
+    key: "branding.view",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Xem thương hiệu",
+    description: "Xem cấu hình nhận diện hệ thống."
+  },
+  {
+    key: "branding.manage",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Quản lý thương hiệu",
+    description: "Cập nhật tên, logo và favicon.",
+    sensitive: true
+  },
+  {
+    key: "appearance.view",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Xem giao diện",
+    description: "Xem cấu hình giao diện."
+  },
+  {
+    key: "appearance.manage",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Quản lý giao diện",
+    description: "Cập nhật màu và mật độ giao diện.",
+    sensitive: true
+  },
+  {
+    key: "navigation.manage",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Quản lý điều hướng",
+    description: "Cập nhật thứ tự và hiển thị menu.",
+    sensitive: true
+  },
+  {
+    key: "module.manage",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Quản lý module",
+    description: "Bật hoặc tắt module đã triển khai.",
+    sensitive: true
+  },
+  {
+    key: "organization_settings.view",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Xem cấu hình tổ chức",
+    description: "Xem thông tin dùng chung của tổ chức."
+  },
+  {
+    key: "organization_settings.manage",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Quản lý cấu hình tổ chức",
+    description: "Cập nhật thông tin dùng chung của tổ chức.",
+    sensitive: true
+  },
+  {
+    key: "localization.manage",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Quản lý định dạng",
+    description: "Cập nhật định dạng ngày và giờ."
+  },
+  {
+    key: "config_history.view",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Xem lịch sử cấu hình",
+    description: "Xem các phiên bản cấu hình đã xuất bản."
+  },
+  {
+    key: "config_history.restore",
+    module: "system-admin",
+    group: "Hệ thống",
+    label: "Khôi phục cấu hình",
+    description: "Khôi phục phiên bản cấu hình được hỗ trợ.",
+    sensitive: true
+  },
+  {
     key: "department.manage",
     module: "settings",
     group: "Hệ thống",
@@ -534,6 +624,27 @@ export function assertNoAdminLockout({
     throw new AppError(
       "VALIDATION_ERROR",
       "Không thể khóa hoặc gỡ quyền quản trị khỏi tài khoản quản trị cuối cùng."
+    );
+  }
+}
+
+export function assertAdminAccessRemains({
+  accounts,
+  roles
+}: {
+  accounts: readonly AccountRoleState[];
+  roles: readonly RoleDefinition[];
+}): void {
+  const hasActiveAdmin = accounts.some((account) => {
+    if (account.status !== "active") return false;
+    const permissions = getEffectivePermissions(account.roleIds, roles);
+    return adminGuardPermissions.every((permission) => permissions.includes(permission));
+  });
+
+  if (!hasActiveAdmin) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Không thể gỡ quyền khỏi vai trò quản trị cuối cùng."
     );
   }
 }

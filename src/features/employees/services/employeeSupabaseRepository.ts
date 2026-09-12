@@ -1,3 +1,5 @@
+import "server-only";
+
 import { AppError } from "@/lib/api/errors";
 import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";

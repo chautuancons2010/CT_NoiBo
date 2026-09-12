@@ -5,7 +5,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import {
   desktopNavigation,
-  filterGroupsByPermissions,
+  filterGroupsByAccess,
   isNavigationItemActive
 } from "@/config/navigation";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils/cn";
 import { IconButton } from "@/components/shared/Button";
 import { AppLogo } from "@/components/layout/AppLogo";
 import { navigationIconMap } from "@/components/layout/icons";
+import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 
 export interface AppSidebarProps {
   pathname: string;
@@ -27,7 +28,13 @@ export function AppSidebar({
   collapsed,
   onCollapsedChange
 }: AppSidebarProps) {
-  const groups = filterGroupsByPermissions(desktopNavigation, user.permissions);
+  const { settings } = useSystemSettings();
+  const groups = filterGroupsByAccess(
+    desktopNavigation,
+    user.permissions,
+    settings.modules,
+    settings.navigation
+  );
 
   return (
     <aside className={cn("app-sidebar", collapsed && "is-collapsed")} aria-label="Điều hướng chính">
@@ -42,8 +49,8 @@ export function AppSidebar({
       </div>
       <div className="app-sidebar__nav">
         {groups.map((group) => (
-          <section className="nav-group" key={group.label}>
-            {!collapsed ? <h2>{group.label}</h2> : null}
+          <details className="nav-group" key={group.label} open={collapsed || settings.navigation.groupsExpanded}>
+            {!collapsed ? <summary>{group.label}</summary> : null}
             <ul>
               {group.items.map((item) => {
                 const Icon = navigationIconMap[item.icon];
@@ -64,7 +71,7 @@ export function AppSidebar({
                 );
               })}
             </ul>
-          </section>
+          </details>
         ))}
       </div>
     </aside>

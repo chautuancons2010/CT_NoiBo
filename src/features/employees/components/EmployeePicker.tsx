@@ -11,9 +11,11 @@ export interface EmployeePickerProps {
   label: string;
   options: EmployeePickerOption[];
   workerCategory?: WorkerCategory;
+  selectedId?: string;
+  onSelect?: (option: EmployeePickerOption) => void;
 }
 
-export function EmployeePicker({ label, options, workerCategory }: EmployeePickerProps) {
+export function EmployeePicker({ label, options, workerCategory, selectedId, onSelect }: EmployeePickerProps) {
   const [query, setQuery] = useState("");
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -45,7 +47,13 @@ export function EmployeePicker({ label, options, workerCategory }: EmployeePicke
       />
       <div className="employee-picker__list">
         {filteredOptions.map((option) => (
-          <article className="employee-picker__item" key={option.id}>
+          <button
+            aria-pressed={selectedId === option.id}
+            className={`employee-picker__item${selectedId === option.id ? " is-selected" : ""}`}
+            key={option.id}
+            onClick={() => onSelect?.(option)}
+            type="button"
+          >
             <span>
               <strong>{option.displayName}</strong>
               <small>
@@ -55,7 +63,7 @@ export function EmployeePicker({ label, options, workerCategory }: EmployeePicke
             <StatusBadge tone={employeeStatusMeta[option.employmentStatus].tone}>
               {workerCategoryLabels[option.workerCategory]}
             </StatusBadge>
-          </article>
+          </button>
         ))}
       </div>
     </section>

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 import { foundationDemoUser } from "@/lib/auth/currentUser";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
+import { isPathEnabled } from "@/config/systemSettings";
 
 function subscribeToOnlineStatus(callback: () => void): () => void {
   window.addEventListener("online", callback);
@@ -28,12 +30,20 @@ function getServerOnlineSnapshot(): boolean {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const router = useRouter();
+  const { settings } = useSystemSettings();
+  const [collapsed, setCollapsed] = useState(settings.appearance.sidebarDefault === "collapsed");
   const online = useSyncExternalStore(
     subscribeToOnlineStatus,
     getOnlineSnapshot,
     getServerOnlineSnapshot
   );
+
+  useEffect(() => {
+    if (!isPathEnabled(pathname, settings.modules)) {
+      router.replace(settings.navigation.defaultLandingPage);
+    }
+  }, [pathname, router, settings.modules, settings.navigation.defaultLandingPage]);
 
   return (
     <div className="app-shell">

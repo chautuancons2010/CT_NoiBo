@@ -6,6 +6,7 @@ import { provisionAccountSchema } from "@/features/employees/schemas/employeeSch
 import { provisionAccountInRepository } from "@/features/employees/services/employeeRepository";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
+import { recordAuditLog } from "@/services/audit/auditLog";
 
 export async function POST(
   request: Request,
@@ -21,6 +22,14 @@ export async function POST(
     const { id } = await params;
     const input = parseWithSchema(provisionAccountSchema, await request.json());
     const result = provisionAccountInRepository(id, input, authorizedUser.id);
+
+    await recordAuditLog({
+      actorId: authorizedUser.id,
+      action: "account.provisioned",
+      entityType: "account",
+      entityId: result.account.id,
+      after: { employeeId: id, status: result.account.status, roleIds: result.account.roleIds }
+    });
 
     return successResponse(
       {

@@ -10,6 +10,7 @@ import { getPermissionGroups, permissionCatalog } from "@/services/authorization
 import { createRoleInRepository, getRolesFromRepository } from "@/services/authorization/roleRepository";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
+import { recordAuditLog } from "@/services/audit/auditLog";
 
 const permissionKeySchema = z.custom<Permission>(
   (value) => typeof value === "string" && permissionCatalog.some((permission) => permission.key === value),
@@ -46,9 +47,17 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await getRequestUser();
-    requirePermission(user, "role.manage");
+    const authorizedUser = requirePermission(user, "role.manage");
     const input = parseWithSchema(roleCreateSchema, await request.json());
     const role = createRoleInRepository(input);
+
+    await recordAuditLog({
+      actorId: authorizedUser.id,
+      action: "role.created",
+      entityType: "role",
+      entityId: role.id,
+      after: { code: role.code, name: role.name, permissionKeys: role.permissionKeys }
+    });
 
     return successResponse({ role }, { status: 201 });
   } catch (error) {

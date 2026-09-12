@@ -13,3 +13,16 @@ export function parseWithSchema<TSchema extends z.ZodTypeAny>(
 
   return result.data;
 }
+
+export async function parseJsonBody<TSchema extends z.ZodTypeAny>(
+  request: Request,
+  schema: TSchema
+): Promise<z.infer<TSchema>> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw new AppError("VALIDATION_ERROR", "Nội dung yêu cầu không phải JSON hợp lệ.");
+  }
+  return parseWithSchema(schema, body);
+}

@@ -10,6 +10,8 @@ import {
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils/cn";
 import { navigationIconMap } from "@/components/layout/icons";
+import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
+import { isPathEnabled } from "@/config/systemSettings";
 
 export interface MobileBottomNavProps {
   pathname: string;
@@ -17,7 +19,10 @@ export interface MobileBottomNavProps {
 }
 
 export function MobileBottomNav({ pathname, user }: MobileBottomNavProps) {
-  const items = filterNavigationByPermissions(mobileNavigation, user.permissions).slice(0, 5);
+  const { settings } = useSystemSettings();
+  const items = filterNavigationByPermissions(mobileNavigation, user.permissions)
+    .filter((item) => isPathEnabled(item.href, settings.modules))
+    .slice(0, 5);
 
   return (
     <nav aria-label="Điều hướng mobile" className="mobile-bottom-nav">

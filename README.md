@@ -46,3 +46,4 @@ npm run build
 Migration nền tảng nằm tại `supabase/migrations/202609090001_foundation_system_primitives.sql`.
 
 Prompt 1 chỉ tạo system primitives: account mapping, role/permission, configuration, audit log, file metadata và webhook foundation. Không tạo domain tables cho nhân sự, chấm công, kho hoặc xuất nhập khẩu ở bước này.
+Tài liệu module theo dõi dự án: [docs/project-monitoring.md](docs/project-monitoring.md).

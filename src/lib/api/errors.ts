@@ -6,6 +6,12 @@ export type AppErrorCode =
   | "PERMISSION_DENIED"
   | "NOT_FOUND"
   | "CONFLICT"
+  | "DUPLICATE"
+  | "LOCATION_UNAVAILABLE"
+  | "LOCATION_OUTSIDE_GEOFENCE"
+  | "LOCATION_ACCURACY_LOW"
+  | "PHOTO_UPLOAD"
+  | "SESSION_EXPIRED"
   | "NETWORK_ERROR"
   | "SERVER_ERROR";
 
@@ -15,6 +21,12 @@ const statusByCode: Record<AppErrorCode, number> = {
   PERMISSION_DENIED: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  DUPLICATE: 409,
+  LOCATION_UNAVAILABLE: 422,
+  LOCATION_OUTSIDE_GEOFENCE: 422,
+  LOCATION_ACCURACY_LOW: 422,
+  PHOTO_UPLOAD: 422,
+  SESSION_EXPIRED: 401,
   NETWORK_ERROR: 503,
   SERVER_ERROR: 500
 };
@@ -25,6 +37,12 @@ const defaultMessageByCode: Record<AppErrorCode, string> = {
   PERMISSION_DENIED: "Bạn không có quyền thực hiện thao tác này.",
   NOT_FOUND: "Không tìm thấy dữ liệu yêu cầu.",
   CONFLICT: "Dữ liệu đã thay đổi. Vui lòng tải lại và thử lại.",
+  DUPLICATE: "Lượt chấm công tương ứng đã tồn tại.",
+  LOCATION_UNAVAILABLE: "Không thể xác định vị trí. Hãy bật quyền vị trí và thử lại.",
+  LOCATION_OUTSIDE_GEOFENCE: "Bạn đang ở ngoài phạm vi chấm công cho phép.",
+  LOCATION_ACCURACY_LOW: "Vị trí chưa đủ chính xác. Hãy đứng ở khu vực thoáng và thử lại.",
+  PHOTO_UPLOAD: "Ảnh chưa thể đồng bộ. Dữ liệu vẫn được giữ trên thiết bị.",
+  SESSION_EXPIRED: "Phiên đăng nhập đã hết hạn. Dữ liệu vẫn được giữ trên thiết bị.",
   NETWORK_ERROR: "Kết nối mạng không ổn định. Vui lòng thử lại.",
   SERVER_ERROR: "Hệ thống đang gặp lỗi. Vui lòng thử lại sau."
 };

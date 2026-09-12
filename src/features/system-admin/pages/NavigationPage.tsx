@@ -1,0 +1,30 @@
+"use client";
+
+import { ArrowDown, ArrowUp } from "lucide-react";
+
+import { IconButton, Button } from "@/components/shared/Button";
+import { Select, Switch } from "@/components/shared/FormControls";
+import { StickyActionBar } from "@/components/shared/FormLayout";
+import { configurableNavigationPaths } from "@/config/systemSettings";
+import { AdminPage } from "@/features/system-admin/components/AdminPage";
+import { useSettingsEditor } from "@/features/system-admin/components/editorUtils";
+
+const labels: Record<(typeof configurableNavigationPaths)[number], string> = {
+  "/dashboard": "Tổng quan", "/employees": "Nhân viên", "/attendance": "Chấm công", "/timesheets": "Bảng công", "/shifts": "Ca làm", "/leave": "Nghỉ phép", "/projects": "Dự án / Công trường", "/projects/updates": "Cập nhật dự án", "/worker-attendance": "Điểm danh công nhân", "/warehouse/items": "Hàng hóa", "/warehouse/receipts": "Nhập kho", "/warehouse/issues": "Xuất kho", "/warehouse/transfers": "Chuyển kho", "/warehouse/inventory": "Kiểm kê", "/import-export/shipments": "Lô hàng", "/import-export/documents": "Chứng từ", "/approvals": "Phê duyệt", "/reports": "Báo cáo"
+};
+
+export function NavigationPage() {
+  const editor = useSettingsEditor("navigation");
+  function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= editor.draft.itemOrder.length) return;
+    const order = [...editor.draft.itemOrder];
+    [order[index], order[target]] = [order[target], order[index]];
+    editor.setDraft({ ...editor.draft, itemOrder: order });
+  }
+  function setVisible(path: (typeof configurableNavigationPaths)[number], visible: boolean) {
+    const hidden = visible ? editor.draft.hiddenItems.filter((item) => item !== path) : [...new Set([...editor.draft.hiddenItems, path])];
+    editor.setDraft({ ...editor.draft, hiddenItems: hidden });
+  }
+  return <AdminPage title="Điều hướng"><section className="settings-form-card"><div className="form-section"><div className="form-section__header"><h2>Menu chính</h2></div><div className="navigation-editor">{editor.draft.itemOrder.map((path, index) => <div className="navigation-editor__row" key={path}><div className="navigation-editor__move"><IconButton disabled={index === 0} label="Di chuyển lên" onClick={() => move(index, -1)}><ArrowUp aria-hidden="true" size={16} /></IconButton><IconButton disabled={index === editor.draft.itemOrder.length - 1} label="Di chuyển xuống" onClick={() => move(index, 1)}><ArrowDown aria-hidden="true" size={16} /></IconButton></div><strong>{labels[path]}</strong><code>{path}</code><Switch checked={!editor.draft.hiddenItems.includes(path)} label="Hiển thị" onCheckedChange={(checked) => setVisible(path, checked)} /></div>)}</div></div><div className="form-section"><div className="form-section__header"><h2>Mặc định</h2></div><div className="form-section__grid"><Select label="Trang bắt đầu" onChange={(e) => editor.setDraft({ ...editor.draft, defaultLandingPage: e.target.value as typeof editor.draft.defaultLandingPage })} options={[{ label: "Tổng quan", value: "/dashboard" }, { label: "Chấm công", value: "/attendance" }, { label: "Dự án", value: "/projects" }]} value={editor.draft.defaultLandingPage} /><Switch checked={editor.draft.groupsExpanded} label="Mở rộng nhóm menu" onCheckedChange={(checked) => editor.setDraft({ ...editor.draft, groupsExpanded: checked })} /></div></div>{editor.message ? <div aria-live="polite" className="save-feedback">{editor.message}</div> : null}<StickyActionBar><Button disabled={!editor.dirty || editor.saving} onClick={editor.reset}>Hoàn tác</Button><Button disabled={!editor.dirty || editor.saving} onClick={() => void editor.save()} variant="primary">{editor.saving ? "Đang lưu" : "Xuất bản"}</Button></StickyActionBar></section></AdminPage>;
+}

@@ -1,7 +1,10 @@
+import "server-only";
+
 import { AppError } from "@/lib/api/errors";
 import type { RoleDefinition, RoleInput, AccountRoleState } from "@/services/authorization/rbacService";
 import {
   createRoleDefinition,
+  assertAdminAccessRemains,
   getRoleCatalog,
   roleCatalog,
   updateRoleDefinition
@@ -33,7 +36,8 @@ export function createRoleInRepository(input: RoleInput): RoleDefinition {
 
 export function updateRoleInRepository(
   roleId: string,
-  input: Partial<RoleInput>
+  input: Partial<RoleInput>,
+  accounts: readonly AccountRoleState[] = []
 ): RoleDefinition {
   const role = roles.find((item) => item.id === roleId);
   if (!role) {
@@ -41,6 +45,12 @@ export function updateRoleInRepository(
   }
 
   const updatedRole = updateRoleDefinition(role, input);
+  if (accounts.length > 0) {
+    assertAdminAccessRemains({
+      accounts,
+      roles: roles.map((item) => (item.id === roleId ? updatedRole : item))
+    });
+  }
   roles = roles.map((item) => (item.id === roleId ? updatedRole : item));
 
   return updatedRole;

@@ -1,14 +1,3 @@
-import { PageHeader } from "@/components/shared/PageHeader";
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { ProjectUpdateTimeline } from "@/features/projects";
+import { ProjectMonitoringPage } from "@/features/projects/pages/ProjectMonitoringPage";
 
-const meta = routeMetaByPath["/projects/updates"];
-
-export default function Page() {
-  return (
-    <div className="page-stack">
-      <PageHeader description={meta.description} title={meta.title} />
-      <ProjectUpdateTimeline />
-    </div>
-  );
-}
+export default function Page() { return <ProjectMonitoringPage recentOnly />; }

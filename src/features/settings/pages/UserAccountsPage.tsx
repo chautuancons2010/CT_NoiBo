@@ -5,31 +5,36 @@ import { UserAccountsTable } from "@/features/settings/components/UserAccountsTa
 import { SettingsShell } from "@/features/settings/components/SettingsShell";
 import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
 import { listAccounts } from "@/features/employees/services/employeeService";
+import { PermissionDeniedState } from "@/components/shared/States";
+import { getRequestUser } from "@/services/auth/getRequestUser";
+import { can } from "@/lib/auth/permissions";
 
 export async function UserAccountsPage() {
+  const user = await getRequestUser();
+  if (!user || !can(user.permissions, "user.view")) return <PermissionDeniedState />;
   const accounts = listAccounts(await getEmployeeDataSetAsync());
 
   return (
     <SettingsShell activePath="/settings/users">
       <div className="page-stack">
         <PageHeader
-          title="Nguoi dung"
+          title="Người dùng"
         />
         <UserAccountsTable accounts={accounts} />
         <Card>
-          <h2 className="section-title">Dang nhap thong nhat</h2>
+          <h2 className="section-title">Đăng nhập thống nhất</h2>
           <ul className="foundation-list">
             <li>
               <span>
-                <strong>Email, so dien thoai, ma nhan vien</strong>
+                <strong>Email, số điện thoại, mã nhân viên</strong>
               </span>
-              <StatusBadge tone="info">Resolver layer</StatusBadge>
+              <StatusBadge tone="info">Lớp phân giải</StatusBadge>
             </li>
             <li>
               <span>
-                <strong>Disable khong xoa ho so</strong>
+                <strong>Vô hiệu hóa không xóa hồ sơ</strong>
               </span>
-              <StatusBadge tone="success">Da tach</StatusBadge>
+              <StatusBadge tone="success">Đã tách</StatusBadge>
             </li>
           </ul>
         </Card>

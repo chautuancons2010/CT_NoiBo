@@ -30,11 +30,23 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Nền tảng chấm công cá nhân qua mobile, GPS, ảnh và trạng thái đồng bộ.",
     module: "Nhân sự"
   },
+  "/attendance/history": {
+    title: "Lịch sử chấm công",
+    description: "",
+    module: "Nhân sự"
+  },
+  "/attendance/records": {
+    title: "Kiểm tra chấm công",
+    description: "",
+    module: "Nhân sự"
+  },
   "/timesheets": {
     title: "Bảng công",
     description: "Tầng tổng hợp dữ liệu công từ chấm công, điểm danh, đơn nghỉ và điều chỉnh.",
     module: "Nhân sự"
   },
+  "/timesheets/exceptions": { title: "Ngoại lệ bảng công", description: "", module: "Nhân sự" },
+  "/timesheets/adjustments": { title: "Điều chỉnh bảng công", description: "", module: "Nhân sự" },
   "/shifts": {
     title: "Ca làm",
     description: "Cấu hình ca làm và chính sách liên quan sẽ nằm trong dữ liệu cấu hình.",
@@ -55,9 +67,24 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Kênh cập nhật tình hình dự án, hình ảnh và lịch sử theo công trường.",
     module: "Dự án"
   },
+  "/project-monitoring": {
+    title: "Theo dõi dự án",
+    description: "",
+    module: "Dự án"
+  },
+  "/project-monitoring/issues": {
+    title: "Trung tâm vấn đề",
+    description: "",
+    module: "Dự án"
+  },
+  "/project-monitoring/recent": {
+    title: "Cập nhật gần đây",
+    description: "",
+    module: "Dự án"
+  },
   "/worker-attendance": {
     title: "Điểm danh công nhân",
-    description: "Nền tảng cho giám sát điểm danh theo đội, ảnh tập thể và chốt ngày.",
+    description: "",
     module: "Dự án"
   },
   "/warehouse/items": {
@@ -120,6 +147,14 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Extension point cho ca làm, GPS, ngày công và policy.",
     module: "Hệ thống"
   },
+  "/settings/attendance/locations": {
+    title: "Địa điểm chấm công",
+    description: "",
+    module: "Hệ thống"
+  },
+  "/settings/attendance/shifts": { title: "Ca làm", description: "", module: "Hệ thống" },
+  "/settings/attendance/calendar": { title: "Lịch làm việc", description: "", module: "Hệ thống" },
+  "/settings/attendance/policies": { title: "Chính sách chấm công", description: "", module: "Hệ thống" },
   "/settings/roles": {
     title: "Vai trò",
     description: "Role là gói permission, không phải điều kiện hard-code trong UI.",
@@ -150,6 +185,15 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Theo dõi thay đổi quan trọng theo actor, entity, before/after và lý do.",
     module: "Hệ thống"
   },
+  "/system-admin/branding": { title: "Thương hiệu", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/appearance": { title: "Giao diện", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/navigation": { title: "Điều hướng", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/modules": { title: "Module", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/organization": { title: "Tổ chức", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/localization": { title: "Định dạng & thời gian", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/security": { title: "Bảo mật", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/config-history": { title: "Lịch sử cấu hình", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/audit": { title: "Audit log", description: "", module: "Trung tâm quản trị" },
   "/notifications": {
     title: "Thông báo",
     description: "Route mobile cho thông báo nghiệp vụ và trạng thái đồng bộ.",
@@ -168,17 +212,23 @@ const employeeSectionLabels: Record<string, string> = {
   contracts: "Hợp đồng",
   documents: "Tài liệu",
   history: "Lịch sử",
+  leave: "Nghỉ phép",
   account: "Tài khoản"
 };
 
 const projectSectionLabels: Record<string, string> = {
   overview: "Tổng quan",
   updates: "Cập nhật",
-  workforce: "Nhân lực",
-  attendance: "Điểm danh",
+  team: "Nhân sự",
+  schedule: "Lịch",
+  "worker-attendance": "Điểm danh",
   documents: "Tài liệu",
   history: "Lịch sử"
 };
+
+function getEmployeeSectionLabel(section: string) {
+  return section === "edit" ? "Chỉnh sửa" : employeeSectionLabels[section] ?? "Chi tiết";
+}
 
 export function getRouteMeta(pathname: string): RouteMeta {
   const exact = routeMetaByPath[pathname];
@@ -186,14 +236,26 @@ export function getRouteMeta(pathname: string): RouteMeta {
     return exact;
   }
 
+  {
+    const employeeTimesheet = pathname.match(/^\/timesheets\/periods\/([^/]+)\/employees\/([^/]+)$/);
+    if (employeeTimesheet) return { title: "Công nhân viên", description: "", module: "Nhân sự" };
+    const periodTimesheet = pathname.match(/^\/timesheets\/periods\/([^/]+)$/);
+    if (periodTimesheet) return { title: "Chi tiết kỳ công", description: "", module: "Nhân sự" };
+  }
+
   const employeeMatch = pathname.match(/^\/employees\/([^/]+)\/([^/]+)$/);
   if (employeeMatch) {
-    const section = employeeSectionLabels[employeeMatch[2]] ?? "Chi tiết";
+    const section = getEmployeeSectionLabel(employeeMatch[2]);
     return {
       title: `Nhân viên ${employeeMatch[1]} · ${section}`,
       description: "Route-backed tab cho hồ sơ nhân viên, giữ đúng URL khi refresh.",
       module: "Nhân sự"
     };
+  }
+
+  const projectUpdateMatch = pathname.match(/^\/projects\/([^/]+)\/updates\/(new|[^/]+)$/);
+  if (projectUpdateMatch) {
+    return { title: projectUpdateMatch[2] === "new" ? "Cập nhật dự án" : "Chi tiết cập nhật", description: "", module: "Dự án" };
   }
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/([^/]+)$/);
@@ -223,8 +285,13 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
     return [
       { label: "Nhân sự", href: "/employees" },
       { label: employeeMatch[1], href: `/employees/${employeeMatch[1]}/profile` },
-      { label: employeeSectionLabels[employeeMatch[2]] ?? "Chi tiết" }
+      { label: getEmployeeSectionLabel(employeeMatch[2]) }
     ];
+  }
+
+  const projectUpdateMatch = pathname.match(/^\/projects\/([^/]+)\/updates\/(new|[^/]+)$/);
+  if (projectUpdateMatch) {
+    return [{ label: "Dự án", href: "/projects" }, { label: projectUpdateMatch[1], href: `/projects/${projectUpdateMatch[1]}/overview` }, { label: "Cập nhật", href: `/projects/${projectUpdateMatch[1]}/updates` }, { label: projectUpdateMatch[2] === "new" ? "Tạo mới" : "Chi tiết" }];
   }
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/([^/]+)$/);

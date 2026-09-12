@@ -165,7 +165,7 @@ export function EmployeeCreateForm({
       </FormSection>
 
       <StickyActionBar>
-        <Button disabled={submitting} type="button" variant="secondary">
+        <Button disabled={submitting} onClick={() => router.back()} type="button" variant="secondary">
           Hủy
         </Button>
         <Button

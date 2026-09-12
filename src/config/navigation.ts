@@ -1,5 +1,6 @@
 import type { Permission } from "@/lib/auth/permissions";
 import { can, createPermissionSet } from "@/lib/auth/permissions";
+import { isPathEnabled, type ModuleSettings, type NavigationSettings } from "@/config/systemSettings";
 
 export type NavigationIcon =
   | "LayoutDashboard"
@@ -100,6 +101,12 @@ export const desktopNavigation: NavigationGroup[] = [
         requiredPermission: "project.view"
       },
       {
+        label: "Theo dõi dự án",
+        href: "/project-monitoring",
+        icon: "BarChart3",
+        requiredPermission: "project_monitoring.view"
+      },
+      {
         label: "Điểm danh công nhân",
         href: "/worker-attendance",
         icon: "ClipboardCheck",
@@ -198,10 +205,10 @@ export const desktopNavigation: NavigationGroup[] = [
         requiredPermission: "permission.view"
       },
       {
-        label: "Cấu hình",
-        href: "/settings/organization",
+        label: "Trung tâm quản trị",
+        href: "/system-admin",
         icon: "Settings",
-        requiredPermission: "settings.view"
+        requiredPermission: "system_admin.access"
       },
       {
         label: "Tích hợp",
@@ -265,10 +272,24 @@ export function filterGroupsByPermissions(
   groups: readonly NavigationGroup[],
   permissions: readonly Permission[]
 ): NavigationGroup[] {
+  return filterGroupsByAccess(groups, permissions);
+}
+
+export function filterGroupsByAccess(
+  groups: readonly NavigationGroup[],
+  permissions: readonly Permission[],
+  modules?: ModuleSettings,
+  navigation?: NavigationSettings
+): NavigationGroup[] {
+  const order = new Map<string, number>(navigation?.itemOrder.map((href, index) => [href, index]) ?? []);
+  const hidden = new Set<string>(navigation?.hiddenItems ?? []);
   return groups
     .map((group) => ({
       ...group,
       items: filterNavigationByPermissions(group.items, permissions)
+        .filter((item) => !modules || isPathEnabled(item.href, modules))
+        .filter((item) => !hidden.has(item.href))
+        .sort((first, second) => (order.get(first.href) ?? 999) - (order.get(second.href) ?? 999))
     }))
     .filter((group) => group.items.length > 0);
 }

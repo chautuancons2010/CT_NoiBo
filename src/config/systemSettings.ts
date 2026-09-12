@@ -1,0 +1,277 @@
+import { z } from "zod";
+
+export const configurableNavigationPaths = [
+  "/dashboard",
+  "/employees",
+  "/attendance",
+  "/timesheets",
+  "/shifts",
+  "/leave",
+  "/projects",
+  "/projects/updates",
+  "/worker-attendance",
+  "/warehouse/items",
+  "/warehouse/receipts",
+  "/warehouse/issues",
+  "/warehouse/transfers",
+  "/warehouse/inventory",
+  "/import-export/shipments",
+  "/import-export/documents",
+  "/approvals",
+  "/reports"
+] as const;
+
+export const moduleKeys = [
+  "human_resources",
+  "attendance",
+  "projects",
+  "warehouse",
+  "import_export",
+  "reports"
+] as const;
+
+export type ModuleKey = (typeof moduleKeys)[number];
+
+const nullableAssetUrl = z.string().url().max(2_000).nullable();
+const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Mã màu phải có dạng #RRGGBB.");
+
+export const brandingSettingsSchema = z
+  .object({
+    systemName: z.string().trim().min(2).max(100),
+    loginSubtitle: z.string().trim().max(140),
+    logoMainUrl: nullableAssetUrl,
+    logoCompactUrl: nullableAssetUrl,
+    logoDarkUrl: nullableAssetUrl,
+    faviconUrl: nullableAssetUrl,
+    assetVersion: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const appearanceSettingsSchema = z
+  .object({
+    primaryColor: hexColorSchema,
+    density: z.enum(["comfortable", "standard", "compact"]),
+    tableDensity: z.enum(["standard", "compact"]),
+    defaultPageSize: z.union([z.literal(10), z.literal(20), z.literal(50), z.literal(100)]),
+    sidebarDefault: z.enum(["expanded", "collapsed"]),
+    appearanceMode: z.literal("light")
+  })
+  .strict();
+
+export const organizationSettingsSchema = z
+  .object({
+    companyName: z.string().trim().min(2).max(120),
+    shortName: z.string().trim().min(2).max(30),
+    address: z.string().trim().max(240),
+    phone: z.string().trim().max(30),
+    email: z.union([z.literal(""), z.string().email()]),
+    taxCode: z.string().trim().max(30),
+    representativeName: z.string().trim().max(100)
+  })
+  .strict();
+
+export const localizationSettingsSchema = z
+  .object({
+    timezone: z.enum(["Asia/Ho_Chi_Minh"]),
+    dateFormat: z.enum(["DD/MM/YYYY", "YYYY-MM-DD"]),
+    timeFormat: z.enum(["HH:mm", "hh:mm a"]),
+    weekStartsOn: z.literal("monday"),
+    locale: z.literal("vi-VN")
+  })
+  .strict();
+
+const navigationPathSchema = z.enum(configurableNavigationPaths);
+
+export const navigationSettingsSchema = z
+  .object({
+    hiddenItems: z.array(navigationPathSchema).max(configurableNavigationPaths.length),
+    itemOrder: z.array(navigationPathSchema).length(configurableNavigationPaths.length),
+    defaultLandingPage: z.enum(["/dashboard", "/attendance", "/projects"]),
+    groupsExpanded: z.boolean()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (new Set(value.itemOrder).size !== configurableNavigationPaths.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["itemOrder"], message: "Thứ tự điều hướng không hợp lệ." });
+    }
+  });
+
+export const moduleSettingsSchema = z
+  .object({
+    human_resources: z.boolean(),
+    attendance: z.boolean(),
+    projects: z.boolean(),
+    warehouse: z.boolean(),
+    import_export: z.boolean(),
+    reports: z.boolean()
+  })
+  .strict();
+
+export const featureFlagDefinitionSchema = z
+  .object({
+    key: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/),
+    moduleKey: z.string().regex(/^[a-z][a-z0-9_-]*$/),
+    enabled: z.boolean(),
+    config: z.record(z.unknown()).default({})
+  })
+  .strict();
+
+export type FeatureFlagDefinition = z.infer<typeof featureFlagDefinitionSchema>;
+
+export const systemSettingsSchemas = {
+  branding: brandingSettingsSchema,
+  appearance: appearanceSettingsSchema,
+  organization: organizationSettingsSchema,
+  localization: localizationSettingsSchema,
+  navigation: navigationSettingsSchema,
+  modules: moduleSettingsSchema
+} as const;
+
+export type BrandingSettings = z.infer<typeof brandingSettingsSchema>;
+export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
+export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
+export type LocalizationSettings = z.infer<typeof localizationSettingsSchema>;
+export type NavigationSettings = z.infer<typeof navigationSettingsSchema>;
+export type ModuleSettings = z.infer<typeof moduleSettingsSchema>;
+export type SystemSettingsGroup = keyof typeof systemSettingsSchemas;
+
+export interface SystemSettingsDocument {
+  branding: BrandingSettings;
+  appearance: AppearanceSettings;
+  organization: OrganizationSettings;
+  localization: LocalizationSettings;
+  navigation: NavigationSettings;
+  modules: ModuleSettings;
+}
+
+export const defaultSystemSettings: SystemSettingsDocument = {
+  branding: {
+    systemName: "Hệ thống nội bộ Châu Tuấn",
+    loginSubtitle: "Quản lý nhân sự, công trường và vận hành",
+    logoMainUrl: null,
+    logoCompactUrl: null,
+    logoDarkUrl: null,
+    faviconUrl: null,
+    assetVersion: 0
+  },
+  appearance: {
+    primaryColor: "#0F766E",
+    density: "standard",
+    tableDensity: "standard",
+    defaultPageSize: 20,
+    sidebarDefault: "expanded",
+    appearanceMode: "light"
+  },
+  organization: {
+    companyName: "Công ty Châu Tuấn",
+    shortName: "CHÂU TUẤN",
+    address: "",
+    phone: "",
+    email: "",
+    taxCode: "",
+    representativeName: ""
+  },
+  localization: {
+    timezone: "Asia/Ho_Chi_Minh",
+    dateFormat: "DD/MM/YYYY",
+    timeFormat: "HH:mm",
+    weekStartsOn: "monday",
+    locale: "vi-VN"
+  },
+  navigation: {
+    hiddenItems: [],
+    itemOrder: [...configurableNavigationPaths],
+    defaultLandingPage: "/dashboard",
+    groupsExpanded: true
+  },
+  modules: {
+    human_resources: true,
+    attendance: true,
+    projects: true,
+    warehouse: false,
+    import_export: false,
+    reports: true
+  }
+};
+
+export function isSystemSettingsGroup(value: string): value is SystemSettingsGroup {
+  return Object.hasOwn(systemSettingsSchemas, value);
+}
+
+export function parseSystemSettingsGroup<TGroup extends SystemSettingsGroup>(
+  group: TGroup,
+  value: unknown
+): SystemSettingsDocument[TGroup] {
+  return systemSettingsSchemas[group].parse(value) as SystemSettingsDocument[TGroup];
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16)) as [number, number, number];
+}
+
+function channelToLinear(channel: number): number {
+  const value = channel / 255;
+  return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+export function relativeLuminance(hex: string): number {
+  const [red, green, blue] = hexToRgb(hex).map(channelToLinear);
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+export function contrastRatio(first: string, second: string): number {
+  const light = Math.max(relativeLuminance(first), relativeLuminance(second));
+  const dark = Math.min(relativeLuminance(first), relativeLuminance(second));
+  return (light + 0.05) / (dark + 0.05);
+}
+
+function mix(hex: string, target: "#000000" | "#FFFFFF", amount: number): string {
+  const source = hexToRgb(hex);
+  const destination = hexToRgb(target);
+  const channels = source.map((channel, index) => Math.round(channel + (destination[index] - channel) * amount));
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+}
+
+export interface BrandColorTokens {
+  primary: string;
+  primaryHover: string;
+  primaryActive: string;
+  primarySubtle: string;
+  primaryBorder: string;
+  primaryForeground: "#FFFFFF" | "#111827";
+  focusRing: string;
+  contrast: number;
+}
+
+export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
+  const primary = hexColorSchema.parse(primaryColor).toUpperCase();
+  const whiteContrast = contrastRatio(primary, "#FFFFFF");
+  const blackContrast = contrastRatio(primary, "#111827");
+  const primaryForeground = whiteContrast >= blackContrast ? "#FFFFFF" : "#111827";
+
+  return {
+    primary,
+    primaryHover: mix(primary, "#000000", 0.16),
+    primaryActive: mix(primary, "#000000", 0.26),
+    primarySubtle: mix(primary, "#FFFFFF", 0.9),
+    primaryBorder: mix(primary, "#FFFFFF", 0.62),
+    primaryForeground,
+    focusRing: `${primary}38`,
+    contrast: Math.max(whiteContrast, blackContrast)
+  };
+}
+
+export function moduleForPath(pathname: string): ModuleKey | null {
+  if (pathname.startsWith("/employees") || pathname.startsWith("/timesheets") || pathname.startsWith("/leave") || pathname.startsWith("/shifts")) return "human_resources";
+  if (pathname.startsWith("/attendance")) return "attendance";
+  if (pathname.startsWith("/projects") || pathname.startsWith("/worker-attendance")) return "projects";
+  if (pathname.startsWith("/warehouse")) return "warehouse";
+  if (pathname.startsWith("/import-export")) return "import_export";
+  if (pathname.startsWith("/reports")) return "reports";
+  return null;
+}
+
+export function isPathEnabled(pathname: string, modules: ModuleSettings): boolean {
+  const moduleKey = moduleForPath(pathname);
+  return moduleKey ? modules[moduleKey] : true;
+}

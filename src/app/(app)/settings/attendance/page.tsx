@@ -1,8 +1,9 @@
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { SettingsPlaceholderPage } from "@/features/settings";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { AttendanceSettings } from "@/features/attendance";
 
 const meta = routeMetaByPath["/settings/attendance"];
 
 export default function Page() {
-  return <SettingsPlaceholderPage activePath="/settings/attendance" description={meta.description} title={meta.title} />;
+  return <div className="page-stack"><PageHeader title={meta.title} /><AttendanceSettings /></div>;
 }

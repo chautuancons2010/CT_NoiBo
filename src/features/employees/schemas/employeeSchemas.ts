@@ -111,13 +111,75 @@ export const provisionAccountSchema = z.object({
   roleIds: z.array(z.string().min(1)).min(1, "Cần chọn ít nhất một vai trò.")
 });
 
-export const accountStatusPatchSchema = z.object({
-  status: accountStatusSchema,
-  reason: optionalText
+export const accountStatusPatchSchema = z
+  .object({
+    status: accountStatusSchema,
+    reason: optionalText
+  })
+  .superRefine((value, context) => {
+    if (value.status === "disabled" && !value.reason) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "Cần nhập lý do vô hiệu hóa tài khoản."
+      });
+    }
+  });
+
+export const accountRolesPatchSchema = z.object({
+  roleIds: z.array(z.string().min(1)).min(1, "Cần chọn ít nhất một vai trò.")
 });
+
+export const archiveEmployeeSchema = z.object({
+  reason: z.string().trim().min(3, "Cần nhập lý do lưu trữ.").max(500)
+});
+
+export const sensitiveProfilePatchSchema = z
+  .object({
+    nationalIdNumber: optionalText,
+    nationalIdIssuedDate: optionalDateText,
+    nationalIdIssuedPlace: optionalText,
+    nationalIdExpiryDate: optionalDateText,
+    bankName: optionalText,
+    bankAccountNumber: optionalText,
+    bankAccountHolder: optionalText,
+    bankBranch: optionalText,
+    personalTaxCode: optionalText,
+    socialInsuranceCode: optionalText,
+    reason: optionalText
+  })
+  .superRefine((value, context) => {
+    if (value.nationalIdNumber && !/^\d{9,12}$/.test(value.nationalIdNumber)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["nationalIdNumber"],
+        message: "Số CCCD/CMND chưa hợp lệ."
+      });
+    }
+    if (value.nationalIdNumber && !value.reason) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "Cần nhập lý do khi cập nhật CCCD."
+      });
+    }
+    if (
+      value.nationalIdIssuedDate &&
+      value.nationalIdExpiryDate &&
+      value.nationalIdExpiryDate < value.nationalIdIssuedDate
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["nationalIdExpiryDate"],
+        message: "Ngày hết hạn không được trước ngày cấp."
+      });
+    }
+  });
 
 export type EmployeeListQuery = z.infer<typeof employeeListQuerySchema>;
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type PatchEmployeeInput = z.infer<typeof patchEmployeeSchema>;
 export type ProvisionAccountInput = z.infer<typeof provisionAccountSchema>;
 export type AccountStatusPatchInput = z.infer<typeof accountStatusPatchSchema>;
+export type AccountRolesPatchInput = z.infer<typeof accountRolesPatchSchema>;
+export type SensitiveProfilePatchInput = z.infer<typeof sensitiveProfilePatchSchema>;

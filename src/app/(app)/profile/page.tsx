@@ -18,12 +18,12 @@ export default async function Page() {
 
   return (
     <div className="page-stack">
-      <PageHeader title="Ca nhan" />
+      <PageHeader title="Cá nhân" />
 
       <Card className="self-profile-card">
         <Avatar className="employee-detail-header__avatar" name={detail?.summary.fullName ?? user?.displayName ?? "User"} />
         <div>
-          <h2>{detail?.summary.fullName ?? user?.displayName ?? "Chua dang nhap"}</h2>
+          <h2>{detail?.summary.fullName ?? user?.displayName ?? "Chưa đăng nhập"}</h2>
           <p>
             {detail
               ? `${detail.summary.employeeCode} - ${detail.summary.departmentName} - ${detail.summary.positionName}`
@@ -36,60 +36,60 @@ export default async function Page() {
       {detail ? (
         <div className="content-grid content-grid--two">
           <Card>
-            <h2 className="section-title">Thong tin lien he</h2>
+            <h2 className="section-title">Thông tin liên hệ</h2>
             <ul className="foundation-list">
               <li>
                 <span>
-                  <strong>So dien thoai</strong>
+                  <strong>Số điện thoại</strong>
                   <small>{detail.profile.personalPhone}</small>
                 </span>
               </li>
               <li>
                 <span>
-                  <strong>Email cong ty</strong>
-                  <small>{detail.profile.companyEmail ?? "Chua co"}</small>
+                  <strong>Email công ty</strong>
+                  <small>{detail.profile.companyEmail ?? "Chưa có"}</small>
                 </span>
               </li>
               <li>
                 <span>
-                  <strong>Dia chi hien tai</strong>
-                  <small>{detail.profile.currentAddress ?? "Chua co"}</small>
+                  <strong>Địa chỉ hiện tại</strong>
+                  <small>{detail.profile.currentAddress ?? "Chưa có"}</small>
                 </span>
               </li>
             </ul>
           </Card>
           <Card>
-            <h2 className="section-title">Tai khoan</h2>
+            <h2 className="section-title">Tài khoản</h2>
             <ul className="foundation-list">
               <li>
                 <span>
-                  <strong>Trang thai</strong>
+                  <strong>Trạng thái</strong>
                   <small>{user?.status}</small>
                 </span>
                 <StatusBadge tone={user?.status === "active" ? "success" : "warning"}>{user?.status}</StatusBadge>
               </li>
               <li>
                 <span>
-                  <strong>Vai tro/quyen</strong>
-                  <small>{user?.permissions.length ?? 0} effective permissions</small>
+                  <strong>Vai trò/quyền</strong>
+                  <small>{user?.permissions.length ?? 0} quyền hiệu lực</small>
                 </span>
               </li>
             </ul>
             <div className="account-action-row">
               <Button leftIcon={<KeyRound aria-hidden="true" size={16} />} variant="secondary">
-                Doi mat khau
+                Đổi mật khẩu
               </Button>
               <Button leftIcon={<LogOut aria-hidden="true" size={16} />} variant="secondary">
-                Dang xuat
+                Đăng xuất
               </Button>
             </div>
           </Card>
         </div>
       ) : (
         <Card>
-          <p className="muted-text">Tai khoan demo chua lien ket voi ho so nhan su.</p>
+          <p className="muted-text">Tài khoản demo chưa liên kết với hồ sơ nhân sự.</p>
           <Link className="button button--secondary button--md" href="/employees">
-            Xem danh sach nhan su
+            Xem danh sách nhân sự
           </Link>
         </Card>
       )}

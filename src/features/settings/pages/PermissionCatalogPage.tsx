@@ -2,16 +2,21 @@ import { Card } from "@/components/shared/Card";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SettingsShell } from "@/features/settings/components/SettingsShell";
+import { PermissionDeniedState } from "@/components/shared/States";
+import { can } from "@/lib/auth/permissions";
+import { getRequestUser } from "@/services/auth/getRequestUser";
 import { getPermissionGroups } from "@/services/authorization/rbacService";
 
-export function PermissionCatalogPage() {
+export async function PermissionCatalogPage() {
+  const user = await getRequestUser();
+  if (!user || !can(user.permissions, "permission.view")) return <PermissionDeniedState />;
   const groups = getPermissionGroups();
 
   return (
     <SettingsShell activePath="/settings/permissions">
       <div className="page-stack">
         <PageHeader
-          title="Phan quyen"
+          title="Phân quyền"
         />
         <div className="permission-group-grid">
           {groups.map((group) => (
@@ -22,9 +27,8 @@ export function PermissionCatalogPage() {
                   <li key={permission.key}>
                     <span>
                       <strong>{permission.label}</strong>
-                      <code>{permission.key}</code>
                     </span>
-                    {permission.sensitive ? <StatusBadge tone="warning">Nhay cam</StatusBadge> : null}
+                    {permission.sensitive ? <StatusBadge tone="warning">Nhạy cảm</StatusBadge> : null}
                   </li>
                 ))}
               </ul>

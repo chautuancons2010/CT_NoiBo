@@ -7,8 +7,10 @@ import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
 import { permissionCatalog } from "@/services/authorization/rbacService";
 import { updateRoleInRepository } from "@/services/authorization/roleRepository";
+import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
+import { recordAuditLog } from "@/services/audit/auditLog";
 
 const permissionKeySchema = z.custom<Permission>(
   (value) => typeof value === "string" && permissionCatalog.some((permission) => permission.key === value),
@@ -32,10 +34,23 @@ export async function PATCH(
 ) {
   try {
     const user = await getRequestUser();
-    requirePermission(user, "role.manage");
+    const authorizedUser = requirePermission(user, "role.manage");
     const { id } = await params;
     const input = parseWithSchema(rolePatchSchema, await request.json());
-    const role = updateRoleInRepository(id, input);
+    const accounts = (await getEmployeeDataSetAsync()).accounts.map((account) => ({
+      accountId: account.id,
+      status: account.status,
+      roleIds: account.roleIds
+    }));
+    const role = updateRoleInRepository(id, input, accounts);
+
+    await recordAuditLog({
+      actorId: authorizedUser.id,
+      action: "role.updated",
+      entityType: "role",
+      entityId: id,
+      after: { code: role.code, name: role.name, permissionKeys: role.permissionKeys }
+    });
 
     return successResponse({ role });
   } catch (error) {

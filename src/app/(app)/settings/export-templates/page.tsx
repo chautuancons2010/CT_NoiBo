@@ -1,15 +1,2 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { SettingsPlaceholderPage } from "@/features/settings";
-
-const meta = routeMetaByPath["/settings/export-templates"];
-
-export default function Page() {
-  return (
-    <SettingsPlaceholderPage
-      activePath="/settings/export-templates"
-      description={meta.description}
-      listPattern
-      title={meta.title}
-    />
-  );
-}
+import { BackLink } from "@/components/shared/BackLink";import { PageHeader } from "@/components/shared/PageHeader";import { SettingsShell } from "@/features/settings/components/SettingsShell";import { ReportTemplateDesigner } from "@/features/timesheets/components/ReportTemplateDesigner";
+export default function Page(){return <SettingsShell activePath="/settings/export-templates"><div className="page-stack"><BackLink href="/timesheets"/><PageHeader title="Mẫu xuất dữ liệu"/><ReportTemplateDesigner/></div></SettingsShell>;}

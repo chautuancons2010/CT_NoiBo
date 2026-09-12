@@ -10,6 +10,7 @@ import {
 } from "@/features/employees/services/employeeRepository";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
+import { recordAuditLog } from "@/services/audit/auditLog";
 
 export async function GET(
   _request: Request,
@@ -53,6 +54,16 @@ export async function PATCH(
 
     const result = patchEmployeeInRepository(id, input, authorizedUser.id);
     const detail = getEmployeeDetail(id, authorizedUser.permissions, await getEmployeeDataSetAsync());
+
+    await recordAuditLog({
+      actorId: authorizedUser.id,
+      action: input.employmentStatus === "terminated" ? "employee.offboarded" : "employee.updated",
+      entityType: "employee",
+      entityId: id,
+      before: { rowVersion: input.rowVersion },
+      after: { rowVersion: result.employee.rowVersion },
+      reason: input.reason ?? input.terminationReason
+    });
 
     return successResponse({
       employee: detail,

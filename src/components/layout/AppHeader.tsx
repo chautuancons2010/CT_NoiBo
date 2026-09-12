@@ -2,11 +2,14 @@
 
 import { Bell, Search } from "lucide-react";
 import Link from "next/link";
+import { useEffect } from "react";
 
 import { getBreadcrumbs, getRouteMeta } from "@/config/routeRegistry";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { UserMenu } from "@/components/shared/UserMenu";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
+import { AppLogo } from "@/components/layout/AppLogo";
+import { useBranding } from "@/components/providers/SystemSettingsProvider";
 
 export interface AppHeaderProps {
   pathname: string;
@@ -15,11 +18,17 @@ export interface AppHeaderProps {
 }
 
 export function AppHeader({ pathname, user, online }: AppHeaderProps) {
+  const branding = useBranding();
   const meta = getRouteMeta(pathname);
   const breadcrumbs = getBreadcrumbs(pathname);
 
+  useEffect(() => {
+    document.title = `${meta.title} | ${branding.systemName}`;
+  }, [branding.systemName, meta.title]);
+
   return (
     <header className="app-header">
+      <div className="app-header__mobile-logo"><AppLogo compact /></div>
       <div className="app-header__title">
         <Breadcrumb items={breadcrumbs} />
         <h1>{meta.title}</h1>

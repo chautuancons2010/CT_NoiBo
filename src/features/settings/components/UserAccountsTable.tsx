@@ -9,7 +9,7 @@ type AccountRow = ReturnType<typeof listAccounts>[number];
 const accountColumns: DataTableColumn<AccountRow>[] = [
   {
     id: "displayName",
-    header: "Tai khoan",
+    header: "Tài khoản",
     cell: (account) => (
       <span className="employee-name-cell">
         <strong>{account.displayName}</strong>
@@ -19,22 +19,22 @@ const accountColumns: DataTableColumn<AccountRow>[] = [
   },
   {
     id: "employee",
-    header: "Ho so nhan su",
-    cell: (account) => account.employeeName ?? "Chua lien ket"
+    header: "Hồ sơ nhân sự",
+    cell: (account) => account.employeeName ?? "Chưa liên kết"
   },
   {
     id: "roles",
-    header: "Vai tro",
+    header: "Vai trò",
     cell: (account) => account.roleNames.join(", ")
   },
   {
     id: "effectivePermissions",
-    header: "Effective permissions",
-    cell: (account) => `${account.effectivePermissions.length} quyen`
+    header: "Quyền hiệu lực",
+    cell: (account) => `${account.effectivePermissions.length} quyền`
   },
   {
     id: "status",
-    header: "Trang thai",
+    header: "Trạng thái",
     cell: (account) => (
       <StatusBadge tone={account.status === "active" ? "success" : "warning"}>
         {account.status}

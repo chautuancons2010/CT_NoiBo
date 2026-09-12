@@ -1,8 +1,2 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
-
-const meta = routeMetaByPath["/timesheets"];
-
-export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Bảng công" title={meta.title} />;
-}
+import { PageHeader } from "@/components/shared/PageHeader";import { TimesheetPeriodList } from "@/features/timesheets/components/TimesheetPeriodList";
+export default function Page(){return <div className="page-stack"><PageHeader title="Bảng công"/><TimesheetPeriodList/></div>;}

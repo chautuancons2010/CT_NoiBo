@@ -1,12 +1,17 @@
+import "server-only";
+
 import {
+  archiveEmployee,
   createEmployeeRecord,
   defaultEmployeeDataSet,
   findAccountForEmployee,
   findEmployee,
   offboardEmployee,
   provisionAccountForEmployee,
-  updateEmployeeProfile,
+  updateAccountRoles,
   updateAccountStatus,
+  updateEmployeeProfile,
+  updateEmployeeSensitiveProfile,
   type CreateEmployeeResult,
   type EmployeeDataSet,
   type ProvisionAccountResult
@@ -25,12 +30,14 @@ import type {
   AccountStatusPatchInput,
   CreateEmployeeInput,
   PatchEmployeeInput,
-  ProvisionAccountInput
+  ProvisionAccountInput,
+  SensitiveProfilePatchInput
 } from "@/features/employees/schemas/employeeSchemas";
 import { getEmployeeDataSetFromSupabase } from "@/features/employees/services/employeeSupabaseRepository";
+import { assertNoAdminLockout } from "@/services/authorization/rbacService";
 
 let employees: EmployeeRecord[] = [...defaultEmployeeDataSet.employees];
-const sensitiveProfiles: EmployeeSensitiveProfile[] = [...defaultEmployeeDataSet.sensitiveProfiles];
+let sensitiveProfiles: EmployeeSensitiveProfile[] = [...defaultEmployeeDataSet.sensitiveProfiles];
 const emergencyContacts: EmployeeEmergencyContact[] = [...defaultEmployeeDataSet.emergencyContacts];
 const contracts: EmployeeContract[] = [...defaultEmployeeDataSet.contracts];
 const documents: EmployeeDocument[] = [...defaultEmployeeDataSet.documents];
@@ -95,9 +102,22 @@ export function patchEmployeeInRepository(
   }
 
   if (input.employmentStatus === "terminated" && input.terminationDate) {
+    const account = findAccountForEmployee(employeeId, dataSet);
+    if (account) {
+      assertNoAdminLockout({
+        accounts: accounts.map((item) => ({
+          accountId: item.id,
+          status: item.status,
+          roleIds: item.roleIds
+        })),
+        targetAccountId: account.id,
+        nextStatus: "disabled"
+      });
+    }
+
     const result = offboardEmployee({
       employee,
-      account: findAccountForEmployee(employeeId, dataSet),
+      account,
       terminationDate: input.terminationDate,
       reason: input.reason ?? input.terminationReason,
       actorAccountId
@@ -121,6 +141,22 @@ export function patchEmployeeInRepository(
   return result;
 }
 
+export function archiveEmployeeInRepository(
+  employeeId: string,
+  actorAccountId: string,
+  reason?: string
+) {
+  const employee = findEmployee(employeeId, getEmployeeDataSet());
+  if (!employee) {
+    throw new AppError("NOT_FOUND", "Không tìm thấy hồ sơ nhân sự.");
+  }
+
+  const result = archiveEmployee(employee, actorAccountId, reason);
+  employees = employees.map((item) => (item.id === employeeId ? result.employee : item));
+  history = [...result.historyEvents, ...history];
+  return result;
+}
+
 export function updateAccountStatusInRepository(
   accountId: string,
   input: AccountStatusPatchInput,
@@ -138,4 +174,27 @@ export function updateAccountStatusInRepository(
 
 export function getAccountForEmployeeFromRepository(employeeId: string): AppAccountRecord | undefined {
   return findAccountForEmployee(employeeId, getEmployeeDataSet());
+}
+
+export function updateAccountRolesInRepository(accountId: string, roleIds: string[]) {
+  const result = updateAccountRoles(accounts, accountId, roleIds);
+  accounts = accounts.map((account) => (account.id === accountId ? result.account : account));
+  return result;
+}
+
+export function updateSensitiveProfileInRepository(
+  employeeId: string,
+  input: SensitiveProfilePatchInput,
+  actorAccountId: string
+) {
+  const dataSet = getEmployeeDataSet();
+  const employee = findEmployee(employeeId, dataSet);
+  if (!employee) throw new AppError("NOT_FOUND", "Không tìm thấy hồ sơ nhân sự.");
+  const currentProfile = sensitiveProfiles.find((profile) => profile.employeeId === employeeId);
+  const result = updateEmployeeSensitiveProfile(employee, currentProfile, input, actorAccountId, dataSet);
+  sensitiveProfiles = currentProfile
+    ? sensitiveProfiles.map((profile) => (profile.employeeId === employeeId ? result.profile : profile))
+    : [...sensitiveProfiles, result.profile];
+  history = [result.historyEvent, ...history];
+  return result;
 }

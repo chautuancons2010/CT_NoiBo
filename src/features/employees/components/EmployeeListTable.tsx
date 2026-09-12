@@ -6,6 +6,7 @@ import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
 import { PermissionGate } from "@/components/shared/PermissionGate";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ArchiveEmployeeButton } from "@/features/employees/components/ArchiveEmployeeButton";
 import type { Permission } from "@/lib/auth/permissions";
 import type { EmployeeSummary } from "@/features/employees/types";
 
@@ -80,13 +81,13 @@ export function EmployeeListTable({ employees, permissions }: EmployeeListTableP
         <DropdownMenu label={`Thao tác ${employee.employeeCode}`}>
           <Link href={`/employees/${employee.id}/profile`}>Xem hồ sơ</Link>
           <PermissionGate permissions={permissions} require="employee.edit">
-            <Link href={`/employees/${employee.id}/employment`}>Chỉnh sửa</Link>
+            <Link href={`/employees/${employee.id}/edit`}>Chỉnh sửa</Link>
           </PermissionGate>
           <PermissionGate permissions={permissions} require="account.view">
             <Link href={`/employees/${employee.id}/account`}>Tài khoản</Link>
           </PermissionGate>
           <PermissionGate permissions={permissions} require="employee.archive">
-            <button type="button">Lưu trữ</button>
+            <ArchiveEmployeeButton employeeId={employee.id} />
           </PermissionGate>
         </DropdownMenu>
       )}

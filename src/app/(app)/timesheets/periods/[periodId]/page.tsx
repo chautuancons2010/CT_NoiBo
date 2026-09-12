@@ -1,0 +1,2 @@
+import { BackLink } from "@/components/shared/BackLink";import { PageHeader } from "@/components/shared/PageHeader";import { TimesheetPeriodDetail } from "@/features/timesheets/components/TimesheetPeriodDetail";
+export default async function Page({params}:{params:Promise<{periodId:string}>}){const {periodId}=await params;return <div className="page-stack"><BackLink href="/timesheets"/><PageHeader title="Chi tiết kỳ công"/><TimesheetPeriodDetail periodId={periodId}/></div>;}
