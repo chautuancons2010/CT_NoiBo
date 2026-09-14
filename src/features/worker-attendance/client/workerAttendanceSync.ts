@@ -73,6 +73,7 @@ export async function syncWorkerDraft(draft: WorkerLocalDraft): Promise<WorkerAt
       const form = new FormData();
       form.set("photo", localPhoto.photo, "worker-attendance.jpg");
       form.set("thumbnail", localPhoto.thumbnail, "worker-attendance-thumbnail.jpg");
+      form.set("photoId", localPhoto.id);
       form.set("width", String(localPhoto.width));
       form.set("height", String(localPhoto.height));
       form.set("capturedAt", localPhoto.capturedAt);

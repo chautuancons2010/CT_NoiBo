@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { Card, StatCard } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -10,10 +10,11 @@ import { FilterBar } from "@/components/shared/FilterBar";
 import { SearchInput, Select } from "@/components/shared/FormControls";
 import { StatusBadge, type StatusBadgeTone } from "@/components/shared/StatusBadge";
 import type { InventoryBalance, InventoryDocument, InventoryDocumentType, InventoryItem, StockCount, StockLedgerEntry, Warehouse, WarehouseDashboard } from "@/features/warehouse/types/warehouseTypes";
+import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 
 type ApiBody<T>={ok:boolean;data?:T;error?:{message?:string}};
 async function api<T>(url:string):Promise<T>{const response=await fetch(url,{cache:"no-store"}),body=await response.json() as ApiBody<T>;if(!response.ok||!body.data)throw new Error(body.error?.message||"Không thể tải dữ liệu.");return body.data;}
-function useWarehouseData<T>(url:string){const[data,setData]=useState<T>(),[error,setError]=useState<string>();useEffect(()=>{let active=true;void api<T>(url).then((value)=>{if(active)setData(value);}).catch((reason)=>{if(active)setError(reason instanceof Error?reason.message:"Không thể tải dữ liệu.");});return()=>{active=false;};},[url]);return{data,error,loading:!data&&!error};}
+function useWarehouseData<T>(url:string){const[data,setData]=useState<T>(),[error,setError]=useState<string>();const load=useCallback(()=>api<T>(url).then((value)=>{setData(value);setError(undefined);return value;}).catch((reason)=>{setError(reason instanceof Error?reason.message:"Không thể tải dữ liệu.");}),[url]);useEffect(()=>{void load();},[load]);useDomainReconciliation("warehouse",load);return{data,error,loading:!data&&!error};}
 const number=new Intl.NumberFormat("vi-VN",{maximumFractionDigits:4});
 const statusLabels:Record<string,string>={draft:"Nháp",submitted:"Đã gửi",posted:"Đã ghi sổ",cancelled:"Đã hủy",reversed:"Đã đảo",counting:"Đang kiểm",reviewed:"Đã đối chiếu",active:"Hoạt động",inactive:"Ngừng dùng",in_stock:"Còn hàng",low_stock:"Sắp hết",out_of_stock:"Hết hàng"};
 function badge(value:string){const tone:StatusBadgeTone=value==="posted"||value==="active"||value==="in_stock"?"success":value==="low_stock"||value==="submitted"||value==="reviewed"?"warning":value==="out_of_stock"||value==="cancelled"?"error":"neutral";return <StatusBadge tone={tone}>{statusLabels[value]??value}</StatusBadge>;}

@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { cacheWorkerTasks, deleteWorkerDraft, getLatestCachedWorkerTasks, listWorkerDrafts, saveWorkerDraft, type CachedWorkerTasks, type WorkerLocalDraft } from "@/features/worker-attendance/client/workerDraftStore";
 import { readWorkerResponse } from "@/features/worker-attendance/client/workerAttendanceSync";
 import type { WorkerAttendanceSession, WorkerAttendanceTask } from "@/features/worker-attendance/types/workerAttendanceTypes";
+import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 
 const sessionLabels: Record<string, string> = { draft: "Nháp", in_progress: "Đang làm", submitted: "Đã gửi", locked: "Đã khóa", needs_review: "Cần rà soát" };
 const sessionTones: Record<string, "neutral" | "info" | "success" | "warning"> = { draft: "neutral", in_progress: "info", submitted: "success", locked: "neutral", needs_review: "warning" };
@@ -71,6 +72,7 @@ export function WorkerAttendanceToday() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+  useDomainReconciliation("worker-attendance", load);
 
   async function start(task: WorkerAttendanceTask) {
     if (task.existingSessionId) {
@@ -124,7 +126,9 @@ export function WorkerAttendanceSessionList() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState("");
-  useEffect(() => { fetch("/api/v1/worker-attendance/sessions", { cache: "no-store" }).then(readWorkerResponse<WorkerAttendanceSession[]>).then(setSessions).catch((caught) => setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu.")); }, []);
+  const load = useCallback(() => fetch("/api/v1/worker-attendance/sessions", { cache: "no-store" }).then(readWorkerResponse<WorkerAttendanceSession[]>).then(setSessions).catch((caught) => setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu.")), []);
+  useEffect(() => { void load(); }, [load]);
+  useDomainReconciliation("worker-attendance", load);
   const visible = useMemo(() => sessions.filter((session) => (!from || session.date >= from) && (!to || session.date <= to) && (!status || session.status === status)), [from, sessions, status, to]);
   if (error) return <Card><div className="form-message form-message--error">{error}</div></Card>;
   return <div className="worker-session-list"><div className="worker-session-filters"><Input label="Từ ngày" onChange={(event) => setFrom(event.target.value)} type="date" value={from} /><Input label="Đến ngày" onChange={(event) => setTo(event.target.value)} type="date" value={to} /><Select label="Trạng thái" onChange={(event) => setStatus(event.target.value)} options={Object.entries(sessionLabels).map(([value, label]) => ({ value, label }))} placeholder="Tất cả" value={status} /></div>{visible.length ? visible.map((session) => <Link className="worker-session-row" href={`/worker-attendance/sessions/${session.id}`} key={session.id}><div><strong>{session.projectName}</strong><span>{session.worksiteName} · {new Date(`${session.date}T00:00:00`).toLocaleDateString("vi-VN")}</span></div><StatusBadge tone={sessionTones[session.status]}>{sessionLabels[session.status]}</StatusBadge></Link>) : <Card><div className="empty-compact">Chưa có phiên điểm danh.</div></Card>}</div>;

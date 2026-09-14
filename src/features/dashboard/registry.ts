@@ -9,6 +9,7 @@ import {
   type DashboardSettings,
   type DashboardWidgetKey
 } from "@/features/dashboard/types";
+import { shouldUseWorkspace } from "@/lib/auth/applicationAccess";
 
 interface DashboardProfileDefinition {
   key: DashboardProfileKey;
@@ -83,6 +84,11 @@ export function canUseDashboardProfile(user: AuthenticatedUser, profile: Dashboa
 }
 
 export function resolveLandingPage(user: AuthenticatedUser, settings: DashboardSettings): string {
+  if (shouldUseWorkspace(user)) return "/workspace";
+  return resolveRoleLandingPage(user, settings);
+}
+
+export function resolveRoleLandingPage(user: AuthenticatedUser, settings: DashboardSettings): string {
   const profile = resolveDashboardProfile(user, settings);
   const configured = settings.presets.find((item) => item.profile === profile)?.landingPage;
   const candidate = configured ?? dashboardProfiles.find((item) => item.key === profile)?.defaultLandingPage ?? "/dashboard";
@@ -90,6 +96,7 @@ export function resolveLandingPage(user: AuthenticatedUser, settings: DashboardS
 }
 
 export function isLandingPageAllowed(user: AuthenticatedUser, route: string): boolean {
+  if (route === "/workspace") return shouldUseWorkspace(user);
   const required: Array<[string, Permission[]]> = [
     ["/dashboard/management", ["project_monitoring.view_all"]],
     ["/dashboard/import-export", ["import_export.view", "shipment.view"]],

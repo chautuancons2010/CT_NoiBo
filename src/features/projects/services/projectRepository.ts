@@ -69,15 +69,52 @@ async function actorAccountId(client: SupabaseClient, user: AuthenticatedUser): 
   return data?.id ? String(data.id) : undefined;
 }
 
-export async function listProjects(): Promise<ProjectSummary[]> {
+function hasCompanyProjectScope(user: AuthenticatedUser): boolean {
+  return can(user.permissions, "project_monitoring.view_all") || can(user.permissions, "worker_attendance.view_all");
+}
+
+async function scopedProjectIds(client: SupabaseClient, user: AuthenticatedUser): Promise<Set<string> | undefined> {
+  if (hasCompanyProjectScope(user)) return undefined;
+  const accountId = await actorAccountId(client, user);
+  let accountQuery = client.from("app_accounts").select("employee_id").limit(1);
+  accountQuery = accountId ? accountQuery.eq("id", accountId) : accountQuery.eq("primary_email", user.email);
+  const { data: account, error: accountError } = await accountQuery.maybeSingle();
+  if (accountError) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi dự án.");
+  const employeeId = account?.employee_id ? String(account.employee_id) : undefined;
+  const [assignedResult, managedResult, createdResult] = await Promise.all([
+    employeeId
+      ? client.from("project_assignments").select("project_id").eq("employee_id", employeeId).eq("status", "active")
+      : Promise.resolve({ data: [], error: null }),
+    employeeId
+      ? client.from("projects").select("id").eq("project_manager_employee_id", employeeId)
+      : Promise.resolve({ data: [], error: null }),
+    accountId
+      ? client.from("projects").select("id").eq("created_by", accountId)
+      : Promise.resolve({ data: [], error: null })
+  ]);
+  if (assignedResult.error || managedResult.error || createdResult.error) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi dự án.");
+  return new Set([
+    ...(assignedResult.data ?? []).map((row) => String(row.project_id)),
+    ...(managedResult.data ?? []).map((row) => String(row.id)),
+    ...(createdResult.data ?? []).map((row) => String(row.id))
+  ]);
+}
+
+async function assertProjectScope(client: SupabaseClient, user: AuthenticatedUser, projectId: string): Promise<void> {
+  const scope = await scopedProjectIds(client, user);
+  if (scope && !scope.has(projectId)) throw new AppError("NOT_FOUND", "Không tìm thấy dự án.");
+}
+
+export async function listProjects(user?: AuthenticatedUser): Promise<ProjectSummary[]> {
   const client = db();
-  const [{ data, error }, { data: worksites }, { data: assignments }] = await Promise.all([
+  const [{ data, error }, { data: worksites }, { data: assignments }, scope] = await Promise.all([
     client.from("projects").select(projectSelect).order("updated_at", { ascending: false }),
     client.from("worksites").select("project_id,id"),
-    client.from("project_assignments").select("project_id,employee_id").eq("status", "active")
+    client.from("project_assignments").select("project_id,employee_id").eq("status", "active"),
+    user ? scopedProjectIds(client, user) : Promise.resolve(undefined)
   ]);
   if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách dự án.");
-  return (data ?? []).map((item) => {
+  return (data ?? []).filter((item) => !scope || scope.has(String(item.id))).map((item) => {
     const row = item as Row;
     const manager = nested(row, "manager");
     return {
@@ -92,8 +129,9 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   });
 }
 
-export async function getProject(projectId: string): Promise<ProjectDetail> {
+export async function getProject(projectId: string, user?: AuthenticatedUser): Promise<ProjectDetail> {
   const client = db();
+  if (user) await assertProjectScope(client, user, projectId);
   const [{ data, error }, { data: sites, error: siteError }, { data: assignments, error: assignmentError }] = await Promise.all([
     client.from("projects").select(projectSelect).eq("id", projectId).maybeSingle(),
     client.from("worksites").select("*").eq("project_id", projectId).order("name"),
@@ -101,7 +139,8 @@ export async function getProject(projectId: string): Promise<ProjectDetail> {
   ]);
   if (error || !data) throw new AppError("NOT_FOUND", "Không tìm thấy dự án.");
   if (siteError || assignmentError) throw new AppError("SERVER_ERROR", "Không thể đọc dữ liệu dự án.");
-  const summary = (await listProjects()).find((project) => project.id === projectId)!;
+  const summary = (await listProjects(user)).find((project) => project.id === projectId);
+  if (!summary) throw new AppError("NOT_FOUND", "Không tìm thấy dự án.");
   return { ...summary, note: optional(data as Row, "note"), worksites: (sites ?? []).map((row) => mapWorksite(row as Row)), assignments: (assignments ?? []).map((row) => mapAssignment(row as Row)) };
 }
 
@@ -119,13 +158,13 @@ export async function createProject(user: AuthenticatedUser, input: z.infer<type
     throw new AppError("SERVER_ERROR", "Không thể tạo dự án.");
   }
   await recordAuditLog({ actorId: accountId ?? user.id, action: "project.created", entityType: "project", entityId: data.id, after: { code: input.code, status: input.status } });
-  return getProject(data.id);
+  return getProject(data.id, user);
 }
 
 export async function createWorksite(user: AuthenticatedUser, projectId: string, input: z.infer<typeof worksiteInputSchema>): Promise<Worksite> {
   if (!can(user.permissions, "worksite.manage")) throw new AppError("PERMISSION_DENIED");
   const client = db();
-  const project = await getProject(projectId);
+  const project = await getProject(projectId, user);
   if (project.status === "closed") throw new AppError("CONFLICT", "Dự án đã đóng, không thể thêm công trường.");
   const accountId = await actorAccountId(client, user);
   const { data, error } = await client.from("worksites").insert({
@@ -149,7 +188,7 @@ function timesOverlap(firstStart: string, firstEnd: string, secondStart: string,
 export async function createAssignment(user: AuthenticatedUser, projectId: string, input: z.infer<typeof assignmentInputSchema>): Promise<ProjectAssignment> {
   if (!can(user.permissions, "project.manage_team")) throw new AppError("PERMISSION_DENIED");
   const client = db();
-  const project = await getProject(projectId);
+  const project = await getProject(projectId, user);
   if (project.status === "closed") throw new AppError("CONFLICT", "Dự án đã đóng, không thể phân công mới.");
   if (input.worksiteId && !project.worksites.some((site) => site.id === input.worksiteId && site.status === "active")) throw new AppError("VALIDATION_ERROR", "Công trường không hoạt động hoặc không thuộc dự án.");
   const { data: current } = await client.from("project_assignments").select("*").eq("employee_id", input.employeeId).eq("status", "active");
@@ -166,8 +205,9 @@ export async function createAssignment(user: AuthenticatedUser, projectId: strin
   return mapAssignment(data as Row);
 }
 
-export async function getProjectRoster(projectId: string, date: string, worksiteId?: string): Promise<ProjectAssignment[]> {
+export async function getProjectRoster(projectId: string, date: string, worksiteId?: string, user?: AuthenticatedUser): Promise<ProjectAssignment[]> {
   const client = db();
+  if (user) await assertProjectScope(client, user, projectId);
   let query = client.from("project_assignments").select(assignmentSelect).eq("project_id", projectId).eq("status", "active").lte("start_date", date).or("end_date.is.null,end_date.gte." + date);
   if (worksiteId) query = query.eq("worksite_id", worksiteId);
   const { data, error } = await query;
@@ -177,8 +217,8 @@ export async function getProjectRoster(projectId: string, date: string, worksite
   return roster.map(item=>({...item,approvedLeave:leaveByEmployee.get(item.employeeId)}));
 }
 
-export async function getProjectSchedule(projectId: string, from: string, to: string): Promise<DailySchedule[]> {
-  const project = await getProject(projectId);
+export async function getProjectSchedule(projectId: string, from: string, to: string, user?: AuthenticatedUser): Promise<DailySchedule[]> {
+  const project = await getProject(projectId, user);
   const result: DailySchedule[] = [];
   const cursor = new Date(from + "T12:00:00Z");
   const end = new Date(to + "T12:00:00Z");

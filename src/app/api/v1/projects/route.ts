@@ -7,7 +7,7 @@ import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 
 export async function GET() {
-  try { requirePermission(await getRequestUser(), "project.view"); return successResponse(await listProjects()); }
+  try { const user = requirePermission(await getRequestUser(), "project.view"); return successResponse(await listProjects(user)); }
   catch (error) { return errorResponse(error); }
 }
 

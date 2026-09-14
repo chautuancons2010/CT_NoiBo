@@ -10,6 +10,7 @@ export interface BreadcrumbItem {
 }
 
 export const routeMetaByPath: Record<string, RouteMeta> = {
+  "/workspace": { title: "Không gian làm việc", description: "", module: "Tổng quan" },
   "/settings": { title: "Cấu hình nghiệp vụ", description: "", module: "Hệ thống" },
   "/approvals/pending": { title: "Cần tôi duyệt", description: "", module: "Phê duyệt" },
   "/approvals/completed": { title: "Đã hoàn tất", description: "", module: "Phê duyệt" },

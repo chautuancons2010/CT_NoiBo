@@ -8,6 +8,7 @@ import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
 import { StatusBadge, type StatusBadgeTone } from "@/components/shared/StatusBadge";
 import type { DashboardProfileKey, DashboardReadModel, DashboardWidgetKey, DashboardWidgetResult } from "@/features/dashboard/types";
+import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 
 interface ApiBody {
   ok: boolean;
@@ -90,6 +91,7 @@ export function DashboardView({ profile }: { profile?: DashboardProfileKey }) {
     setError("");
     setModel(body.data);
   }, [endpoint]);
+  useDomainReconciliation("dashboard", load);
 
   useEffect(() => {
     const controller = new AbortController();

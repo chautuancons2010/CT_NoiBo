@@ -54,9 +54,13 @@ export function removePendingAttendance(clientEventId: string): Promise<void> {
 export function listPendingAttendance(accountId: string): Promise<PendingAttendanceItem[]> {
   return transactStore("readonly", (store, resolve, reject) => {
     const request = store.index("ownerAccountId").getAll(accountId);
-    request.onsuccess = () => resolve((request.result ?? []) as PendingAttendanceItem[]);
+    request.onsuccess = () => resolve(sortPendingAttendance((request.result ?? []) as PendingAttendanceItem[]));
     request.onerror = () => reject(request.error);
   });
+}
+
+export function sortPendingAttendance(items: PendingAttendanceItem[]): PendingAttendanceItem[] {
+  return [...items].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.clientEventId.localeCompare(b.clientEventId));
 }
 
 export async function countPendingAttendance(accountId: string): Promise<number> {

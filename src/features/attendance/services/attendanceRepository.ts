@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError } from "@/lib/api/errors";
@@ -18,6 +19,14 @@ import type {
 import { recordAuditLog } from "@/services/audit/auditLog";
 
 type Row = Record<string, unknown>;
+
+function deterministicUuid(operationId: string, derivative: "full" | "thumbnail"): string {
+  const value = createHash("sha256").update(`${operationId}:${derivative}`).digest("hex").slice(0, 32).split("");
+  value[12] = "4";
+  value[16] = ((Number.parseInt(value[16] ?? "0", 16) & 3) | 8).toString(16);
+  const hex = value.join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 interface AttendanceIdentity {
   accountId: string;
@@ -331,37 +340,37 @@ export async function uploadAttendancePhoto(
   if (!Number.isInteger(input.width) || !Number.isInteger(input.height) || input.width < 1 || input.height < 1 || input.width > 10000 || input.height > 10000) {
     throw new AppError("PHOTO_UPLOAD", "Kích thước ảnh không hợp lệ.");
   }
-  const photoId = crypto.randomUUID();
+  const photoId = String((eventRow as Row).client_event_id);
   const date = new Date(input.capturedAt);
   const prefix = `${date.getUTCFullYear()}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${identity.employeeId}/${photoId}`;
   const photoPath = `${prefix}.${extension}`;
   const thumbnailPath = `${prefix}-thumb.${extension}`;
   await client.from("attendance_events").update({ photo_status: "uploading" }).eq("id", eventId);
 
-  const uploadedPaths: string[] = [];
   try {
     for (const [path, file] of [[photoPath, input.photo], [thumbnailPath, input.thumbnail]] as const) {
-      const { error } = await client.storage.from("attendance-photos").upload(path, file, { contentType: file.type, upsert: false });
+      const { error } = await client.storage.from("attendance-photos").upload(path, file, { contentType: file.type, upsert: true });
       if (error) throw new AppError("PHOTO_UPLOAD", "Chưa thể tải ảnh lên. Dữ liệu vẫn được giữ trên thiết bị.");
-      uploadedPaths.push(path);
     }
-    const fullAssetId = crypto.randomUUID();
-    const thumbnailAssetId = crypto.randomUUID();
-    const { error: assetError } = await client.from("file_assets").insert([
+    const fullAssetId = deterministicUuid(photoId, "full");
+    const thumbnailAssetId = deterministicUuid(photoId, "thumbnail");
+    const { data: assets, error: assetError } = await client.from("file_assets").upsert([
       { id: fullAssetId, bucket: "attendance-photos", object_path: photoPath, owner_entity_type: "attendance_event", owner_entity_id: eventId, mime_type: input.photo.type, byte_size: input.photo.size, visibility: "private", created_by: identity.accountId, metadata: { derivative: "full" } },
       { id: thumbnailAssetId, bucket: "attendance-photos", object_path: thumbnailPath, owner_entity_type: "attendance_event", owner_entity_id: eventId, mime_type: input.thumbnail.type, byte_size: input.thumbnail.size, visibility: "private", created_by: identity.accountId, metadata: { derivative: "thumbnail" } }
-    ]);
-    if (assetError) throw new AppError("PHOTO_UPLOAD", "Không thể lưu thông tin ảnh.");
-    const { error: photoError } = await client.from("attendance_photos").insert({
+    ], { onConflict: "bucket,object_path" }).select("id,object_path");
+    if (assetError || !assets) throw new AppError("PHOTO_UPLOAD", "Không thể lưu thông tin ảnh.");
+    const resolvedFullId = String(assets.find((asset) => asset.object_path === photoPath)?.id ?? fullAssetId);
+    const resolvedThumbnailId = String(assets.find((asset) => asset.object_path === thumbnailPath)?.id ?? thumbnailAssetId);
+    const { error: photoError } = await client.from("attendance_photos").upsert({
       id: photoId,
       attendance_event_id: eventId,
-      file_id: fullAssetId,
-      thumbnail_file_id: thumbnailAssetId,
+      file_id: resolvedFullId,
+      thumbnail_file_id: resolvedThumbnailId,
       captured_at: input.capturedAt,
       width: input.width,
       height: input.height,
       metadata: { normalizedOrientation: true, source: "camera" }
-    });
+    }, { onConflict: "attendance_event_id" });
     if (photoError) throw new AppError("PHOTO_UPLOAD", "Không thể liên kết ảnh chấm công.");
     const { data: completed, error: updateError } = await client
       .from("attendance_events")
@@ -376,7 +385,8 @@ export async function uploadAttendancePhoto(
   } catch (error) {
     await client.from("attendance_events").update({ photo_status: "upload_failed", sync_status: "sync_failed" }).eq("id", eventId);
     await client.from("attendance_sync_events").insert({ attendance_event_id: eventId, state: "sync_failed", category: "photo_upload" });
-    if (uploadedPaths.length > 0) await client.storage.from("attendance-photos").remove(uploadedPaths);
+    // Deterministic paths are retained for a safe retry. The scheduled orphan cleanup may remove
+    // objects that still have no file_assets/attendance_photos reference after its grace period.
     await recordAuditLog({ actorId: identity.accountId, action: "attendance.photo_upload_failed", entityType: "attendance_event", entityId: eventId });
     throw error;
   }

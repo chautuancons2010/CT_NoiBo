@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import "@fontsource/noto-sans/400.css";
+import "@fontsource/noto-sans/500.css";
+import "@fontsource/noto-sans/600.css";
+import "@fontsource/noto-sans/700.css";
 import "@/app/globals.css";
 import { SystemSettingsProvider } from "@/components/providers/SystemSettingsProvider";
 import { deriveBrandColorTokens } from "@/config/systemSettings";

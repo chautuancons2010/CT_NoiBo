@@ -9,7 +9,7 @@ import { defaultSystemSettings, deriveBrandColorTokens } from "@/config/systemSe
 import { AdminPage } from "@/features/system-admin/components/AdminPage";
 import { useSettingsEditor } from "@/features/system-admin/components/editorUtils";
 
-const colorPresets = ["#0F766E", "#0F5EA8", "#114F8B", "#7C3AED", "#B42318"];
+const colorPresets = ["#19A94A", "#2563EB", "#7C3AED", "#F59E0B", "#DC2625"];
 
 export function AppearancePage() {
   const editor = useSettingsEditor("appearance");

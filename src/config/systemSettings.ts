@@ -43,7 +43,8 @@ export const moduleKeys = [
 
 export type ModuleKey = (typeof moduleKeys)[number];
 
-const nullableAssetUrl = z.string().url().max(2_000).nullable();
+const localAssetPath = z.string().regex(/^\/[A-Za-z0-9/_-]+\.(png|jpe?g|webp|ico)$/i, "Đường dẫn tài sản không hợp lệ.");
+const nullableAssetUrl = z.union([z.string().url().max(2_000), localAssetPath]).nullable();
 const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Mã màu phải có dạng #RRGGBB.");
 
 export const brandingSettingsSchema = z
@@ -222,14 +223,14 @@ export const defaultSystemSettings: SystemSettingsDocument = {
   branding: {
     systemName: "Hệ thống nội bộ Châu Tuấn",
     loginSubtitle: "Quản lý nhân sự, công trường và vận hành",
-    logoMainUrl: null,
+    logoMainUrl: "/brand/chau-tuan-logo.png",
     logoCompactUrl: null,
     logoDarkUrl: null,
     faviconUrl: null,
     assetVersion: 0
   },
   appearance: {
-    primaryColor: "#0F766E",
+    primaryColor: "#19A94A",
     density: "standard",
     tableDensity: "standard",
     defaultPageSize: 20,
@@ -319,10 +320,24 @@ export interface BrandColorTokens {
 }
 
 export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
-  const primary = hexColorSchema.parse(primaryColor).toUpperCase();
+  const configuredPrimary = hexColorSchema.parse(primaryColor).toUpperCase();
+  const primary = configuredPrimary === "#0F766E" ? "#19A94A" : configuredPrimary;
   const whiteContrast = contrastRatio(primary, "#FFFFFF");
   const blackContrast = contrastRatio(primary, "#111827");
   const primaryForeground = whiteContrast >= blackContrast ? "#FFFFFF" : "#111827";
+
+  if (primary === "#19A94A") {
+    return {
+      primary,
+      primaryHover: "#158A3D",
+      primaryActive: "#117533",
+      primarySubtle: "#ECF9F0",
+      primaryBorder: "#A7DFB9",
+      primaryForeground,
+      focusRing: "#19A94A38",
+      contrast: Math.max(whiteContrast, blackContrast)
+    };
+  }
 
   return {
     primary,

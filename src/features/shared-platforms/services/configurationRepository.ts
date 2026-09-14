@@ -38,13 +38,9 @@ export async function publishApprovalWorkflow(user:AuthenticatedUser,input:z.inf
       const{data}=await client.from("roles").select("id").eq("code",code).maybeSingle();if(!data)throw new AppError("VALIDATION_ERROR","Vai trò không tồn tại.");
     }
   }
-  const{data:existing}=await client.from("approval_workflows").select("id,published_version").eq("code",input.code).maybeSingle();
-  let workflowId:string,version:number;
-  if(existing){workflowId=existing.id;version=Number(existing.published_version)+1;const{error}=await client.from("approval_workflows").update({name:input.name,domain_type:input.domainType,expected_processing_hours:input.expectedProcessingHours??null,published_version:version,active:true}).eq("id",workflowId);if(error)throw new AppError("SERVER_ERROR");}
-  else{version=1;const{data,error}=await client.from("approval_workflows").insert({code:input.code,name:input.name,domain_type:input.domainType,expected_processing_hours:input.expectedProcessingHours??null,published_version:version,created_by:actor.accountId}).select("id").single();if(error||!data)throw new AppError("SERVER_ERROR","Không thể tạo quy trình.");workflowId=data.id;}
-  await client.from("approval_workflow_versions").update({status:"retired"}).eq("workflow_id",workflowId).eq("status","published");
-  const{data:workflowVersion,error:versionError}=await client.from("approval_workflow_versions").insert({workflow_id:workflowId,version,status:"published",published_at:new Date().toISOString(),published_by:actor.accountId}).select("id").single();if(versionError||!workflowVersion)throw new AppError("SERVER_ERROR");
-  const{error:stepsError}=await client.from("approval_workflow_steps").insert(input.steps.map((step,index)=>({workflow_version_id:workflowVersion.id,step_order:index+1,step_name:step.stepName,approver_source:step.approverSource,resolver_config:step.resolverConfig})));if(stepsError)throw new AppError("SERVER_ERROR","Không thể lưu bước duyệt.");
+  const{data,error}=await client.rpc("publish_approval_workflow_command",{p_code:input.code,p_name:input.name,p_domain_type:input.domainType,p_expected_processing_hours:input.expectedProcessingHours??null,p_steps:input.steps,p_actor_id:actor.accountId});
+  if(error||!data||typeof data!=="object"||Array.isArray(data))throw new AppError("SERVER_ERROR","Không thể phát hành quy trình.");
+  const result=data as{workflow_id?:unknown;version?:unknown},workflowId=String(result.workflow_id??""),version=Number(result.version);if(!workflowId||!Number.isInteger(version))throw new AppError("SERVER_ERROR","Kết quả phát hành quy trình không hợp lệ.");
   await recordAuditLog({actorId:actor.accountId,action:"approval.workflow_published",entityType:"approval_workflow",entityId:workflowId,after:{version,...input}});return{id:workflowId,version};
 }
 

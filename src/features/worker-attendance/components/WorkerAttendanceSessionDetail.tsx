@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { fetchWorkerSession, readWorkerResponse } from "@/features/worker-attendance/client/workerAttendanceSync";
 import { countWorkerAttendance } from "@/features/worker-attendance/services/workerAttendanceRules";
 import type { WorkerAttendanceEntry, WorkerAttendanceSession } from "@/features/worker-attendance/types/workerAttendanceTypes";
+import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 
 const labels: Record<string, string> = { unconfirmed: "Chưa xác nhận", present: "Có mặt", absent: "Vắng", leave: "Nghỉ phép", late: "Đi trễ", transferred: "Điều chuyển", draft: "Nháp", in_progress: "Đang làm", submitted: "Đã gửi", locked: "Đã khóa", needs_review: "Cần rà soát" };
 
@@ -25,6 +26,7 @@ export function WorkerAttendanceSessionDetail({ sessionId }: { sessionId: string
   const [message, setMessage] = useState("");
   const load = useCallback(() => fetchWorkerSession(sessionId).then(setSession).catch((caught) => setMessage(caught instanceof Error ? caught.message : "Không thể tải phiên.")), [sessionId]);
   useEffect(() => { void load(); }, [load]);
+  useDomainReconciliation("worker-attendance", load);
   const counts = useMemo(() => countWorkerAttendance(session?.entries ?? []), [session]);
   const images = useMemo(() => session?.photos.map((photo, index) => ({ id: photo.id, src: `/api/v1/worker-attendance/photos/${photo.id}`, alt: `Ảnh điểm danh ${index + 1}`, title: `${session.projectName} · Ảnh ${index + 1}`, metadata: { "Thời gian": new Date(photo.capturedAt).toLocaleString("vi-VN") } })) ?? [], [session]);
 

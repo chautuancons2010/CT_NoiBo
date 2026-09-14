@@ -27,6 +27,7 @@ import { countPendingAttendance, listPendingAttendance, savePendingAttendance } 
 import { AttendanceSyncError, syncAttendanceItem } from "@/features/attendance/client/attendanceSync";
 import { matchAttendanceLocation } from "@/features/attendance/services/attendanceRules";
 import type { AttendanceCoordinates, AttendanceDashboard, PendingAttendanceItem } from "@/features/attendance/types/attendanceTypes";
+import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 
 type CaptureStep = "home" | "camera" | "preview" | "saving" | "success";
 type PermissionState = "idle" | "requesting" | "ready" | "denied" | "unavailable";
@@ -81,6 +82,7 @@ export function AttendanceCameraExperience() {
       setLoadError(errorMessage(error));
     }
   }, []);
+  useDomainReconciliation("attendance", loadDashboard);
 
   const syncPending = useCallback(async (manual = false) => {
     if (!dashboard || !navigator.onLine) return;

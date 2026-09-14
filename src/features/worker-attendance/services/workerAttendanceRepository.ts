@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
 
@@ -27,6 +28,14 @@ import type {
 import { recordAuditLog } from "@/services/audit/auditLog";
 
 type Row = Record<string, unknown>;
+
+function deterministicPhotoAssetId(photoId: string, derivative: "full" | "thumbnail"): string {
+  const value = createHash("sha256").update(`${photoId}:${derivative}`).digest("hex").slice(0, 32).split("");
+  value[12] = "4";
+  value[16] = ((Number.parseInt(value[16] ?? "0", 16) & 3) | 8).toString(16);
+  const hex = value.join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 interface Identity {
   accountId: string;
@@ -239,36 +248,40 @@ async function validatePhoto(file: File) {
   if (file.type !== "image/jpeg" || !isJpeg(new Uint8Array(await file.slice(0, 4).arrayBuffer()))) throw new AppError("PHOTO_UPLOAD", "Ảnh phải là JPEG hợp lệ.");
 }
 
-export async function uploadWorkerPhoto(user: AuthenticatedUser, sessionId: string, input: { photo: File; thumbnail: File; width: number; height: number; capturedAt: string }): Promise<WorkerAttendanceSession> {
+export async function uploadWorkerPhoto(user: AuthenticatedUser, sessionId: string, input: { photoId: string; photo: File; thumbnail: File; width: number; height: number; capturedAt: string }): Promise<WorkerAttendanceSession> {
   if (!can(user.permissions, "worker_attendance.create")) throw new AppError("PERMISSION_DENIED");
   const client = db();
   const actor = await identity(client, user);
   const session = await getWorkerSession(user, sessionId);
   if (session.status === "locked") throw new AppError("CONFLICT", "Phiên đã khóa.");
+  const { data: existingPhoto, error: existingPhotoError } = await client.from("worker_attendance_photos").select("id,session_id").eq("id", input.photoId).maybeSingle();
+  if (existingPhotoError) throw new AppError("PHOTO_UPLOAD", "Không thể kiểm tra thao tác tải ảnh.");
+  if (existingPhoto) {
+    if (existingPhoto.session_id !== sessionId) throw new AppError("CONFLICT", "Mã thao tác ảnh đã được sử dụng.");
+    return session;
+  }
   await Promise.all([validatePhoto(input.photo), validatePhoto(input.thumbnail)]);
-  const photoId = crypto.randomUUID();
+  const photoId = input.photoId;
   const prefix = `${session.date.slice(0, 7).replace("-", "/")}/${session.projectId}/${sessionId}/${photoId}`;
   const paths = [`${prefix}.jpg`, `${prefix}-thumb.jpg`];
-  const uploaded: string[] = [];
   try {
     for (const [index, file] of [input.photo, input.thumbnail].entries()) {
-      const { error } = await client.storage.from("worker-attendance-photos").upload(paths[index], file, { contentType: "image/jpeg", upsert: false });
+      const { error } = await client.storage.from("worker-attendance-photos").upload(paths[index], file, { contentType: "image/jpeg", upsert: true });
       if (error) throw new AppError("PHOTO_UPLOAD", "Ảnh chưa thể đồng bộ.");
-      uploaded.push(paths[index]);
     }
-    const fullId = crypto.randomUUID(); const thumbId = crypto.randomUUID();
-    const { error: assetError } = await client.from("file_assets").insert([
+    const fullId = deterministicPhotoAssetId(photoId, "full"); const thumbId = deterministicPhotoAssetId(photoId, "thumbnail");
+    const { error: assetError } = await client.from("file_assets").upsert([
       { id: fullId, bucket: "worker-attendance-photos", object_path: paths[0], owner_entity_type: "worker_attendance_session", owner_entity_id: sessionId, mime_type: "image/jpeg", byte_size: input.photo.size, visibility: "private", created_by: actor.accountId, metadata: { derivative: "full" } },
       { id: thumbId, bucket: "worker-attendance-photos", object_path: paths[1], owner_entity_type: "worker_attendance_session", owner_entity_id: sessionId, mime_type: "image/jpeg", byte_size: input.thumbnail.size, visibility: "private", created_by: actor.accountId, metadata: { derivative: "thumbnail" } }
-    ]);
+    ], { onConflict: "bucket,object_path" });
     if (assetError) throw new AppError("PHOTO_UPLOAD", "Không thể lưu thông tin ảnh.");
-    const { error: photoError } = await client.from("worker_attendance_photos").insert({ id: photoId, session_id: sessionId, file_id: fullId, thumbnail_file_id: thumbId, captured_at: input.capturedAt, sort_order: session.photos.length, width: input.width, height: input.height, metadata: { normalizedOrientation: true } });
+    const { error: photoError } = await client.from("worker_attendance_photos").upsert({ id: photoId, session_id: sessionId, file_id: fullId, thumbnail_file_id: thumbId, captured_at: input.capturedAt, sort_order: session.photos.length, width: input.width, height: input.height, metadata: { normalizedOrientation: true } }, { onConflict: "id" });
     if (photoError) throw new AppError("PHOTO_UPLOAD", "Không thể liên kết ảnh với phiên.");
     await client.from("worker_attendance_sessions").update({ photo_status: "uploaded" }).eq("id", sessionId);
     await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.photo_linked", entityType: "worker_attendance_session", entityId: sessionId, metadata: { photoId } });
     return getWorkerSession(user, sessionId);
   } catch (error) {
-    if (uploaded.length) await client.storage.from("worker-attendance-photos").remove(uploaded);
+    // Retain deterministic objects so the same client operation can safely resume after a lost response.
     await client.from("worker_attendance_sessions").update({ photo_status: "upload_failed", sync_status: "sync_failed" }).eq("id", sessionId);
     throw error;
   }

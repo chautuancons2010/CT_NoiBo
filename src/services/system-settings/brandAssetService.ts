@@ -74,8 +74,8 @@ function validateDimensions(bytes: Uint8Array, mimeType: string, assetType: Bran
   if (square && (ratio < 0.8 || ratio > 1.2)) {
     throw new AppError("VALIDATION_ERROR", "Ảnh cần có tỷ lệ 1:1.");
   }
-  if (!square && (ratio < 2 || ratio > 6)) {
-    throw new AppError("VALIDATION_ERROR", "Logo ngang cần có tỷ lệ từ 2:1 đến 6:1.");
+  if (!square && (ratio < 0.65 || ratio > 6)) {
+    throw new AppError("VALIDATION_ERROR", "Tỷ lệ logo cần nằm trong khoảng 0,65:1 đến 6:1.");
   }
 }
 

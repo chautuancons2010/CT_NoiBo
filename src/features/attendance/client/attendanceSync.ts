@@ -3,6 +3,7 @@
 import { removePendingAttendance, savePendingAttendance } from "./attendanceQueue";
 import { retryDelayMilliseconds } from "@/features/attendance/services/attendanceRules";
 import type { AttendanceRecordResult, PendingAttendanceItem } from "@/features/attendance/types/attendanceTypes";
+import { withAttendanceSyncLock } from "@/features/attendance/client/attendanceSyncLock";
 
 interface ApiResponse<T> {
   ok: boolean;
@@ -24,7 +25,7 @@ async function readResponse<T>(response: Response): Promise<T> {
   return body.data;
 }
 
-export async function syncAttendanceItem(item: PendingAttendanceItem): Promise<AttendanceRecordResult> {
+async function syncAttendanceItemUnlocked(item: PendingAttendanceItem): Promise<AttendanceRecordResult> {
   const syncing: PendingAttendanceItem = { ...item, syncState: "syncing" };
   let serverEventId = syncing.serverEventId;
   await savePendingAttendance(syncing);
@@ -95,4 +96,8 @@ export async function syncAttendanceItem(item: PendingAttendanceItem): Promise<A
     });
     throw error;
   }
+}
+
+export function syncAttendanceItem(item: PendingAttendanceItem): Promise<AttendanceRecordResult> {
+  return withAttendanceSyncLock(item.ownerAccountId, () => syncAttendanceItemUnlocked(item));
 }

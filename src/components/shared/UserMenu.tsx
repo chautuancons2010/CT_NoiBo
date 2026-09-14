@@ -1,12 +1,32 @@
 "use client";
 
 import { LogOut, Settings, UserRound } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
+import { can } from "@/lib/auth/permissions";
 import { Avatar } from "@/components/shared/Avatar";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
+import { clearSupabaseRealtimeAuthentication } from "@/lib/supabase/client";
 
 export function UserMenu({ user }: { user: AuthenticatedUser }) {
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function logout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" });
+    } finally {
+      clearSupabaseRealtimeAuthentication();
+      router.replace("/login");
+      router.refresh();
+    }
+  }
+
   return (
     <DropdownMenu
       label="Mở menu người dùng"
@@ -22,17 +42,17 @@ export function UserMenu({ user }: { user: AuthenticatedUser }) {
           <strong>{user.displayName}</strong>
           <span>@{user.username}</span>
         </p>
-        <a href="/profile">
+        <Link href="/profile">
           <UserRound aria-hidden="true" size={16} />
           Hồ sơ cá nhân
-        </a>
-        <a href="/settings/users">
+        </Link>
+        {can(user.permissions, "user.view") ? <Link href="/settings/users">
           <Settings aria-hidden="true" size={16} />
           Thiết lập tài khoản
-        </a>
-        <button type="button">
+        </Link> : null}
+        <button disabled={loggingOut} onClick={() => void logout()} type="button">
           <LogOut aria-hidden="true" size={16} />
-          Đăng xuất
+          {loggingOut ? "Đang đăng xuất…" : "Đăng xuất"}
         </button>
       </div>
     </DropdownMenu>

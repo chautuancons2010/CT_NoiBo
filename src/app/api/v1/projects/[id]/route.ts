@@ -9,6 +9,6 @@ import { requirePermission } from "@/services/authorization/requirePermission";
 
 const paramsSchema = z.object({ id: z.string().uuid() });
 export async function GET(_request: Request, context: RouteContext<"/api/v1/projects/[id]">) {
-  try { requirePermission(await getRequestUser(), "project.view"); const { id } = parseWithSchema(paramsSchema, await context.params); return successResponse(await getProject(id)); }
+  try { const user = requirePermission(await getRequestUser(), "project.view"); const { id } = parseWithSchema(paramsSchema, await context.params); return successResponse(await getProject(id, user)); }
   catch (error) { return errorResponse(error); }
 }

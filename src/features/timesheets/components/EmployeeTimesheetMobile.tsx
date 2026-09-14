@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, TriangleAlert } from "lucide-react";
 import { Card } from "@/components/shared/Card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 import type { DailyTimesheet, TimesheetPeriod, TimesheetSummary } from "../types/timesheetTypes";
 
 const label: Record<string,string> = { full_work:"Đủ công",late:"Đi trễ",early_leave:"Về sớm",missing_check_in:"Thiếu chấm vào",missing_check_out:"Thiếu chấm ra",annual_leave:"Nghỉ phép",unpaid_leave:"Nghỉ không lương",absent:"Vắng",business_trip:"Công tác",holiday:"Ngày lễ",rest_day:"Ngày nghỉ",worker_site:"Công trường",needs_review:"Cần rà soát" };
@@ -14,7 +15,9 @@ export function EmployeeTimesheetMobile({ periodId, employeeId }:{ periodId:stri
   const [daily,setDaily]=useState<DailyTimesheet[]>([]);
   const [summary,setSummary]=useState<TimesheetSummary>();
   const [error,setError]=useState("");
-  useEffect(()=>{const timer=window.setTimeout(()=>fetch(`/api/v1/timesheet-periods/${periodId}`).then(async response=>{const body=await response.json();if(!response.ok)throw new Error(body.error?.message);setPeriod(body.data.period);setDaily(body.data.daily.filter((item:DailyTimesheet)=>item.employeeId===employeeId));setSummary(body.data.summaries.find((item:TimesheetSummary)=>item.employeeId===employeeId));}).catch(value=>setError(value.message)),0);return()=>window.clearTimeout(timer);},[periodId,employeeId]);
+  const load=useCallback(()=>fetch(`/api/v1/timesheet-periods/${periodId}`).then(async response=>{const body=await response.json();if(!response.ok)throw new Error(body.error?.message);setPeriod(body.data.period);setDaily(body.data.daily.filter((item:DailyTimesheet)=>item.employeeId===employeeId));setSummary(body.data.summaries.find((item:TimesheetSummary)=>item.employeeId===employeeId));}).catch(value=>setError(value.message)),[periodId,employeeId]);
+  useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(timer);},[load]);
+  useDomainReconciliation("timesheets",load);
   const grouped=useMemo(()=>[...daily].sort((a,b)=>b.workDate.localeCompare(a.workDate)),[daily]);
   if(error)return <Card><p className="form-error">{error}</p></Card>;
   if(!period)return <Card>Đang tải…</Card>;

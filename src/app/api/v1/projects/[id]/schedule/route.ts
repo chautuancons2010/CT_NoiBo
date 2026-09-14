@@ -10,6 +10,6 @@ import { requirePermission } from "@/services/authorization/requirePermission";
 const paramsSchema = z.object({ id: z.string().uuid() });
 const querySchema = z.object({ from: z.string().date(), to: z.string().date() });
 export async function GET(request: Request, context: RouteContext<"/api/v1/projects/[id]/schedule">) {
-  try { requirePermission(await getRequestUser(), "project.view"); const { id } = parseWithSchema(paramsSchema, await context.params); const query = parseWithSchema(querySchema, Object.fromEntries(new URL(request.url).searchParams)); return successResponse(await getProjectSchedule(id, query.from, query.to)); }
+  try { const user = requirePermission(await getRequestUser(), "project.view"); const { id } = parseWithSchema(paramsSchema, await context.params); const query = parseWithSchema(querySchema, Object.fromEntries(new URL(request.url).searchParams)); return successResponse(await getProjectSchedule(id, query.from, query.to, user)); }
   catch (error) { return errorResponse(error); }
 }
