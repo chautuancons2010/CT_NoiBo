@@ -15,6 +15,11 @@ const serverEnvSchema = clientEnvSchema.extend({
   API_KEY_PEPPER: z.string().optional().or(z.literal("")),
   INTEGRATION_ENCRYPTION_KEY: z.string().optional().or(z.literal("")),
   INTEGRATION_WORKER_SECRET: z.string().optional().or(z.literal("")),
+  OPERATIONS_CRON_SECRET: z.string().optional().or(z.literal("")),
+  SESSION_HASH_PEPPER: z.string().optional().or(z.literal("")),
+  BACKUP_LAST_VERIFIED_AT: z.string().datetime().optional().or(z.literal("")),
+  RELEASE_SHA: z.string().max(128).default("development"),
+  RELEASE_ENVIRONMENT: z.enum(["development", "staging", "production", "test"]).default("development"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info")
 });
 
@@ -42,6 +47,11 @@ export function getServerEnv(): ServerEnv {
     API_KEY_PEPPER: process.env.API_KEY_PEPPER,
     INTEGRATION_ENCRYPTION_KEY: process.env.INTEGRATION_ENCRYPTION_KEY,
     INTEGRATION_WORKER_SECRET: process.env.INTEGRATION_WORKER_SECRET,
+    OPERATIONS_CRON_SECRET: process.env.OPERATIONS_CRON_SECRET,
+    SESSION_HASH_PEPPER: process.env.SESSION_HASH_PEPPER,
+    BACKUP_LAST_VERIFIED_AT: process.env.BACKUP_LAST_VERIFIED_AT,
+    RELEASE_SHA: process.env.RELEASE_SHA,
+    RELEASE_ENVIRONMENT: process.env.RELEASE_ENVIRONMENT,
     LOG_LEVEL: process.env.LOG_LEVEL
   });
 }

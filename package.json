@@ -11,7 +11,11 @@
     "typegen": "next typegen",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "validate:migrations": "node scripts/validate-migrations.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "migration:dry-run": "node scripts/migration/dry-run.mjs",
+    "bootstrap:admin": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
     "@fontsource/noto-sans": "^5.3.0",

@@ -1,49 +1,37 @@
 # Hệ thống nội bộ Châu Tuấn
 
-Foundation cho hệ thống quản trị nội bộ Châu Tuấn, xây bằng Next.js App Router, TypeScript strict và Supabase-ready architecture.
+Next.js 16 App Router + TypeScript strict + Supabase. Release candidate 0.1.0 gồm HR/RBAC, attendance, leave/timesheet, project, warehouse, XNK, shared platform, integrations và operations hardening.
 
-## Stack
-
-- Next.js App Router cho routing thật, deep link và production build.
-- React + TypeScript strict cho UI.
-- CSS design tokens trong `src/app/globals.css`.
-- Zod cho validation client/server.
-- Supabase-ready client/server boundary, chưa commit secret.
-- Vitest cho test foundation.
-
-## Chạy local
+## Local setup
 
 ```bash
-npm install
+npm ci
+copy .env.example .env.local
 npm run dev
 ```
 
-Mở `http://localhost:3000/dashboard`.
-
-## Environment
-
-Copy các biến từ `.env.example` sang `.env.local` và điền Supabase:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-```
-
-`SUPABASE_SERVICE_ROLE_KEY` chỉ được dùng server-side.
+Áp dụng toàn bộ `supabase/migrations` trước khi đăng nhập. Tạo admin trực tiếp bằng tên tài khoản: đặt mật khẩu trong biến tạm `BOOTSTRAP_ADMIN_PASSWORD`, rồi chạy `npm run bootstrap:admin -- --username=<username> --name=<name>`. Script không gửi email và không có mật khẩu mặc định.
 
 ## Quality gate
 
 ```bash
+npm run validate:migrations
 npm run lint
 npm run typecheck
-npm run test
+npm test
 npm run build
 ```
 
-## Supabase
+Smoke trên deployment: đặt `SMOKE_BASE_URL` rồi chạy `npm run smoke`.
 
-Migration nền tảng nằm tại `supabase/migrations/202609090001_foundation_system_primitives.sql`.
+## Documentation
 
-Prompt 1 chỉ tạo system primitives: account mapping, role/permission, configuration, audit log, file metadata và webhook foundation. Không tạo domain tables cho nhân sự, chấm công, kho hoặc xuất nhập khẩu ở bước này.
-Tài liệu module theo dõi dự án: [docs/project-monitoring.md](docs/project-monitoring.md).
+- [Production readiness](docs/operations/production-readiness.md), [deployment](docs/operations/deployment.md), [backup/restore](docs/operations/backup-restore.md), [security runbook](docs/operations/security-runbook.md)
+- [Architecture](docs/architecture/README.md), [data dictionary](docs/architecture/data-dictionary.md), [business rules](docs/architecture/business-rules.md)
+- [Permission catalog](docs/security/permissions.md), [settings catalog](docs/configuration/settings-catalog.md)
+- [QA matrix](docs/qa/qa-matrix.md), [test report](docs/qa/test-report.md), [UAT sign-off](docs/uat/uat-signoff.md)
+- [Migration inventory](docs/migration/data-inventory.md), [mapping](docs/migration/mapping.md), [runbook](docs/migration/runbook.md), [validation report](docs/migration/validation-report.md)
+- [Go-live checklist](docs/go-live/go-live-checklist.md), [blockers](docs/go-live/blockers.md), [scorecard](docs/go-live/readiness-scorecard.md), [evidence](docs/go-live/evidence/README.md)
+- Role guides: [Employee](docs/user-guide/employee.md), [Supervisor](docs/user-guide/supervisor.md), [HR](docs/user-guide/hr.md), [Warehouse](docs/user-guide/warehouse.md), [XNK](docs/user-guide/import-export.md), [Manager](docs/user-guide/manager.md), [Admin](docs/user-guide/admin.md)
+
+Current technical readiness is **NOT READY** until production/staging configuration, verified backup/restore drill, real migration reconciliation, device pilot and business UAT evidence exist.

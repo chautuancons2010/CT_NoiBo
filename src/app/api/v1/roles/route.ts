@@ -5,9 +5,8 @@ import { errorResponse } from "@/lib/api/errors";
 import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
-import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
 import { getPermissionGroups, permissionCatalog } from "@/services/authorization/rbacService";
-import { createRoleInRepository, getRolesFromRepository } from "@/services/authorization/roleRepository";
+import { createPersistedRole, listPersistedRoles } from "@/services/authorization/rolePersistenceService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 import { recordAuditLog } from "@/services/audit/auditLog";
@@ -28,14 +27,8 @@ export async function GET() {
   try {
     const user = await getRequestUser();
     requirePermission(user, "role.view");
-    const accounts = (await getEmployeeDataSetAsync()).accounts.map((account) => ({
-      accountId: account.id,
-      status: account.status,
-      roleIds: account.roleIds
-    }));
-
     return successResponse({
-      roles: getRolesFromRepository(accounts),
+      roles: await listPersistedRoles(),
       permissionGroups: getPermissionGroups()
     });
   } catch (error) {
@@ -49,7 +42,7 @@ export async function POST(request: Request) {
     const user = await getRequestUser();
     const authorizedUser = requirePermission(user, "role.manage");
     const input = parseWithSchema(roleCreateSchema, await request.json());
-    const role = createRoleInRepository(input);
+    const role = await createPersistedRole(input);
 
     await recordAuditLog({
       actorId: authorizedUser.id,

@@ -4,10 +4,8 @@ import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
 import { patchEmployeeSchema } from "@/features/employees/schemas/employeeSchemas";
 import { getEmployeeDetail } from "@/features/employees/services/employeeService";
-import {
-  getEmployeeDataSetAsync,
-  patchEmployeeInRepository
-} from "@/features/employees/services/employeeRepository";
+import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
+import { patchEmployee } from "@/features/employees/services/employeeMutationService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 import { recordAuditLog } from "@/services/audit/auditLog";
@@ -52,7 +50,7 @@ export async function PATCH(
     const authorizedUser = requirePermission(user, requiredPermission);
     const { id } = await params;
 
-    const result = patchEmployeeInRepository(id, input, authorizedUser.id);
+    const rowVersion = await patchEmployee(id, input, authorizedUser.id);
     const detail = getEmployeeDetail(id, authorizedUser.permissions, await getEmployeeDataSetAsync());
 
     await recordAuditLog({
@@ -61,13 +59,13 @@ export async function PATCH(
       entityType: "employee",
       entityId: id,
       before: { rowVersion: input.rowVersion },
-      after: { rowVersion: result.employee.rowVersion },
+      after: { rowVersion },
       reason: input.reason ?? input.terminationReason
     });
 
     return successResponse({
       employee: detail,
-      historyEvents: result.historyEvents
+      historyEvents: []
     });
   } catch (error) {
     logger.error("api.employees.patch_failed");

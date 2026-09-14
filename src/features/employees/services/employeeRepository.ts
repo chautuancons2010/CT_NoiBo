@@ -58,7 +58,10 @@ export function getEmployeeDataSet(): EmployeeDataSet {
 }
 
 export async function getEmployeeDataSetAsync(): Promise<EmployeeDataSet> {
-  return (await getEmployeeDataSetFromSupabase()) ?? getEmployeeDataSet();
+  const persisted = await getEmployeeDataSetFromSupabase();
+  if (persisted) return persisted;
+  if (process.env.NODE_ENV === "test") return getEmployeeDataSet();
+  throw new AppError("SERVER_ERROR", "Kho dữ liệu nhân sự chưa được cấu hình.");
 }
 
 export function createEmployeeInRepository(

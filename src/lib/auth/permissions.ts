@@ -190,7 +190,10 @@ export type Permission =
   | "import.execute"
   | "api_docs.view"
   | "file.read"
-  | "webhook.publish";
+  | "webhook.publish"
+  | "operations.view"
+  | "operations.run"
+  | "jobs.retry";
 
 export type PermissionSet = ReadonlySet<Permission>;
 
@@ -199,6 +202,7 @@ export type AccountStatus = "pending_activation" | "active" | "disabled" | "lock
 export interface AuthenticatedUser {
   id: string;
   displayName: string;
+  username: string;
   email: string;
   status: AccountStatus;
   permissions: Permission[];
@@ -396,7 +400,10 @@ export const allFoundationPermissions: Permission[] = [
   "import.execute",
   "api_docs.view",
   "file.read",
-  "webhook.publish"
+  "webhook.publish",
+  "operations.view",
+  "operations.run",
+  "jobs.retry"
 ];
 
 export function createPermissionSet(permissions: readonly Permission[]): PermissionSet {

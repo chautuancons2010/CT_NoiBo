@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import type { Permission } from "@/lib/auth/permissions";
 import { allowedFields, type ReportField } from "./reportFieldRegistry";
 import type { ReportTemplate } from "../types/timesheetTypes";
+import { sanitizeSpreadsheetCell } from "@/lib/security/filePolicy";
 
 type RecordRow = Record<string, unknown>;
 
@@ -67,16 +68,16 @@ function localize(value: unknown): unknown {
 }
 
 function cellValue(field: ReportField, value: unknown): ExcelJS.CellValue {
-  if (field.format === "status" || field.format === "boolean") return localize(value) as ExcelJS.CellValue;
-  if (Array.isArray(value)) return value.join(", ");
+  if (field.format === "status" || field.format === "boolean") return sanitizeSpreadsheetCell(localize(value)) as ExcelJS.CellValue;
+  if (Array.isArray(value)) return sanitizeSpreadsheetCell(value.join(", ")) as ExcelJS.CellValue;
   if ((field.format === "date" || field.format === "datetime") && typeof value === "string" && value) {
     const parsed = new Date(field.format === "date" ? `${value}T00:00:00Z` : value);
-    return Number.isNaN(parsed.getTime()) ? value : parsed;
+    return Number.isNaN(parsed.getTime()) ? sanitizeSpreadsheetCell(value) as ExcelJS.CellValue : parsed;
   }
   if (field.format === "link" && typeof value === "string" && value) {
     return { text: "Mở ảnh", hyperlink: value, tooltip: "Ảnh chấm công" };
   }
-  return (value ?? "") as ExcelJS.CellValue;
+  return sanitizeSpreadsheetCell(value ?? "") as ExcelJS.CellValue;
 }
 
 export async function generateReportWorkbook(input: {

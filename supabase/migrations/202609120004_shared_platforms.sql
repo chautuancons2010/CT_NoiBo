@@ -116,7 +116,7 @@ create table if not exists public.system_notices (
 create table if not exists public.business_configuration_catalog (
   key text primary key, group_key text not null, label text not null, route text not null, permission_key text not null,
   status text not null default 'active' check(status in ('active','inactive')), effective_from date, effective_to date,
-  sort_order integer not null default 100, unique(route), check(effective_to is null or effective_from is null or effective_to >= effective_from)
+  sort_order integer not null default 100, check(effective_to is null or effective_from is null or effective_to >= effective_from)
 );
 
 alter table public.audit_logs add column if not exists actor_employee_id uuid references public.employees(id);

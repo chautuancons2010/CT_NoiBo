@@ -11,6 +11,7 @@ import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { recordAuditLog } from "@/services/audit/auditLog";
 import { createProjectUpdateTitle, isProjectStale, sortIssuesByPriority } from "@/features/projects/services/projectUpdateRules";
+import { safeUploadName, validateUploadedFile } from "@/lib/security/filePolicy";
 
 type Row = Record<string, unknown>;
 
@@ -227,11 +228,12 @@ export async function uploadProjectUpdateAttachment(user: AuthenticatedUser, upd
   const current = await getProjectUpdate(user, updateId);
   if (current.publishStatus === "archived") throw new AppError("CONFLICT", "Cập nhật đã lưu trữ.");
   const attachmentType = allowedAttachments[file.type];
-  if (!attachmentType || file.size <= 0 || file.size > 10 * 1024 * 1024) throw new AppError("VALIDATION_ERROR", "Tệp không đúng định dạng hoặc vượt quá 10 MB.");
+  if (!attachmentType) throw new AppError("VALIDATION_ERROR", "Tệp không đúng định dạng.");
+  const bytes = await validateUploadedFile(file, { allowedMimeTypes: Object.keys(allowedAttachments), maxBytes: 10 * 1024 * 1024 });
   const client = db(); const identity = await actor(client, user); const assetId = crypto.randomUUID();
-  const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || "attachment";
+  const safeName = safeUploadName(file.name, "attachment");
   const objectPath = `${current.projectId}/${updateId}/${assetId}-${safeName}`;
-  const { error: uploadError } = await client.storage.from("project-update-files").upload(objectPath, file, { contentType: file.type, upsert: false });
+  const { error: uploadError } = await client.storage.from("project-update-files").upload(objectPath, bytes, { contentType: file.type, upsert: false });
   if (uploadError) throw new AppError("PHOTO_UPLOAD", "Không thể tải tệp lên. Nội dung cập nhật vẫn được giữ.");
   const { error: assetError } = await client.from("file_assets").insert({ id: assetId, bucket: "project-update-files", object_path: objectPath, owner_entity_type: "project_update", owner_entity_id: updateId, mime_type: file.type, byte_size: file.size, visibility: "private", created_by: identity.accountId ?? null, metadata: { originalName: file.name } });
   if (assetError) throw new AppError("SERVER_ERROR", "Không thể lưu thông tin tệp.");

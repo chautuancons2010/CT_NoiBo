@@ -5,7 +5,7 @@ import { defaultDashboardSettings, enabledWidgetsFor, resolveDashboardProfile, r
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
 
 function user(permissions: Permission[]): AuthenticatedUser {
-  return { id: "test", displayName: "Test", email: "test@example.com", status: "active", permissions };
+  return { id: "test", displayName: "Test", username: "test", email: "test@example.com", status: "active", permissions };
 }
 
 describe("permission-driven dashboard registry", () => {

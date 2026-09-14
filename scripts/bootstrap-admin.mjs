@@ -1,0 +1,63 @@
+import { createClient } from "@supabase/supabase-js";
+
+const args = Object.fromEntries(process.argv.slice(2).map((value) => {
+  const [key, ...rest] = value.replace(/^--/, "").split("=");
+  return [key, rest.join("=")];
+}));
+const username = String(args.username || "").trim().toLowerCase();
+const displayName = String(args.name || "").trim();
+const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!url || !key || !displayName || !/^[a-z][a-z0-9._-]{2,31}$/.test(username) || !password || password.length < 12) {
+  throw new Error("Cần Supabase URL/secret, --username hợp lệ, --name và BOOTSTRAP_ADMIN_PASSWORD từ 12 ký tự.");
+}
+
+const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+let accountQuery = client.from("app_accounts").select("id,auth_user_id,primary_email");
+accountQuery = args["existing-email"]
+  ? accountQuery.eq("primary_email", String(args["existing-email"]).trim().toLowerCase())
+  : accountQuery.eq("username", username);
+const { data: existing, error: existingError } = await accountQuery.maybeSingle();
+if (existingError) throw existingError;
+
+let authUserId = existing?.auth_user_id;
+const internalEmail = existing?.primary_email || `${username}@accounts.chautuan.local`;
+if (authUserId) {
+  const { error } = await client.auth.admin.updateUserById(authUserId, {
+    password,
+    email_confirm: true,
+    user_metadata: { display_name: displayName, username }
+  });
+  if (error) throw error;
+} else {
+  const { data, error } = await client.auth.admin.createUser({
+    email: internalEmail,
+    password,
+    email_confirm: true,
+    user_metadata: { display_name: displayName, username }
+  });
+  if (error || !data.user) throw error || new Error("Không thể tạo Supabase Auth user.");
+  authUserId = data.user.id;
+}
+
+const accountPayload = {
+  auth_user_id: authUserId,
+  username,
+  display_name: displayName,
+  primary_email: internalEmail,
+  status: "active"
+};
+const accountResult = existing
+  ? await client.from("app_accounts").update(accountPayload).eq("id", existing.id).select("id").single()
+  : await client.from("app_accounts").insert(accountPayload).select("id").single();
+if (accountResult.error || !accountResult.data) throw accountResult.error || new Error("Không thể tạo app account.");
+
+const { data: role, error: roleError } = await client.from("roles").select("id").eq("code", "admin").single();
+if (roleError || !role) throw roleError || new Error("Không tìm thấy vai trò admin.");
+const { error: grantError } = await client.from("account_roles").upsert(
+  { account_id: accountResult.data.id, role_id: role.id },
+  { onConflict: "account_id,role_id" }
+);
+if (grantError) throw grantError;
+console.log(`Admin '${username}' đã được tạo trực tiếp; không gửi email.`);

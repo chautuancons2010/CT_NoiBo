@@ -3,7 +3,9 @@ import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
 import { provisionAccountSchema } from "@/features/employees/schemas/employeeSchemas";
-import { provisionAccountInRepository } from "@/features/employees/services/employeeRepository";
+import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
+import { provisionAccount } from "@/features/employees/services/employeeMutationService";
+import { findAccountForEmployee, toEmployeeAccountView } from "@/features/employees/services/employeeService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 import { recordAuditLog } from "@/services/audit/auditLog";
@@ -21,20 +23,21 @@ export async function POST(
     const authorizedUser = requirePermission(user, "account.create");
     const { id } = await params;
     const input = parseWithSchema(provisionAccountSchema, await request.json());
-    const result = provisionAccountInRepository(id, input, authorizedUser.id);
+    const accountId = await provisionAccount(id, input, authorizedUser.id);
+    const account = findAccountForEmployee(id, await getEmployeeDataSetAsync());
+    if (!account) throw new Error("Provisioned account could not be reloaded");
 
     await recordAuditLog({
       actorId: authorizedUser.id,
       action: "account.provisioned",
       entityType: "account",
-      entityId: result.account.id,
-      after: { employeeId: id, status: result.account.status, roleIds: result.account.roleIds }
+      entityId: accountId,
+      after: { employeeId: id, status: account.status, roleIds: account.roleIds }
     });
 
     return successResponse(
       {
-        account: result.accountView,
-        historyEvent: result.historyEvent
+        account: toEmployeeAccountView(account)
       },
       { status: 201 }
     );

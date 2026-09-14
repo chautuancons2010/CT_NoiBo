@@ -6,8 +6,7 @@ import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
 import { permissionCatalog } from "@/services/authorization/rbacService";
-import { updateRoleInRepository } from "@/services/authorization/roleRepository";
-import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
+import { updatePersistedRole } from "@/services/authorization/rolePersistenceService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 import { recordAuditLog } from "@/services/audit/auditLog";
@@ -37,12 +36,7 @@ export async function PATCH(
     const authorizedUser = requirePermission(user, "role.manage");
     const { id } = await params;
     const input = parseWithSchema(rolePatchSchema, await request.json());
-    const accounts = (await getEmployeeDataSetAsync()).accounts.map((account) => ({
-      accountId: account.id,
-      status: account.status,
-      roleIds: account.roleIds
-    }));
-    const role = updateRoleInRepository(id, input, accounts);
+    const role = await updatePersistedRole(id, input, authorizedUser.id);
 
     await recordAuditLog({
       actorId: authorizedUser.id,

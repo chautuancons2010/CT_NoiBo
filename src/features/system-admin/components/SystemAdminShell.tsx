@@ -16,6 +16,7 @@ const adminRoutes = [
   ["/system-admin/organization", "Tổ chức", "organization_settings.view"],
   ["/system-admin/localization", "Định dạng & thời gian", "localization.manage"],
   ["/system-admin/security", "Bảo mật", "system_admin.access"],
+  ["/system-admin/operations", "Vận hành", "operations.view"],
   ["/system-admin/config-history", "Lịch sử cấu hình", "config_history.view"],
   ["/system-admin/audit", "Audit log", "audit.view"]
 ] as const;

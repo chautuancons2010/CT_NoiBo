@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Pagination } from "@/components/shared/Pagination";
 import { PermissionGate } from "@/components/shared/PermissionGate";
 import { ListToolbar } from "@/features/foundation/components/ListToolbar";
-import { foundationDemoUser } from "@/lib/auth/currentUser";
 import type { Permission } from "@/lib/auth/permissions";
 
 interface PlaceholderPageProps {
@@ -17,6 +16,7 @@ interface PlaceholderPageProps {
   primaryActionLabel?: string;
   primaryActionPermission?: Permission;
   dateRangeFilter?: boolean;
+  permissions?: readonly Permission[];
 }
 
 interface PlaceholderRow {
@@ -37,14 +37,15 @@ export function PlaceholderPage({
   listPattern = false,
   primaryActionLabel,
   primaryActionPermission = "settings.view",
-  dateRangeFilter = true
+  dateRangeFilter = true,
+  permissions = []
 }: PlaceholderPageProps) {
   return (
     <div className="page-stack">
       <PageHeader
         action={
           primaryActionLabel ? (
-            <PermissionGate permissions={foundationDemoUser.permissions} require={primaryActionPermission}>
+            <PermissionGate permissions={permissions} require={primaryActionPermission}>
               <Button leftIcon={<Plus aria-hidden="true" size={16} />} variant="primary">
                 {primaryActionLabel}
               </Button>

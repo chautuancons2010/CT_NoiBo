@@ -20,7 +20,7 @@ export function UserMenu({ user }: { user: AuthenticatedUser }) {
       <div className="user-menu__content">
         <p>
           <strong>{user.displayName}</strong>
-          <span>{user.email}</span>
+          <span>@{user.username}</span>
         </p>
         <a href="/profile">
           <UserRound aria-hidden="true" size={16} />

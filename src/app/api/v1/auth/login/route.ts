@@ -1,0 +1,24 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { errorResponse } from "@/lib/api/errors";
+import { logger } from "@/lib/logger";
+import { parseWithSchema } from "@/lib/api/validation";
+import { usernamePattern } from "@/lib/auth/username";
+import { resolveLandingPage } from "@/features/dashboard/registry";
+import { readSettingsGroup } from "@/services/system-settings/systemSettingsService";
+import { requestNetworkContext, signInWithPassword, writeSessionCookies } from "@/services/auth/sessionService";
+
+const schema = z.object({
+  username: z.string().trim().toLowerCase().regex(usernamePattern, "Tên tài khoản không hợp lệ."),
+  password: z.string().min(8).max(256)
+}).strict();
+export async function POST(request: Request) {
+  try {
+    const input = parseWithSchema(schema, await request.json());
+    const result = await signInWithPassword({ ...input, ...await requestNetworkContext() });
+    const response = NextResponse.json({ ok: true, data: { redirectTo: resolveLandingPage(result.user, await readSettingsGroup("dashboard")) } }, { headers: { "cache-control": "no-store" } });
+    writeSessionCookies(response.cookies, result.session, result.sessionId);
+    logger.info("auth.login_succeeded", { actorId: result.user.id });
+    return response;
+  } catch (error) { logger.warn("auth.login_failed"); return errorResponse(error); }
+}

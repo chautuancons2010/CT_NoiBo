@@ -8,14 +8,12 @@ import {
 } from "@/features/employees/schemas/employeeSchemas";
 import {
   buildEmployeeSummary,
+  findEmployee,
   getEmployeeFilterOptions,
   listEmployees
 } from "@/features/employees/services/employeeService";
-import {
-  createEmployeeInRepository,
-  getEmployeeDataSet,
-  getEmployeeDataSetAsync
-} from "@/features/employees/services/employeeRepository";
+import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
+import { createEmployee } from "@/features/employees/services/employeeMutationService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 import { recordAuditLog } from "@/services/audit/auditLog";
@@ -51,27 +49,28 @@ export async function POST(request: Request) {
     const user = await getRequestUser();
     const authorizedUser = requirePermission(user, "employee.create");
     const input = parseWithSchema(createEmployeeSchema, await request.json());
-    const result = createEmployeeInRepository(input, authorizedUser.id);
-    const dataSet = getEmployeeDataSet();
+    const employeeId = await createEmployee(input, authorizedUser.id);
+    const dataSet = await getEmployeeDataSetAsync();
+    const employee = findEmployee(employeeId, dataSet);
+    if (!employee) throw new Error("Created employee could not be reloaded");
 
     await recordAuditLog({
       actorId: authorizedUser.id,
       action: "employee.created",
       entityType: "employee",
-      entityId: result.employee.id,
+      entityId: employee.id,
       after: {
-        employeeCode: result.employee.employeeCode,
-        departmentId: result.employee.departmentId,
-        positionId: result.employee.positionId,
-        employmentStatus: result.employee.employmentStatus
+        employeeCode: employee.employeeCode,
+        departmentId: employee.departmentId,
+        positionId: employee.positionId,
+        employmentStatus: employee.employmentStatus
       }
     });
 
     return successResponse(
       {
-        employee: buildEmployeeSummary(result.employee, dataSet),
-        historyEvent: result.historyEvent,
-        duplicateWarnings: result.duplicateWarnings
+        employee: buildEmployeeSummary(employee, dataSet),
+        duplicateWarnings: []
       },
       { status: 201 }
     );

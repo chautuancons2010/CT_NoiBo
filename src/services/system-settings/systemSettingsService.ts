@@ -36,6 +36,7 @@ const localSettings = new Map<SystemSettingsGroup, StoredSettingsGroup>(
   ])
 );
 const localVersions: SettingsVersion[] = [];
+let lastSettingsReadFailureLog = 0;
 
 function safeDefault<TGroup extends SystemSettingsGroup>(group: TGroup): SystemSettingsDocument[TGroup] {
   return structuredClone(defaultSystemSettings[group]);
@@ -63,7 +64,10 @@ export async function readSystemSettings(): Promise<SystemSettingsDocument> {
       }
       return result;
     }
-    logger.error("system_settings.read_failed");
+    if (Date.now() - lastSettingsReadFailureLog > 60_000) {
+      logger.error("system_settings.read_failed");
+      lastSettingsReadFailureLog = Date.now();
+    }
   }
 
   for (const group of groups) {

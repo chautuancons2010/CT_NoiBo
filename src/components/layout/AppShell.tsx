@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { foundationDemoUser } from "@/lib/auth/currentUser";
+import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
@@ -30,7 +30,7 @@ function getServerOnlineSnapshot(): boolean {
   return true;
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, user }: { children: ReactNode; user: AuthenticatedUser }) {
   const pathname = usePathname();
   const router = useRouter();
   const { settings } = useSystemSettings();
@@ -43,10 +43,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isPathEnabled(pathname, settings.modules)) {
-      const contextualLanding = resolveLandingPage(foundationDemoUser, settings.dashboard);
+      const contextualLanding = resolveLandingPage(user, settings.dashboard);
       router.replace(isPathEnabled(contextualLanding, settings.modules) ? contextualLanding : "/dashboard");
     }
-  }, [pathname, router, settings.dashboard, settings.modules]);
+  }, [pathname, router, settings.dashboard, settings.modules, user]);
 
   return (
     <div className="app-shell">
@@ -54,15 +54,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         collapsed={collapsed}
         onCollapsedChange={setCollapsed}
         pathname={pathname}
-        user={foundationDemoUser}
+        user={user}
       />
       <div className="app-content">
-        <AppHeader online={online} pathname={pathname} user={foundationDemoUser} />
+        <AppHeader online={online} pathname={pathname} user={user} />
         <SystemNoticeBanner />
         <main className="page-main" id="main-content" tabIndex={-1}>
           {children}
         </main>
-        <MobileBottomNav pathname={pathname} user={foundationDemoUser} />
+        <MobileBottomNav pathname={pathname} user={user} />
       </div>
     </div>
   );
