@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+import {
+  dashboardProfileKeys,
+  dashboardWidgetKeys,
+  defaultDashboardSettings
+} from "@/features/dashboard/registry";
+import { dashboardLandingPages } from "@/features/dashboard/types";
+
 export const configurableNavigationPaths = [
   "/dashboard",
   "/employees",
@@ -15,9 +22,13 @@ export const configurableNavigationPaths = [
   "/warehouse/issues",
   "/warehouse/transfers",
   "/warehouse/inventory",
+  "/import-export",
+  "/import-export/contracts",
   "/import-export/shipments",
   "/import-export/documents",
+  "/import-export/partners",
   "/approvals",
+  "/documents",
   "/reports"
 ] as const;
 
@@ -96,6 +107,66 @@ export const navigationSettingsSchema = z
     }
   });
 
+/**
+ * Keeps a saved navigation layout usable when a release adds new registered
+ * destinations. Publishing remains strict; only persisted older versions are
+ * upgraded by appending missing routes in registry order.
+ */
+export function normalizeStoredNavigationSettings(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const stored = value as Record<string, unknown>;
+  if (!Array.isArray(stored.itemOrder) || !Array.isArray(stored.hiddenItems)) return value;
+
+  const knownPaths = new Set<string>(configurableNavigationPaths);
+  const itemOrder = [...new Set(stored.itemOrder.filter(
+    (path): path is (typeof configurableNavigationPaths)[number] =>
+      typeof path === "string" && knownPaths.has(path)
+  ))];
+  for (const path of configurableNavigationPaths) {
+    if (!itemOrder.includes(path)) itemOrder.push(path);
+  }
+
+  return {
+    hiddenItems: [...new Set(stored.hiddenItems.filter(
+      (path): path is (typeof configurableNavigationPaths)[number] =>
+        typeof path === "string" && knownPaths.has(path)
+    ))],
+    itemOrder,
+    defaultLandingPage: ["/dashboard", "/attendance", "/projects"].includes(String(stored.defaultLandingPage))
+      ? stored.defaultLandingPage
+      : "/dashboard",
+    groupsExpanded: typeof stored.groupsExpanded === "boolean" ? stored.groupsExpanded : true
+  };
+}
+
+const dashboardProfileSchema = z.enum(dashboardProfileKeys);
+const dashboardWidgetSchema = z.enum(dashboardWidgetKeys);
+const dashboardLandingPageSchema = z.enum(dashboardLandingPages);
+
+export const dashboardSettingsSchema = z
+  .object({
+    presetOrder: z.array(dashboardProfileSchema).length(dashboardProfileKeys.length),
+    presets: z.array(z.object({
+      profile: dashboardProfileSchema,
+      landingPage: dashboardLandingPageSchema,
+      enabledWidgets: z.array(dashboardWidgetSchema).max(dashboardWidgetKeys.length)
+    }).strict()).length(dashboardProfileKeys.length)
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (new Set(value.presetOrder).size !== dashboardProfileKeys.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["presetOrder"], message: "Thứ tự preset không hợp lệ." });
+    }
+    if (new Set(value.presets.map((preset) => preset.profile)).size !== dashboardProfileKeys.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["presets"], message: "Danh sách preset không hợp lệ." });
+    }
+    value.presets.forEach((preset, index) => {
+      if (new Set(preset.enabledWidgets).size !== preset.enabledWidgets.length) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["presets", index, "enabledWidgets"], message: "Widget bị trùng." });
+      }
+    });
+  });
+
 export const moduleSettingsSchema = z
   .object({
     human_resources: z.boolean(),
@@ -124,6 +195,7 @@ export const systemSettingsSchemas = {
   organization: organizationSettingsSchema,
   localization: localizationSettingsSchema,
   navigation: navigationSettingsSchema,
+  dashboard: dashboardSettingsSchema,
   modules: moduleSettingsSchema
 } as const;
 
@@ -132,6 +204,7 @@ export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
 export type LocalizationSettings = z.infer<typeof localizationSettingsSchema>;
 export type NavigationSettings = z.infer<typeof navigationSettingsSchema>;
+export type DashboardSettings = z.infer<typeof dashboardSettingsSchema>;
 export type ModuleSettings = z.infer<typeof moduleSettingsSchema>;
 export type SystemSettingsGroup = keyof typeof systemSettingsSchemas;
 
@@ -141,6 +214,7 @@ export interface SystemSettingsDocument {
   organization: OrganizationSettings;
   localization: LocalizationSettings;
   navigation: NavigationSettings;
+  dashboard: DashboardSettings;
   modules: ModuleSettings;
 }
 
@@ -184,12 +258,13 @@ export const defaultSystemSettings: SystemSettingsDocument = {
     defaultLandingPage: "/dashboard",
     groupsExpanded: true
   },
+  dashboard: structuredClone(defaultDashboardSettings),
   modules: {
     human_resources: true,
     attendance: true,
     projects: true,
-    warehouse: false,
-    import_export: false,
+    warehouse: true,
+    import_export: true,
     reports: true
   }
 };

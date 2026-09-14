@@ -8,6 +8,9 @@ export interface ReportField {
   format?: "date" | "datetime" | "number" | "decimal" | "link" | "status" | "boolean";
 }
 
+const warehouseFields = (fields: ReportField[]): ReportField[] => fields.map((field) => ({ ...field, permission: "warehouse.report.export" }));
+const importExportFields = (fields: ReportField[]): ReportField[] => fields.map((field) => ({ ...field, permission: "import_export.report.export" }));
+
 export const reportFieldRegistry: Record<string, readonly ReportField[]> = {
   summary: [
     { key: "employeeCode", label: "Mã NV", width: 14 },
@@ -95,6 +98,55 @@ export const reportFieldRegistry: Record<string, readonly ReportField[]> = {
     { key: "dateOfBirth", label: "Ngày sinh", permission: "employee.export_sensitive", format: "date" },
     { key: "currentAddress", label: "Địa chỉ", permission: "employee.export_sensitive", width: 35 }
   ],
+  inventory_balance: warehouseFields([
+    { key: "warehouseCode", label: "Mã kho" }, { key: "warehouseName", label: "Tên kho", width: 24 },
+    { key: "itemCode", label: "Mã hàng" }, { key: "itemName", label: "Tên hàng", width: 30 },
+    { key: "categoryName", label: "Nhóm hàng" }, { key: "uomCode", label: "ĐVT" },
+    { key: "onHand", label: "Tồn kho", format: "decimal" }, { key: "minimumStock", label: "Tồn tối thiểu", format: "decimal" },
+    { key: "status", label: "Trạng thái", format: "status" }
+  ]),
+  stock_ledger: warehouseFields([
+    { key: "postingDate", label: "Ngày", format: "date" }, { key: "documentNumber", label: "Chứng từ" },
+    { key: "warehouseName", label: "Kho", width: 24 }, { key: "itemCode", label: "Mã hàng" }, { key: "itemName", label: "Tên hàng", width: 30 },
+    { key: "quantityIn", label: "Nhập", format: "decimal" }, { key: "quantityOut", label: "Xuất", format: "decimal" },
+    { key: "runningBalance", label: "Tồn sau", format: "decimal" }, { key: "uomCode", label: "ĐVT" }, { key: "reference", label: "Tham chiếu" }
+  ]),
+  warehouse_receipts: warehouseFields([
+    { key: "documentNumber", label: "Số phiếu" }, { key: "documentDate", label: "Ngày phiếu", format: "date" },
+    { key: "targetWarehouseName", label: "Kho nhận", width: 24 }, { key: "transactionTypeCode", label: "Loại giao dịch" },
+    { key: "supplierReference", label: "Tham chiếu NCC" }, { key: "status", label: "Trạng thái", format: "status" }
+  ]),
+  warehouse_issues: warehouseFields([
+    { key: "documentNumber", label: "Số phiếu" }, { key: "documentDate", label: "Ngày phiếu", format: "date" },
+    { key: "sourceWarehouseName", label: "Kho xuất", width: 24 }, { key: "transactionTypeCode", label: "Loại giao dịch" },
+    { key: "recipient", label: "Người nhận" }, { key: "status", label: "Trạng thái", format: "status" }
+  ]),
+  stock_count: warehouseFields([
+    { key: "countNumber", label: "Số kiểm kê" }, { key: "countDate", label: "Ngày kiểm", format: "date" },
+    { key: "warehouseName", label: "Kho", width: 24 }, { key: "itemCode", label: "Mã hàng" }, { key: "itemName", label: "Tên hàng", width: 30 },
+    { key: "expectedQuantity", label: "Tồn hệ thống", format: "decimal" }, { key: "countedQuantity", label: "Thực kiểm", format: "decimal" },
+    { key: "variance", label: "Chênh lệch", format: "decimal" }
+  ]),
+  import_shipments: importExportFields([
+    { key:"shipmentNumber",label:"Shipment No" },{ key:"supplierName",label:"Nhà cung cấp",width:28 },{ key:"contractNumber",label:"Hợp đồng / PO" },
+    { key:"transportMode",label:"Phương thức",format:"status" },{ key:"origin",label:"Điểm đi" },{ key:"destination",label:"Điểm đến" },
+    { key:"currentEtd",label:"ETD",format:"date" },{ key:"currentEta",label:"ETA",format:"date" },{ key:"actualArrival",label:"Cập cảng thực tế",format:"date" },
+    { key:"status",label:"Trạng thái",format:"status" },{ key:"customsStatus",label:"Thông quan",format:"status" },
+    { key:"expectedQuantity",label:"Dự kiến",format:"decimal" },{ key:"receivedQuantity",label:"Đã nhận",format:"decimal" },{ key:"remainingQuantity",label:"Còn lại",format:"decimal" }
+  ]),
+  import_contract_fulfillment: importExportFields([
+    { key:"contractNumber",label:"Hợp đồng / PO" },{ key:"supplierName",label:"Nhà cung cấp",width:28 },{ key:"itemCode",label:"Mã hàng" },{ key:"itemName",label:"Tên hàng",width:30 },
+    { key:"orderedQuantity",label:"Đặt",format:"decimal" },{ key:"shippedQuantity",label:"Đã xếp",format:"decimal" },{ key:"receivedQuantity",label:"Đã nhận",format:"decimal" },{ key:"remainingQuantity",label:"Còn lại",format:"decimal" }
+  ]),
+  shipment_document_checklist: importExportFields([
+    { key:"shipmentNumber",label:"Shipment No" },{ key:"documentType",label:"Loại chứng từ" },{ key:"required",label:"Bắt buộc",format:"boolean" },{ key:"status",label:"Trạng thái",format:"status" },{ key:"documentLink",label:"Xem chứng từ",format:"link",width:40 }
+  ]),
+  shipment_receiving: importExportFields([
+    { key:"shipmentNumber",label:"Shipment No" },{ key:"itemCode",label:"Mã hàng" },{ key:"itemName",label:"Tên hàng",width:30 },{ key:"expectedQuantity",label:"Dự kiến",format:"decimal" },{ key:"receivedQuantity",label:"Đã nhận",format:"decimal" },{ key:"remainingQuantity",label:"Còn lại",format:"decimal" },{ key:"variance",label:"Chênh lệch",format:"decimal" }
+  ]),
+  customs_status: importExportFields([
+    { key:"shipmentNumber",label:"Shipment No" },{ key:"supplierName",label:"Nhà cung cấp",width:28 },{ key:"customsStatus",label:"Trạng thái",format:"status" },{ key:"declarationNumber",label:"Số tờ khai" },{ key:"declarationDate",label:"Ngày khai",format:"date" },{ key:"clearanceDate",label:"Ngày thông quan",format:"date" },{ key:"issueNote",label:"Vướng mắc",width:35 }
+  ]),
   profile: [
     { key: "field", label: "Trường", width: 25 },
     { key: "value", label: "Giá trị", width: 45 }

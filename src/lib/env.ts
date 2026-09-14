@@ -12,6 +12,9 @@ const serverEnvSchema = clientEnvSchema.extend({
   APP_TIMEZONE: z.string().default("Asia/Ho_Chi_Minh"),
   APP_BASE_URL: z.string().url().default("http://localhost:3000"),
   WEBHOOK_SIGNING_SECRET: z.string().optional().or(z.literal("")),
+  API_KEY_PEPPER: z.string().optional().or(z.literal("")),
+  INTEGRATION_ENCRYPTION_KEY: z.string().optional().or(z.literal("")),
+  INTEGRATION_WORKER_SECRET: z.string().optional().or(z.literal("")),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info")
 });
 
@@ -36,6 +39,9 @@ export function getServerEnv(): ServerEnv {
     APP_TIMEZONE: process.env.APP_TIMEZONE,
     APP_BASE_URL: process.env.APP_BASE_URL,
     WEBHOOK_SIGNING_SECRET: process.env.WEBHOOK_SIGNING_SECRET,
+    API_KEY_PEPPER: process.env.API_KEY_PEPPER,
+    INTEGRATION_ENCRYPTION_KEY: process.env.INTEGRATION_ENCRYPTION_KEY,
+    INTEGRATION_WORKER_SECRET: process.env.INTEGRATION_WORKER_SECRET,
     LOG_LEVEL: process.env.LOG_LEVEL
   });
 }

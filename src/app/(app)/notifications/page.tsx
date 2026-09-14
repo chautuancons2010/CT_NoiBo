@@ -1,14 +1,1 @@
-import { PageHeader } from "@/components/shared/PageHeader";
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { NotificationPanel } from "@/features/foundation";
-
-const meta = routeMetaByPath["/notifications"];
-
-export default function Page() {
-  return (
-    <div className="page-stack">
-      <PageHeader description={meta.description} title={meta.title} />
-      <NotificationPanel />
-    </div>
-  );
-}
+import { PageHeader } from "@/components/shared/PageHeader";import { Tabs } from "@/components/shared/Tabs";import { NotificationCenter } from "@/features/shared-platforms/components/NotificationCenter";export default function Page(){return <div className="page-stack"><PageHeader title="Thông báo"/><Tabs label="Thông báo" items={[{label:"Tất cả",href:"/notifications",active:true},{label:"Chưa đọc",href:"/notifications/unread"}]}/><NotificationCenter/></div>}

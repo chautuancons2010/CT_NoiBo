@@ -88,10 +88,69 @@ export type Permission =
   | "worksite.view"
   | "worksite.manage"
   | "warehouse.view"
+  | "warehouse.view_all"
+  | "warehouse.item.view"
+  | "warehouse.item.manage"
+  | "warehouse.master.manage"
+  | "warehouse.receipt.view"
+  | "warehouse.receipt.create"
+  | "warehouse.receipt.post"
+  | "warehouse.receipt.reverse"
+  | "warehouse.issue.view"
+  | "warehouse.issue.create"
+  | "warehouse.issue.post"
+  | "warehouse.issue.reverse"
+  | "warehouse.transfer.view"
+  | "warehouse.transfer.create"
+  | "warehouse.transfer.post"
+  | "warehouse.adjustment.view"
+  | "warehouse.adjustment.create"
+  | "warehouse.adjustment.post"
+  | "warehouse.stock_count.view"
+  | "warehouse.stock_count.create"
+  | "warehouse.stock_count.post"
+  | "warehouse.ledger.view"
+  | "warehouse.report.export"
   | "import_export.view"
+  | "import_export.view_all"
+  | "import_contract.view"
+  | "import_contract.create"
+  | "import_contract.edit"
+  | "import_contract.close"
+  | "shipment.view"
+  | "shipment.create"
+  | "shipment.edit"
+  | "shipment.update_schedule"
+  | "shipment.close"
+  | "shipment.cancel"
+  | "shipment_document.view"
+  | "shipment_document.upload"
+  | "shipment_document.replace"
+  | "customs.view"
+  | "customs.manage"
+  | "shipment_receiving.view"
+  | "shipment_receiving.create_receipt"
+  | "partner.view"
+  | "partner.manage"
+  | "import_export.report.export"
   | "approval.view"
+  | "approval.inbox.view"
+  | "approval.view_assigned"
+  | "approval.view_all"
+  | "approval.act"
+  | "approval.reassign"
+  | "approval.workflow.manage"
+  | "approval.delegation.manage"
   | "report.view"
   | "notification.view"
+  | "notification.self.view"
+  | "notification.preference.manage"
+  | "notification.system_notice.manage"
+  | "document.view"
+  | "document.upload"
+  | "document.replace"
+  | "document.archive"
+  | "document.company_manage"
   | "profile.view"
   | "user.view"
   | "role.view"
@@ -113,7 +172,23 @@ export type Permission =
   | "department.manage"
   | "position.manage"
   | "audit.view"
+  | "audit.view_sensitive"
+  | "settings.manage"
   | "integration.view"
+  | "integration.manage"
+  | "api_key.view"
+  | "api_key.create"
+  | "api_key.revoke"
+  | "service_account.manage"
+  | "webhook.view"
+  | "webhook.manage"
+  | "webhook.retry"
+  | "integration_log.view"
+  | "integration_conflict.view"
+  | "integration_conflict.resolve"
+  | "import.create"
+  | "import.execute"
+  | "api_docs.view"
   | "file.read"
   | "webhook.publish";
 
@@ -219,10 +294,69 @@ export const allFoundationPermissions: Permission[] = [
   "worksite.view",
   "worksite.manage",
   "warehouse.view",
+  "warehouse.view_all",
+  "warehouse.item.view",
+  "warehouse.item.manage",
+  "warehouse.master.manage",
+  "warehouse.receipt.view",
+  "warehouse.receipt.create",
+  "warehouse.receipt.post",
+  "warehouse.receipt.reverse",
+  "warehouse.issue.view",
+  "warehouse.issue.create",
+  "warehouse.issue.post",
+  "warehouse.issue.reverse",
+  "warehouse.transfer.view",
+  "warehouse.transfer.create",
+  "warehouse.transfer.post",
+  "warehouse.adjustment.view",
+  "warehouse.adjustment.create",
+  "warehouse.adjustment.post",
+  "warehouse.stock_count.view",
+  "warehouse.stock_count.create",
+  "warehouse.stock_count.post",
+  "warehouse.ledger.view",
+  "warehouse.report.export",
   "import_export.view",
+  "import_export.view_all",
+  "import_contract.view",
+  "import_contract.create",
+  "import_contract.edit",
+  "import_contract.close",
+  "shipment.view",
+  "shipment.create",
+  "shipment.edit",
+  "shipment.update_schedule",
+  "shipment.close",
+  "shipment.cancel",
+  "shipment_document.view",
+  "shipment_document.upload",
+  "shipment_document.replace",
+  "customs.view",
+  "customs.manage",
+  "shipment_receiving.view",
+  "shipment_receiving.create_receipt",
+  "partner.view",
+  "partner.manage",
+  "import_export.report.export",
   "approval.view",
+  "approval.inbox.view",
+  "approval.view_assigned",
+  "approval.view_all",
+  "approval.act",
+  "approval.reassign",
+  "approval.workflow.manage",
+  "approval.delegation.manage",
   "report.view",
   "notification.view",
+  "notification.self.view",
+  "notification.preference.manage",
+  "notification.system_notice.manage",
+  "document.view",
+  "document.upload",
+  "document.replace",
+  "document.archive",
+  "document.company_manage",
   "profile.view",
   "user.view",
   "role.view",
@@ -244,7 +378,23 @@ export const allFoundationPermissions: Permission[] = [
   "department.manage",
   "position.manage",
   "audit.view",
+  "audit.view_sensitive",
+  "settings.manage",
   "integration.view",
+  "integration.manage",
+  "api_key.view",
+  "api_key.create",
+  "api_key.revoke",
+  "service_account.manage",
+  "webhook.view",
+  "webhook.manage",
+  "webhook.retry",
+  "integration_log.view",
+  "integration_conflict.view",
+  "integration_conflict.resolve",
+  "import.create",
+  "import.execute",
+  "api_docs.view",
   "file.read",
   "webhook.publish"
 ];

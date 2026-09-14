@@ -11,6 +11,7 @@ const adminRoutes = [
   ["/system-admin/branding", "Thương hiệu", "branding.view"],
   ["/system-admin/appearance", "Giao diện", "appearance.view"],
   ["/system-admin/navigation", "Điều hướng", "navigation.manage"],
+  ["/system-admin/dashboard", "Dashboard", "navigation.manage"],
   ["/system-admin/modules", "Module", "module.manage"],
   ["/system-admin/organization", "Tổ chức", "organization_settings.view"],
   ["/system-admin/localization", "Định dạng & thời gian", "localization.manage"],

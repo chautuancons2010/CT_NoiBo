@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { AppError, errorResponse } from "@/lib/api/errors";
 import { parseWithSchema } from "@/lib/api/validation";
-import { can } from "@/lib/auth/permissions";
+import { can, type Permission } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/services/auth/getRequestUser";
@@ -67,6 +67,38 @@ export async function GET(
         const { data: account } = await accountQuery.maybeSingle();
         const { data: assignment } = account?.employee_id ? await client.from("project_assignments").select("id").eq("project_id", update.project_id).eq("employee_id", account.employee_id).eq("status", "active").limit(1).maybeSingle() : { data: null };
         if (!assignment) throw new AppError("PERMISSION_DENIED", "Bạn không thuộc phạm vi dự án này.");
+      }
+    }
+
+    if (asset.owner_entity_type === "inventory_document") {
+      const { data: inventoryDocument } = await client.from("inventory_documents").select("type,reverses_document_id,source_warehouse_id,target_warehouse_id").eq("id", asset.owner_entity_id).maybeSingle();
+      if (!inventoryDocument) throw new AppError("NOT_FOUND", "Không tìm thấy chứng từ chứa tệp.");
+      let permissionType = inventoryDocument.type;
+      if (permissionType === "reversal" && inventoryDocument.reverses_document_id) {
+        const { data: original } = await client.from("inventory_documents").select("type").eq("id", inventoryDocument.reverses_document_id).maybeSingle();
+        permissionType = original?.type ?? "receipt";
+      }
+      const viewPermission = `warehouse.${permissionType}.view` as Permission;
+      if (!can(user.permissions, viewPermission)) throw new AppError("PERMISSION_DENIED");
+      if (!can(user.permissions, "warehouse.view_all")) {
+        let accountQuery = client.from("app_accounts").select("id").limit(1);
+        accountQuery = /^[0-9a-f-]{36}$/i.test(user.id) ? accountQuery.eq("id", user.id) : accountQuery.eq("primary_email", user.email);
+        const { data: account } = await accountQuery.maybeSingle();
+        const warehouseIds = [inventoryDocument.source_warehouse_id, inventoryDocument.target_warehouse_id].filter(Boolean);
+        const { data: scope } = account?.id && warehouseIds.length ? await client.from("warehouse_user_scopes").select("warehouse_id").eq("account_id", account.id).eq("can_view", true).in("warehouse_id", warehouseIds) : { data: null };
+        if (!scope?.length) throw new AppError("PERMISSION_DENIED", "Bạn không thuộc phạm vi kho của chứng từ này.");
+      }
+    }
+
+    if (asset.owner_entity_type === "shipment_document") {
+      if (!can(user.permissions, "shipment_document.view")) throw new AppError("PERMISSION_DENIED");
+      const { data: shipment } = await client.from("shipments").select("id,assigned_account_id,created_by").eq("id", asset.owner_entity_id).maybeSingle();
+      if (!shipment) throw new AppError("NOT_FOUND", "Không tìm thấy lô hàng chứa chứng từ.");
+      if (!can(user.permissions, "import_export.view_all")) {
+        let accountQuery = client.from("app_accounts").select("id").limit(1);
+        accountQuery = /^[0-9a-f-]{36}$/i.test(user.id) ? accountQuery.eq("id", user.id) : accountQuery.eq("primary_email", user.email);
+        const { data: account } = await accountQuery.maybeSingle();
+        if (!account?.id || (shipment.assigned_account_id !== account.id && shipment.created_by !== account.id)) throw new AppError("PERMISSION_DENIED", "Bạn không thuộc phạm vi lô hàng này.");
       }
     }
 

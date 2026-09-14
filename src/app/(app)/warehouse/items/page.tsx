@@ -1,8 +1,2 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { PlaceholderPage } from "@/features/foundation/pages/PlaceholderPage";
-
-const meta = routeMetaByPath["/warehouse/items"];
-
-export default function Page() {
-  return <PlaceholderPage description={meta.description} listPattern moduleName="Hàng hóa" title={meta.title} />;
-}
+import { PageHeader } from "@/components/shared/PageHeader"; import { ItemListView } from "@/features/warehouse";
+export default function Page(){return <div className="page-stack"><PageHeader title="Hàng hóa"/><ItemListView/></div>;}

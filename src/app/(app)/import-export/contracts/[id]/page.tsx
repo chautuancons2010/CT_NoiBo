@@ -1,0 +1,1 @@
+import { ContractDetailView,ContractEditor } from "@/features/import-export/components/ImportExportViews";export default async function Page({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{edit?:string}>}){const{id}=await params,{edit}=await searchParams;return edit==="1"?<ContractEditor id={id}/>:<ContractDetailView id={id}/>;}

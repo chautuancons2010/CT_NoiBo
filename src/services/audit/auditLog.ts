@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
+import { sanitizeAuditValue } from "@/features/shared-platforms/rules";
 
 export const auditActionSchema = z.string().min(3).max(120);
 
@@ -10,6 +11,11 @@ export interface AuditLogEntry {
   action: string;
   entityType: string;
   entityId: string;
+  entityReference?: string;
+  module?: string;
+  source?: "web" | "api" | "job" | "system";
+  correlationId?: string;
+  severity?: "normal" | "security" | "sensitive";
   timestamp?: string;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
@@ -18,17 +24,8 @@ export interface AuditLogEntry {
 }
 
 const localAuditEntries: AuditLogEntry[] = [];
-const sensitiveKeyPattern = /(national.?id|cccd|bank.?account|tax.?code|social.?insurance|password)/i;
-
 function sanitizeRecord(record?: Record<string, unknown>): Record<string, unknown> | undefined {
-  if (!record) return undefined;
-
-  return Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [
-      key,
-      sensitiveKeyPattern.test(key) ? "[REDACTED]" : value
-    ])
-  );
+  return record ? sanitizeAuditValue(record) as Record<string, unknown> : undefined;
 }
 
 export function getLocalAuditLogs(): AuditLogEntry[] {
@@ -53,6 +50,11 @@ export async function recordAuditLog(entry: AuditLogEntry): Promise<void> {
       action: safeEntry.action,
       entity_type: safeEntry.entityType,
       entity_id: safeEntry.entityId,
+      entity_reference: safeEntry.entityReference ?? null,
+      module: safeEntry.module ?? safeEntry.action.split(".")[0],
+      source: safeEntry.source ?? "web",
+      correlation_id: safeEntry.correlationId ?? (typeof safeEntry.metadata?.correlationId === "string" ? safeEntry.metadata.correlationId : null),
+      severity: safeEntry.severity ?? "normal",
       happened_at: safeEntry.timestamp,
       before_data: safeEntry.before,
       after_data: safeEntry.after,

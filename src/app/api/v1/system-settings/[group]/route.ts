@@ -13,6 +13,7 @@ const viewPermissionByGroup: Record<SystemSettingsGroup, Permission> = {
   organization: "organization_settings.view",
   localization: "system_admin.access",
   navigation: "system_admin.access",
+  dashboard: "system_admin.access",
   modules: "system_admin.access"
 };
 
@@ -22,6 +23,7 @@ const managePermissionByGroup: Record<SystemSettingsGroup, Permission> = {
   organization: "organization_settings.manage",
   localization: "localization.manage",
   navigation: "navigation.manage",
+  dashboard: "navigation.manage",
   modules: "module.manage"
 };
 

@@ -118,8 +118,21 @@ export const desktopNavigation: NavigationGroup[] = [
     label: "Kho",
     items: [
       {
+        label: "Tổng quan kho",
+        href: "/warehouse",
+        icon: "LayoutDashboard",
+        requiredPermission: "warehouse.view",
+        exact: true
+      },
+      {
         label: "Hàng hóa",
         href: "/warehouse/items",
+        icon: "Warehouse",
+        requiredPermission: "warehouse.item.view"
+      },
+      {
+        label: "Danh sách kho",
+        href: "/warehouse/warehouses",
         icon: "Warehouse",
         requiredPermission: "warehouse.view"
       },
@@ -127,25 +140,43 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Nhập kho",
         href: "/warehouse/receipts",
         icon: "PackagePlus",
-        requiredPermission: "warehouse.view"
+        requiredPermission: "warehouse.receipt.view"
       },
       {
         label: "Xuất kho",
         href: "/warehouse/issues",
         icon: "PackageMinus",
-        requiredPermission: "warehouse.view"
+        requiredPermission: "warehouse.issue.view"
       },
       {
         label: "Chuyển kho",
         href: "/warehouse/transfers",
         icon: "Repeat",
+        requiredPermission: "warehouse.transfer.view"
+      },
+      {
+        label: "Điều chỉnh",
+        href: "/warehouse/adjustments",
+        icon: "FileText",
+        requiredPermission: "warehouse.adjustment.view"
+      },
+      {
+        label: "Tồn kho",
+        href: "/warehouse/inventory",
+        icon: "Boxes",
         requiredPermission: "warehouse.view"
       },
       {
         label: "Kiểm kê",
-        href: "/warehouse/inventory",
-        icon: "Boxes",
-        requiredPermission: "warehouse.view"
+        href: "/warehouse/stock-counts",
+        icon: "ClipboardCheck",
+        requiredPermission: "warehouse.stock_count.view"
+      },
+      {
+        label: "Sổ kho",
+        href: "/warehouse/ledger",
+        icon: "FileText",
+        requiredPermission: "warehouse.ledger.view"
       }
     ]
   },
@@ -153,16 +184,35 @@ export const desktopNavigation: NavigationGroup[] = [
     label: "Xuất nhập khẩu",
     items: [
       {
+        label: "Tổng quan XNK",
+        href: "/import-export",
+        icon: "LayoutDashboard",
+        requiredPermission: "import_export.view",
+        exact: true
+      },
+      {
+        label: "Hợp đồng / PO",
+        href: "/import-export/contracts",
+        icon: "FileText",
+        requiredPermission: "import_contract.view"
+      },
+      {
         label: "Lô hàng",
         href: "/import-export/shipments",
         icon: "Ship",
-        requiredPermission: "import_export.view"
+        requiredPermission: "shipment.view"
       },
       {
         label: "Chứng từ",
         href: "/import-export/documents",
         icon: "FileText",
-        requiredPermission: "import_export.view"
+        requiredPermission: "shipment_document.view"
+      },
+      {
+        label: "Đối tác",
+        href: "/import-export/partners",
+        icon: "Users",
+        requiredPermission: "partner.view"
       }
     ]
   },
@@ -173,7 +223,13 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Phê duyệt",
         href: "/approvals",
         icon: "CheckSquare",
-        requiredPermission: "approval.view"
+        requiredPermission: "approval.inbox.view"
+      },
+      {
+        label: "Tài liệu",
+        href: "/documents",
+        icon: "FileText",
+        requiredPermission: "document.view"
       },
       {
         label: "Báo cáo",
@@ -186,6 +242,13 @@ export const desktopNavigation: NavigationGroup[] = [
   {
     label: "Hệ thống",
     items: [
+      {
+        label: "Cấu hình nghiệp vụ",
+        href: "/settings",
+        icon: "Settings",
+        requiredPermission: "settings.view",
+        exact: true
+      },
       {
         label: "Người dùng",
         href: "/settings/users",
@@ -215,6 +278,18 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/settings/integrations",
         icon: "Settings",
         requiredPermission: "integration.view"
+      },
+      {
+        label: "Cấu hình kho",
+        href: "/settings/warehouse",
+        icon: "Warehouse",
+        requiredPermission: "warehouse.master.manage"
+      },
+      {
+        label: "Cấu hình XNK",
+        href: "/settings/import-export",
+        icon: "Ship",
+        requiredPermission: "module.manage"
       },
       {
         label: "Audit log",

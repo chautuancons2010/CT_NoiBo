@@ -1,1 +1,1 @@
-import Link from "next/link";import { Card } from "@/components/shared/Card";import { PageHeader } from "@/components/shared/PageHeader";export default function Page(){return <div className="page-stack"><PageHeader title="Phê duyệt"/><Card><Link className="button button--primary button--md" href="/approvals/leave">Đơn nghỉ phép</Link></Card></div>}
+import { redirect } from "next/navigation";export default function Page(){redirect("/approvals/pending");}

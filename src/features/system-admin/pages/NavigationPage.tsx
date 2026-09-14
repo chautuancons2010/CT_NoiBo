@@ -10,7 +10,7 @@ import { AdminPage } from "@/features/system-admin/components/AdminPage";
 import { useSettingsEditor } from "@/features/system-admin/components/editorUtils";
 
 const labels: Record<(typeof configurableNavigationPaths)[number], string> = {
-  "/dashboard": "Tổng quan", "/employees": "Nhân viên", "/attendance": "Chấm công", "/timesheets": "Bảng công", "/shifts": "Ca làm", "/leave": "Nghỉ phép", "/projects": "Dự án / Công trường", "/projects/updates": "Cập nhật dự án", "/worker-attendance": "Điểm danh công nhân", "/warehouse/items": "Hàng hóa", "/warehouse/receipts": "Nhập kho", "/warehouse/issues": "Xuất kho", "/warehouse/transfers": "Chuyển kho", "/warehouse/inventory": "Kiểm kê", "/import-export/shipments": "Lô hàng", "/import-export/documents": "Chứng từ", "/approvals": "Phê duyệt", "/reports": "Báo cáo"
+  "/dashboard": "Tổng quan", "/employees": "Nhân viên", "/attendance": "Chấm công", "/timesheets": "Bảng công", "/shifts": "Ca làm", "/leave": "Nghỉ phép", "/projects": "Dự án / Công trường", "/projects/updates": "Cập nhật dự án", "/worker-attendance": "Điểm danh công nhân", "/warehouse/items": "Hàng hóa", "/warehouse/receipts": "Nhập kho", "/warehouse/issues": "Xuất kho", "/warehouse/transfers": "Chuyển kho", "/warehouse/inventory": "Kiểm kê", "/import-export": "Tổng quan XNK", "/import-export/contracts": "Hợp đồng / PO", "/import-export/shipments": "Lô hàng", "/import-export/documents": "Chứng từ", "/import-export/partners": "Đối tác", "/approvals": "Phê duyệt", "/documents": "Tài liệu", "/reports": "Báo cáo"
 };
 
 export function NavigationPage() {

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   appearanceSettingsSchema,
+  dashboardSettingsSchema,
   defaultSystemSettings,
   deriveBrandColorTokens,
   isPathEnabled,
   moduleForPath,
-  navigationSettingsSchema
+  navigationSettingsSchema,
+  normalizeStoredNavigationSettings
 } from "@/config/systemSettings";
 
 describe("typed system settings", () => {
@@ -25,6 +27,20 @@ describe("typed system settings", () => {
     })).toThrow();
   });
 
+  it("upgrades a saved navigation layout when new routes are registered", () => {
+    const upgraded = navigationSettingsSchema.parse(normalizeStoredNavigationSettings({
+      hiddenItems: ["/employees", "/removed"],
+      itemOrder: ["/projects", "/dashboard", "/removed"],
+      defaultLandingPage: "/projects",
+      groupsExpanded: false
+    }));
+
+    expect(upgraded.itemOrder.slice(0, 2)).toEqual(["/projects", "/dashboard"]);
+    expect(upgraded.itemOrder).toHaveLength(defaultSystemSettings.navigation.itemOrder.length);
+    expect(upgraded.hiddenItems).toEqual(["/employees"]);
+    expect(upgraded.groupsExpanded).toBe(false);
+  });
+
   it("derives a readable foreground and all safe color tokens", () => {
     const light = deriveBrandColorTokens("#FDE68A");
     const dark = deriveBrandColorTokens("#114F8B");
@@ -37,8 +53,13 @@ describe("typed system settings", () => {
 
   it("maps routes to module flags without changing permission state", () => {
     expect(moduleForPath("/warehouse/items/123")).toBe("warehouse");
-    expect(isPathEnabled("/warehouse/items", defaultSystemSettings.modules)).toBe(false);
+    expect(isPathEnabled("/warehouse/items", defaultSystemSettings.modules)).toBe(true);
     expect(isPathEnabled("/employees", defaultSystemSettings.modules)).toBe(true);
     expect(isPathEnabled("/system-admin/modules", defaultSystemSettings.modules)).toBe(true);
+  });
+
+  it("only accepts registered dashboard presets and widgets", () => {
+    expect(dashboardSettingsSchema.parse(defaultSystemSettings.dashboard)).toEqual(defaultSystemSettings.dashboard);
+    expect(() => dashboardSettingsSchema.parse({ ...defaultSystemSettings.dashboard, presets: defaultSystemSettings.dashboard.presets.map((preset, index) => index ? preset : { ...preset, enabledWidgets: ["unknown"] }) })).toThrow();
   });
 });

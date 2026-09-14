@@ -1,0 +1,3 @@
+"use client";
+import Link from "next/link";import { Bell } from "lucide-react";import { useEffect,useState } from "react";
+export function NotificationBell(){const[count,setCount]=useState(0);useEffect(()=>{let active=true;async function load(){const response=await fetch("/api/v1/notifications/unread-count"),body=await response.json() as{data?:{count:number}};if(active&&response.ok)setCount(body.data?.count??0);}void load();const timer=window.setInterval(load,60000);return()=>{active=false;window.clearInterval(timer);};},[]);return <Link aria-label={count?`${count} thông báo chưa đọc`:"Thông báo"} className="icon-link notification-bell" href="/notifications" title="Thông báo"><Bell aria-hidden="true" size={18}/>{count?<span>{count>99?"99+":count}</span>:null}</Link>}

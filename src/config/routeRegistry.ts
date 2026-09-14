@@ -10,11 +10,27 @@ export interface BreadcrumbItem {
 }
 
 export const routeMetaByPath: Record<string, RouteMeta> = {
+  "/settings": { title: "Cấu hình nghiệp vụ", description: "", module: "Hệ thống" },
+  "/approvals/pending": { title: "Cần tôi duyệt", description: "", module: "Phê duyệt" },
+  "/approvals/completed": { title: "Đã hoàn tất", description: "", module: "Phê duyệt" },
+  "/approvals/delegated": { title: "Được ủy quyền", description: "", module: "Phê duyệt" },
+  "/documents": { title: "Tài liệu", description: "", module: "Quản lý" },
+  "/documents/recent": { title: "Tài liệu gần đây", description: "", module: "Tài liệu" },
+  "/documents/shared": { title: "Tài liệu dùng chung", description: "", module: "Tài liệu" },
+  "/warehouse": { title: "Tổng quan kho", description: "", module: "Kho" },
   "/dashboard": {
     title: "Tổng quan",
     description: "Các việc cần theo dõi trong ngày và trạng thái nền tảng.",
     module: "Tổng quan"
   },
+  "/home": { title: "Trang chủ", description: "", module: "Tổng quan" },
+  "/dashboard/hr": { title: "Dashboard Nhân sự", description: "", module: "Tổng quan" },
+  "/dashboard/warehouse": { title: "Dashboard Kho", description: "", module: "Tổng quan" },
+  "/dashboard/import-export": { title: "Dashboard XNK", description: "", module: "Tổng quan" },
+  "/dashboard/management": { title: "Dashboard Quản lý", description: "", module: "Tổng quan" },
+  "/search": { title: "Tìm kiếm", description: "", module: "Tổng quan" },
+  "/search/results": { title: "Kết quả tìm kiếm", description: "", module: "Tổng quan" },
+  "/command": { title: "Command Center", description: "", module: "Tổng quan" },
   "/employees": {
     title: "Nhân viên",
     description: "Nền tảng quản lý hồ sơ nhân sự, tài khoản liên kết và lịch sử thay đổi.",
@@ -108,20 +124,29 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     module: "Kho"
   },
   "/warehouse/inventory": {
-    title: "Kiểm kê",
-    description: "Route kiểm kê và đối chiếu tồn kho.",
+    title: "Tồn kho",
+    description: "",
     module: "Kho"
   },
+  "/warehouse/warehouses": { title: "Danh sách kho", description: "", module: "Kho" },
+  "/warehouse/adjustments": { title: "Điều chỉnh kho", description: "", module: "Kho" },
+  "/warehouse/stock-counts": { title: "Kiểm kê", description: "", module: "Kho" },
+  "/warehouse/ledger": { title: "Sổ kho", description: "", module: "Kho" },
+  "/settings/warehouse": { title: "Cấu hình kho", description: "", module: "Hệ thống" },
+  "/import-export": { title: "Tổng quan XNK", description: "", module: "Xuất nhập khẩu" },
+  "/import-export/contracts": { title: "Hợp đồng / PO", description: "", module: "Xuất nhập khẩu" },
   "/import-export/shipments": {
     title: "Lô hàng",
-    description: "Nền tảng quản lý shipment, container, ETA/ETD và liên kết nhập kho.",
+    description: "",
     module: "Xuất nhập khẩu"
   },
   "/import-export/documents": {
     title: "Chứng từ XNK",
-    description: "Quản lý metadata chứng từ và file lưu trữ private.",
+    description: "",
     module: "Xuất nhập khẩu"
   },
+  "/import-export/partners": { title: "Đối tác", description: "", module: "Xuất nhập khẩu" },
+  "/settings/import-export": { title: "Cấu hình XNK", description: "", module: "Hệ thống" },
   "/approvals": {
     title: "Phê duyệt",
     description: "Hàng đợi phê duyệt dùng chung cho đơn từ và nghiệp vụ phát sinh.",
@@ -170,6 +195,8 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Cấu hình workflow phê duyệt theo nghiệp vụ.",
     module: "Hệ thống"
   },
+  "/settings/approval-delegations": { title: "Ủy quyền phê duyệt", description: "", module: "Hệ thống" },
+  "/settings/notifications": { title: "Tùy chọn thông báo", description: "", module: "Hệ thống" },
   "/settings/export-templates": {
     title: "Mẫu xuất dữ liệu",
     description: "Cấu hình template Excel/PDF dùng chung.",
@@ -180,6 +207,14 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "API key, webhook và kết nối hệ thống bên ngoài.",
     module: "Hệ thống"
   },
+  "/settings/integrations/api-keys": { title: "API key", description: "", module: "Tích hợp" },
+  "/settings/integrations/service-accounts": { title: "Service account", description: "", module: "Tích hợp" },
+  "/settings/integrations/webhooks": { title: "Webhooks", description: "", module: "Tích hợp" },
+  "/settings/integrations/webhook-deliveries": { title: "Webhook deliveries", description: "", module: "Tích hợp" },
+  "/settings/integrations/conflicts": { title: "Xung đột đồng bộ", description: "", module: "Tích hợp" },
+  "/settings/integrations/imports": { title: "Import dữ liệu", description: "", module: "Tích hợp" },
+  "/settings/integrations/attendance-devices": { title: "Máy chấm công", description: "", module: "Tích hợp" },
+  "/settings/integrations/api-docs": { title: "Tài liệu API & Webhook", description: "", module: "Tích hợp" },
   "/settings/audit-log": {
     title: "Audit log",
     description: "Theo dõi thay đổi quan trọng theo actor, entity, before/after và lý do.",
@@ -188,12 +223,14 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/system-admin/branding": { title: "Thương hiệu", description: "", module: "Trung tâm quản trị" },
   "/system-admin/appearance": { title: "Giao diện", description: "", module: "Trung tâm quản trị" },
   "/system-admin/navigation": { title: "Điều hướng", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/dashboard": { title: "Dashboard", description: "", module: "Trung tâm quản trị" },
   "/system-admin/modules": { title: "Module", description: "", module: "Trung tâm quản trị" },
   "/system-admin/organization": { title: "Tổ chức", description: "", module: "Trung tâm quản trị" },
   "/system-admin/localization": { title: "Định dạng & thời gian", description: "", module: "Trung tâm quản trị" },
   "/system-admin/security": { title: "Bảo mật", description: "", module: "Trung tâm quản trị" },
   "/system-admin/config-history": { title: "Lịch sử cấu hình", description: "", module: "Trung tâm quản trị" },
   "/system-admin/audit": { title: "Audit log", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/notices": { title: "Thông báo hệ thống", description: "", module: "Trung tâm quản trị" },
   "/notifications": {
     title: "Thông báo",
     description: "Route mobile cho thông báo nghiệp vụ và trạng thái đồng bộ.",
@@ -236,11 +273,30 @@ export function getRouteMeta(pathname: string): RouteMeta {
     return exact;
   }
 
+  const approvalCaseMatch = pathname.match(/^\/approvals\/([^/]+)$/);
+  if (approvalCaseMatch) return { title: "Chi tiết phê duyệt", description: "", module: "Phê duyệt" };
+  const documentMatch = pathname.match(/^\/documents\/([^/]+)$/);
+  if (documentMatch) return { title: "Chi tiết tài liệu", description: "", module: "Tài liệu" };
+  const integrationMatch = pathname.match(/^\/settings\/integrations\/([^/]+)(?:\/(logs|mappings))?$/);
+  if (integrationMatch) return { title: integrationMatch[2] === "logs" ? "Integration logs" : integrationMatch[2] === "mappings" ? "Data mappings" : "Chi tiết tích hợp", description: "", module: "Tích hợp" };
+
   {
+    const warehouseMatch = pathname.match(/^\/warehouse\/(items|warehouses|receipts|issues|transfers|adjustments|stock-counts)\/(new|[^/]+)$/);
+    if (warehouseMatch) {
+      const labels: Record<string, string> = { items: "Hàng hóa", warehouses: "Kho", receipts: "Phiếu nhập", issues: "Phiếu xuất", transfers: "Phiếu chuyển", adjustments: "Phiếu điều chỉnh", "stock-counts": "Kiểm kê" };
+      return { title: warehouseMatch[2] === "new" ? `Tạo ${labels[warehouseMatch[1]].toLowerCase()}` : labels[warehouseMatch[1]], description: "", module: "Kho" };
+    }
     const employeeTimesheet = pathname.match(/^\/timesheets\/periods\/([^/]+)\/employees\/([^/]+)$/);
     if (employeeTimesheet) return { title: "Công nhân viên", description: "", module: "Nhân sự" };
     const periodTimesheet = pathname.match(/^\/timesheets\/periods\/([^/]+)$/);
     if (periodTimesheet) return { title: "Chi tiết kỳ công", description: "", module: "Nhân sự" };
+    const shipmentMatch = pathname.match(/^\/import-export\/shipments\/(new|[^/]+)(?:\/(overview|lines|containers|documents|customs|receiving|history))?$/);
+    if (shipmentMatch) {
+      const sectionLabels: Record<string,string> = { overview:"Tổng quan",lines:"Dòng hàng",containers:"Container",documents:"Chứng từ",customs:"Thông quan",receiving:"Nhận hàng",history:"Lịch sử" };
+      return { title: shipmentMatch[1] === "new" ? "Tạo lô hàng" : sectionLabels[shipmentMatch[2] ?? "overview"], description: "", module: "Xuất nhập khẩu" };
+    }
+    const contractMatch = pathname.match(/^\/import-export\/contracts\/(new|[^/]+)$/);
+    if (contractMatch) return { title: contractMatch[1] === "new" ? "Tạo hợp đồng / PO" : "Chi tiết hợp đồng / PO", description: "", module: "Xuất nhập khẩu" };
   }
 
   const employeeMatch = pathname.match(/^\/employees\/([^/]+)\/([^/]+)$/);
@@ -279,6 +335,11 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (pathname === "/dashboard") {
     return [{ label: "Tổng quan" }];
   }
+
+  const shipmentMatch = pathname.match(/^\/import-export\/shipments\/([^/]+)(?:\/([^/]+))?$/);
+  if (shipmentMatch) return [{label:"Xuất nhập khẩu",href:"/import-export"},{label:"Lô hàng",href:"/import-export/shipments"},{label:shipmentMatch[1],href:`/import-export/shipments/${shipmentMatch[1]}/overview`},{label:getRouteMeta(pathname).title}];
+  const contractMatch = pathname.match(/^\/import-export\/contracts\/([^/]+)$/);
+  if (contractMatch) return [{label:"Xuất nhập khẩu",href:"/import-export"},{label:"Hợp đồng / PO",href:"/import-export/contracts"},{label:getRouteMeta(pathname).title}];
 
   const employeeMatch = pathname.match(/^\/employees\/([^/]+)\/([^/]+)$/);
   if (employeeMatch) {

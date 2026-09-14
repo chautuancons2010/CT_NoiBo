@@ -1,14 +1,1 @@
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { SettingsPlaceholderPage } from "@/features/settings";
-
-const meta = routeMetaByPath["/settings/approval-workflows"];
-
-export default function Page() {
-  return (
-    <SettingsPlaceholderPage
-      activePath="/settings/approval-workflows"
-      description={meta.description}
-      title={meta.title}
-    />
-  );
-}
+import { PageHeader } from "@/components/shared/PageHeader";import { WorkflowManager } from "@/features/shared-platforms/components/WorkflowManager";export default function Page(){return <div className="page-stack"><PageHeader title="Quy trình phê duyệt"/><WorkflowManager/></div>}

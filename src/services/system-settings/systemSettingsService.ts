@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   defaultSystemSettings,
   isSystemSettingsGroup,
+  normalizeStoredNavigationSettings,
   parseSystemSettingsGroup,
   systemSettingsSchemas,
   type SystemSettingsDocument,
@@ -50,7 +51,10 @@ export async function readSystemSettings(): Promise<SystemSettingsDocument> {
     if (!error && data) {
       for (const row of data) {
         if (!isSystemSettingsGroup(row.group_key)) continue;
-        const parsed = systemSettingsSchemas[row.group_key].safeParse(row.value);
+        const storedValue = row.group_key === "navigation"
+          ? normalizeStoredNavigationSettings(row.value)
+          : row.value;
+        const parsed = systemSettingsSchemas[row.group_key].safeParse(storedValue);
         if (parsed.success) {
           result[row.group_key] = parsed.data as never;
         } else {

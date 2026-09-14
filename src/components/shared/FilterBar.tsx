@@ -7,7 +7,7 @@ import { IconButton } from "@/components/shared/Button";
 import { cn } from "@/lib/utils/cn";
 
 export interface FilterBarProps {
-  children: ReactNode;
+  children?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }

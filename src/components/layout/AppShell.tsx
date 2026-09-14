@@ -9,6 +9,8 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { isPathEnabled } from "@/config/systemSettings";
+import { SystemNoticeBanner } from "@/features/shared-platforms/components/SystemNoticeBanner";
+import { resolveLandingPage } from "@/features/dashboard/registry";
 
 function subscribeToOnlineStatus(callback: () => void): () => void {
   window.addEventListener("online", callback);
@@ -41,9 +43,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isPathEnabled(pathname, settings.modules)) {
-      router.replace(settings.navigation.defaultLandingPage);
+      const contextualLanding = resolveLandingPage(foundationDemoUser, settings.dashboard);
+      router.replace(isPathEnabled(contextualLanding, settings.modules) ? contextualLanding : "/dashboard");
     }
-  }, [pathname, router, settings.modules, settings.navigation.defaultLandingPage]);
+  }, [pathname, router, settings.dashboard, settings.modules]);
 
   return (
     <div className="app-shell">
@@ -55,6 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <div className="app-content">
         <AppHeader online={online} pathname={pathname} user={foundationDemoUser} />
+        <SystemNoticeBanner />
         <main className="page-main" id="main-content" tabIndex={-1}>
           {children}
         </main>
