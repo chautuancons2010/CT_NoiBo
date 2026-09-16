@@ -4,6 +4,8 @@ import { ChevronRight } from "lucide-react";
 import type { BreadcrumbItem } from "@/config/routeRegistry";
 
 export function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
+  if (items.length < 2) return null;
+
   return (
     <nav aria-label="Breadcrumb" className="breadcrumb">
       <ol>

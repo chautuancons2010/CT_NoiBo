@@ -18,7 +18,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button, IconButton } from "@/components/shared/Button";
-import { Card } from "@/components/shared/Card";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Tabs } from "@/components/shared/Tabs";
@@ -237,7 +236,7 @@ export function AttendanceCameraExperience() {
   if (!dashboard) return <ErrorState title="Không thể mở chấm công" description={loadError} action={<Button onClick={() => void loadDashboard()}>Thử lại</Button>} />;
 
   const match = matchAttendanceLocation(coordinates, dashboard.locations, dashboard.policy);
-  const nextLabel = dashboard.nextAction === "check_in" ? "CHẤM VÀO" : dashboard.nextAction === "check_out" ? "CHẤM RA" : "ĐÃ HOÀN TẤT";
+  const nextLabel = dashboard.nextAction === "check_in" ? "Chấm vào" : dashboard.nextAction === "check_out" ? "Chấm ra" : "Đã hoàn tất";
 
   return (
     <div className="attendance-page">
@@ -258,14 +257,15 @@ export function AttendanceCameraExperience() {
 
       {step === "home" ? (
         <div className="attendance-home-grid">
-          <Card className="attendance-clock-card">
+          <section className="attendance-clock-card" aria-label="Thời gian và ca làm hôm nay">
             <span className="attendance-date">{new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" }).format(now)}</span>
             <strong>{formatTime(now, true)}</strong>
             <div className="attendance-shift"><Clock3 size={18} /><span>{dashboard.policy.shiftName}</span><b>{dashboard.policy.shiftStart} – {dashboard.policy.shiftEnd}</b></div>
-          </Card>
-          <Card className="attendance-status-card">
+          </section>
+          <section className="attendance-status-card" aria-label="Trạng thái sẵn sàng và dòng thời gian hôm nay">
             <div className="attendance-status-row"><MapPin size={18} /><span>{dashboard.locations.map((location) => location.name).join(", ") || "Chưa gán địa điểm"}</span><StatusBadge tone="neutral">GPS khi mở camera</StatusBadge></div>
-            <div className="attendance-status-row">{online ? <Wifi size={18} /> : <WifiOff size={18} />}<span>{online ? "Đã kết nối" : "Không có mạng"}</span><StatusBadge tone={online ? "success" : "warning"}>{online ? "Online" : "Offline"}</StatusBadge></div>
+            <div className="attendance-status-row">{online ? <Wifi size={18} /> : <WifiOff size={18} />}<span>{online ? "Kết nối sẵn sàng" : "Không có mạng"}</span><StatusBadge tone={online ? "success" : "warning"}>{online ? "Trực tuyến" : "Ngoại tuyến"}</StatusBadge></div>
+            <h2 className="attendance-timeline-title">Dòng thời gian hôm nay</h2>
             <div className="attendance-today-events">
               {dashboard.todayEvents.length ? dashboard.todayEvents.map((event) => (
                 <div key={event.id}><span>{event.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</span><strong>{formatTime(event.effectiveAt)}</strong><StatusBadge tone={event.syncStatus === "synced" ? "success" : "warning"}>{event.syncStatus === "synced" ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge></div>
@@ -273,12 +273,12 @@ export function AttendanceCameraExperience() {
             </div>
             <Button className="attendance-primary-action" disabled={dashboard.nextAction === "completed" || !dashboard.policy.attendanceEnabled} leftIcon={<Camera size={20} />} onClick={openCapture} size="lg" variant="primary">{nextLabel}</Button>
             {dashboard.lastEvent ? <Link className="attendance-last-link" href={`/attendance/history/${dashboard.lastEvent.attendanceDate}`}><History size={16} />Lần gần nhất: {formatTime(dashboard.lastEvent.effectiveAt)} · {dashboard.lastEvent.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</Link> : null}
-          </Card>
+          </section>
         </div>
       ) : null}
 
       {step === "camera" ? (
-        <Card className="attendance-capture-card">
+        <section className="attendance-capture-card" aria-label="Chụp ảnh chấm công">
           <div className="attendance-camera-toolbar"><strong>{nextLabel}</strong><IconButton label="Đóng camera" onClick={closeCapture}><X size={20} /></IconButton></div>
           <div className="attendance-live-preview">
             <video muted playsInline ref={videoRef} />
@@ -293,21 +293,21 @@ export function AttendanceCameraExperience() {
             <button aria-label="Chụp ảnh" className="capture-button" disabled={cameraState !== "ready"} onClick={() => void takePhoto()} type="button"><span /></button>
             <IconButton label="Thử lại GPS" onClick={requestLocation}><RefreshCcw size={20} /></IconButton>
           </div>
-        </Card>
+        </section>
       ) : null}
 
       {step === "preview" && photo ? (
-        <Card className="attendance-photo-review">
+        <section className="attendance-photo-review" aria-label="Kiểm tra ảnh chấm công">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img alt="Ảnh chấm công vừa chụp" src={photo.previewUrl} />
           <div className="attendance-capture-status"><span><MapPin size={16} />{match.status === "valid" ? `${match.location?.name} · Vị trí hợp lệ` : "Vị trí chưa hợp lệ"}</span><span>{online ? <Wifi size={16} /> : <WifiOff size={16} />}{online ? "Đã kết nối" : "Sẽ lưu trên thiết bị"}</span></div>
           <div className="action-row"><Button leftIcon={<RotateCcw size={16} />} onClick={retake}>Chụp lại</Button><Button disabled={dashboard.policy.gpsRequired && match.status !== "valid"} leftIcon={<CheckCircle2 size={16} />} onClick={() => void submitPhoto()} variant="primary">Sử dụng ảnh</Button></div>
-        </Card>
+        </section>
       ) : null}
 
       {step === "saving" ? <LoadingState title="Đang ghi nhận..." description="Đang lưu dữ liệu an toàn trên thiết bị." /> : null}
       {step === "success" ? (
-        <Card className="attendance-success-card"><CheckCircle2 size={52} /><h2>{successSynced ? "Chấm công thành công" : "Đã ghi nhận"}</h2><strong>{formatTime(now)}</strong><span>{match.location?.name}</span><StatusBadge tone={successSynced ? "success" : "warning"}>{successSynced ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge><Button onClick={closeCapture}>Về màn hình hôm nay</Button></Card>
+        <section className="attendance-success-card"><CheckCircle2 size={52} /><h2>{successSynced ? "Máy chủ đã xác nhận" : "Đã lưu trên thiết bị"}</h2><strong>{formatTime(now)}</strong><span>{match.location?.name}</span><StatusBadge tone={successSynced ? "success" : "warning"}>{successSynced ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge><Button onClick={closeCapture}>Về màn hình hôm nay</Button></section>
       ) : null}
     </div>
   );

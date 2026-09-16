@@ -14,11 +14,15 @@
     "test:watch": "vitest",
     "validate:migrations": "node scripts/validate-migrations.mjs",
     "smoke": "node scripts/smoke-test.mjs",
+    "ui:audit": "node scripts/ui-route-audit.mjs",
+    "ui:qa": "node scripts/ui-qa.mjs",
     "migration:dry-run": "node scripts/migration/dry-run.mjs",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
-    "@fontsource/noto-sans": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/roboto": "^5.3.0",
     "@pdf-lib/fontkit": "^1.1.1",
     "@supabase/supabase-js": "^2.45.4",
     "exceljs": "^4.4.0",
@@ -40,6 +44,7 @@
     "eslint": "^9.14.0",
     "eslint-config-next": "^16.3.4",
     "jsdom": "^25.0.1",
+    "playwright-core": "^1.63.0",
     "supabase": "^2.117.0",
     "typescript": "^5.6.3",
     "vitest": "^4.1.11"

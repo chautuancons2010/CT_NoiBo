@@ -230,7 +230,7 @@ export const defaultSystemSettings: SystemSettingsDocument = {
     assetVersion: 0
   },
   appearance: {
-    primaryColor: "#19A94A",
+    primaryColor: "#2E9B67",
     density: "standard",
     tableDensity: "standard",
     defaultPageSize: 20,
@@ -321,20 +321,22 @@ export interface BrandColorTokens {
 
 export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
   const configuredPrimary = hexColorSchema.parse(primaryColor).toUpperCase();
-  const primary = configuredPrimary === "#0F766E" ? "#19A94A" : configuredPrimary;
+  const primary = configuredPrimary === "#0F766E" || configuredPrimary === "#19A94A" || configuredPrimary === "#46A36D"
+    ? "#2E9B67"
+    : configuredPrimary;
   const whiteContrast = contrastRatio(primary, "#FFFFFF");
   const blackContrast = contrastRatio(primary, "#111827");
   const primaryForeground = whiteContrast >= blackContrast ? "#FFFFFF" : "#111827";
 
-  if (primary === "#19A94A") {
+  if (primary === "#2E9B67") {
     return {
       primary,
-      primaryHover: "#158A3D",
-      primaryActive: "#117533",
-      primarySubtle: "#ECF9F0",
-      primaryBorder: "#A7DFB9",
-      primaryForeground,
-      focusRing: "#19A94A38",
+      primaryHover: "#27875A",
+      primaryActive: "#21734D",
+      primarySubtle: "#EAF7F0",
+      primaryBorder: "#B8DDCA",
+      primaryForeground: "#FFFFFF",
+      focusRing: "#2E9B6738",
       contrast: Math.max(whiteContrast, blackContrast)
     };
   }

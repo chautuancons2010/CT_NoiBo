@@ -1,1 +1,1 @@
-import{PageHeader}from"@/components/shared/PageHeader";import{DeliveryManager}from"@/features/integrations/components/IntegrationConsole";export default function Page(){return <div className="page-stack"><PageHeader title="Webhook deliveries"/><DeliveryManager/></div>}
+import{PageHeader}from"@/components/shared/PageHeader";import{DeliveryManager}from"@/features/integrations/components/IntegrationConsole";export default function Page(){return <div className="page-stack"><PageHeader title="Lịch sử gửi webhook"/><DeliveryManager/></div>}

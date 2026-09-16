@@ -16,7 +16,7 @@ describe("permission-driven dashboard registry", () => {
 
   it("does not render enabled widgets when their permission is missing", () => {
     const widgets = enabledWidgetsFor(user(["dashboard.view"]), "employee", defaultDashboardSettings);
-    expect(widgets.map((widget) => widget.key)).toEqual(["quick_actions"]);
+    expect(widgets.map((widget) => widget.key)).toEqual([]);
   });
 
   it("falls back to an accessible landing page", () => {

@@ -1,2 +1,2 @@
-import { PageHeader } from "@/components/shared/PageHeader"; import { DocumentListView } from "@/features/warehouse";
-export default function Page(){return <div className="page-stack"><PageHeader title="Xuất kho"/><DocumentListView type="issue"/></div>;}
+import { WarehouseDocumentListRoute } from "@/features/warehouse";
+export default function Page(){return <WarehouseDocumentListRoute title="Xuất kho" type="issue"/>;}

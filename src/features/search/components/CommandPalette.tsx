@@ -23,9 +23,11 @@ export function CommandPalette({ user }: { user: AuthenticatedUser }) {
   const [active, setActive] = useState(0);
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchSequence = useRef(0);
   const commands = useMemo(() => commandsForUser(user, query).slice(0, 6), [query, user]);
   const recentResults: SearchResult[] = useMemo(() => recent.map((item) => ({ ...item, reference: undefined, status: undefined, icon: "file", score: 0 })), [recent]);
   const visibleResults = query.trim().length >= 2 ? results : recentResults;
+  const searchLoading = loading && open && query.trim().length >= 2;
   const selectable = useMemo(() => [...commands.map((item) => ({ kind: "command" as const, item })), ...visibleResults.map((item) => ({ kind: "result" as const, item }))], [commands, visibleResults]);
 
   const close = useCallback(() => { setOpen(false); setQuery(""); setResults([]); setActive(0); }, []);
@@ -51,15 +53,18 @@ export function CommandPalette({ user }: { user: AuthenticatedUser }) {
   }, [open]);
 
   useEffect(() => {
-    if (!open || query.trim().length < 2) return;
+    const requestId = ++searchSequence.current;
+    if (!open || query.trim().length < 2) {
+      return;
+    }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setLoading(true);
       void fetch(`/api/v1/search?q=${encodeURIComponent(query)}&limit=8`, { cache: "no-store", signal: controller.signal })
         .then((response) => response.json() as Promise<SearchBody>)
-        .then((body) => { setResults(body.data?.results ?? []); setActive(0); })
-        .catch((reason: unknown) => { if (!(reason instanceof DOMException && reason.name === "AbortError")) setResults([]); })
-        .finally(() => setLoading(false));
+        .then((body) => { if (requestId === searchSequence.current) { setResults(body.data?.results ?? []); setActive(0); } })
+        .catch((reason: unknown) => { if (requestId === searchSequence.current && !(reason instanceof DOMException && reason.name === "AbortError")) setResults([]); })
+        .finally(() => { if (requestId === searchSequence.current) setLoading(false); });
     }, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [open, query]);
@@ -88,7 +93,7 @@ export function CommandPalette({ user }: { user: AuthenticatedUser }) {
 
   return (
     <>
-      <button aria-haspopup="dialog" className="header-search" onClick={() => setOpen(true)} type="button"><Search aria-hidden="true" size={17} /><span>Tìm nhân viên, dự án, shipment, chứng từ...</span><kbd>Ctrl K</kbd></button>
+      <button aria-haspopup="dialog" className="header-search" onClick={() => setOpen(true)} type="button"><Search aria-hidden="true" size={17} /><span>Tìm nhân viên, dự án, lô hàng, chứng từ...</span><kbd>Ctrl K</kbd></button>
       <IconButton className="header-search-mobile" label="Tìm kiếm" onClick={() => setOpen(true)}><Search aria-hidden="true" size={19} /></IconButton>
       {open ? (
         <div className="command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
@@ -97,7 +102,7 @@ export function CommandPalette({ user }: { user: AuthenticatedUser }) {
             <div className="command-content" id="command-results">
               {commands.length ? <section><h2>{query ? "Đi đến và tạo mới" : "Đi đến"}</h2><ul className="command-list" role="listbox">{commands.map((command, index) => <li aria-selected={active === index} className={active === index ? "is-active" : undefined} id={`command-option-${index}`} key={command.key} role="option"><button onClick={() => selectCommand(command)} type="button"><Command aria-hidden="true" size={17} /><span>{command.label}</span><ArrowRight aria-hidden="true" size={16} /></button></li>)}</ul></section> : null}
               {query.trim().length < 2 && recentResults.length ? <section><h2>Gần đây</h2><SearchResultList activeIndex={active - commands.length} idPrefix="command-option" indexOffset={commands.length} results={recentResults} /></section> : null}
-              {query.trim().length >= 2 ? <section><h2>Tìm kiếm</h2>{loading ? <div className="command-loading">Đang tìm…</div> : results.length ? <SearchResultList activeIndex={active - commands.length} idPrefix="command-option" indexOffset={commands.length} results={results} /> : <div className="command-empty">Không tìm thấy kết quả cho “{query}”.</div>}</section> : null}
+              {query.trim().length >= 2 ? <section><h2>Tìm kiếm</h2>{searchLoading ? <div className="command-loading">Đang tìm…</div> : results.length ? <SearchResultList activeIndex={active - commands.length} idPrefix="command-option" indexOffset={commands.length} results={results} /> : <div className="command-empty">Không tìm thấy kết quả cho “{query}”.</div>}</section> : null}
             </div>
             <footer><span><CornerDownLeft aria-hidden="true" size={14} /> Chọn</span><span>↑↓ Di chuyển</span><span>Esc Đóng</span></footer>
           </div>

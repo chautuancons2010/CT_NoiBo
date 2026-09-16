@@ -14,9 +14,9 @@ function splitText(text:string,font:PDFFont,size:number,width:number){const word
 
 export async function generateLeaveRequestPdf(request:LeaveRequest,settings:SystemSettingsDocument):Promise<Uint8Array>{
   const document=await PDFDocument.create();document.registerFontkit(fontkit);
-  const fontRoot=path.join(process.cwd(),"node_modules","@fontsource","noto-sans","files");
-  const [regularBytes,boldBytes]=await Promise.all([readFile(path.join(fontRoot,"noto-sans-vietnamese-400-normal.woff")),readFile(path.join(fontRoot,"noto-sans-vietnamese-700-normal.woff"))]);
-  const regular=await document.embedFont(Uint8Array.from(regularBytes),{subset:true});const bold=await document.embedFont(Uint8Array.from(boldBytes),{subset:true});
+  const fontRoot=path.join(process.cwd(),"node_modules","@fontsource","ibm-plex-sans","files");
+  const [regularBytes,boldBytes]=await Promise.all([readFile(path.join(fontRoot,"ibm-plex-sans-latin-ext-400-normal.woff2")),readFile(path.join(fontRoot,"ibm-plex-sans-latin-ext-600-normal.woff2"))]);
+  const regular=await document.embedFont(Uint8Array.from(regularBytes),{subset:false});const bold=await document.embedFont(Uint8Array.from(boldBytes),{subset:false});
   let page:PDFPage=document.addPage(A4);let y=790;const left=48;const width=A4[0]-96;
   const ensure=(height:number)=>{if(y-height<48){page=document.addPage(A4);y=790;}};
   const line=(value:string,font=regular,size=10,gap=17)=>{for(const part of splitText(value,font,size,width)){ensure(gap);page.drawText(part,{x:left,y,font,size,color:rgb(.11,.16,.24)});y-=gap;}};

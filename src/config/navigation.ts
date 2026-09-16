@@ -184,14 +184,14 @@ export const desktopNavigation: NavigationGroup[] = [
     label: "Xuất nhập khẩu",
     items: [
       {
-        label: "Tổng quan XNK",
+        label: "Điều hành xuất nhập khẩu",
         href: "/import-export",
         icon: "LayoutDashboard",
         requiredPermission: "import_export.view",
         exact: true
       },
       {
-        label: "Hợp đồng / PO",
+        label: "Hợp đồng mua hàng",
         href: "/import-export/contracts",
         icon: "FileText",
         requiredPermission: "import_contract.view"
@@ -292,7 +292,7 @@ export const desktopNavigation: NavigationGroup[] = [
         requiredPermission: "module.manage"
       },
       {
-        label: "Audit log",
+        label: "Nhật ký hệ thống",
         href: "/settings/audit-log",
         icon: "FileText",
         requiredPermission: "audit.view"

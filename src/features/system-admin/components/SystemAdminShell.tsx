@@ -11,14 +11,14 @@ const adminRoutes = [
   ["/system-admin/branding", "Thương hiệu", "branding.view"],
   ["/system-admin/appearance", "Giao diện", "appearance.view"],
   ["/system-admin/navigation", "Điều hướng", "navigation.manage"],
-  ["/system-admin/dashboard", "Dashboard", "navigation.manage"],
-  ["/system-admin/modules", "Module", "module.manage"],
+  ["/system-admin/dashboard", "Bố cục bản tin", "navigation.manage"],
+  ["/system-admin/modules", "Phân hệ", "module.manage"],
   ["/system-admin/organization", "Tổ chức", "organization_settings.view"],
   ["/system-admin/localization", "Định dạng & thời gian", "localization.manage"],
   ["/system-admin/security", "Bảo mật", "system_admin.access"],
   ["/system-admin/operations", "Vận hành", "operations.view"],
   ["/system-admin/config-history", "Lịch sử cấu hình", "config_history.view"],
-  ["/system-admin/audit", "Audit log", "audit.view"]
+  ["/system-admin/audit", "Nhật ký hệ thống", "audit.view"]
 ] as const;
 
 export function SystemAdminShell({ children, permissions }: { children: ReactNode; permissions: readonly Permission[] }) {

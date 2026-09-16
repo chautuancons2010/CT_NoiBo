@@ -144,7 +144,15 @@ async function loadWarehouse(user: AuthenticatedUser): Promise<DashboardWidgetDa
       { label: "Sắp hết", value: summary.lowStock, href: "/warehouse/inventory?status=low_stock", tone: summary.lowStock ? "warning" : "success" },
       { label: "Hết hàng", value: summary.outOfStock, href: "/warehouse/inventory?status=out_of_stock", tone: summary.outOfStock ? "error" : "success" }
     ],
-    items: summary.lowStockItems.slice(0, 8).map((item) => ({ id: `${item.warehouseId}:${item.itemId}`, type: "warehouse_item", title: `${item.itemCode} · ${item.itemName}`, context: item.warehouseName, priority: item.status === "out_of_stock" ? "HIGH" : "MEDIUM", href: `/warehouse/items/${item.itemId}`, status: item.status === "out_of_stock" ? "Hết hàng" : "Sắp hết" }))
+    items: summary.lowStockItems.slice(0, 8).map((item) => ({ id: `${item.warehouseId}:${item.itemId}`, type: "warehouse_item", title: `${item.itemCode} · ${item.itemName}`, context: item.warehouseName, priority: item.status === "out_of_stock" ? "HIGH" : "MEDIUM", href: `/warehouse/items/${item.itemId}`, status: item.status === "out_of_stock" ? "Hết hàng" : "Sắp hết" })),
+    charts: [{
+      key: "warehouse-stock-alerts",
+      title: "Trạng thái cảnh báo tồn",
+      series: [
+        { label: "Sắp hết", value: summary.lowStock, tone: "warning" },
+        { label: "Hết hàng", value: summary.outOfStock, tone: "error" }
+      ]
+    }]
   };
 }
 
@@ -158,7 +166,17 @@ async function loadShipments(user: AuthenticatedUser): Promise<DashboardWidgetDa
       { label: "Chờ nhập kho", value: summary.awaitingReceipt, href: "/import-export/shipments" },
       { label: "Cần chú ý", value: summary.attentionCount, href: "/import-export/shipments", tone: summary.attentionCount ? "warning" : "success" }
     ],
-    items: summary.needsAttention.slice(0, 8).flatMap(({ shipment, flags }) => flags.map((flag) => ({ id: `${shipment.id}:${flag.code}`, type: "shipment", title: shipment.shipmentNumber, context: flag.label, priority: flag.code === "customs_issue" ? "HIGH" as const : flag.code === "eta_delayed" || flag.code === "document_missing" ? "MEDIUM" as const : "LOW" as const, href: `/import-export/shipments/${shipment.id}/overview`, status: "Cần chú ý" })))
+    items: summary.needsAttention.slice(0, 8).flatMap(({ shipment, flags }) => flags.map((flag) => ({ id: `${shipment.id}:${flag.code}`, type: "shipment", title: shipment.shipmentNumber, context: flag.label, priority: flag.code === "customs_issue" ? "HIGH" as const : flag.code === "eta_delayed" || flag.code === "document_missing" ? "MEDIUM" as const : "LOW" as const, href: `/import-export/shipments/${shipment.id}/overview`, status: "Cần chú ý" }))),
+    charts: [{
+      key: "shipment-status",
+      title: "Tiến độ lô hàng",
+      series: [
+        { label: "Sắp về", value: summary.upcoming },
+        { label: "Đang vận chuyển", value: summary.inTransit },
+        { label: "Đang thông quan", value: summary.customsProcessing },
+        { label: "Chờ nhập kho", value: summary.awaitingReceipt, tone: "warning" }
+      ]
+    }]
   };
 }
 
@@ -166,26 +184,41 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
   if (!can(user.permissions, "employee.view")) throw new AppError("PERMISSION_DENIED");
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình.");
-  const [active, probation, incomplete, pendingHr] = await Promise.all([
+  const [active, probation, incomplete, departmentRows, pendingHr] = await Promise.all([
     client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "active"),
     client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "probation"),
     client.from("employees").select("id", { count: "exact", head: true }).lt("profile_completeness", 100).in("employment_status", ["active", "probation", "pending_onboarding"]),
+    client.from("employees").select("department_id,departments(name)").in("employment_status", ["active", "probation"]),
     client.from("employees").select("id", { count: "exact", head: true }).eq("profile_status", "pending_hr_completion")
   ]);
-  if ([active, probation, incomplete, pendingHr].some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
+  if ([active, probation, incomplete, pendingHr, departmentRows].some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
+  const byDepartment = new Map<string, number>();
+  for (const row of departmentRows.data ?? []) {
+    const relation = Array.isArray(row.departments) ? row.departments[0] : row.departments;
+    const label = relation?.name ? String(relation.name) : "Chưa phân phòng";
+    byDepartment.set(label, (byDepartment.get(label) ?? 0) + 1);
+  }
   return {
     metrics: [
       { label: "Đang làm việc", value: active.count ?? 0, href: "/employees?status=active" },
       { label: "Thử việc", value: probation.count ?? 0, href: "/employees?status=probation" },
       { label: "Hồ sơ chưa hoàn thiện", value: incomplete.count ?? 0, href: "/employees?profile=incomplete", tone: incomplete.count ? "warning" : "success" },
       { label: "Chờ HR hoàn thiện", value: pendingHr.count ?? 0, href: "/employees?profile=pending_hr_completion", tone: pendingHr.count ? "warning" : "success" }
-    ]
+    ],
+    charts: byDepartment.size ? [{
+      key: "hr-by-department",
+      title: "Nhân sự theo phòng ban",
+      series: [...byDepartment.entries()]
+        .map(([label, value]) => ({ label, value }))
+        .sort((first, second) => second.value - first.value)
+        .slice(0, 8)
+    }] : undefined
   };
 }
 
 async function loadRecentActivity(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const { entries } = await listAuditLogs(user, { page: 1 });
-  return { items: entries.slice(0, 8).map((entry) => ({ id: entry.id, type: entry.entityType, title: `${entry.actorName} · ${entry.actionLabel}`, context: entry.entityReference ? String(entry.entityReference) : `${entry.entityType} ${entry.entityId}`, dueOrAge: formatAge(entry.happenedAt), href: `/settings/audit-log?q=${encodeURIComponent(entry.entityId)}`, status: entry.severity === "critical" ? "Quan trọng" : undefined })) };
+  return { items: entries.slice(0, 8).map((entry) => ({ id: entry.id, type: entry.entityType, title: entry.actorName, context: entry.entityReference ? `${entry.actionLabel} · ${String(entry.entityReference)}` : entry.actionLabel, dueOrAge: formatAge(entry.happenedAt), href: `/settings/audit-log?q=${encodeURIComponent(entry.entityId)}`, status: entry.severity === "critical" ? "Quan trọng" : undefined })) };
 }
 
 async function loadNotifications(user: AuthenticatedUser): Promise<DashboardWidgetData> {

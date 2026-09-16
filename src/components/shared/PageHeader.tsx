@@ -10,7 +10,7 @@ export function PageHeader({ title, action }: PageHeaderProps) {
   return (
     <div className="page-header">
       <div className="page-header__copy">
-        <h2>{title}</h2>
+        <h1>{title}</h1>
       </div>
       {action ? <div>{action}</div> : null}
     </div>

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { AppSidebar } from "@/components/layout/AppSidebar";
+import { AppRail } from "@/components/layout/AppRail";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
@@ -24,6 +24,7 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
   const [collapsed, setCollapsed] = useState(settings.appearance.sidebarDefault === "collapsed");
   const isWorkspace = pathname === "/workspace";
   const connectionState = useRealtimeConnectionState();
+  const breadcrumbs = getBreadcrumbs(pathname);
 
   useEffect(() => {
     if (!isPathEnabled(pathname, settings.modules)) {
@@ -35,22 +36,32 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
   useEffect(() => {
     const domain = realtimeDomainForPath(pathname);
     if (!domain) return;
-    return subscribeRealtimeDomain(domain, () => router.refresh());
+    let refreshTimer: number | undefined;
+    const unsubscribe = subscribeRealtimeDomain(domain, () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => router.refresh(), 180);
+    });
+    return () => {
+      window.clearTimeout(refreshTimer);
+      unsubscribe();
+    };
   }, [pathname, router]);
 
   return (
     <div className={isWorkspace ? "app-shell app-shell--workspace" : "app-shell"}>
-      {!isWorkspace ? <AppSidebar
-        collapsed={collapsed}
-        onCollapsedChange={setCollapsed}
-        pathname={pathname}
-        user={user}
-      /> : null}
+      {!isWorkspace ? (
+        <AppRail
+          collapsed={collapsed}
+          onCollapsedChange={setCollapsed}
+          pathname={pathname}
+          user={user}
+        />
+      ) : null}
       <div className="app-content">
         <AppHeader connectionState={connectionState} pathname={pathname} user={user} />
         <SystemNoticeBanner />
         <main className="page-main" id="main-content" tabIndex={-1}>
-          {!isWorkspace ? <div className="page-breadcrumb"><Breadcrumb items={getBreadcrumbs(pathname)} /></div> : null}
+          {!isWorkspace && breadcrumbs.length > 1 ? <div className="page-breadcrumb"><Breadcrumb items={breadcrumbs} /></div> : null}
           {children}
         </main>
         <MobileBottomNav pathname={pathname} user={user} />

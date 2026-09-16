@@ -17,4 +17,15 @@ describe("route registry", () => {
       { label: "Hợp đồng" }
     ]);
   });
+
+  it("hides a breadcrumb that only repeats the current page", () => {
+    expect(getBreadcrumbs("/dashboard")).toEqual([]);
+  });
+
+  it("keeps warehouse edit routes in the warehouse context", () => {
+    expect(getRouteMeta("/warehouse/items/57a/edit")).toMatchObject({
+      title: "Chỉnh sửa hàng hóa",
+      module: "Kho"
+    });
+  });
 });

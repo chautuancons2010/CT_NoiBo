@@ -10,14 +10,15 @@ export interface FilterBarProps {
   children?: ReactNode;
   actions?: ReactNode;
   className?: string;
+  label?: string;
 }
 
-export function FilterBar({ children, actions, className }: FilterBarProps) {
+export function FilterBar({ children, actions, className, label = "Bộ lọc dữ liệu" }: FilterBarProps) {
   return (
-    <div className={cn("filter-bar", className)}>
+    <section aria-label={label} className={cn("filter-bar", className)}>
       <div className="filter-bar__controls">{children}</div>
       {actions ? <div className="filter-bar__actions">{actions}</div> : null}
-    </div>
+    </section>
   );
 }
 

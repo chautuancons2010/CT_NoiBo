@@ -1,1 +1,1 @@
-import { ContractListView } from "@/features/import-export/components/ImportExportViews";export default function Page(){return <ContractListView/>;}
+import { PageHeader } from "@/components/shared/PageHeader";import { ContractListView } from "@/features/import-export/components/ImportExportViews";export default function Page(){return <div className="page-stack"><PageHeader title="Hợp đồng mua hàng"/><ContractListView/></div>;}

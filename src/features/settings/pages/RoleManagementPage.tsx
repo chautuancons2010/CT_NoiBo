@@ -35,7 +35,7 @@ export async function RoleManagementPage() {
         <Card>
           <header className="panel-header">
             <div>
-              <h2>Permission matrix</h2>
+              <h2>Ma trận quyền</h2>
             </div>
             <StatusBadge tone="success">
               <ShieldCheck aria-hidden="true" size={14} />

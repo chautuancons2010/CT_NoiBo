@@ -148,7 +148,7 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
   return (
     <div className="worker-wizard">
       <BackLink href={step === "roster" ? "/worker-attendance/today" : route(draft.id, step === "photos" ? "roster" : "photos")} />
-      <div className="worker-wizard__title"><div><h2>{draft.session.projectName}</h2><span>{draft.session.worksiteName} · {draft.session.shiftName}</span></div><StatusBadge tone={draft.session.syncStatus === "synced" ? "success" : "warning"}>{draft.session.syncStatus === "synced" ? "Đã đồng bộ" : "Bản nháp"}</StatusBadge></div>
+      <div className="worker-wizard__title"><div><h1>{draft.session.projectName}</h1><span>{draft.session.worksiteName} · {draft.session.shiftName}</span></div><StatusBadge tone={draft.session.syncStatus === "synced" ? "success" : "warning"}>{draft.session.syncStatus === "synced" ? "Đã đồng bộ" : "Bản nháp"}</StatusBadge></div>
       <nav className="worker-steps" aria-label="Các bước điểm danh">{(["roster", "photos", "review"] as WizardStep[]).map((item, index) => <button aria-current={step === item ? "step" : undefined} className={step === item ? "is-active" : ""} key={item} onClick={() => void saveAndGo(item)} type="button"><span>{step === item ? <Check size={14} /> : index + 1}</span>{stepLabels[item]}</button>)}</nav>
       {message ? <div className="form-message form-message--info">{message}</div> : null}
 

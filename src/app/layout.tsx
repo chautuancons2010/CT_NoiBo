@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import "@fontsource/noto-sans/400.css";
-import "@fontsource/noto-sans/500.css";
-import "@fontsource/noto-sans/600.css";
-import "@fontsource/noto-sans/700.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
 import "@/app/globals.css";
 import { SystemSettingsProvider } from "@/components/providers/SystemSettingsProvider";
 import { deriveBrandColorTokens } from "@/config/systemSettings";
@@ -44,7 +43,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       lang="vi"
       style={themeStyle}
     >
-      <body>
+      <body className="font-inter">
         <SystemSettingsProvider initialSettings={settings}>{children}</SystemSettingsProvider>
       </body>
     </html>

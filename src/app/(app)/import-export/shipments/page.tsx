@@ -1,1 +1,1 @@
-import { ShipmentListView } from "@/features/import-export/components/ImportExportViews";export default function Page(){return <ShipmentListView/>;}
+import { PageHeader } from "@/components/shared/PageHeader";import { ShipmentListView } from "@/features/import-export/components/ImportExportViews";export default function Page(){return <div className="page-stack"><PageHeader title="Lô hàng"/><ShipmentListView/></div>;}

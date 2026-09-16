@@ -13,11 +13,11 @@ import { useSettingsEditor } from "@/features/system-admin/components/editorUtil
 
 const landingOptions = [
   { label: "Trang chủ", value: "/home" },
-  { label: "Dashboard chung", value: "/dashboard" },
-  { label: "Dashboard Nhân sự", value: "/dashboard/hr" },
-  { label: "Dashboard Kho", value: "/dashboard/warehouse" },
-  { label: "Dashboard XNK", value: "/dashboard/import-export" },
-  { label: "Dashboard Quản lý", value: "/dashboard/management" },
+  { label: "Bản tin chung", value: "/dashboard" },
+  { label: "Bản tin nhân sự", value: "/dashboard/hr" },
+  { label: "Bản tin kho", value: "/dashboard/warehouse" },
+  { label: "Bản tin xuất nhập khẩu", value: "/dashboard/import-export" },
+  { label: "Bản tin quản lý", value: "/dashboard/management" },
   { label: "Chấm công", value: "/attendance" },
   { label: "Điểm danh hôm nay", value: "/worker-attendance/today" },
   { label: "Dự án", value: "/projects" }
@@ -51,16 +51,16 @@ export function DashboardSettingsPage() {
   }
 
   return (
-    <AdminPage title="Dashboard">
+    <AdminPage title="Bố cục bản tin">
       <section className="settings-form-card dashboard-settings">
         <div className="form-section">
           <div className="form-section__grid">
-            <Select label="Preset" onChange={(event) => setSelected(event.target.value as DashboardProfileKey)} options={dashboardProfiles.map((profile) => ({ label: profile.label, value: profile.key }))} value={selected} />
+            <Select label="Nhóm người dùng" onChange={(event) => setSelected(event.target.value as DashboardProfileKey)} options={dashboardProfiles.map((profile) => ({ label: profile.label, value: profile.key }))} value={selected} />
             <Select label="Trang bắt đầu" onChange={(event) => updatePreset({ landingPage: event.target.value as DashboardLandingPage })} options={[...landingOptions]} value={preset.landingPage} />
           </div>
         </div>
         <div className="form-section">
-          <div className="form-section__header"><h2>Widget</h2></div>
+          <div className="form-section__header"><h2>Khu vực hiển thị</h2></div>
           <div className="dashboard-widget-editor">
             {ordered.map((key) => {
               const widget = dashboardWidgetRegistry.find((item) => item.key === key)!;

@@ -1,2 +1,2 @@
-import { PageHeader } from "@/components/shared/PageHeader"; import { InventoryDocumentEditor } from "@/features/warehouse";
-export default function Page(){return <div className="page-stack"><PageHeader title="Tạo phiếu xuất"/><InventoryDocumentEditor type="issue"/></div>;}
+import { WarehouseDocumentRoute } from "@/features/warehouse";
+export default function Page(){return <WarehouseDocumentRoute title="Tạo phiếu xuất" type="issue"/>;}

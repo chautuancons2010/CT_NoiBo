@@ -1,1 +1,1 @@
-import { ImportExportDashboardView } from "@/features/import-export/components/ImportExportViews";export default function Page(){return <ImportExportDashboardView/>;}
+import { PageHeader } from "@/components/shared/PageHeader";import { ImportExportDashboardView } from "@/features/import-export/components/ImportExportViews";export default function Page(){return <div className="page-stack"><PageHeader title="Tổng quan xuất nhập khẩu"/><ImportExportDashboardView/></div>;}

@@ -1,20 +1,24 @@
 "use client";
 
+import type { CSSProperties } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, CalendarDays, Search, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CalendarDays, LockKeyhole, X } from "lucide-react";
 
-import { visibleApplications, visibleApplicationShortcuts } from "@/config/moduleRegistry";
-import type { ModuleSettings, NavigationSettings } from "@/config/systemSettings";
 import { navigationIconMap } from "@/components/layout/icons";
-import { visibleQuickActions } from "@/features/dashboard/registry";
-import type { DashboardItem, DashboardReadModel } from "@/features/dashboard/types";
+import { IconButton } from "@/components/shared/Button";
+import { applicationsForLauncher } from "@/config/moduleRegistry";
+import type { ModuleSettings, NavigationSettings } from "@/config/systemSettings";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
+
+type ApplicationStyle = CSSProperties & {
+  "--application-accent": string;
+  "--application-soft": string;
+};
 
 export function WorkspaceView({
   user,
   modules,
-  navigation,
   today
 }: {
   user: AuthenticatedUser;
@@ -22,68 +26,61 @@ export function WorkspaceView({
   navigation: NavigationSettings;
   today: string;
 }) {
-  const availableModules = visibleApplications(user, modules);
-  const quickActions = visibleQuickActions(user).slice(0, 5);
-  const [attention, setAttention] = useState<DashboardItem[]>();
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/v1/dashboard", { cache: "no-store", signal: controller.signal })
-      .then((response) => response.json() as Promise<{ data?: DashboardReadModel }>)
-      .then((body) => setAttention(body.data?.attention ?? []))
-      .catch(() => setAttention([]));
-    return () => controller.abort();
-  }, []);
+  const applications = applicationsForLauncher(user, modules);
+  const [lockedApplication, setLockedApplication] = useState<string>();
 
   return (
-    <div className="workspace-page page-stack">
-      <section className="workspace-hero">
-        <div className="workspace-hero__copy">
-          <span className="workspace-kicker"><Sparkles aria-hidden="true" size={16} /> Không gian làm việc</span>
-          <h2>Xin chào, {user.displayName}</h2>
-          <span className="workspace-date"><CalendarDays aria-hidden="true" size={16} /> {today}</span>
-          <Link className="workspace-search" href="/search">
-            <Search aria-hidden="true" size={19} />
-            <span>Tìm chức năng, dự án, nhân viên, hàng hóa...</span>
-            <kbd>⌘ K</kbd>
-          </Link>
+    <div className="application-launcher">
+      <header className="application-launcher__header">
+        <div>
+          <span>Ứng dụng</span>
+          <h1>Chọn khu vực làm việc</h1>
         </div>
-        <div aria-hidden="true" className="workspace-hero__geometry"><i /><i /><i /></div>
-      </section>
+        <time><CalendarDays aria-hidden="true" size={15} />{today}</time>
+      </header>
 
-      {attention?.length ? (
-        <section className="workspace-section workspace-attention">
-          <header><h3>Việc cần xử lý</h3><span>{attention.length} việc</span></header>
-          <div>{attention.slice(0, 6).map((item) => <Link href={item.href} key={`${item.type}-${item.id}`}><AlertCircle aria-hidden="true" size={18} /><span><strong>{item.title}</strong>{item.context ? <small>{item.context}</small> : null}</span><ArrowRight aria-hidden="true" size={16} /></Link>)}</div>
-        </section>
+      {lockedApplication ? (
+        <div className="application-lock-notice" role="status">
+          <LockKeyhole aria-hidden="true" size={18} />
+          <span>Bạn không có quyền truy cập ứng dụng {lockedApplication}. Vui lòng liên hệ quản trị viên nếu cần được cấp quyền.</span>
+          <IconButton label="Đóng thông báo" onClick={() => setLockedApplication(undefined)}><X aria-hidden="true" size={16} /></IconButton>
+        </div>
       ) : null}
 
-      <section className="workspace-section">
-        <header><h3>Ứng dụng của tôi</h3><span>{availableModules.length} ứng dụng</span></header>
-        <div className="workspace-grid">
-          {availableModules.map((module) => {
-            const Icon = navigationIconMap[module.icon];
-            const shortcuts = visibleApplicationShortcuts(module, user, modules, navigation).slice(0, 3);
-            return (
-              <article className={`workspace-module workspace-module--${module.tone}`} key={module.id}>
-                <Link className="workspace-module__main" href={module.defaultRoute}>
-                  <span className="workspace-module__icon"><Icon aria-hidden="true" size={25} /></span>
-                  <strong>{module.label}</strong>
-                  <ArrowRight aria-hidden="true" className="workspace-module__arrow" size={18} />
-                </Link>
-                {shortcuts.length ? <div className="workspace-module__shortcuts">{shortcuts.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}</div> : null}
-              </article>
-            );
-          })}
-        </div>
-      </section>
+      <section aria-label="Danh sách ứng dụng" className="application-launcher__grid">
+        {applications.map((application) => {
+          const Icon = navigationIconMap[application.icon];
+          const style: ApplicationStyle = {
+            "--application-accent": application.accentColor,
+            "--application-soft": application.accentSoft
+          };
+          const content = (
+            <>
+              <span className="application-tile__icon">
+                <Icon aria-hidden="true" size={32} />
+                {!application.accessible ? <LockKeyhole aria-hidden="true" className="application-tile__lock" size={13} /> : null}
+              </span>
+              <strong>{application.label}</strong>
+            </>
+          );
 
-      {quickActions.length ? (
-        <section className="workspace-section workspace-quick-actions">
-          <header><h3>Lối tắt</h3></header>
-          <div>{quickActions.map((action) => <Link href={action.href} key={action.key}>{action.label}<ArrowRight aria-hidden="true" size={15} /></Link>)}</div>
-        </section>
-      ) : null}
+          return application.accessible ? (
+            <Link className="application-tile" href={application.defaultRoute} key={application.id} style={style}>{content}</Link>
+          ) : (
+            <button
+              aria-disabled="true"
+              className="application-tile is-locked"
+              key={application.id}
+              onClick={() => setLockedApplication(application.label)}
+              style={style}
+              title="Bạn chưa được cấp quyền truy cập ứng dụng này."
+              type="button"
+            >
+              {content}
+            </button>
+          );
+        })}
+      </section>
     </div>
   );
 }

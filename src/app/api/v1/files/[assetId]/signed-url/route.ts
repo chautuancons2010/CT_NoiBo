@@ -90,6 +90,10 @@ export async function GET(
       }
     }
 
+    if (asset.owner_entity_type === "inventory_item" && !can(user.permissions, "warehouse.item.view")) {
+      throw new AppError("PERMISSION_DENIED");
+    }
+
     if (asset.owner_entity_type === "shipment_document") {
       if (!can(user.permissions, "shipment_document.view")) throw new AppError("PERMISSION_DENIED");
       const { data: shipment } = await client.from("shipments").select("id,assigned_account_id,created_by").eq("id", asset.owner_entity_id).maybeSingle();

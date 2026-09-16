@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
+import Link from "next/link";
 
 import { Checkbox } from "@/components/shared/FormControls";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/States";
@@ -17,6 +18,7 @@ export interface DataTableColumn<TData extends object> {
 }
 
 export interface DataTableProps<TData extends object> {
+  ariaLabel?: string;
   columns: DataTableColumn<TData>[];
   data: TData[];
   loading?: boolean;
@@ -26,6 +28,8 @@ export interface DataTableProps<TData extends object> {
   getRowId?: (row: TData, index: number) => string;
   selectedRowIds?: ReadonlySet<string>;
   onSelectRow?: (rowId: string, selected: boolean) => void;
+  rowHrefPrefix?: string;
+  rowHrefSuffix?: string;
   actions?: (row: TData) => ReactNode;
   className?: string;
 }
@@ -48,6 +52,7 @@ function renderCell<TData extends object>(row: TData, column: DataTableColumn<TD
 }
 
 export function DataTable<TData extends object>({
+  ariaLabel = "Bảng dữ liệu",
   columns,
   data,
   loading,
@@ -57,9 +62,17 @@ export function DataTable<TData extends object>({
   getRowId,
   selectedRowIds,
   onSelectRow,
+  rowHrefPrefix,
+  rowHrefSuffix = "",
   actions,
   className
 }: DataTableProps<TData>) {
+  const [activeRowId, setActiveRowId] = useState<string>();
+
+  function isDirectAction(event: MouseEvent<HTMLElement>): boolean {
+    return event.target instanceof Element && Boolean(event.target.closest("a, button, input, select, textarea, summary"));
+  }
+
   if (loading) {
     return <LoadingState />;
   }
@@ -75,7 +88,7 @@ export function DataTable<TData extends object>({
   return (
     <div className={cn("data-table-shell", className)}>
       <div className="data-table-scroll">
-        <table className="data-table">
+        <table aria-label={ariaLabel} className="data-table">
           <thead>
             <tr>
               {onSelectRow ? <th className="data-table__select">Chọn</th> : null}
@@ -98,9 +111,25 @@ export function DataTable<TData extends object>({
             {data.map((row, index) => {
               const rowId = getRowId?.(row, index) ?? String(index);
               const selected = selectedRowIds?.has(rowId) ?? false;
+              const active = selected || activeRowId === rowId;
+              const rowHref = rowHrefPrefix ? `${rowHrefPrefix}${encodeURIComponent(rowId)}${rowHrefSuffix}` : undefined;
 
               return (
-                <tr key={rowId}>
+                <tr
+                  aria-selected={active || undefined}
+                  className={active ? "is-selected" : undefined}
+                  key={rowId}
+                  onClick={(event) => {
+                    if (!isDirectAction(event)) setActiveRowId(rowId);
+                  }}
+                  onDoubleClick={(event) => {
+                    if (!isDirectAction(event)) event.currentTarget.querySelector<HTMLAnchorElement>(".data-table__row-link")?.click();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && rowHref) event.currentTarget.querySelector<HTMLAnchorElement>(".data-table__row-link")?.click();
+                  }}
+                  tabIndex={rowHref ? 0 : undefined}
+                >
                   {onSelectRow ? (
                     <td className="data-table__select">
                       <Checkbox
@@ -111,8 +140,9 @@ export function DataTable<TData extends object>({
                       />
                     </td>
                   ) : null}
-                  {columns.map((column) => (
+                  {columns.map((column, columnIndex) => (
                     <td key={column.id} className={column.align ? `text-${column.align}` : undefined}>
+                      {columnIndex === 0 && rowHref ? <Link className="data-table__row-link sr-only" href={rowHref}>Mở bản ghi {rowId}</Link> : null}
                       {renderCell(row, column)}
                     </td>
                   ))}

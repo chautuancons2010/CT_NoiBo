@@ -18,4 +18,5 @@ export * from "./StatusBadge";
 export * from "./Tabs";
 export * from "./Toast";
 export * from "./Uploads";
+export * from "./Workbench";
 export * from "./UserMenu";

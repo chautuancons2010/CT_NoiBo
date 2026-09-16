@@ -10,12 +10,18 @@ import { ArchiveEmployeeButton } from "@/features/employees/components/ArchiveEm
 import type { Permission } from "@/lib/auth/permissions";
 import type { EmployeeSummary } from "@/features/employees/types";
 
-const columns: DataTableColumn<EmployeeSummary>[] = [
+function selectedEmployeeHref(baseHref: string, employeeId: string): string {
+  const separator = baseHref.includes("?") ? "&" : "?";
+  return `${baseHref}${separator}selected=${encodeURIComponent(employeeId)}`;
+}
+
+function columnsFor(selectionBaseHref?: string): DataTableColumn<EmployeeSummary>[] {
+  return [
   {
     id: "employeeCode",
     header: "Mã NV",
     cell: (employee) => (
-      <Link className="table-link" href={`/employees/${employee.id}/profile`}>
+      <Link className="table-link" href={selectionBaseHref ? selectedEmployeeHref(selectionBaseHref, employee.id) : `/employees/${employee.id}/profile`}>
         {employee.employeeCode}
       </Link>
     ),
@@ -55,28 +61,26 @@ const columns: DataTableColumn<EmployeeSummary>[] = [
     hiddenOnMobile: true
   },
   {
-    id: "joinDate",
-    header: "Ngày vào làm",
-    accessor: "joinDate",
-    hiddenOnMobile: true
-  },
-  {
     id: "employmentStatus",
     header: "Trạng thái",
     cell: (employee) => (
       <StatusBadge tone={employee.employmentStatusTone}>{employee.employmentStatusLabel}</StatusBadge>
     )
   }
-];
+  ];
+}
 
 export interface EmployeeListTableProps {
   employees: EmployeeSummary[];
   permissions: readonly Permission[];
+  selectionBaseHref?: string;
 }
 
-export function EmployeeListTable({ employees, permissions }: EmployeeListTableProps) {
+export function EmployeeListTable({ employees, permissions, selectionBaseHref }: EmployeeListTableProps) {
   return (
     <DataTable
+      ariaLabel="Danh sách nhân viên"
+      className="employee-table"
       actions={(employee) => (
         <DropdownMenu label={`Thao tác ${employee.employeeCode}`}>
           <Link href={`/employees/${employee.id}/profile`}>Xem hồ sơ</Link>
@@ -91,11 +95,13 @@ export function EmployeeListTable({ employees, permissions }: EmployeeListTableP
           </PermissionGate>
         </DropdownMenu>
       )}
-      columns={columns}
+      columns={columnsFor(selectionBaseHref)}
       data={employees}
       emptyDescription="Thêm hồ sơ đầu tiên để bắt đầu quản lý nhân sự."
       emptyTitle="Chưa có nhân viên"
       getRowId={(employee) => employee.id}
+      rowHrefPrefix="/employees/"
+      rowHrefSuffix="/profile"
     />
   );
 }

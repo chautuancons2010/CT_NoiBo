@@ -45,16 +45,16 @@ export const dashboardWidgetRegistry: DashboardWidgetDefinition[] = [
   { key: "hr_summary", label: "Tổng quan nhân sự", requiredAny: ["employee.view"], allowedProfiles: ["hr", "management"] },
   { key: "recent_activity", label: "Hoạt động gần đây", requiredAny: ["audit.view"], allowedProfiles: ["hr", "warehouse", "import_export", "management"] },
   { key: "recent_notifications", label: "Thông báo", requiredAny: ["notification.self.view", "notification.view"], allowedProfiles: [...dashboardProfileKeys] },
-  { key: "quick_actions", label: "Thao tác nhanh", requiredAny: ["dashboard.view"], allowedProfiles: [...dashboardProfileKeys] }
+  { key: "quick_actions", label: "Tác vụ thường dùng", requiredAny: ["dashboard.view"], allowedProfiles: [...dashboardProfileKeys] }
 ];
 
 const defaultWidgets: Record<DashboardProfileKey, DashboardWidgetKey[]> = {
-  management: ["my_approvals", "project_attention", "hr_summary", "timesheet_exceptions", "warehouse_low_stock", "shipment_attention", "recent_activity", "quick_actions"],
-  import_export: ["shipment_attention", "my_approvals", "recent_notifications", "recent_activity", "quick_actions"],
-  warehouse: ["warehouse_low_stock", "my_approvals", "recent_notifications", "recent_activity", "quick_actions"],
-  hr: ["my_approvals", "timesheet_exceptions", "hr_summary", "recent_notifications", "recent_activity", "quick_actions"],
-  supervisor: ["supervisor_today", "project_attention", "my_approvals", "recent_notifications", "quick_actions"],
-  employee: ["employee_today", "my_approvals", "recent_notifications", "quick_actions"]
+  management: ["my_approvals", "project_attention", "hr_summary", "timesheet_exceptions", "warehouse_low_stock", "shipment_attention", "recent_activity"],
+  import_export: ["shipment_attention", "my_approvals", "recent_notifications", "recent_activity"],
+  warehouse: ["warehouse_low_stock", "my_approvals", "recent_notifications", "recent_activity"],
+  hr: ["my_approvals", "timesheet_exceptions", "hr_summary", "recent_notifications", "recent_activity"],
+  supervisor: ["supervisor_today", "project_attention", "my_approvals", "recent_notifications"],
+  employee: ["employee_today", "my_approvals", "recent_notifications"]
 };
 
 export const defaultDashboardSettings: DashboardSettings = {

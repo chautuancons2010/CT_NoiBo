@@ -68,10 +68,23 @@ export interface DashboardAction {
   requiredPermission: Permission;
 }
 
+export interface DashboardChartSeries {
+  label: string;
+  value: number;
+  tone?: keyof typeof import("@/config/dataVisualization").semanticChartColors;
+}
+
+export interface DashboardChart {
+  key: string;
+  title: string;
+  series: DashboardChartSeries[];
+}
+
 export interface DashboardWidgetData {
   metrics?: DashboardMetric[];
   items?: DashboardItem[];
   actions?: DashboardAction[];
+  charts?: DashboardChart[];
   state?: Record<string, string | number | boolean | undefined>;
 }
 

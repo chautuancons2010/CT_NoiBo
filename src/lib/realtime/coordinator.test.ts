@@ -45,4 +45,19 @@ describe("realtime coordinator", () => {
     window.dispatchEvent(new Event("online"));
     expect(listener).toHaveBeenCalledOnce();
   });
+
+  it("keeps lifecycle listeners balanced across repeated mount and unmount cycles", () => {
+    const added = vi.spyOn(window, "addEventListener");
+    const removed = vi.spyOn(window, "removeEventListener");
+
+    for (let cycle = 0; cycle < 30; cycle += 1) {
+      const stop = startRealtimeCoordinator("account-1");
+      stop();
+    }
+
+    const focusAdds = added.mock.calls.filter(([type]) => type === "focus").length;
+    const focusRemovals = removed.mock.calls.filter(([type]) => type === "focus").length;
+    expect(focusAdds).toBe(30);
+    expect(focusRemovals).toBe(focusAdds);
+  });
 });

@@ -1,2 +1,2 @@
-import { PageHeader } from "@/components/shared/PageHeader"; import { InventoryDocumentEditor } from "@/features/warehouse";
-export default async function Page({params}:{params:Promise<{id:string}>}){return <div className="page-stack"><PageHeader title="Phiếu nhập kho"/><InventoryDocumentEditor id={(await params).id} type="receipt"/></div>;}
+import { WarehouseDocumentRoute } from "@/features/warehouse";
+export default async function Page({params}:{params:Promise<{id:string}>}){return <WarehouseDocumentRoute id={(await params).id} title="Phiếu nhập kho" type="receipt"/>;}
