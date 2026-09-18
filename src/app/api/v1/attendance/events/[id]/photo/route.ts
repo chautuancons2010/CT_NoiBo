@@ -5,13 +5,15 @@ import { AppError, errorResponse } from "@/lib/api/errors";
 import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { getRequestUser } from "@/services/auth/getRequestUser";
-import { requirePermission } from "@/services/authorization/requirePermission";
+import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
+import { can } from "@/lib/auth/permissions";
 
 const paramsSchema = z.object({ id: z.string().uuid() });
 
 export async function POST(request: Request, context: RouteContext<"/api/v1/attendance/events/[id]/photo">) {
   try {
-    const user = requirePermission(await getRequestUser(), "attendance.self.create");
+    const user = requireAuthenticatedUser(await getRequestUser());
+    if (!can(user.permissions, "attendance.self.create") && !can(user.permissions, "attendance.self")) throw new AppError("PERMISSION_DENIED");
     const { id } = parseWithSchema(paramsSchema, await context.params);
     const form = await request.formData();
     const photo = form.get("photo");

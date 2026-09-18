@@ -9,6 +9,17 @@ export type Permission =
   | "employee.offboard"
   | "employee.export_basic"
   | "employee.export_sensitive"
+  | "employee.identity_document.view"
+  | "employee.identity_document.edit"
+  | "contract.view"
+  | "contract.edit"
+  | "contract.file.view"
+  | "contract.file.upload"
+  | "insurance.view"
+  | "insurance.edit"
+  | "insurance.history.view"
+  | "insurance.document.view"
+  | "insurance.document.upload"
   | "account.view"
   | "account.create"
   | "account.disable"
@@ -25,6 +36,13 @@ export type Permission =
   | "attendance.adjust"
   | "attendance.config.view"
   | "attendance.config.manage"
+  | "attendance.self"
+  | "attendance.self_history"
+  | "attendance.self_request"
+  | "attendance.period.manage"
+  | "attendance.manage"
+  | "attendance.log.view"
+  | "shift.edit"
   | "timesheet.view"
   | "shift.view"
   | "shift.manage"
@@ -133,6 +151,24 @@ export type Permission =
   | "partner.view"
   | "partner.manage"
   | "import_export.report.export"
+  | "accounting.access"
+  | "salary.view"
+  | "salary.edit"
+  | "salary.history.view"
+  | "payroll.view"
+  | "payroll.create"
+  | "payroll.edit"
+  | "payroll.lock"
+  | "payroll.export"
+  | "payslip.create"
+  | "payslip.publish"
+  | "payslip.revoke"
+  | "payslip.self.view"
+  | "bonus.manage"
+  | "allowance.manage"
+  | "deduction.manage"
+  | "chat.access"
+  | "chat.group.create"
   | "approval.view"
   | "approval.inbox.view"
   | "approval.view_assigned"
@@ -219,6 +255,17 @@ export const allFoundationPermissions: Permission[] = [
   "employee.offboard",
   "employee.export_basic",
   "employee.export_sensitive",
+  "employee.identity_document.view",
+  "employee.identity_document.edit",
+  "contract.view",
+  "contract.edit",
+  "contract.file.view",
+  "contract.file.upload",
+  "insurance.view",
+  "insurance.edit",
+  "insurance.history.view",
+  "insurance.document.view",
+  "insurance.document.upload",
   "account.view",
   "account.create",
   "account.disable",
@@ -235,6 +282,13 @@ export const allFoundationPermissions: Permission[] = [
   "attendance.adjust",
   "attendance.config.view",
   "attendance.config.manage",
+  "attendance.self",
+  "attendance.self_history",
+  "attendance.self_request",
+  "attendance.period.manage",
+  "attendance.manage",
+  "attendance.log.view",
+  "shift.edit",
   "timesheet.view",
   "shift.view",
   "shift.manage",
@@ -343,6 +397,24 @@ export const allFoundationPermissions: Permission[] = [
   "partner.view",
   "partner.manage",
   "import_export.report.export",
+  "accounting.access",
+  "salary.view",
+  "salary.edit",
+  "salary.history.view",
+  "payroll.view",
+  "payroll.create",
+  "payroll.edit",
+  "payroll.lock",
+  "payroll.export",
+  "payslip.create",
+  "payslip.publish",
+  "payslip.revoke",
+  "payslip.self.view",
+  "bonus.manage",
+  "allowance.manage",
+  "deduction.manage",
+  "chat.access",
+  "chat.group.create",
   "approval.view",
   "approval.inbox.view",
   "approval.view_assigned",

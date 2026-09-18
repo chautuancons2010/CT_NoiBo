@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Grid3X3, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { AppLogo } from "@/components/layout/AppLogo";
@@ -33,13 +33,9 @@ export function AppRail({ pathname, user, collapsed, onCollapsedChange }: AppRai
     >
       <div className="app-rail__brand"><AppLogo compact /></div>
       <nav className="app-rail__nav">
-        <Link aria-label="Mở danh sách ứng dụng" className="app-rail__link app-rail__workspace" href="/workspace" title="Ứng dụng">
-          <Grid3X3 aria-hidden="true" size={20} />
-          {!collapsed ? <span>Ứng dụng</span> : null}
-        </Link>
-        <div aria-hidden="true" className="app-rail__divider" />
         {groups.map((group) => (
           <ul key={group.label}>
+            {group.label !== application.label && group.label !== "Tổng quan" && !collapsed ? <li className="app-rail__section-label">{group.label}</li> : null}
             {group.items.map((item) => {
               const Icon = navigationIconMap[item.icon];
               const active = isNavigationItemActive(pathname, item);

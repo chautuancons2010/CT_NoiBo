@@ -1,10 +1,9 @@
-import { PermissionDeniedState } from "@/components/shared/States";
-import { DashboardView } from "@/features/dashboard/components/DashboardView";
-import { canUseDashboardProfile } from "@/features/dashboard/registry";
+import { redirect } from "next/navigation";
+import { visibleApplications } from "@/config/moduleRegistry";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 
 export default async function Page() {
   const user = await getRequestUser();
-  if (!user || !canUseDashboardProfile(user, "hr")) return <PermissionDeniedState />;
-  return <DashboardView profile="hr" />;
+  const target = user ? visibleApplications(user).find((application) => application.id === "human-resources")?.defaultRoute : undefined;
+  redirect(target ?? "/dashboard");
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { AppError } from "@/lib/api/errors";
+import { can, type Permission } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import type {
@@ -15,7 +16,8 @@ import type {
   EmploymentType,
   Position
 } from "@/features/employees/types";
-import type { EmployeeDataSet } from "@/features/employees/services/employeeService";
+import { buildEmployeeSummary, defaultEmployeeDataSet, getEmployeeFilterOptions, listEmployees, type EmployeeDataSet } from "@/features/employees/services/employeeService";
+import type { EmployeeListFilters } from "@/features/employees/types";
 
 type Row = Record<string, unknown>;
 
@@ -98,8 +100,8 @@ function mapEmployee(row: Row): EmployeeRecord {
     dateOfBirth: text(row, "date_of_birth"),
     gender: text(row, "gender") as EmployeeRecord["gender"],
     avatarAssetId: text(row, "avatar_file_id"),
-    personalPhone: requiredText(row, "personal_phone"),
-    normalizedPhone: requiredText(row, "normalized_phone"),
+    personalPhone: text(row, "personal_phone") ?? "",
+    normalizedPhone: text(row, "normalized_phone") ?? "",
     personalEmail: text(row, "personal_email"),
     companyEmail: text(row, "company_email"),
     currentAddress: text(row, "current_address"),
@@ -114,6 +116,7 @@ function mapEmployee(row: Row): EmployeeRecord {
     contractorName: text(row, "contractor_name"),
     joinDate: requiredText(row, "join_date"),
     probationStartDate: text(row, "probation_start_date"),
+    probationEndDate: text(row, "probation_end_date"),
     officialDate: text(row, "official_date"),
     terminationDate: text(row, "termination_date"),
     terminationReason: text(row, "termination_reason"),
@@ -166,11 +169,15 @@ function mapContract(row: Row): EmployeeContract {
     employeeId: requiredText(row, "employee_id"),
     contractNumber: requiredText(row, "contract_number"),
     contractType: requiredText(row, "contract_type"),
+    signedDate: text(row, "signed_date"),
+    effectiveDate: text(row, "effective_date"),
     startDate: requiredText(row, "start_date"),
     endDate: text(row, "end_date"),
     status: requiredText(row, "status") as EmployeeContract["status"],
     attachmentFileId: text(row, "attachment_file_id"),
-    note: text(row, "note")
+    note: text(row, "note"),
+    archivedAt: text(row, "archived_at"),
+    rowVersion: Number(row.row_version ?? 1)
   };
 }
 
@@ -210,6 +217,7 @@ function mapAccount(row: Row, roleIds: string[]): AppAccountRecord {
     id: requiredText(row, "id"),
     employeeId: text(row, "employee_id"),
     displayName: requiredText(row, "display_name"),
+    username: text(row, "username"),
     loginEmail: text(row, "primary_email"),
     loginPhone: text(row, "phone"),
     employeeCodeIdentifier: text(row, "employee_code_identifier"),
@@ -296,6 +304,88 @@ export async function getEmployeeDataSetFromSupabase(): Promise<EmployeeDataSet 
     contracts: contractRows.map(mapContract),
     documents: documentRows.map(mapDocument),
     history: historyRows.map(mapHistoryEvent),
-    accounts: accountRows.map((row) => mapAccount(row, roleIdsByAccountId.get(requiredText(row, "id")) ?? textArray(row, "role_ids")))
+    accounts: accountRows
+      .filter((row) => !jsonRecord(row, "metadata")?.deleted_at)
+      .map((row) => mapAccount(row, roleIdsByAccountId.get(requiredText(row, "id")) ?? textArray(row, "role_ids")))
   };
+}
+
+export async function getEmployeeListFromSupabase(filters: EmployeeListFilters, permissions: readonly Permission[]) {
+  const client = getSupabaseServiceClient();
+  if (!client) return null;
+
+  const [departmentRows, positionRows, employmentTypeRows] = await Promise.all([
+    readTable("departments"),
+    readTable("positions"),
+    readTable("employment_types")
+  ]);
+  const dataSet: EmployeeDataSet = {
+    ...defaultEmployeeDataSet,
+    employees: [],
+    departments: departmentRows.map(mapDepartment),
+    positions: positionRows.map(mapPosition),
+    employmentTypes: employmentTypeRows.map(mapEmploymentType),
+    sensitiveProfiles: [],
+    emergencyContacts: [],
+    contracts: [],
+    documents: [],
+    history: [],
+    accounts: []
+  };
+
+  let result;
+  if (filters.q) {
+    // Accent-insensitive and cross-catalog search retains the existing semantics.
+    // Only a search request needs the wider employee scan.
+    const rows: Row[] = [];
+    for (let offset = 0;; offset += 500) {
+      const { data, error } = await client.from("employees").select("*").order("employee_code").range(offset, offset + 499);
+      if (error) throw new AppError("SERVER_ERROR", "Không thể tìm nhân sự.");
+      rows.push(...((data ?? []) as Row[]));
+      if ((data ?? []).length < 500) break;
+    }
+    dataSet.employees = rows.map(mapEmployee);
+    if (can(permissions, "employee.view_sensitive")) {
+      const sensitiveRows: Row[] = [];
+      for (let offset = 0;; offset += 500) {
+        const { data, error } = await client.from("employee_sensitive_profiles")
+          .select("employee_id,national_id_number,bank_account_number,personal_tax_code,social_insurance_code,updated_at")
+          .order("employee_id").range(offset, offset + 499);
+        if (error) throw new AppError("SERVER_ERROR", "Không thể tìm nhân sự.");
+        sensitiveRows.push(...((data ?? []) as Row[]));
+        if ((data ?? []).length < 500) break;
+      }
+      dataSet.sensitiveProfiles = sensitiveRows.map(mapSensitiveProfile);
+    }
+    result = listEmployees(filters, permissions, dataSet);
+  } else {
+    const page = Math.max(1, filters.page);
+    const pageSize = Math.min(Math.max(1, filters.pageSize), 100);
+    let query = client.from("employees").select("*", { count: "exact" }).neq("profile_status", "archived");
+    if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
+    if (filters.positionId) query = query.eq("position_id", filters.positionId);
+    if (filters.employmentTypeId) query = query.eq("employment_type_id", filters.employmentTypeId);
+    if (filters.status) query = query.eq("employment_status", filters.status);
+    const { data, count, error } = await query.order("employee_code").range((page - 1) * pageSize, page * pageSize - 1);
+    if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách nhân sự.");
+    dataSet.employees = ((data ?? []) as Row[]).map(mapEmployee);
+    const total = count ?? 0;
+    result = {
+      items: dataSet.employees.map((employee) => buildEmployeeSummary(employee, dataSet)),
+      total,
+      page,
+      pageSize,
+      pageCount: Math.max(1, Math.ceil(total / pageSize)),
+      filters: { ...filters, page, pageSize }
+    };
+  }
+
+  const ids = result.items.map((item) => item.id);
+  if (ids.length) {
+    const { data, error } = await client.from("app_accounts").select("employee_id").in("employee_id", ids);
+    if (error) throw new AppError("SERVER_ERROR", "Không thể đọc trạng thái tài khoản nhân sự.");
+    const accountIds = new Set((data ?? []).map((row) => String(row.employee_id)));
+    result.items = result.items.map((item) => ({ ...item, hasAccount: accountIds.has(item.id) }));
+  }
+  return { employees: result, filterOptions: getEmployeeFilterOptions(dataSet) };
 }

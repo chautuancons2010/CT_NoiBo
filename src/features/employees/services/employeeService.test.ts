@@ -125,6 +125,8 @@ describe("employee domain service", () => {
     const provisioned = provisionAccountForEmployee(
       employee!,
       {
+        username: "cn018",
+        password: "12345678",
         roleIds: ["role-employee"]
       },
       "demo-admin"

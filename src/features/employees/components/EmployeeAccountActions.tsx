@@ -4,15 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/shared/Button";
-import { Input } from "@/components/shared/FormControls";
+import { Input, PasswordInput } from "@/components/shared/FormControls";
 import { ConfirmDialog, Modal } from "@/components/shared/Overlays";
 import type { Permission } from "@/lib/auth/permissions";
 import { can } from "@/lib/auth/permissions";
+import { ACCOUNT_PASSWORD_HTML_PATTERN, ACCOUNT_PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 import type { EmployeeAccountView } from "@/features/employees/types";
 import type { RoleDefinition } from "@/services/authorization/rbacService";
 
 interface EmployeeAccountActionsProps {
   employeeId: string;
+  usernameSuggestion?: string;
   account?: EmployeeAccountView;
   permissions: readonly Permission[];
   roles: RoleDefinition[];
@@ -20,6 +22,7 @@ interface EmployeeAccountActionsProps {
 
 export function EmployeeAccountActions({
   employeeId,
+  usernameSuggestion,
   account: initialAccount,
   permissions,
   roles
@@ -60,8 +63,14 @@ export function EmployeeAccountActions({
   async function handleProvision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const password = String(formData.get("password") ?? "");
+    if (password !== String(formData.get("confirmPassword") ?? "")) {
+      setError("Mật khẩu nhập lại không khớp.");
+      return;
+    }
     const updatedAccount = await submitJson(`/api/v1/employees/${employeeId}/accounts`, "POST", {
-      loginEmail: String(formData.get("loginEmail") ?? "").trim() || undefined,
+      username: String(formData.get("username") ?? "").trim().toLowerCase(),
+      password,
       loginPhone: String(formData.get("loginPhone") ?? "").trim() || undefined,
       roleIds: selectedRoleIds
     });
@@ -148,7 +157,9 @@ export function EmployeeAccountActions({
       <Modal open={mode === "provision"} title="Cấp tài khoản" onClose={() => setMode(null)}>
         <form className="overlay-form" onSubmit={handleProvision}>
           {error ? <div className="form-alert form-alert--error">{error}</div> : null}
-          <Input label="Email đăng nhập" name="loginEmail" type="email" />
+          <Input autoCapitalize="none" autoComplete="username" defaultValue={usernameSuggestion?.toLowerCase()} label="Tên tài khoản" maxLength={32} minLength={3} name="username" pattern="[A-Za-z][A-Za-z0-9._-]{2,31}" required />
+          <PasswordInput autoComplete="new-password" label="Mật khẩu ban đầu" minLength={ACCOUNT_PASSWORD_MIN_LENGTH} name="password" pattern={ACCOUNT_PASSWORD_HTML_PATTERN} required />
+          <PasswordInput autoComplete="new-password" label="Nhập lại mật khẩu" minLength={ACCOUNT_PASSWORD_MIN_LENGTH} name="confirmPassword" pattern={ACCOUNT_PASSWORD_HTML_PATTERN} required />
           <Input label="Số điện thoại đăng nhập" name="loginPhone" />
           {roleChoices}
           <footer>

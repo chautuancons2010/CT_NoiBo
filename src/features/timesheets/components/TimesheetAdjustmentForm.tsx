@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/shared/Card";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { DataSurface, FormPageLayout } from "@/components/shared/PageLayouts";
 import type { TimesheetAdjustment } from "../types/timesheetTypes";
 
 const adjustmentLabels: Record<string, string> = {
@@ -68,7 +70,15 @@ export function TimesheetAdjustmentForm({ defaults }: {
     if (response.ok) await loadHistory(periodId, employeeId, workDate);
   }
 
-  return <div className="page-stack">
+  const columns: DataTableColumn<TimesheetAdjustment>[] = [
+    { id: "created", header: "Thời gian", cell: (item) => new Date(item.createdAt).toLocaleString("vi-VN") },
+    { id: "date", header: "Ngày công", cell: (item) => new Date(`${item.workDate}T00:00:00`).toLocaleDateString("vi-VN") },
+    { id: "type", header: "Loại", cell: (item) => adjustmentLabels[item.adjustmentType] ?? item.adjustmentType },
+    { id: "reason", header: "Lý do", accessor: "reason" },
+    { id: "note", header: "Ghi chú HR", cell: (item) => item.hrNote ?? "—", hiddenOnMobile: true }
+  ];
+
+  return <FormPageLayout>
     <Card><form className="leave-form" onSubmit={submit}>
       <div className="form-grid">
         <label>ID kỳ công<input className="input" name="periodId" defaultValue={defaults.periodId} required /></label>
@@ -85,9 +95,6 @@ export function TimesheetAdjustmentForm({ defaults }: {
       <div className="form-actions"><button className="button button--primary">Lưu điều chỉnh</button></div>
       {message ? <p className="save-feedback">{message}</p> : null}
     </form></Card>
-    <Card><h3 className="section-title">Lịch sử điều chỉnh</h3><div className="data-table-scroll"><table className="data-table"><thead><tr><th>Thời gian</th><th>Ngày công</th><th>Loại</th><th>Lý do</th><th>Ghi chú HR</th></tr></thead><tbody>
-      {history.map((item) => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td><td>{new Date(`${item.workDate}T00:00:00`).toLocaleDateString("vi-VN")}</td><td>{adjustmentLabels[item.adjustmentType] ?? item.adjustmentType}</td><td>{item.reason}</td><td>{item.hrNote ?? "—"}</td></tr>)}
-      {!history.length ? <tr><td colSpan={5}>Chưa có điều chỉnh.</td></tr> : null}
-    </tbody></table></div></Card>
-  </div>;
+    <DataSurface><header className="data-surface__toolbar"><h3 className="section-title">Lịch sử điều chỉnh</h3></header><DataTable columns={columns} data={history} emptyDescription="" emptyTitle="Chưa có điều chỉnh" getRowId={(item) => item.id} /></DataSurface>
+  </FormPageLayout>;
 }

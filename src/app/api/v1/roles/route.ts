@@ -6,7 +6,7 @@ import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
 import { getPermissionGroups, permissionCatalog } from "@/services/authorization/rbacService";
-import { createPersistedRole, listPersistedRoles } from "@/services/authorization/rolePersistenceService";
+import { createPersistedRole, listPersistedPermissionKeys, listPersistedRoles } from "@/services/authorization/rolePersistenceService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
 import { recordAuditLog } from "@/services/audit/auditLog";
@@ -27,9 +27,13 @@ export async function GET() {
   try {
     const user = await getRequestUser();
     requirePermission(user, "role.view");
+    const [roles, persistedPermissionKeys] = await Promise.all([listPersistedRoles(), listPersistedPermissionKeys()]);
     return successResponse({
-      roles: await listPersistedRoles(),
-      permissionGroups: getPermissionGroups()
+      roles,
+      permissionGroups: getPermissionGroups().map((group) => ({
+        ...group,
+        permissions: group.permissions.filter((permission) => persistedPermissionKeys.has(permission.key))
+      })).filter((group) => group.permissions.length > 0)
     });
   } catch (error) {
     logger.error("api.roles.list_failed");

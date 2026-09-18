@@ -81,11 +81,50 @@ export interface AttendanceDashboard {
   incompletePreviousDate?: string;
 }
 
+export interface AttendanceAdminTodayRow {
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
+  departmentId?: string;
+  departmentName: string;
+  shiftId?: string;
+  shiftName: string;
+  checkIn?: string;
+  checkOut?: string;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  totalMinutes: number;
+  status: "present" | "late" | "leave" | "not_checked" | "missing_check";
+}
+
+export interface AttendanceAdminToday {
+  date: string;
+  totalEmployees: number;
+  present: number;
+  late: number;
+  leave: number;
+  notChecked: number;
+  missingCheck: number;
+  rows: AttendanceAdminTodayRow[];
+}
+
+export interface AttendanceEventAdjustment {
+  id: string;
+  oldValue: Record<string, unknown>;
+  newValue: Record<string, unknown>;
+  reason: string;
+  changedByName?: string;
+  changedAt: string;
+}
+
 export interface AttendanceHistoryDay {
   date: string;
   checkIn?: AttendanceEvent;
   checkOut?: AttendanceEvent;
-  status: "complete" | "missing_check_out" | "late" | "pending";
+  shiftName?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
+  status: "complete" | "missing_check_out" | "late" | "pending" | "leave" | "holiday" | "rest_day" | "business_trip";
 }
 
 export interface AttendanceRecordInput {

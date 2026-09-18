@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/shared/Button";
+import { BackLink } from "@/components/shared/BackLink";
 import { Card, StatCard } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { ErrorState, LoadingState } from "@/components/shared/States";
@@ -78,6 +79,7 @@ export function InventoryItemDetail({ id, canManage, canViewLedger }: { id: stri
 
   return (
     <div className="page-stack">
+      <BackLink href="/warehouse/items" />
       <Card className="item-detail-card">
         <div className="item-detail-heading">
           <ItemImagePreview assetId={item.imageAssetId} itemName={item.name} variant="detail" />

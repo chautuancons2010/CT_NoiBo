@@ -1,7 +1,8 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/shared/Button";
-import { Input } from "@/components/shared/FormControls";
+import { Input, PasswordInput } from "@/components/shared/FormControls";
+import { ACCOUNT_PASSWORD_HTML_PATTERN, ACCOUNT_PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 
 export function LoginForm() {
   const [error, setError] = useState(""); const [submitting, setSubmitting] = useState(false);
@@ -14,5 +15,5 @@ export function LoginForm() {
       window.location.assign(body.data?.redirectTo || "/dashboard");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể đăng nhập."); setSubmitting(false); }
   }
-  return <form onSubmit={submit}><Input autoCapitalize="none" autoComplete="username" label="Tên tài khoản" name="username" pattern="[A-Za-z][A-Za-z0-9._-]{2,31}" required /><Input autoComplete="current-password" label="Mật khẩu" minLength={8} name="password" required type="password" />{error ? <p aria-live="polite" className="form-error" role="alert">{error}</p> : null}<Button disabled={submitting} type="submit" variant="primary">{submitting ? "Đang đăng nhập…" : "Đăng nhập"}</Button></form>;
+  return <form onSubmit={submit}><Input autoCapitalize="none" autoComplete="username" label="Tên tài khoản" name="username" pattern="[A-Za-z][A-Za-z0-9._-]{2,31}" required /><PasswordInput autoComplete="current-password" label="Mật khẩu" minLength={ACCOUNT_PASSWORD_MIN_LENGTH} name="password" pattern={ACCOUNT_PASSWORD_HTML_PATTERN} required />{error ? <p aria-live="polite" className="form-error" role="alert">{error}</p> : null}<Button disabled={submitting} type="submit" variant="primary">{submitting ? "Đang đăng nhập…" : "Đăng nhập"}</Button></form>;
 }

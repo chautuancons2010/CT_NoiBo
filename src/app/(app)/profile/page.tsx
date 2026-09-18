@@ -9,6 +9,7 @@ import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeR
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { LogoutButton } from "@/features/auth/components/LogoutButton";
 import { ChangePasswordForm } from "@/features/auth/components/ChangePasswordForm";
+import { PersonalUiSettings } from "@/features/workspace/PersonalUiSettings";
 
 export default async function Page() {
   const user = await getRequestUser();
@@ -21,7 +22,7 @@ export default async function Page() {
       <PageHeader title="Cá nhân" />
 
       <Card className="self-profile-card">
-        <Avatar className="employee-detail-header__avatar" name={detail?.summary.fullName ?? user?.displayName ?? "User"} />
+        <Avatar className="employee-detail-header__avatar" imageUrl={detail?.profile.avatarAssetId ? "/api/v1/workspace/avatar" : undefined} name={detail?.summary.fullName ?? user?.displayName ?? "User"} />
         <div>
           <h2>{detail?.summary.fullName ?? user?.displayName ?? "Chưa đăng nhập"}</h2>
           <p>
@@ -89,6 +90,7 @@ export default async function Page() {
           </Link>
         </Card>
       )}
+      {user ? <PersonalUiSettings initialHasAvatar={Boolean(detail?.profile.avatarAssetId)} /> : null}
     </div>
   );
 }

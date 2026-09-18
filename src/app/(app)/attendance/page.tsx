@@ -1,14 +1,20 @@
-import { PageHeader } from "@/components/shared/PageHeader";
-import { routeMetaByPath } from "@/config/routeRegistry";
-import { AttendanceCameraExperience } from "@/features/attendance";
+import { redirect } from "next/navigation";
 
-const meta = routeMetaByPath["/attendance"];
+import { PermissionDeniedState } from "@/components/shared/States";
+import { can } from "@/lib/auth/permissions";
+import { getRequestUser } from "@/services/auth/getRequestUser";
 
-export default function Page() {
-  return (
-    <div className="page-stack">
-      <PageHeader title={meta.title} />
-      <AttendanceCameraExperience />
-    </div>
-  );
+export default async function Page() {
+  const user = await getRequestUser();
+  if (!user) return <PermissionDeniedState />;
+
+  if (
+    can(user.permissions, "attendance.self") ||
+    can(user.permissions, "attendance.self.view") ||
+    can(user.permissions, "attendance.self.create")
+  ) {
+    redirect("/attendance/me");
+  }
+
+  return <PermissionDeniedState />;
 }

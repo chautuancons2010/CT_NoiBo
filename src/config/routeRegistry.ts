@@ -37,6 +37,10 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Nền tảng quản lý hồ sơ nhân sự, tài khoản liên kết và lịch sử thay đổi.",
     module: "Nhân sự"
   },
+  "/employees/insurance": { title: "Bảo hiểm xã hội", description: "", module: "Nhân sự" },
+  "/employees/departments": { title: "Phòng ban", description: "", module: "Nhân sự" },
+  "/employees/positions": { title: "Chức vụ", description: "", module: "Nhân sự" },
+  "/employees/contracts": { title: "Hợp đồng lao động", description: "", module: "Nhân sự" },
   "/employees/new": {
     title: "Tạo hồ sơ nhân viên",
     description: "Route riêng cho form dài; nghiệp vụ chi tiết sẽ triển khai ở prompt Nhân sự.",
@@ -45,23 +49,29 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/attendance": {
     title: "Chấm công",
     description: "Nền tảng chấm công cá nhân qua mobile, GPS, ảnh và trạng thái đồng bộ.",
-    module: "Nhân sự"
+    module: "Chấm công"
   },
+  "/attendance/me": { title: "Chấm công của tôi", description: "", module: "Chấm công" },
+  "/attendance/today": { title: "Chấm công hôm nay", description: "", module: "Nhân sự" },
+  "/attendance/logs": { title: "Nhật ký công", description: "", module: "Nhân sự" },
+  "/attendance/requests": { title: "Đơn của tôi", description: "", module: "Chấm công" },
+  "/attendance/notifications": { title: "Thông báo", description: "", module: "Chấm công" },
   "/attendance/history": {
     title: "Lịch sử chấm công",
     description: "",
-    module: "Nhân sự"
+    module: "Chấm công"
   },
   "/attendance/records": {
     title: "Kiểm tra chấm công",
     description: "",
-    module: "Nhân sự"
+    module: "Chấm công"
   },
   "/timesheets": {
-    title: "Bảng công",
+    title: "Kỳ công",
     description: "Tầng tổng hợp dữ liệu công từ chấm công, điểm danh, đơn nghỉ và điều chỉnh.",
     module: "Nhân sự"
   },
+  "/timesheets/matrix": { title: "Bảng công", description: "", module: "Nhân sự" },
   "/timesheets/exceptions": { title: "Ngoại lệ bảng công", description: "", module: "Nhân sự" },
   "/timesheets/adjustments": { title: "Điều chỉnh bảng công", description: "", module: "Nhân sự" },
   "/shifts": {
@@ -69,6 +79,7 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Cấu hình ca làm và chính sách liên quan sẽ nằm trong dữ liệu cấu hình.",
     module: "Nhân sự"
   },
+  "/shifts/calendar": { title: "Lịch ngày làm việc và ngày nghỉ", description: "", module: "Nhân sự" },
   "/leave": {
     title: "Nghỉ phép",
     description: "Nền tảng route cho đơn từ, phê duyệt và xuất PDF ở bước sau.",
@@ -134,7 +145,7 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/warehouse/stock-counts": { title: "Kiểm kê", description: "", module: "Kho" },
   "/warehouse/ledger": { title: "Sổ kho", description: "", module: "Kho" },
   "/settings/warehouse": { title: "Cấu hình kho", description: "", module: "Hệ thống" },
-  "/import-export": { title: "Điều hành xuất nhập khẩu", description: "", module: "Xuất nhập khẩu" },
+  "/import-export": { title: "Tổng quan xuất nhập khẩu", description: "", module: "Xuất nhập khẩu" },
   "/import-export/contracts": { title: "Hợp đồng mua hàng", description: "", module: "Xuất nhập khẩu" },
   "/import-export/shipments": {
     title: "Lô hàng",
@@ -147,6 +158,14 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     module: "Xuất nhập khẩu"
   },
   "/import-export/partners": { title: "Đối tác", description: "", module: "Xuất nhập khẩu" },
+  "/import-export/transport": { title: "Vận chuyển", description: "", module: "Xuất nhập khẩu" },
+  "/import-export/customs": { title: "Thông quan", description: "", module: "Xuất nhập khẩu" },
+  "/accounting": { title: "Tổng quan kế toán", description: "", module: "Kế toán" },
+  "/accounting/salaries": { title: "Hồ sơ lương", description: "", module: "Kế toán" },
+  "/accounting/salary-history": { title: "Nhật ký lương", description: "", module: "Kế toán" },
+  "/accounting/payroll": { title: "Bảng lương", description: "", module: "Kế toán" },
+  "/accounting/payslips": { title: "Phiếu lương", description: "", module: "Kế toán" },
+  "/messages": { title: "Tin nhắn", description: "", module: "Tin nhắn" },
   "/settings/import-export": { title: "Cấu hình XNK", description: "", module: "Hệ thống" },
   "/approvals": {
     title: "Phê duyệt",
@@ -179,16 +198,16 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     module: "Hệ thống"
   },
   "/settings/attendance/shifts": { title: "Ca làm", description: "", module: "Hệ thống" },
-  "/settings/attendance/calendar": { title: "Lịch làm việc", description: "", module: "Hệ thống" },
+  "/settings/attendance/calendar": { title: "Lịch ngày làm việc và ngày nghỉ", description: "", module: "Hệ thống" },
   "/settings/attendance/policies": { title: "Chính sách chấm công", description: "", module: "Hệ thống" },
   "/settings/roles": {
-    title: "Vai trò",
-    description: "Role là gói permission, không phải điều kiện hard-code trong UI.",
+    title: "Vai trò & phân quyền",
+    description: "",
     module: "Hệ thống"
   },
   "/settings/permissions": {
-    title: "Quyền",
-    description: "Nền tảng effective permission cho UI và API.",
+    title: "Vai trò & phân quyền",
+    description: "",
     module: "Hệ thống"
   },
   "/settings/approval-workflows": {
@@ -227,6 +246,7 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/system-admin/dashboard": { title: "Bố cục bản tin", description: "", module: "Trung tâm quản trị" },
   "/system-admin/modules": { title: "Phân hệ", description: "", module: "Trung tâm quản trị" },
   "/system-admin/organization": { title: "Tổ chức", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/payslip-template": { title: "Mẫu phiếu lương", description: "", module: "Trung tâm quản trị" },
   "/system-admin/localization": { title: "Định dạng & thời gian", description: "", module: "Trung tâm quản trị" },
   "/system-admin/security": { title: "Bảo mật", description: "", module: "Trung tâm quản trị" },
   "/system-admin/config-history": { title: "Lịch sử cấu hình", description: "", module: "Trung tâm quản trị" },
@@ -248,6 +268,7 @@ const employeeSectionLabels: Record<string, string> = {
   profile: "Hồ sơ",
   employment: "Công việc",
   contracts: "Hợp đồng",
+  salary: "Lương & phúc lợi",
   documents: "Tài liệu",
   history: "Lịch sử",
   leave: "Nghỉ phép",
@@ -256,6 +277,7 @@ const employeeSectionLabels: Record<string, string> = {
 
 const projectSectionLabels: Record<string, string> = {
   overview: "Tổng quan",
+  progress: "Tiến độ",
   updates: "Cập nhật",
   team: "Nhân sự",
   schedule: "Lịch",
@@ -278,6 +300,8 @@ export function getRouteMeta(pathname: string): RouteMeta {
   if (approvalCaseMatch) return { title: "Chi tiết phê duyệt", description: "", module: "Phê duyệt" };
   const documentMatch = pathname.match(/^\/documents\/([^/]+)$/);
   if (documentMatch) return { title: "Chi tiết tài liệu", description: "", module: "Tài liệu" };
+  const messageMatch = pathname.match(/^\/messages\/([^/]+)$/);
+  if (messageMatch) return { title: "Hội thoại", description: "", module: "Tin nhắn" };
   const integrationMatch = pathname.match(/^\/settings\/integrations\/([^/]+)(?:\/(logs|mappings))?$/);
   if (integrationMatch) return { title: integrationMatch[2] === "logs" ? "Nhật ký tích hợp" : integrationMatch[2] === "mappings" ? "Ánh xạ dữ liệu" : "Kết nối tích hợp", description: "", module: "Tích hợp" };
 
@@ -298,6 +322,8 @@ export function getRouteMeta(pathname: string): RouteMeta {
     }
     const contractMatch = pathname.match(/^\/import-export\/contracts\/(new|[^/]+)$/);
     if (contractMatch) return { title: contractMatch[1] === "new" ? "Tạo hợp đồng mua hàng" : "Hợp đồng mua hàng", description: "", module: "Xuất nhập khẩu" };
+    const payrollMatch = pathname.match(/^\/accounting\/payroll\/([^/]+)$/);
+    if (payrollMatch) return { title: "Chi tiết bảng lương", description: "", module: "Kế toán" };
   }
 
   const employeeMatch = pathname.match(/^\/employees\/([^/]+)\/([^/]+)$/);
@@ -371,6 +397,25 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
   }
 
   return [{ label: meta.module }, { label: meta.title }];
+}
+
+export function getBackHref(pathname: string): string | null {
+  if (pathname === "/dashboard" || pathname === "/workspace") return null;
+
+  const breadcrumbParent = [...getBreadcrumbs(pathname)]
+    .reverse()
+    .find((item) => item.href && item.href !== pathname)?.href;
+  if (breadcrumbParent) return breadcrumbParent;
+
+  const segments = pathname.split("/").filter(Boolean);
+  for (let length = segments.length - 1; length > 0; length -= 1) {
+    const candidate = `/${segments.slice(0, length).join("/")}`;
+    if (routeMetaByPath[candidate] || getRouteMeta(candidate).title !== "Không tìm thấy") {
+      return candidate;
+    }
+  }
+
+  return "/dashboard";
 }
 
 export const employeeDetailSections = Object.entries(employeeSectionLabels).map(

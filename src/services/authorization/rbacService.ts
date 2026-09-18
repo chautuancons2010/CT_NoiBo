@@ -10,6 +10,8 @@ export type PermissionGroup =
   | "Dự án"
   | "Kho"
   | "XNK"
+  | "Kế toán"
+  | "Tin nhắn"
   | "Báo cáo"
   | "Hệ thống";
 
@@ -411,7 +413,40 @@ export const permissionCatalog: PermissionDefinition[] = [
     group: "Hệ thống",
     label: "Phát webhook",
     description: "Gửi sự kiện nghiệp vụ ra endpoint đã cấu hình."
-  }
+  },
+  { key: "employee.identity_document.view", module: "employees", group: "Nhân sự", label: "Xem ảnh CCCD", description: "Xem ảnh hai mặt giấy tờ định danh.", sensitive: true },
+  { key: "employee.identity_document.edit", module: "employees", group: "Nhân sự", label: "Cập nhật ảnh CCCD", description: "Tải lên, thay thế hoặc xóa ảnh giấy tờ định danh.", sensitive: true },
+  { key: "contract.view", module: "contracts", group: "Nhân sự", label: "Xem hợp đồng", description: "Xem lịch sử hợp đồng lao động." },
+  { key: "contract.edit", module: "contracts", group: "Nhân sự", label: "Sửa hợp đồng", description: "Tạo và cập nhật hợp đồng lao động." },
+  { key: "contract.file.view", module: "contracts", group: "Nhân sự", label: "Xem file hợp đồng", description: "Xem file PDF hợp đồng private.", sensitive: true },
+  { key: "contract.file.upload", module: "contracts", group: "Nhân sự", label: "Tải file hợp đồng", description: "Tải lên hoặc thay thế file hợp đồng.", sensitive: true },
+  { key: "insurance.view", module: "insurance", group: "Nhân sự", label: "Xem bảo hiểm", description: "Xem hồ sơ bảo hiểm xã hội." },
+  { key: "insurance.edit", module: "insurance", group: "Nhân sự", label: "Cập nhật bảo hiểm", description: "Ghi nhận thay đổi hồ sơ bảo hiểm.", sensitive: true },
+  { key: "insurance.history.view", module: "insurance", group: "Nhân sự", label: "Xem lịch sử bảo hiểm", description: "Xem lịch sử biến động bảo hiểm." },
+  { key: "insurance.document.view", module: "insurance", group: "Nhân sự", label: "Xem tài liệu bảo hiểm", description: "Xem tài liệu bảo hiểm private.", sensitive: true },
+  { key: "insurance.document.upload", module: "insurance", group: "Nhân sự", label: "Tải tài liệu bảo hiểm", description: "Tải tài liệu bảo hiểm vào kho private.", sensitive: true },
+  { key: "attendance.self", module: "attendance", group: "Chấm công", label: "Chấm công của tôi", description: "Thực hiện chấm vào và chấm ra cá nhân." },
+  { key: "attendance.manage", module: "attendance", group: "Chấm công", label: "Quản trị chấm công", description: "Xem dữ liệu chấm công toàn công ty." },
+  { key: "attendance.log.view", module: "attendance", group: "Chấm công", label: "Xem nhật ký công", description: "Xem sự kiện và lịch sử điều chỉnh công." },
+  { key: "shift.edit", module: "attendance", group: "Chấm công", label: "Chỉnh sửa ca", description: "Tạo phiên bản cấu hình ca có hiệu lực." },
+  { key: "accounting.access", module: "accounting", group: "Kế toán", label: "Truy cập Kế toán", description: "Truy cập ứng dụng kế toán." },
+  { key: "salary.view", module: "accounting", group: "Kế toán", label: "Xem lương", description: "Xem dữ liệu lương nhân viên.", sensitive: true },
+  { key: "salary.edit", module: "accounting", group: "Kế toán", label: "Điều chỉnh lương", description: "Ghi nhận mức lương mới có hiệu lực.", sensitive: true },
+  { key: "salary.history.view", module: "accounting", group: "Kế toán", label: "Xem lịch sử lương", description: "Xem toàn bộ lịch sử thay đổi lương.", sensitive: true },
+  { key: "payroll.view", module: "accounting", group: "Kế toán", label: "Xem bảng lương", description: "Xem kỳ và dòng bảng lương.", sensitive: true },
+  { key: "payroll.create", module: "accounting", group: "Kế toán", label: "Tạo bảng lương", description: "Tạo và tính kỳ lương.", sensitive: true },
+  { key: "payroll.edit", module: "accounting", group: "Kế toán", label: "Sửa bảng lương", description: "Điều chỉnh bảng lương chưa khóa.", sensitive: true },
+  { key: "payroll.lock", module: "accounting", group: "Kế toán", label: "Khóa bảng lương", description: "Kiểm tra và khóa bảng lương.", sensitive: true },
+  { key: "payroll.export", module: "accounting", group: "Kế toán", label: "Xuất bảng lương", description: "Xuất dữ liệu bảng lương được phép xem ra Excel.", sensitive: true },
+  { key: "payslip.create", module: "accounting", group: "Kế toán", label: "Tạo phiếu lương", description: "Sinh phiếu lương từ bảng lương khóa.", sensitive: true },
+  { key: "payslip.publish", module: "accounting", group: "Kế toán", label: "Phát hành phiếu lương", description: "Phát hành phiếu và thông báo nhân viên.", sensitive: true },
+  { key: "payslip.revoke", module: "accounting", group: "Kế toán", label: "Thu hồi phiếu lương", description: "Thu hồi phiếu sai nhưng giữ lịch sử.", sensitive: true },
+  { key: "payslip.self.view", module: "accounting", group: "Kế toán", label: "Xem phiếu lương cá nhân", description: "Xem phiếu lương đã phát hành của bản thân.", sensitive: true },
+  { key: "bonus.manage", module: "accounting", group: "Kế toán", label: "Quản lý thưởng", description: "Quản lý khoản thưởng." },
+  { key: "allowance.manage", module: "accounting", group: "Kế toán", label: "Quản lý phụ cấp", description: "Quản lý khoản phụ cấp." },
+  { key: "deduction.manage", module: "accounting", group: "Kế toán", label: "Quản lý khấu trừ", description: "Quản lý khoản khấu trừ." },
+  { key: "chat.access", module: "messaging", group: "Tin nhắn", label: "Truy cập tin nhắn", description: "Đọc và gửi tin trong các hội thoại được tham gia." },
+  { key: "chat.group.create", module: "messaging", group: "Tin nhắn", label: "Tạo nhóm chat", description: "Tạo nhóm và chọn thành viên." }
 ];
 
 export const roleCatalog: RoleDefinition[] = [
@@ -440,6 +475,17 @@ export const roleCatalog: RoleDefinition[] = [
       "employee.archive",
       "employee.offboard",
       "employee.export_basic",
+      "employee.identity_document.view",
+      "employee.identity_document.edit",
+      "contract.view",
+      "contract.edit",
+      "contract.file.view",
+      "contract.file.upload",
+      "insurance.view",
+      "insurance.edit",
+      "insurance.history.view",
+      "insurance.document.view",
+      "insurance.document.upload",
       "account.view",
       "account.create",
       "account.disable",
@@ -449,6 +495,13 @@ export const roleCatalog: RoleDefinition[] = [
       "department.manage",
       "position.manage",
       "audit.view",
+      "attendance.manage",
+      "attendance.view_all",
+      "attendance.adjust",
+      "attendance.log.view",
+      "shift.edit",
+      "chat.access",
+      "chat.group.create",
       "file.read"
     ],
     userCount: 0
@@ -464,8 +517,11 @@ export const roleCatalog: RoleDefinition[] = [
       "profile.view",
       "notification.view",
       "attendance.view",
+      "attendance.self",
+      "payslip.self.view",
       "timesheet.view",
       "leave.view",
+      "chat.access",
       "file.read"
     ],
     userCount: 0
@@ -483,6 +539,37 @@ export const roleCatalog: RoleDefinition[] = [
       "project.view",
       "notification.view",
       "profile.view",
+      "chat.access",
+      "file.read"
+    ],
+    userCount: 0
+  },
+  {
+    id: "role-accountant",
+    code: "accountant",
+    name: "Kế toán",
+    description: "Quản lý lương, bảng lương và phiếu lương.",
+    isSystem: true,
+    permissionKeys: [
+      "dashboard.view",
+      "accounting.access",
+      "salary.view",
+      "salary.edit",
+      "salary.history.view",
+      "payroll.view",
+      "payroll.create",
+      "payroll.edit",
+      "payroll.lock",
+      "payroll.export",
+      "payslip.create",
+      "payslip.publish",
+      "payslip.revoke",
+      "payslip.self.view",
+      "bonus.manage",
+      "allowance.manage",
+      "deduction.manage",
+      "notification.view",
+      "chat.access",
       "file.read"
     ],
     userCount: 0

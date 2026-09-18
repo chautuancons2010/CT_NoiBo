@@ -10,9 +10,23 @@ import { dashboardLandingPages } from "@/features/dashboard/types";
 export const configurableNavigationPaths = [
   "/dashboard",
   "/employees",
-  "/attendance",
+  "/employees/departments",
+  "/employees/positions",
+  "/employees/contracts",
+  "/employees/insurance",
+  "/attendance/today",
+  "/attendance/logs",
+  "/timesheets/matrix",
   "/timesheets",
+  "/timesheets/adjustments",
   "/shifts",
+  "/shifts/calendar",
+  "/leave/manage",
+  "/attendance",
+  "/attendance/me",
+  "/attendance/history",
+  "/attendance/requests",
+  "/attendance/notifications",
   "/leave",
   "/projects",
   "/projects/updates",
@@ -23,9 +37,11 @@ export const configurableNavigationPaths = [
   "/warehouse/transfers",
   "/warehouse/inventory",
   "/import-export",
-  "/import-export/contracts",
   "/import-export/shipments",
+  "/import-export/transport",
+  "/import-export/contracts",
   "/import-export/documents",
+  "/import-export/customs",
   "/import-export/partners",
   "/approvals",
   "/documents",
@@ -86,7 +102,7 @@ export const localizationSettingsSchema = z
   .object({
     timezone: z.enum(["Asia/Ho_Chi_Minh"]),
     dateFormat: z.enum(["DD/MM/YYYY", "YYYY-MM-DD"]),
-    timeFormat: z.enum(["HH:mm", "hh:mm a"]),
+    timeFormat: z.literal("HH:mm"),
     weekStartsOn: z.literal("monday"),
     locale: z.literal("vi-VN")
   })
@@ -179,6 +195,18 @@ export const moduleSettingsSchema = z
   })
   .strict();
 
+export const payslipSettingsSchema = z.object({
+  companyName: z.string().trim().min(2).max(120),
+  title: z.string().trim().min(2).max(120),
+  footer: z.string().trim().max(180),
+  primaryColor: hexColorSchema,
+  showWorkDays: z.boolean(),
+  showBaseSalary: z.boolean(),
+  showAllowance: z.boolean(),
+  showBonus: z.boolean(),
+  showDeduction: z.boolean()
+}).strict();
+
 export const featureFlagDefinitionSchema = z
   .object({
     key: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/),
@@ -197,7 +225,8 @@ export const systemSettingsSchemas = {
   localization: localizationSettingsSchema,
   navigation: navigationSettingsSchema,
   dashboard: dashboardSettingsSchema,
-  modules: moduleSettingsSchema
+  modules: moduleSettingsSchema,
+  payslip: payslipSettingsSchema
 } as const;
 
 export type BrandingSettings = z.infer<typeof brandingSettingsSchema>;
@@ -207,6 +236,7 @@ export type LocalizationSettings = z.infer<typeof localizationSettingsSchema>;
 export type NavigationSettings = z.infer<typeof navigationSettingsSchema>;
 export type DashboardSettings = z.infer<typeof dashboardSettingsSchema>;
 export type ModuleSettings = z.infer<typeof moduleSettingsSchema>;
+export type PayslipSettings = z.infer<typeof payslipSettingsSchema>;
 export type SystemSettingsGroup = keyof typeof systemSettingsSchemas;
 
 export interface SystemSettingsDocument {
@@ -217,6 +247,7 @@ export interface SystemSettingsDocument {
   navigation: NavigationSettings;
   dashboard: DashboardSettings;
   modules: ModuleSettings;
+  payslip: PayslipSettings;
 }
 
 export const defaultSystemSettings: SystemSettingsDocument = {
@@ -267,6 +298,17 @@ export const defaultSystemSettings: SystemSettingsDocument = {
     warehouse: true,
     import_export: true,
     reports: true
+  },
+  payslip: {
+    companyName: "CÔNG TY CHÂU TUẤN",
+    title: "PHIẾU LƯƠNG THÁNG {month}",
+    footer: "Tài liệu nội bộ · Dữ liệu lương riêng tư",
+    primaryColor: "#2E9B67",
+    showWorkDays: true,
+    showBaseSalary: true,
+    showAllowance: true,
+    showBonus: true,
+    showDeduction: true
   }
 };
 
@@ -354,11 +396,11 @@ export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
 }
 
 export function moduleForPath(pathname: string): ModuleKey | null {
-  if (pathname.startsWith("/employees") || pathname.startsWith("/timesheets") || pathname.startsWith("/leave") || pathname.startsWith("/shifts")) return "human_resources";
-  if (pathname.startsWith("/attendance")) return "attendance";
+  if (pathname.startsWith("/employees")) return "human_resources";
+  if (pathname.startsWith("/attendance") || pathname.startsWith("/timesheets") || pathname.startsWith("/leave") || pathname.startsWith("/shifts")) return "attendance";
   if (pathname.startsWith("/projects") || pathname.startsWith("/worker-attendance")) return "projects";
-  if (pathname.startsWith("/warehouse")) return "warehouse";
-  if (pathname.startsWith("/import-export")) return "import_export";
+  if (pathname.startsWith("/warehouse") || pathname.startsWith("/settings/warehouse")) return "warehouse";
+  if (pathname.startsWith("/import-export") || pathname.startsWith("/settings/import-export")) return "import_export";
   if (pathname.startsWith("/reports")) return "reports";
   return null;
 }

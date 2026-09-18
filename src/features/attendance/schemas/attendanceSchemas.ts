@@ -28,6 +28,12 @@ export const attendanceRecordFiltersSchema = z.object({
   photo: z.enum(["missing", "pending", "uploaded"]).optional()
 });
 
+export const attendanceAdjustmentSchema = z.object({
+  effectiveAt: z.string().datetime(),
+  attendanceStatus: z.enum(["recorded", "rejected", "needs_review"]),
+  reason: z.string().trim().min(3).max(500)
+});
+
 export const attendancePolicyPatchSchema = z.object({
   attendanceEnabled: z.boolean(),
   photoRequired: z.boolean(),

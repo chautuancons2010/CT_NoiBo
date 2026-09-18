@@ -8,7 +8,8 @@ import {
   isPathEnabled,
   moduleForPath,
   navigationSettingsSchema,
-  normalizeStoredNavigationSettings
+  normalizeStoredNavigationSettings,
+  payslipSettingsSchema
 } from "@/config/systemSettings";
 
 describe("typed system settings", () => {
@@ -61,5 +62,10 @@ describe("typed system settings", () => {
   it("only accepts registered dashboard presets and widgets", () => {
     expect(dashboardSettingsSchema.parse(defaultSystemSettings.dashboard)).toEqual(defaultSystemSettings.dashboard);
     expect(() => dashboardSettingsSchema.parse({ ...defaultSystemSettings.dashboard, presets: defaultSystemSettings.dashboard.presets.map((preset, index) => index ? preset : { ...preset, enabledWidgets: ["unknown"] }) })).toThrow();
+  });
+
+  it("validates the payslip template", () => {
+    expect(payslipSettingsSchema.parse(defaultSystemSettings.payslip)).toEqual(defaultSystemSettings.payslip);
+    expect(() => payslipSettingsSchema.parse({ ...defaultSystemSettings.payslip, primaryColor: "green" })).toThrow();
   });
 });

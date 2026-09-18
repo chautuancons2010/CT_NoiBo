@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
-import { Button } from "@/components/shared/Button";
-import { FilterBar } from "@/components/shared/FilterBar";
-import { SearchInput, Select } from "@/components/shared/FormControls";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { ListPageLayout } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Inspector, WorkbenchLayout, WorkCanvas } from "@/components/shared/Workbench";
 import { PermissionGate } from "@/components/shared/PermissionGate";
@@ -12,12 +10,14 @@ import { PermissionDeniedState } from "@/components/shared/States";
 import { can } from "@/lib/auth/permissions";
 import { employeeListQuerySchema } from "@/features/employees/schemas/employeeSchemas";
 import { EmployeeListTable } from "@/features/employees/components/EmployeeListTable";
+import { EmployeeListFilters } from "@/features/employees/components/EmployeeListFilters";
 import {
   employeeStatusMeta,
   getEmployeeFilterOptions,
   listEmployees
 } from "@/features/employees/services/employeeService";
 import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
+import { getEmployeeListFromSupabase } from "@/features/employees/services/employeeSupabaseRepository";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 
 export interface EmployeeListPageProps {
@@ -84,17 +84,18 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
     return <PermissionDeniedState />;
   }
 
-  const dataSet = await getEmployeeDataSetAsync();
   const filters = buildFilters(searchParams);
-  const result = listEmployees(filters, user.permissions, dataSet);
-  const filterOptions = getEmployeeFilterOptions(dataSet);
+  const persisted = await getEmployeeListFromSupabase(filters, user.permissions);
+  const fallback = persisted ? null : await getEmployeeDataSetAsync();
+  const result = persisted?.employees ?? listEmployees(filters, user.permissions, fallback!);
+  const filterOptions = persisted?.filterOptions ?? getEmployeeFilterOptions(fallback!);
   const selectedId = firstParam(searchParams.selected);
   const selectedEmployee = result.items.find((employee) => employee.id === selectedId);
   const firstRecord = result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1;
   const lastRecord = Math.min(result.page * result.pageSize, result.total);
 
   return (
-    <div className="page-stack">
+    <ListPageLayout>
       <PageHeader
         action={
           <PermissionGate permissions={user.permissions} require="employee.create">
@@ -109,70 +110,15 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
         title="Nhân viên"
       />
 
-      <form action="/employees" method="get">
-        <FilterBar
-          className="employee-filter-bar"
-          actions={
-            <>
-              <Button leftIcon={<Search aria-hidden="true" size={16} />} type="submit" variant="primary">
-                Lọc
-              </Button>
-              <Link className="button button--secondary button--md" href="/employees">
-                Xóa
-              </Link>
-            </>
-          }
-        >
-          <SearchInput defaultValue={filters.q} label="Tìm nhân viên" name="q" placeholder="Tìm mã, tên, SĐT, email" />
-          <Select
-            defaultValue={filters.departmentId ?? ""}
-            label="Phòng ban"
-            labelHidden
-            name="departmentId"
-            options={filterOptions.departments.map((department) => ({
-              label: department.name,
-              value: department.id
-            }))}
-            placeholder="Phòng ban: Tất cả"
-          />
-          <Select
-            defaultValue={filters.positionId ?? ""}
-            label="Chức vụ"
-            labelHidden
-            name="positionId"
-            options={filterOptions.positions.map((position) => ({
-              label: position.name,
-              value: position.id
-            }))}
-            placeholder="Chức vụ: Tất cả"
-          />
-          <Select
-            defaultValue={filters.employmentTypeId ?? ""}
-            label="Loại"
-            labelHidden
-            name="employmentTypeId"
-            options={filterOptions.employmentTypes.map((employmentType) => ({
-              label: employmentType.name,
-              value: employmentType.id
-            }))}
-            placeholder="Loại: Tất cả"
-          />
-          <Select
-            defaultValue={filters.status ?? ""}
-            label="Trạng thái"
-            labelHidden
-            name="status"
-            options={Object.entries(employeeStatusMeta).map(([value, meta]) => ({
-              label: meta.label,
-              value
-            }))}
-            placeholder="Trạng thái: Tất cả"
-          />
-        </FilterBar>
-      </form>
-
       <WorkbenchLayout className={selectedEmployee ? "employee-roster" : "employee-roster workbench-layout--solo"}>
         <WorkCanvas className="employee-roster__canvas">
+          <EmployeeListFilters
+            defaults={filters}
+            departments={filterOptions.departments.map((item) => ({ label: item.name, value: item.id }))}
+            employmentTypes={filterOptions.employmentTypes.map((item) => ({ label: item.name, value: item.id }))}
+            positions={filterOptions.positions.map((item) => ({ label: item.name, value: item.id }))}
+            statuses={Object.entries(employeeStatusMeta).map(([value, meta]) => ({ label: meta.label, value }))}
+          />
           <div className="list-summary-bar"><span>{result.total} hồ sơ</span></div>
           <EmployeeListTable employees={result.items} permissions={user.permissions} selectionBaseHref={selectionHref(filters)} />
           <footer className="employee-table-footer">
@@ -199,6 +145,6 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
           </Inspector>
         ) : null}
       </WorkbenchLayout>
-    </div>
+    </ListPageLayout>
   );
 }

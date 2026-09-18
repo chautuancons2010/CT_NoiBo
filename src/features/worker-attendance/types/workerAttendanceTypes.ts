@@ -1,6 +1,20 @@
 export type WorkerEntryStatus = "unconfirmed" | "present" | "absent" | "leave" | "late" | "transferred";
 export type WorkerSessionStatus = "draft" | "in_progress" | "submitted" | "locked" | "needs_review";
 
+export interface WorkerAttendanceChecklistItem {
+  id: string;
+  group: string;
+  content: string;
+  required: boolean;
+  sortOrder: number;
+}
+
+export interface WorkerAttendanceChecklistResponse {
+  itemId: string;
+  checked: boolean;
+  note?: string;
+}
+
 export interface WorkerAttendanceEntry {
   id: string;
   sessionId: string;
@@ -62,6 +76,8 @@ export interface WorkerAttendanceSession {
   entries: WorkerAttendanceEntry[];
   photos: WorkerAttendancePhoto[];
   adjustments: WorkerAttendanceAdjustment[];
+  checklist: WorkerAttendanceChecklistItem[];
+  checklistResponses: WorkerAttendanceChecklistResponse[];
 }
 
 export interface WorkerAttendanceTask {
@@ -75,6 +91,7 @@ export interface WorkerAttendanceTask {
   expectedWorkers: number;
   existingSessionId?: string;
   existingStatus?: WorkerSessionStatus;
+  checklist: WorkerAttendanceChecklistItem[];
   roster: Array<{
     workerId: string;
     employeeCode: string;

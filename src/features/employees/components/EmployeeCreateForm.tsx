@@ -7,6 +7,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/shared/Button";
 import { DatePicker, Input, Select, Textarea } from "@/components/shared/FormControls";
 import { FormSection, StickyActionBar } from "@/components/shared/FormLayout";
+import { ImageUploader } from "@/components/shared/ImageUploader";
 import type { Department, EmployeePickerOption, EmploymentType, Position } from "@/features/employees/types";
 import { employeeStatusMeta } from "@/features/employees/services/employeeService";
 
@@ -32,6 +33,8 @@ export function EmployeeCreateForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [avatar, setAvatar] = useState<File>();
+  const [employeeId, setEmployeeId] = useState<string>();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,38 +50,59 @@ export function EmployeeCreateForm({
       personalPhone: readString(formData, "personalPhone"),
       personalEmail: readString(formData, "personalEmail"),
       companyEmail: readString(formData, "companyEmail"),
+      dateOfBirth: readString(formData, "dateOfBirth"),
+      gender: readString(formData, "gender"),
       departmentId: readString(formData, "departmentId"),
       positionId: readString(formData, "positionId"),
       employmentTypeId: readString(formData, "employmentTypeId"),
       managerEmployeeId: readString(formData, "managerEmployeeId"),
       joinDate: readString(formData, "joinDate"),
       probationStartDate: readString(formData, "probationStartDate"),
+      probationEndDate: readString(formData, "probationEndDate"),
       officialDate: readString(formData, "officialDate"),
       employmentStatus: readString(formData, "employmentStatus") ?? "active",
       currentAddress: readString(formData, "currentAddress"),
+      permanentAddress: readString(formData, "permanentAddress"),
       province: readString(formData, "province"),
-      contractorName: readString(formData, "contractorName"),
+      maritalStatus: readString(formData, "maritalStatus"),
+      nationalIdNumber: readString(formData, "nationalIdNumber"),
+      nationalIdIssuedDate: readString(formData, "nationalIdIssuedDate"),
+      nationalIdIssuedPlace: readString(formData, "nationalIdIssuedPlace"),
+      personalTaxCode: readString(formData, "personalTaxCode"),
+      emergencyContactName: readString(formData, "emergencyContactName"),
+      emergencyContactPhone: readString(formData, "emergencyContactPhone"),
+      emergencyContactRelation: readString(formData, "emergencyContactRelation"),
       note: readString(formData, "note")
     };
 
-    const response = await fetch("/api/v1/employees", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    const body = await response.json();
-
-    setSubmitting(false);
-
-    if (!body.ok) {
-      setError(body.error?.message ?? "Không thể tạo hồ sơ nhân sự.");
-      return;
+    try {
+      let savedEmployeeId = employeeId;
+      if (!savedEmployeeId) {
+        const response = await fetch("/api/v1/employees", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json();
+        if (!response.ok || !body.ok) throw new Error(body.error?.message ?? "Không thể tạo hồ sơ nhân sự.");
+        savedEmployeeId = body.data.employee.id;
+        setEmployeeId(savedEmployeeId);
+        setWarnings(body.data.duplicateWarnings ?? []);
+      }
+      if (avatar) {
+        const imageForm = new FormData();
+        imageForm.set("file", avatar);
+        const imageResponse = await fetch(`/api/v1/employees/${savedEmployeeId}/avatar`, { method: "POST", body: imageForm });
+        const imageBody = await imageResponse.json();
+        if (!imageResponse.ok || !imageBody.ok) throw new Error(imageBody.error?.message ?? "Không thể tải ảnh nhân viên.");
+      }
+      router.push(`/employees/${savedEmployeeId}/profile`);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Không thể tạo hồ sơ nhân sự.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setWarnings(body.data.duplicateWarnings ?? []);
-    router.push(`/employees/${body.data.employee.id}/profile`);
   }
 
   return (
@@ -92,15 +116,19 @@ export function EmployeeCreateForm({
         </div>
       ) : null}
 
-      <FormSection
-        title="Thông tin cơ bản"
-      >
+      <FormSection columns={1} title="Ảnh nhân viên">
+        <ImageUploader disabled={submitting} file={avatar} label="Chọn ảnh nhân viên" maxBytes={5 * 1024 * 1024} onFileChange={setAvatar} uploading={submitting && Boolean(avatar)} />
+      </FormSection>
+
+      <FormSection title="Thông tin cá nhân">
         <Input label="Mã nhân viên" name="employeeCode" required />
         <Input label="Họ và tên" name="fullName" required />
         <Input label="Tên hiển thị" name="displayName" />
-        <Input label="Số điện thoại" name="personalPhone" required />
+        <DatePicker label="Ngày sinh" name="dateOfBirth" />
+        <Select label="Giới tính" name="gender" options={[{ value: "male", label: "Nam" }, { value: "female", label: "Nữ" }, { value: "other", label: "Khác" }, { value: "undisclosed", label: "Không cung cấp" }]} placeholder="Chưa cập nhật" />
+        <Select label="Tình trạng hôn nhân" name="maritalStatus" options={[{ value: "single", label: "Độc thân" }, { value: "married", label: "Đã kết hôn" }, { value: "other", label: "Khác" }]} placeholder="Chưa cập nhật" />
+        <Input label="Số điện thoại" name="personalPhone" />
         <Input label="Email cá nhân" name="personalEmail" type="email" />
-        <Input label="Email công ty" name="companyEmail" type="email" />
       </FormSection>
 
       <FormSection title="Thông tin công việc">
@@ -145,6 +173,7 @@ export function EmployeeCreateForm({
         />
         <DatePicker label="Ngày vào làm" name="joinDate" required />
         <DatePicker label="Ngày thử việc" name="probationStartDate" />
+        <DatePicker label="Ngày kết thúc thử việc" name="probationEndDate" />
         <DatePicker label="Ngày chính thức" name="officialDate" />
         <Select
           label="Trạng thái"
@@ -155,12 +184,23 @@ export function EmployeeCreateForm({
           }))}
           required
         />
+        <Input label="Email công ty" name="companyEmail" type="email" />
       </FormSection>
 
-      <FormSection columns={1} title="Liên hệ">
+      <FormSection title="Liên hệ">
         <Input label="Địa chỉ hiện tại" name="currentAddress" />
+        <Input label="Địa chỉ thường trú" name="permanentAddress" />
         <Input label="Tỉnh/Thành" name="province" />
-        <Input label="Đơn vị / nhà thầu" name="contractorName" />
+        <Input label="Người liên hệ khẩn cấp" name="emergencyContactName" />
+        <Input label="Quan hệ" name="emergencyContactRelation" />
+        <Input label="Số điện thoại khẩn cấp" name="emergencyContactPhone" />
+      </FormSection>
+
+      <FormSection title="Thông tin bổ sung">
+        <Input label="CCCD/CMND" name="nationalIdNumber" />
+        <DatePicker label="Ngày cấp" name="nationalIdIssuedDate" />
+        <Input label="Nơi cấp" name="nationalIdIssuedPlace" />
+        <Input label="Mã số thuế cá nhân" name="personalTaxCode" />
         <Textarea label="Ghi chú" name="note" />
       </FormSection>
 

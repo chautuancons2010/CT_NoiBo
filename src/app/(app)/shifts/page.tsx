@@ -1,2 +1,11 @@
-import { BackLink } from "@/components/shared/BackLink";import { PageHeader } from "@/components/shared/PageHeader";import { ShiftAssignmentForm } from "@/features/timesheets/components/ShiftAssignmentForm";import { ShiftSettings } from "@/features/timesheets/components/ShiftSettings";
-export default function Page(){return <div className="page-stack"><BackLink href="/timesheets"/><PageHeader title="Ca làm"/><ShiftSettings/><ShiftAssignmentForm/></div>;}
+import { BackLink } from "@/components/shared/BackLink";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { ShiftSettings } from "@/features/timesheets/components/ShiftSettings";
+import { can } from "@/lib/auth/permissions";
+import { getRequestUser } from "@/services/auth/getRequestUser";
+
+export default async function Page() {
+  const user = await getRequestUser();
+  const canEdit = Boolean(user && (can(user.permissions, "shift.manage") || can(user.permissions, "shift.edit")));
+  return <div className="page-stack"><BackLink href="/attendance" /><PageHeader title="Ca làm" /><ShiftSettings canEdit={canEdit} /></div>;
+}

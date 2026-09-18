@@ -5,6 +5,7 @@ import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "@/app/globals.css";
+import "@/app/theme.css";
 import { SystemSettingsProvider } from "@/components/providers/SystemSettingsProvider";
 import { deriveBrandColorTokens } from "@/config/systemSettings";
 import { readSystemSettings } from "@/services/system-settings/systemSettingsService";

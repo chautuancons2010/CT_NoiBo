@@ -14,6 +14,8 @@ const adminRoutes = [
   ["/system-admin/dashboard", "Bố cục bản tin", "navigation.manage"],
   ["/system-admin/modules", "Phân hệ", "module.manage"],
   ["/system-admin/organization", "Tổ chức", "organization_settings.view"],
+  ["/system-admin/payslip-template", "Mẫu phiếu lương", "module.manage"],
+  ["/system-admin/attendance-checklist", "Checklist điểm danh", "system_admin.access"],
   ["/system-admin/localization", "Định dạng & thời gian", "localization.manage"],
   ["/system-admin/security", "Bảo mật", "system_admin.access"],
   ["/system-admin/operations", "Vận hành", "operations.view"],

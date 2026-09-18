@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applicationForPath, applicationsForLauncher, contextualNavigationGroups, visibleApplications } from "@/config/moduleRegistry";
+import { applicationForPath, applicationsForLauncher, contextualNavigationGroups, visibleApplications, visibleApplicationShortcuts } from "@/config/moduleRegistry";
 import { defaultSystemSettings } from "@/config/systemSettings";
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
 
@@ -12,6 +12,11 @@ describe("application registry", () => {
   it("resolves nested routes to one application", () => {
     expect(applicationForPath("/warehouse/receipts/new").id).toBe("warehouse");
     expect(applicationForPath("/dashboard/hr").id).toBe("human-resources");
+    expect(applicationForPath("/attendance/today").id).toBe("human-resources");
+    expect(applicationForPath("/attendance/logs").id).toBe("human-resources");
+    expect(applicationForPath("/timesheets").id).toBe("human-resources");
+    expect(applicationForPath("/attendance/me").id).toBe("attendance");
+    expect(applicationForPath("/attendance/requests").id).toBe("attendance");
     expect(applicationForPath("/dashboard/warehouse").id).toBe("warehouse");
     expect(applicationForPath("/projects/abc/updates").id).toBe("projects");
   });
@@ -19,6 +24,14 @@ describe("application registry", () => {
   it("shows launcher applications by permission", () => {
     const applications = visibleApplications(user(["warehouse.view", "profile.view"]), defaultSystemSettings.modules);
     expect(applications.map((item) => item.id)).toEqual(["warehouse"]);
+  });
+
+  it("does not treat attendance management permission as access to the personal app", () => {
+    const admin = visibleApplications(user(["attendance.view_all"]), defaultSystemSettings.modules);
+    const employee = visibleApplications(user(["attendance.self"]), defaultSystemSettings.modules);
+    expect(admin.map((item) => item.id)).toEqual(["human-resources"]);
+    expect(admin[0].defaultRoute).toBe("/attendance/today");
+    expect(employee.map((item) => item.id)).toEqual(["attendance"]);
   });
 
   it("keeps unavailable applications visible and explicitly locked in the launcher", () => {
@@ -30,14 +43,47 @@ describe("application registry", () => {
 
   it("keeps the sidebar contextual", () => {
     const groups = contextualNavigationGroups("/warehouse/inventory", user(["warehouse.view", "employee.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].items.every((item) => item.href.startsWith("/warehouse"))).toBe(true);
+    expect(groups.map((group) => group.label)).toEqual(["VẬN HÀNH KHO", "DANH MỤC & CẤU HÌNH"]);
+    expect(groups.flatMap((group) => group.items).every((item) => item.href.startsWith("/warehouse"))).toBe(true);
   });
 
-  it("adds the module dashboard to the HR sidebar", () => {
+  it("opens warehouse on inventory and places setup with warehouse navigation", () => {
+    const groups = contextualNavigationGroups(
+      "/settings/warehouse",
+      user(["warehouse.view", "warehouse.item.view", "warehouse.master.manage", "warehouse.ledger.view"]),
+      defaultSystemSettings.modules,
+      { ...defaultSystemSettings.navigation, itemOrder: [...defaultSystemSettings.navigation.itemOrder].reverse() }
+    );
+    const paths = groups.flatMap((group) => group.items.map((item) => item.href));
+
+    expect(applicationForPath("/settings/warehouse").id).toBe("warehouse");
+    expect(paths[0]).toBe("/warehouse/inventory");
+    expect(paths.indexOf("/settings/warehouse")).toBeGreaterThan(paths.indexOf("/warehouse/items"));
+    expect(paths.indexOf("/settings/warehouse")).toBeGreaterThan(paths.indexOf("/warehouse/warehouses"));
+    expect(visibleApplicationShortcuts(applicationForPath("/warehouse"), user(["warehouse.view"]), defaultSystemSettings.modules, { ...defaultSystemSettings.navigation, itemOrder: [...defaultSystemSettings.navigation.itemOrder].reverse() })[0].href).toBe("/warehouse/inventory");
+  });
+
+  it("opens HR directly on its primary function", () => {
     const groups = contextualNavigationGroups("/dashboard/hr", user(["employee.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
 
-    expect(groups[0].items[0].href).toBe("/dashboard/hr");
-    expect(groups[0].items.some((item) => item.href === "/employees")).toBe(true);
+    expect(groups[0].items[0].href).toBe("/employees");
+    expect(groups.flatMap((group) => group.items).some((item) => item.href === "/dashboard/hr")).toBe(false);
+    expect(groups.flatMap((group) => group.items).some((item) => item.href === "/employees")).toBe(true);
+  });
+
+  it("keeps HR administration and personal attendance separate", () => {
+    const hr = contextualNavigationGroups("/attendance/today", user(["attendance.view_all", "timesheet.view", "shift.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
+    expect(hr.flatMap((group) => group.items).map((item) => item.href)).toEqual(["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/timesheets/adjustments", "/attendance/logs", "/shifts/calendar"]);
+    const personal = contextualNavigationGroups("/attendance/me", user(["attendance.self", "attendance.self.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
+    expect(personal[0].items.map((item) => item.href)).toEqual(["/attendance/me", "/attendance/history", "/attendance/requests", "/attendance/notifications"]);
+  });
+
+  it("opens the correct application for dedicated attendance permissions", () => {
+    const manager = visibleApplications(user(["attendance.period.manage"]), defaultSystemSettings.modules);
+    const personal = visibleApplications(user(["attendance.self_history"]), defaultSystemSettings.modules);
+    expect(manager.map((item) => item.id)).toEqual(["human-resources"]);
+    expect(manager[0].defaultRoute).toBe("/timesheets");
+    expect(personal.map((item) => item.id)).toEqual(["attendance"]);
+    expect(personal[0].defaultRoute).toBe("/attendance/history");
   });
 });

@@ -23,12 +23,12 @@ const user: AuthenticatedUser = {
 };
 
 describe("AppRail", () => {
-  it("contains the launcher and current module navigation in one sidebar", () => {
+  it("contains only the current module navigation in the sidebar", () => {
     const onCollapsedChange = vi.fn();
     render(<AppRail collapsed={false} onCollapsedChange={onCollapsedChange} pathname="/employees" user={user} />);
 
     expect(screen.getByRole("complementary", { name: "Điều hướng Nhân sự" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Mở danh sách ứng dụng" })).toHaveAttribute("href", "/workspace");
+    expect(screen.queryByRole("link", { name: "Mở danh sách ứng dụng" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Nhân viên" })).toHaveAttribute("href", "/employees");
 
     fireEvent.click(screen.getByRole("button", { name: "Thu gọn điều hướng" }));

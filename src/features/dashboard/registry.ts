@@ -9,7 +9,6 @@ import {
   type DashboardSettings,
   type DashboardWidgetKey
 } from "@/features/dashboard/types";
-import { shouldUseWorkspace } from "@/lib/auth/applicationAccess";
 
 interface DashboardProfileDefinition {
   key: DashboardProfileKey;
@@ -26,15 +25,16 @@ interface DashboardWidgetDefinition {
 }
 
 export const dashboardProfiles: DashboardProfileDefinition[] = [
-  { key: "management", label: "Quản lý", requiredAny: ["project_monitoring.view_all"], defaultLandingPage: "/dashboard/management" },
-  { key: "import_export", label: "Xuất nhập khẩu", requiredAny: ["import_export.view", "shipment.view"], defaultLandingPage: "/dashboard/import-export" },
-  { key: "warehouse", label: "Kho", requiredAny: ["warehouse.view"], defaultLandingPage: "/dashboard/warehouse" },
-  { key: "hr", label: "Nhân sự", requiredAny: ["employee.view", "timesheet.view_all", "leave.view_all"], defaultLandingPage: "/dashboard/hr" },
-  { key: "supervisor", label: "Giám sát", requiredAny: ["worker_attendance.create", "worker_attendance.self_scope"], defaultLandingPage: "/home" },
-  { key: "employee", label: "Nhân viên", requiredAny: ["attendance.self.view", "leave.self.view", "profile.view", "dashboard.view"], defaultLandingPage: "/home" }
+  { key: "management", label: "Quản lý", requiredAny: ["project_monitoring.view_all"], defaultLandingPage: "/dashboard" },
+  { key: "import_export", label: "Xuất nhập khẩu", requiredAny: ["import_export.view", "shipment.view"], defaultLandingPage: "/dashboard" },
+  { key: "warehouse", label: "Kho", requiredAny: ["warehouse.view"], defaultLandingPage: "/dashboard" },
+  { key: "hr", label: "Nhân sự", requiredAny: ["employee.view", "timesheet.view_all", "leave.view_all"], defaultLandingPage: "/dashboard" },
+  { key: "supervisor", label: "Giám sát", requiredAny: ["worker_attendance.create", "worker_attendance.self_scope"], defaultLandingPage: "/dashboard" },
+  { key: "employee", label: "Nhân viên", requiredAny: ["attendance.self.view", "leave.self.view", "profile.view", "dashboard.view"], defaultLandingPage: "/dashboard" }
 ];
 
 export const dashboardWidgetRegistry: DashboardWidgetDefinition[] = [
+  { key: "attendance_overview", label: "Chấm công hôm nay", requiredAny: ["attendance.view_all", "attendance.manage"], allowedProfiles: ["management", "hr"] },
   { key: "employee_today", label: "Hôm nay", requiredAny: ["attendance.self.view", "attendance.self.create"], allowedProfiles: ["employee"] },
   { key: "supervisor_today", label: "Công trường hôm nay", requiredAny: ["worker_attendance.create", "worker_attendance.self_scope"], allowedProfiles: ["supervisor"] },
   { key: "my_approvals", label: "Phê duyệt cần xử lý", requiredAny: ["approval.inbox.view", "approval.view"], allowedProfiles: [...dashboardProfileKeys] },
@@ -49,10 +49,10 @@ export const dashboardWidgetRegistry: DashboardWidgetDefinition[] = [
 ];
 
 const defaultWidgets: Record<DashboardProfileKey, DashboardWidgetKey[]> = {
-  management: ["my_approvals", "project_attention", "hr_summary", "timesheet_exceptions", "warehouse_low_stock", "shipment_attention", "recent_activity"],
+  management: ["attendance_overview", "my_approvals", "project_attention", "hr_summary", "timesheet_exceptions", "warehouse_low_stock", "shipment_attention", "recent_activity"],
   import_export: ["shipment_attention", "my_approvals", "recent_notifications", "recent_activity"],
   warehouse: ["warehouse_low_stock", "my_approvals", "recent_notifications", "recent_activity"],
-  hr: ["my_approvals", "timesheet_exceptions", "hr_summary", "recent_notifications", "recent_activity"],
+  hr: ["hr_summary", "attendance_overview", "timesheet_exceptions", "my_approvals", "recent_notifications", "recent_activity"],
   supervisor: ["supervisor_today", "project_attention", "my_approvals", "recent_notifications"],
   employee: ["employee_today", "my_approvals", "recent_notifications"]
 };
@@ -84,19 +84,20 @@ export function canUseDashboardProfile(user: AuthenticatedUser, profile: Dashboa
 }
 
 export function resolveLandingPage(user: AuthenticatedUser, settings: DashboardSettings): string {
-  if (shouldUseWorkspace(user)) return "/workspace";
   return resolveRoleLandingPage(user, settings);
 }
 
 export function resolveRoleLandingPage(user: AuthenticatedUser, settings: DashboardSettings): string {
   const profile = resolveDashboardProfile(user, settings);
   const configured = settings.presets.find((item) => item.profile === profile)?.landingPage;
-  const candidate = configured ?? dashboardProfiles.find((item) => item.key === profile)?.defaultLandingPage ?? "/dashboard";
+  const legacyDashboardRoutes = new Set(["/home", "/dashboard/hr", "/dashboard/warehouse", "/dashboard/import-export", "/dashboard/management"]);
+  const candidate = configured && !legacyDashboardRoutes.has(configured)
+    ? configured
+    : dashboardProfiles.find((item) => item.key === profile)?.defaultLandingPage ?? "/dashboard";
   return isLandingPageAllowed(user, candidate) ? candidate : firstAccessibleRoute(user);
 }
 
 export function isLandingPageAllowed(user: AuthenticatedUser, route: string): boolean {
-  if (route === "/workspace") return shouldUseWorkspace(user);
   const required: Array<[string, Permission[]]> = [
     ["/dashboard/management", ["project_monitoring.view_all"]],
     ["/dashboard/import-export", ["import_export.view", "shipment.view"]],

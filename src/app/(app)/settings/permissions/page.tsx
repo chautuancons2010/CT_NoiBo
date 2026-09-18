@@ -1,5 +1,5 @@
-import { PermissionCatalogPage } from "@/features/settings";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <PermissionCatalogPage />;
+  redirect("/settings/roles");
 }

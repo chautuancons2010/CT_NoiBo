@@ -1,0 +1,7 @@
+import { PageHeader } from "@/components/shared/PageHeader";
+import { PermissionDeniedState } from "@/components/shared/States";
+import { SalaryConsole } from "@/features/accounting/components/SalaryConsole";
+import { can } from "@/lib/auth/permissions";
+import { getRequestUser } from "@/services/auth/getRequestUser";
+
+export default async function Page(){const user=await getRequestUser();if(!user||!can(user.permissions,"salary.view"))return <PermissionDeniedState/>;return <div className="page-stack"><PageHeader title="Hồ sơ lương"/><SalaryConsole canEdit={can(user.permissions,"salary.edit")} canViewHistory={can(user.permissions,"salary.history.view")}/></div>;}

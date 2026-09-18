@@ -9,6 +9,7 @@ import {
   Clock3,
   FileText,
   LayoutDashboard,
+  MessageCircle,
   PackageMinus,
   PackagePlus,
   Repeat,
@@ -19,6 +20,7 @@ import {
   UserRound,
   Users,
   Warehouse,
+  WalletCards,
   type LucideIcon
 } from "lucide-react";
 
@@ -44,5 +46,7 @@ export const navigationIconMap: Record<NavigationIcon, LucideIcon> = {
   ShieldCheck,
   Settings,
   Bell,
-  UserRound
+  UserRound,
+  WalletCards,
+  MessageCircle
 };

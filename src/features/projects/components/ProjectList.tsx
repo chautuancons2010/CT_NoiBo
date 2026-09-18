@@ -8,6 +8,7 @@ import { Button } from "@/components/shared/Button";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { Select } from "@/components/shared/FormControls";
+import { DataSurface, ListPageLayout } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { ProjectSummary } from "@/features/projects/types/projectTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
@@ -31,5 +32,5 @@ export function ProjectList() {
     { id: "people", header: "Nhân sự", cell: (row) => String(row.currentPeople) },
     { id: "status", header: "Trạng thái", cell: (row) => <StatusBadge tone={status[row.status].tone}>{status[row.status].label}</StatusBadge> }
   ];
-  return <div className="page-stack"><FilterBar actions={<Link href="/projects/new"><Button leftIcon={<Plus size={16} />} variant="primary">Tạo dự án</Button></Link>}><Select label="Trạng thái" onChange={(event) => setFilter(event.target.value)} options={Object.entries(status).map(([value, item]) => ({ value, label: item.label }))} placeholder="Tất cả" value={filter} /></FilterBar><DataTable columns={columns} data={data} emptyDescription="" emptyTitle="Chưa có dự án" error={error} getRowId={(row) => row.id} loading={loading} /></div>;
+  return <ListPageLayout><DataSurface><div className="data-surface__toolbar"><FilterBar actions={<Link href="/projects/new"><Button leftIcon={<Plus size={16} />} variant="primary">Tạo dự án</Button></Link>}><Select label="Trạng thái" onChange={(event) => setFilter(event.target.value)} options={Object.entries(status).map(([value, item]) => ({ value, label: item.label }))} placeholder="Tất cả" value={filter} /></FilterBar></div><DataTable columns={columns} data={data} emptyDescription="" emptyTitle="Chưa có dự án" error={error} getRowId={(row) => row.id} loading={loading} /></DataSurface></ListPageLayout>;
 }

@@ -4,13 +4,14 @@ import { errorResponse } from "@/lib/api/errors";
 import { logger } from "@/lib/logger";
 import { parseWithSchema } from "@/lib/api/validation";
 import { usernamePattern } from "@/lib/auth/username";
+import { ACCOUNT_PASSWORD_MESSAGE, ACCOUNT_PASSWORD_PATTERN } from "@/lib/auth/passwordPolicy";
 import { resolveLandingPage } from "@/features/dashboard/registry";
 import { readSettingsGroup } from "@/services/system-settings/systemSettingsService";
 import { requestNetworkContext, signInWithPassword, writeSessionCookies } from "@/services/auth/sessionService";
 
 const schema = z.object({
   username: z.string().trim().toLowerCase().regex(usernamePattern, "Tên tài khoản không hợp lệ."),
-  password: z.string().min(8).max(256)
+  password: z.string().regex(ACCOUNT_PASSWORD_PATTERN, ACCOUNT_PASSWORD_MESSAGE)
 }).strict();
 export async function POST(request: Request) {
   try {

@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/shared/PageHeader";
+import { BackLink } from "@/components/shared/BackLink";
 import { PermissionDeniedState } from "@/components/shared/States";
 import { InventoryItemEditor, ItemWarehouseSettings } from "@/features/warehouse";
 import { can } from "@/lib/auth/permissions";
@@ -10,6 +11,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params;
   return (
     <div className="page-stack">
+      <BackLink href={`/warehouse/items/${id}`} />
       <PageHeader title="Chỉnh sửa hàng hóa" />
       <InventoryItemEditor id={id} />
       <ItemWarehouseSettings itemId={id} />

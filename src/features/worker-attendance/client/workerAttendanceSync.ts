@@ -66,7 +66,7 @@ export async function syncWorkerDraft(draft: WorkerLocalDraft): Promise<WorkerAt
     session = await readWorkerResponse<WorkerAttendanceSession>(await fetch(`/api/v1/worker-attendance/sessions/${session.id}/draft`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version: session.version, entries, workNote: syncing.session.workNote ?? null, note: syncing.session.note ?? null, location: syncing.location })
+      body: JSON.stringify({ version: session.version, entries, workNote: syncing.session.workNote ?? null, note: syncing.session.note ?? null, checklistResponses: syncing.session.checklistResponses, location: syncing.location })
     }));
 
     for (const localPhoto of syncing.photos.filter((photo) => !photo.uploaded)) {

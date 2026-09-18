@@ -9,8 +9,8 @@ const displayName = String(args.name || "").trim();
 const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key || !displayName || !/^[a-z][a-z0-9._-]{2,31}$/.test(username) || !password || password.length < 12) {
-  throw new Error("Cần Supabase URL/secret, --username hợp lệ, --name và BOOTSTRAP_ADMIN_PASSWORD từ 12 ký tự.");
+if (!url || !key || !displayName || !/^[a-z][a-z0-9._-]{2,31}$/.test(username) || !password || password.length < 8) {
+  throw new Error("Cần Supabase URL/secret, --username hợp lệ, --name và BOOTSTRAP_ADMIN_PASSWORD có tối thiểu 8 ký tự.");
 }
 
 const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });

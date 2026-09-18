@@ -32,6 +32,24 @@ describe("realtime coordinator", () => {
     expect(getRealtimeConnectionState()).toBe("degraded");
   });
 
+  it("does not fan out lifecycle refreshes to dashboard or repeat focus and resume together", () => {
+    const dashboard = vi.fn();
+    const warehouse = vi.fn();
+    subscribeRealtimeDomain("dashboard", dashboard);
+    subscribeRealtimeDomain("warehouse", warehouse);
+    const stop = startRealtimeCoordinator("account-1");
+
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("pageshow"));
+    expect(warehouse).toHaveBeenCalledOnce();
+    expect(dashboard).toHaveBeenCalledOnce();
+
+    emitRealtimeInvalidation({ version: 1, domain: "warehouse", key: "stock:changed", source: "postgres", occurredAt: new Date().toISOString() });
+    expect(warehouse).toHaveBeenCalledTimes(2);
+    expect(dashboard).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
   it("reconciles mounted domains after the browser returns online and cleans listeners", () => {
     const listener = vi.fn();
     subscribeRealtimeDomain("notifications", listener);

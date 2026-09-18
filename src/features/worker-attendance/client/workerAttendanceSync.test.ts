@@ -39,6 +39,8 @@ function session(id: string, version: number): WorkerAttendanceSession {
     entries: [],
     photos: [],
     adjustments: [],
+    checklist: [],
+    checklistResponses: [],
   };
 }
 

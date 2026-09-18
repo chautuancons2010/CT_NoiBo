@@ -1,4 +1,4 @@
-import type { WorkerAttendanceCounts, WorkerAttendanceEntry, WorkerAttendancePolicy } from "@/features/worker-attendance/types/workerAttendanceTypes";
+import type { WorkerAttendanceChecklistItem, WorkerAttendanceChecklistResponse, WorkerAttendanceCounts, WorkerAttendanceEntry, WorkerAttendancePolicy } from "@/features/worker-attendance/types/workerAttendanceTypes";
 
 export function countWorkerAttendance(entries: readonly WorkerAttendanceEntry[]): WorkerAttendanceCounts {
   const counts: WorkerAttendanceCounts = { total: entries.length, present: 0, absent: 0, leave: 0, late: 0, transferred: 0, unconfirmed: 0, unplanned: 0 };
@@ -9,12 +9,14 @@ export function countWorkerAttendance(entries: readonly WorkerAttendanceEntry[])
   return counts;
 }
 
-export function validateSessionForSubmit(input: { entries: readonly WorkerAttendanceEntry[]; photoCount: number; workNote?: string; geofenceStatus: string }, policy: WorkerAttendancePolicy): string[] {
+export function validateSessionForSubmit(input: { entries: readonly WorkerAttendanceEntry[]; photoCount: number; workNote?: string; geofenceStatus: string; checklist: readonly WorkerAttendanceChecklistItem[]; checklistResponses: readonly WorkerAttendanceChecklistResponse[] }, policy: WorkerAttendancePolicy): string[] {
   const errors: string[] = [];
   if (input.entries.some((entry) => entry.status === "unconfirmed")) errors.push("Còn công nhân chưa xác nhận trạng thái.");
   if (input.photoCount < policy.minimumPhotos) errors.push(`Cần ít nhất ${policy.minimumPhotos} ảnh điểm danh.`);
   if (policy.workNoteRequired && !input.workNote?.trim()) errors.push("Cần nhập nội dung công việc.");
   if (input.geofenceStatus !== "valid" && input.geofenceStatus !== "not_required") errors.push("Vị trí điểm danh chưa hợp lệ.");
+  const checked = new Set(input.checklistResponses.filter((response) => response.checked).map((response) => response.itemId));
+  if (input.checklist.some((item) => item.required && !checked.has(item.id))) errors.push("Cần hoàn thành các mục checklist bắt buộc.");
   return errors;
 }
 

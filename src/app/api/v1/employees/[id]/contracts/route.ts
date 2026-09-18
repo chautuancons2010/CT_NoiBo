@@ -1,35 +1,25 @@
-import { AppError, errorResponse } from "@/lib/api/errors";
+import { z } from "zod";
+
+import { employeeContractInputSchema } from "@/features/employees/schemas/employeeSchemas";
+import { createContract, listContracts } from "@/features/employees/services/contractService";
+import { errorResponse } from "@/lib/api/errors";
 import { successResponse } from "@/lib/api/responses";
-import { logger } from "@/lib/logger";
-import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
-import {
-  findEmployee,
-  getEmployeeContracts
-} from "@/features/employees/services/employeeService";
+import { parseWithSchema } from "@/lib/api/validation";
 import { getRequestUser } from "@/services/auth/getRequestUser";
-import { requirePermission } from "@/services/authorization/requirePermission";
+import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
 
-export async function GET(
-  _request: Request,
-  {
-    params
-  }: {
-    params: Promise<{ id: string }>;
-  }
-) {
+const paramsSchema = z.object({ id: z.string().uuid() });
+function fields(form: FormData) { return { contractNumber: form.get("contractNumber"), contractType: form.get("contractType"), signedDate: form.get("signedDate") || undefined, effectiveDate: form.get("effectiveDate"), endDate: form.get("endDate") || undefined, status: form.get("status") || "draft", note: form.get("note") || undefined }; }
+
+export async function GET(_request: Request, context: RouteContext<"/api/v1/employees/[id]/contracts">) {
+  try { const { id } = parseWithSchema(paramsSchema, await context.params); return successResponse({ contracts: await listContracts(requireAuthenticatedUser(await getRequestUser()), id) }); }
+  catch (error) { return errorResponse(error); }
+}
+
+export async function POST(request: Request, context: RouteContext<"/api/v1/employees/[id]/contracts">) {
   try {
-    const user = await getRequestUser();
-    requirePermission(user, "employee.view");
-    const { id } = await params;
-    const dataSet = await getEmployeeDataSetAsync();
-
-    if (!findEmployee(id, dataSet)) {
-      throw new AppError("NOT_FOUND", "Không tìm thấy hồ sơ nhân sự.");
-    }
-
-    return successResponse({ contracts: getEmployeeContracts(id, dataSet) });
-  } catch (error) {
-    logger.error("api.employees.contracts_failed");
-    return errorResponse(error);
-  }
+    const { id } = parseWithSchema(paramsSchema, await context.params), form = await request.formData();
+    const input = parseWithSchema(employeeContractInputSchema, fields(form)), candidate = form.get("file"), file = candidate instanceof File && candidate.size ? candidate : undefined;
+    return successResponse(await createContract(requireAuthenticatedUser(await getRequestUser()), id, input, file), { status: 201 });
+  } catch (error) { return errorResponse(error); }
 }

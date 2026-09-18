@@ -20,7 +20,14 @@ export async function listNotifications(user:AuthenticatedUser,options:{unreadOn
   if(!can(user.permissions,"notification.self.view")&&!can(user.permissions,"notification.view"))throw new AppError("PERMISSION_DENIED");
   const client=db(),actor=await resolvePlatformIdentity(client,user);let query=client.from("notifications").select("*").eq("recipient_account_id",actor.accountId).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at",{ascending:false}).limit(Math.min(options.limit??50,100));if(options.unreadOnly)query=query.is("read_at",null);const{data,error}=await query;if(error)throw new AppError("SERVER_ERROR","Không thể đọc thông báo.");return(data??[]).map(row=>mapNotification(row as Row));
 }
-export async function unreadNotificationCount(user:AuthenticatedUser){const client=db(),actor=await resolvePlatformIdentity(client,user);const{count,error}=await client.from("notifications").select("id",{count:"exact",head:true}).eq("recipient_account_id",actor.accountId).is("read_at",null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);if(error)throw new AppError("SERVER_ERROR");return count??0;}
+export async function unreadNotificationCount(user:AuthenticatedUser){
+  if(!can(user.permissions,"notification.self.view")&&!can(user.permissions,"notification.view"))throw new AppError("PERMISSION_DENIED");
+  const client=db();
+  const accountId=/^[0-9a-f-]{36}$/i.test(user.id)&&user.status==="active"?user.id:(await resolvePlatformIdentity(client,user)).accountId;
+  const{count,error}=await client.from("notifications").select("id",{count:"exact",head:true}).eq("recipient_account_id",accountId).is("read_at",null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+  if(error)throw new AppError("SERVER_ERROR");
+  return count??0;
+}
 export async function markNotificationRead(user:AuthenticatedUser,id:string){const client=db(),actor=await resolvePlatformIdentity(client,user);const{data,error}=await client.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id).eq("recipient_account_id",actor.accountId).is("read_at",null).select("id").maybeSingle();if(error)throw new AppError("SERVER_ERROR");return{id:data?.id??id};}
 export async function markAllNotificationsRead(user:AuthenticatedUser){const client=db(),actor=await resolvePlatformIdentity(client,user);const{error}=await client.from("notifications").update({read_at:new Date().toISOString()}).eq("recipient_account_id",actor.accountId).is("read_at",null);if(error)throw new AppError("SERVER_ERROR");return{updated:true};}
 

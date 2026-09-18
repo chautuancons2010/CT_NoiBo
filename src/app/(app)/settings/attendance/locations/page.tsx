@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/shared/PageHeader";
 import { AttendanceSettings } from "@/features/attendance";
+import { BackLink } from "@/components/shared/BackLink";
 
 export default function Page() {
-  return <div className="page-stack"><PageHeader title="Địa điểm chấm công" /><AttendanceSettings activeTab="locations" /></div>;
+  return <div className="page-stack"><BackLink href="/settings" /><PageHeader title="Địa điểm chấm công" /><AttendanceSettings activeTab="locations" /></div>;
 }

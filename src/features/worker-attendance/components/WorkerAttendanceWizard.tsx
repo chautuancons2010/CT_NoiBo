@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Check, RefreshCw, Search, Trash2, UserPlus } from "lucide-react";
+import { Check, RefreshCw, Search, Trash2, UserPlus } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -8,7 +8,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackLink } from "@/components/shared/BackLink";
 import { Button, IconButton } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
-import { Input, Select, Textarea } from "@/components/shared/FormControls";
+import { Checkbox, Input, Select, Textarea } from "@/components/shared/FormControls";
+import { ImageUploader } from "@/components/shared/ImageUploader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { processAttendanceImage } from "@/features/attendance/client/imageProcessing";
 import { WorkerSelector } from "@/features/employees/components/EmployeePicker";
@@ -44,6 +45,9 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
   const [showTemporary, setShowTemporary] = useState(false);
   const [selectedExistingId, setSelectedExistingId] = useState<string>();
   const [existingReason, setExistingReason] = useState("support");
+  const [photoFile, setPhotoFile] = useState<File>();
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -85,6 +89,13 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
     void update(next);
   }
 
+  function updateChecklist(itemId: string, checked: boolean) {
+    if (!draft) return;
+    const current = draft.session.checklistResponses.filter((response) => response.itemId !== itemId);
+    const next = { ...draft, session: { ...draft.session, checklistResponses: [...current, { itemId, checked }] }, updatedAt: new Date().toISOString() };
+    void update(next);
+  }
+
   async function saveAndGo(nextStep: WizardStep) {
     if (!draft) return;
     setBusy(true); setMessage("");
@@ -99,13 +110,14 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
 
   async function addPhoto(file?: File) {
     if (!draft || !file) return;
-    setBusy(true); setMessage("");
+    setPhotoBusy(true); setPhotoError(""); setMessage("");
     try {
       const processed = await processAttendanceImage(file);
       const photo: LocalWorkerPhoto = { id: crypto.randomUUID(), photo: processed.photo, thumbnail: processed.thumbnail, width: processed.width, height: processed.height, capturedAt: new Date().toISOString(), uploaded: false };
       await update({ ...draft, photos: [...draft.photos, photo], session: { ...draft.session, photoStatus: "pending_upload" }, updatedAt: new Date().toISOString() });
-    } catch (caught) { setMessage(caught instanceof Error ? caught.message : "Không thể xử lý ảnh."); }
-    finally { setBusy(false); }
+      setPhotoFile(undefined);
+    } catch (caught) { setPhotoError(caught instanceof Error ? caught.message : "Không thể xử lý ảnh."); }
+    finally { setPhotoBusy(false); }
   }
 
   async function addTemporary(formData: FormData) {
@@ -143,6 +155,11 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
 
   const visibleEntries = useMemo(() => draft?.session.entries.filter((entry) => `${entry.employeeCode} ${entry.workerName}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi"))) ?? [], [draft, query]);
   const counts = useMemo(() => countWorkerAttendance(draft?.session.entries ?? []), [draft]);
+  const checklistGroups = useMemo(() => {
+    const groups = new Map<string, WorkerAttendanceSession["checklist"]>();
+    for (const item of draft?.session.checklist ?? []) groups.set(item.group, [...(groups.get(item.group) ?? []), item]);
+    return [...groups.entries()];
+  }, [draft]);
   if (!draft) return <Card>{message ? <div className="form-message form-message--error">{message}</div> : <div className="loading-line"><RefreshCw className="spin" size={18} />Đang tải</div>}</Card>;
 
   return (
@@ -164,12 +181,12 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
       </> : null}
 
       {step === "photos" ? <>
-        <Card><div className="worker-photo-grid">{draft.session.photos.map((photo) => <Image alt="Ảnh điểm danh" height={240} key={photo.id} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320} />)}{draft.photos.map((photo) => <div className="worker-photo-local" key={photo.id}><DraftPhoto photo={photo.thumbnail} /><IconButton label="Xóa ảnh" onClick={() => void update({ ...draft, photos: draft.photos.filter((item) => item.id !== photo.id), updatedAt: new Date().toISOString() })}><Trash2 size={17} /></IconButton></div>)}</div><label className="worker-camera-button"><Camera size={20} /><span>Chụp ảnh</span><input accept="image/*" capture="environment" disabled={busy} onChange={(event) => void addPhoto(event.target.files?.[0])} type="file" /></label></Card>
+        <Card><div className="worker-photo-grid">{draft.session.photos.map((photo) => <Image alt="Ảnh điểm danh" height={240} key={photo.id} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320} />)}{draft.photos.map((photo) => <div className="worker-photo-local" key={photo.id}><DraftPhoto photo={photo.thumbnail} /><IconButton label="Xóa ảnh" onClick={() => void update({ ...draft, photos: draft.photos.filter((item) => item.id !== photo.id), updatedAt: new Date().toISOString() })}><Trash2 size={17} /></IconButton></div>)}</div><ImageUploader accept="image/*" capture="environment" disabled={busy} error={photoError} file={photoFile} label="Chụp ảnh" onFileChange={(file) => { setPhotoFile(file); setPhotoError(""); if (file) void addPhoto(file); }} onRetry={() => void addPhoto(photoFile)} uploading={photoBusy} /></Card>
         <div className="sticky-action-bar"><Button disabled={busy} onClick={() => void saveAndGo("review")} size="lg" variant="primary">Tiếp tục</Button></div>
       </> : null}
 
       {step === "review" ? <>
-        <Card><div className="worker-review-grid"><span>Tổng<strong>{counts.total}</strong></span><span>Có mặt<strong>{counts.present}</strong></span><span>Đi trễ<strong>{counts.late}</strong></span><span>Vắng / nghỉ<strong>{counts.absent + counts.leave}</strong></span><span>Ảnh<strong>{draft.session.photos.length + draft.photos.length}</strong></span><span>Vị trí<strong>{draft.session.geofenceStatus === "valid" ? "Hợp lệ" : draft.session.geofenceStatus === "not_required" ? "Không yêu cầu" : "Chưa hợp lệ"}</strong></span></div><Textarea label="Nội dung công việc" onChange={(event) => void update({ ...draft, session: { ...draft.session, workNote: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.workNote ?? ""} /><Textarea label="Ghi chú" onChange={(event) => void update({ ...draft, session: { ...draft.session, note: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.note ?? ""} /></Card>
+        <Card><div className="worker-review-grid"><span>Tổng<strong>{counts.total}</strong></span><span>Có mặt<strong>{counts.present}</strong></span><span>Đi trễ<strong>{counts.late}</strong></span><span>Vắng / nghỉ<strong>{counts.absent + counts.leave}</strong></span><span>Ảnh<strong>{draft.session.photos.length + draft.photos.length}</strong></span><span>Vị trí<strong>{draft.session.geofenceStatus === "valid" ? "Hợp lệ" : draft.session.geofenceStatus === "not_required" ? "Không yêu cầu" : "Chưa hợp lệ"}</strong></span></div>{checklistGroups.length ? <div className="worker-checklist">{checklistGroups.map(([group, items]) => <fieldset key={group}><legend>{group}</legend>{items.map((item) => <Checkbox checked={draft.session.checklistResponses.some((response) => response.itemId === item.id && response.checked)} key={item.id} label={`${item.content}${item.required ? " *" : ""}`} onChange={(event) => updateChecklist(item.id, event.target.checked)} />)}</fieldset>)}</div> : null}<Textarea label="Nội dung công việc" onChange={(event) => void update({ ...draft, session: { ...draft.session, workNote: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.workNote ?? ""} /><Textarea label="Ghi chú" onChange={(event) => void update({ ...draft, session: { ...draft.session, note: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.note ?? ""} /></Card>
         <div className="sticky-action-bar"><Button disabled={busy} onClick={() => void submit()} size="lg" variant="primary">{busy ? "Đang gửi" : "Gửi điểm danh"}</Button></div>
       </> : null}
     </div>

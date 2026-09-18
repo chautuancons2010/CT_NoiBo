@@ -13,7 +13,11 @@ export const shiftInputSchema = z.object({
   breakMinutes: z.number().int().min(0).max(720), lateGraceMinutes: z.number().int().min(0).max(180),
   earlyLeaveGraceMinutes: z.number().int().min(0).max(180), checkInEarliestMinutes: z.number().int().min(0).max(720),
   checkInLatestMinutes: z.number().int().min(0).max(720), checkOutEarliestMinutes: z.number().int().min(0).max(720),
-  checkOutLatestMinutes: z.number().int().min(0).max(720), crossMidnight: z.boolean(), active: z.boolean()
+  checkOutLatestMinutes: z.number().int().min(0).max(720), crossMidnight: z.boolean(), active: z.boolean(),
+  effectiveFrom: z.string().date().optional(), reason: z.string().trim().min(3).max(500).optional()
+}).superRefine((value, context) => {
+  if (value.id && !value.effectiveFrom) context.addIssue({ code: "custom", path: ["effectiveFrom"], message: "Cần chọn ngày áp dụng." });
+  if (value.id && !value.reason) context.addIssue({ code: "custom", path: ["reason"], message: "Cần nhập lý do thay đổi." });
 });
 export const shiftAssignmentInputSchema = z.object({ ...scopeFields, shiftId: z.string().uuid(), effectiveFrom: z.string().date(), effectiveTo: z.string().date().optional(), weekdays: z.array(z.number().int().min(0).max(6)).min(1) }).refine(validScope, { message: "Phạm vi chưa hợp lệ." });
 export const calendarDayInputSchema = z.object({ ...scopeFields, id: z.string().uuid().optional(), date: z.string().date(), name: z.string().trim().min(2).max(120), dayType: z.enum(["holiday", "company_holiday", "makeup_workday", "special"]), isWorkingDay: z.boolean(), active: z.boolean() }).refine(validScope, { message: "Phạm vi chưa hợp lệ." });

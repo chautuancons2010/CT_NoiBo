@@ -10,7 +10,8 @@ import { requireAuthenticatedUser } from "@/services/authorization/requirePermis
 
 const querySchema = z.object({
   profile: z.enum(dashboardProfileKeys).optional(),
-  widget: z.enum(dashboardWidgetKeys).optional()
+  widget: z.enum(dashboardWidgetKeys).optional(),
+  scope: z.enum(["global"]).optional()
 });
 
 export async function GET(request: Request) {
@@ -18,10 +19,11 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const input = parseWithSchema(querySchema, {
       profile: url.searchParams.get("profile") || undefined,
-      widget: url.searchParams.get("widget") || undefined
+      widget: url.searchParams.get("widget") || undefined,
+      scope: url.searchParams.get("scope") || undefined
     });
     const user = requireAuthenticatedUser(await getRequestUser());
-    return successResponse(await getDashboardReadModel(user, input.profile, input.widget));
+    return successResponse(await getDashboardReadModel(user, input.profile, input.widget, input.scope));
   } catch (error) {
     return errorResponse(error);
   }

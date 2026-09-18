@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
+import { TableActionBar } from "@/components/shared/ActionBars";
 import { IconButton } from "@/components/shared/Button";
 import { cn } from "@/lib/utils/cn";
 
@@ -17,7 +18,7 @@ export function FilterBar({ children, actions, className, label = "Bộ lọc d�
   return (
     <section aria-label={label} className={cn("filter-bar", className)}>
       <div className="filter-bar__controls">{children}</div>
-      {actions ? <div className="filter-bar__actions">{actions}</div> : null}
+      {actions ? <TableActionBar className="filter-bar__actions">{actions}</TableActionBar> : null}
     </section>
   );
 }

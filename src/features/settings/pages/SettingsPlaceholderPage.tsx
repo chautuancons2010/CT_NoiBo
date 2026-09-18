@@ -14,7 +14,6 @@ type SettingsPath =
   | "/settings/organization"
   | "/settings/attendance"
   | "/settings/roles"
-  | "/settings/permissions"
   | "/settings/approval-workflows"
   | "/settings/export-templates"
   | "/settings/integrations"

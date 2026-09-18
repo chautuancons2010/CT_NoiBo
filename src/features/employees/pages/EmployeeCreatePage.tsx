@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/shared/PageHeader";
+import { FormPageLayout } from "@/components/shared/PageLayouts";
+import { BackLink } from "@/components/shared/BackLink";
 import { PermissionDeniedState } from "@/components/shared/States";
 import { can } from "@/lib/auth/permissions";
 import { EmployeeCreateForm } from "@/features/employees/components/EmployeeCreateForm";
@@ -20,7 +22,8 @@ export async function EmployeeCreatePage() {
   const filterOptions = getEmployeeFilterOptions(dataSet);
 
   return (
-    <div className="page-stack">
+    <FormPageLayout>
+      <BackLink href="/employees" />
       <PageHeader
         title="Tạo hồ sơ nhân viên"
       />
@@ -30,6 +33,6 @@ export async function EmployeeCreatePage() {
         managers={getEmployeePickerOptions(dataSet, { activeOnly: true })}
         positions={filterOptions.positions}
       />
-    </div>
+    </FormPageLayout>
   );
 }

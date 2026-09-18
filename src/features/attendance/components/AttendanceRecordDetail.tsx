@@ -1,28 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-
+import { BackLink } from "@/components/shared/BackLink";
+import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
+import { Input, Select } from "@/components/shared/FormControls";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import type { AttendanceEvent } from "@/features/attendance/types/attendanceTypes";
+import type { AttendanceEvent, AttendanceEventAdjustment } from "@/features/attendance/types/attendanceTypes";
 
-export function AttendanceRecordDetail({ id }: { id: string }) {
-  const [event, setEvent] = useState<AttendanceEvent>();
-  const [error, setError] = useState<string>();
-  useEffect(() => { void fetch(`/api/v1/attendance/records/${id}`, { cache: "no-store" }).then(async (response) => { const body = await response.json() as { data?: AttendanceEvent; error?: { message: string } }; if (!response.ok || !body.data) throw new Error(body.error?.message); setEvent(body.data); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Không thể tải dữ liệu.")); }, [id]);
-  if (!event && !error) return <LoadingState />;
-  if (!event) return <ErrorState description={error} />;
-  const rows = [
-    ["Nhân viên", `${event.employeeName ?? "—"} · ${event.employeeCode ?? "—"}`],
-    ["Loại", event.eventType === "check_in" ? "Chấm vào" : "Chấm ra"],
-    ["Thời gian hiệu lực", new Date(event.effectiveAt).toLocaleString("vi-VN")],
-    ["Server nhận", new Date(event.receivedAtServer).toLocaleString("vi-VN")],
-    ["Địa điểm", event.locationName ?? "—"],
-    ["Khoảng cách", event.distanceMeters === undefined ? "—" : `${Math.round(event.distanceMeters)} m`],
-    ["Độ chính xác GPS", event.accuracyMeters === undefined ? "—" : `${Math.round(event.accuracyMeters)} m`],
-    ["Đồng bộ", event.syncStatus === "synced" ? "Đã đồng bộ" : "Đang chờ"]
-  ];
-  return <div className="attendance-day-detail"><Link className="text-link" href="/attendance/records">← Danh sách</Link><Card><div className="attendance-detail-heading"><strong>{event.employeeName}</strong><StatusBadge tone={event.attendanceStatus === "recorded" ? "success" : "warning"}>{event.attendanceStatus === "recorded" ? "Đã ghi nhận" : "Cần kiểm tra"}</StatusBadge></div><dl className="attendance-record-meta">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{event.photoId ? <Link className="button button--secondary button--md" href={`/attendance/photos/${event.photoId}`}>Xem ảnh</Link> : <span>Ảnh chưa đồng bộ</span>}</Card></div>;
+function localInput(value:string){const date=new Date(value);return new Date(date.getTime()-date.getTimezoneOffset()*60_000).toISOString().slice(0,16);}
+
+export function AttendanceRecordDetail({ id, canAdjust = false, canViewHistory = false }: { id: string; canAdjust?: boolean; canViewHistory?: boolean }) {
+  const [event,setEvent]=useState<AttendanceEvent>(),[history,setHistory]=useState<AttendanceEventAdjustment[]>([]),[error,setError]=useState<string>();
+  const load=useCallback(async()=>{const[eventResponse,historyResponse]=await Promise.all([fetch(`/api/v1/attendance/records/${id}`,{cache:"no-store"}),canViewHistory?fetch(`/api/v1/attendance/records/${id}/adjustments`,{cache:"no-store"}):Promise.resolve(undefined)]);const body=await eventResponse.json()as{data?:AttendanceEvent;error?:{message:string}};if(!eventResponse.ok||!body.data)throw new Error(body.error?.message);setEvent(body.data);if(historyResponse){const historyBody=await historyResponse.json();if(historyResponse.ok)setHistory(historyBody.data??[]);}},[canViewHistory,id]);
+  useEffect(()=>{queueMicrotask(()=>void load().catch(reason=>setError(reason instanceof Error?reason.message:"Không thể tải dữ liệu.")));},[load]);
+  async function adjust(submitEvent:FormEvent<HTMLFormElement>){submitEvent.preventDefault();const form=new FormData(submitEvent.currentTarget),response=await fetch(`/api/v1/attendance/records/${id}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({effectiveAt:new Date(String(form.get("effectiveAt"))).toISOString(),attendanceStatus:form.get("attendanceStatus"),reason:form.get("reason")})}),body=await response.json();if(!response.ok){setError(body.error?.message);return;}setError(undefined);await load();}
+  if(!event&&!error)return <LoadingState/>;if(!event)return <ErrorState description={error}/>;
+  const rows=[["Nhân viên",`${event.employeeName??"—"} · ${event.employeeCode??"—"}`],["Loại",event.eventType==="check_in"?"Chấm vào":"Chấm ra"],["Thời gian hiệu lực",new Date(event.effectiveAt).toLocaleString("vi-VN")],["Server nhận",new Date(event.receivedAtServer).toLocaleString("vi-VN")],["Địa điểm",event.locationName??"—"],["Khoảng cách",event.distanceMeters===undefined?"—":`${Math.round(event.distanceMeters)} m`],["Độ chính xác GPS",event.accuracyMeters===undefined?"—":`${Math.round(event.accuracyMeters)} m`],["Đồng bộ",event.syncStatus==="synced"?"Đã đồng bộ":"Đang chờ"]];
+  return <div className="attendance-day-detail"><BackLink href="/attendance/logs"/><div className="content-grid content-grid--two"><Card><div className="attendance-detail-heading"><strong>{event.employeeName}</strong><StatusBadge tone={event.attendanceStatus==="recorded"?"success":"warning"}>{event.attendanceStatus==="recorded"?"Đã ghi nhận":"Cần kiểm tra"}</StatusBadge></div><dl className="attendance-record-meta">{rows.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{event.photoId?<Link className="button button--secondary button--md" href={`/attendance/photos/${event.photoId}`}>Xem ảnh</Link>:<span>Ảnh chưa đồng bộ</span>}</Card>{canAdjust?<Card><h3>Điều chỉnh lượt công</h3><form className="leave-form" onSubmit={adjust}><Input defaultValue={localInput(event.effectiveAt)} label="Thời gian hiệu lực" name="effectiveAt" required type="datetime-local"/><Select defaultValue={event.attendanceStatus} label="Trạng thái" name="attendanceStatus" options={[{value:"recorded",label:"Đã ghi nhận"},{value:"needs_review",label:"Cần kiểm tra"},{value:"rejected",label:"Từ chối"}]}/><Input label="Lý do" name="reason" required/><Button type="submit" variant="primary">Lưu điều chỉnh</Button></form></Card>:null}</div>{canViewHistory?<Card><h3>Lịch sử điều chỉnh</h3>{history.length?<ol className="project-history-list">{history.map(item=><li key={item.id}><time>{new Date(item.changedAt).toLocaleString("vi-VN")}</time><strong>{item.changedByName??"Hệ thống"}</strong><span>{item.reason}</span></li>)}</ol>:<p>Chưa có điều chỉnh.</p>}</Card>:null}{error?<p className="form-error">{error}</p>:null}</div>;
 }

@@ -21,7 +21,7 @@ function columnsFor(selectionBaseHref?: string): DataTableColumn<EmployeeSummary
     id: "employeeCode",
     header: "Mã NV",
     cell: (employee) => (
-      <Link className="table-link" href={selectionBaseHref ? selectedEmployeeHref(selectionBaseHref, employee.id) : `/employees/${employee.id}/profile`}>
+      <Link className="table-link" href={selectionBaseHref ? selectedEmployeeHref(selectionBaseHref, employee.id) : `/employees/${employee.id}/profile`} title={employee.employeeCode}>
         {employee.employeeCode}
       </Link>
     ),

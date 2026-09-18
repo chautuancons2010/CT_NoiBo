@@ -100,6 +100,7 @@ export interface EmployeeRecord {
   contractorName?: string;
   joinDate: string;
   probationStartDate?: string;
+  probationEndDate?: string;
   officialDate?: string;
   terminationDate?: string;
   terminationReason?: string;
@@ -146,11 +147,16 @@ export interface EmployeeContract {
   employeeId: string;
   contractNumber: string;
   contractType: string;
+  signedDate?: string;
+  effectiveDate?: string;
   startDate: string;
   endDate?: string;
   status: ContractStatus;
   attachmentFileId?: string;
+  fileVersions?: Array<{ fileId: string; fileName: string; uploadedAt: string }>;
   note?: string;
+  archivedAt?: string;
+  rowVersion?: number;
 }
 
 export interface EmployeeDocument {
@@ -184,6 +190,7 @@ export interface EmployeeAccountView {
   id: string;
   employeeId: string;
   displayName: string;
+  username?: string;
   loginEmail?: string;
   loginPhone?: string;
   employeeCodeIdentifier: string;
@@ -261,6 +268,8 @@ export interface EmployeePickerOption {
   id: string;
   employeeCode: string;
   displayName: string;
+  code?: string;
+  name?: string;
   departmentName: string;
   positionName: string;
   workerCategory: WorkerCategory;
@@ -281,6 +290,7 @@ export interface AppAccountRecord {
   id: string;
   employeeId?: string;
   displayName: string;
+  username?: string;
   loginEmail?: string;
   loginPhone?: string;
   employeeCodeIdentifier?: string;

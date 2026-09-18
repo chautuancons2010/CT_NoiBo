@@ -14,7 +14,8 @@ const viewPermissionByGroup: Record<SystemSettingsGroup, Permission> = {
   localization: "system_admin.access",
   navigation: "system_admin.access",
   dashboard: "system_admin.access",
-  modules: "system_admin.access"
+  modules: "system_admin.access",
+  payslip: "system_admin.access"
 };
 
 const managePermissionByGroup: Record<SystemSettingsGroup, Permission> = {
@@ -24,7 +25,8 @@ const managePermissionByGroup: Record<SystemSettingsGroup, Permission> = {
   localization: "localization.manage",
   navigation: "navigation.manage",
   dashboard: "navigation.manage",
-  modules: "module.manage"
+  modules: "module.manage",
+  payslip: "module.manage"
 };
 
 type GroupRouteContext = { params: Promise<{ group: string }> };

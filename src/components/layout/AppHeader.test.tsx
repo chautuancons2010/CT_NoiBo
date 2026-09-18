@@ -26,7 +26,14 @@ describe("AppHeader", () => {
   it("does not render the module or current route title", () => {
     render(<AppHeader connectionState="connected" pathname="/dashboard" user={user} />);
     expect(screen.queryByText("Tổng quan")).not.toBeInTheDocument();
-    expect(screen.getByText("Đồng bộ tức thời")).toBeInTheDocument();
+    expect(screen.queryByText("Đồng bộ tức thời")).not.toBeInTheDocument();
     expect(screen.getByText("Tìm kiếm")).toBeInTheDocument();
+  });
+
+  it("only shows realtime state when the connection needs attention", () => {
+    const { rerender } = render(<AppHeader connectionState="reconnecting" pathname="/dashboard" user={user} />);
+    expect(screen.getByText("Đang thử kết nối lại…")).toBeInTheDocument();
+    rerender(<AppHeader connectionState="offline" pathname="/dashboard" user={user} />);
+    expect(screen.getByText("Mất kết nối")).toBeInTheDocument();
   });
 });

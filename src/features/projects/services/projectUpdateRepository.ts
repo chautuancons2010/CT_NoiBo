@@ -303,19 +303,25 @@ export async function getProjectMonitoring(user: AuthenticatedUser): Promise<Pro
   if (!can(user.permissions, "project_monitoring.view") && !can(user.permissions, "project_monitoring.view_all")) throw new AppError("PERMISSION_DENIED");
   const client = db(); const scope = await scopedProjectIds(client, user); const projects = (await listProjects()).filter((project) => project.status !== "closed" && (!scope || scope.includes(project.id)));
   const projectIds = projects.map((project) => project.id);
-  if (!projectIds.length) return { active: 0, onTrack: 0, atRisk: 0, delayed: 0, paused: 0, projects: [], attention: [], recentUpdates: [] };
-  const [{ data: updateRows }, issues] = await Promise.all([
+  if (!projectIds.length) return { active: 0, averageCompletion: 0, onTrack: 0, atRisk: 0, delayed: 0, paused: 0, projects: [], attention: [], recentUpdates: [] };
+  const [{ data: updateRows }, issues, { data: progressRows, error: progressError }] = await Promise.all([
     client.from("project_updates").select("*").in("project_id", projectIds).eq("publish_status", "published").order("created_at", { ascending: false }).limit(100),
-    listProjectIssues(user, {})
+    listProjectIssues(user, {}),
+    client.from("project_progress_nodes").select("project_id,completion_percent").in("project_id", projectIds).is("parent_id", null)
   ]);
+  if (progressError) throw new AppError("SERVER_ERROR", "Không thể đọc tiến độ dự án.");
+  const progressByProject = new Map<string, number[]>();
+  for (const row of progressRows ?? []) progressByProject.set(String(row.project_id), [...(progressByProject.get(String(row.project_id)) ?? []), Number(row.completion_percent)]);
   const rows = (updateRows ?? []) as Row[]; const relations = await loadRelations(client, rows); const updates = rows.map((row) => mapUpdate(row, relations));
   const now = Date.now();
   const enriched = projects.map((project) => {
     const latestUpdate = updates.find((update) => update.projectId === project.id);
     const openHighIssues = issues.filter((issue) => issue.projectId === project.id && ["open", "in_progress"].includes(issue.status) && ["high", "critical"].includes(issue.severity)).length;
-    return { ...project, latestUpdate, openHighIssues, stale: isProjectStale(latestUpdate?.createdAt, 3, new Date(now)) };
+    const progress = progressByProject.get(project.id) ?? [];
+    return { ...project, completionPercent: progress.length ? Math.round(progress.reduce((sum, value) => sum + value, 0) / progress.length) : 0, latestUpdate, openHighIssues, stale: isProjectStale(latestUpdate?.createdAt, 3, new Date(now)) };
   });
   return {
+    averageCompletion: Math.round(enriched.reduce((sum, project) => sum + project.completionPercent, 0) / enriched.length),
     active: projects.filter((project) => project.status === "active").length, onTrack: projects.filter((project) => project.health === "on_track").length,
     atRisk: projects.filter((project) => project.health === "at_risk").length, delayed: projects.filter((project) => project.health === "delayed").length,
     paused: projects.filter((project) => project.health === "paused" || project.status === "paused").length, projects: enriched,

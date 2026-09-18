@@ -1,0 +1,1 @@
+import{PageHeader}from"@/components/shared/PageHeader";import{AccountingOverview}from"@/features/accounting/components/AccountingOverview";export default function Page(){return <div className="page-stack"><PageHeader title="Tổng quan kế toán"/><AccountingOverview/></div>;}

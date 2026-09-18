@@ -252,6 +252,7 @@ export function toEmployeeAccountView(account: AppAccountRecord): EmployeeAccoun
     id: account.id,
     employeeId: account.employeeId ?? "",
     displayName: account.displayName,
+    username: account.username,
     loginEmail: account.loginEmail,
     loginPhone: account.loginPhone,
     employeeCodeIdentifier: account.employeeCodeIdentifier ?? "",
@@ -325,8 +326,8 @@ function employeeMatchesQuery(
     employee.normalizedPhone,
     employee.personalEmail,
     employee.companyEmail,
-    buildEmployeeSummary(employee, dataSet).departmentName,
-    buildEmployeeSummary(employee, dataSet).positionName
+    findDepartment(employee.departmentId, dataSet)?.name,
+    findPosition(employee.positionId, dataSet)?.name
   ];
 
   if (textFields.some((value) => value && normalizeSearch(value).includes(normalizedQuery))) {
@@ -508,6 +509,8 @@ export function getEmployeePickerOptions(
       id: employee.id,
       employeeCode: employee.employeeCode,
       displayName: employee.displayName,
+      code: employee.employeeCode,
+      name: employee.displayName,
       departmentName: employee.departmentName,
       positionName: employee.positionName,
       workerCategory: employee.workerCategory,
@@ -572,10 +575,10 @@ function assertEmployeeReferences(input: CreateEmployeeInput | PatchEmployeeInpu
 }
 
 function getDuplicateWarnings(input: CreateEmployeeInput, dataSet: EmployeeDataSet): string[] {
-  const normalizedPhone = normalizePhone(input.personalPhone);
+  const normalizedPhone = input.personalPhone ? normalizePhone(input.personalPhone) : undefined;
   const warnings: string[] = [];
 
-  if (dataSet.employees.some((employee) => employee.normalizedPhone === normalizedPhone)) {
+  if (normalizedPhone && dataSet.employees.some((employee) => employee.normalizedPhone === normalizedPhone)) {
     warnings.push("Có thể đã tồn tại một hồ sơ dùng cùng số điện thoại.");
   }
 
@@ -634,7 +637,7 @@ export function createEmployeeRecord(
   actorAccountId: string,
   dataSet: EmployeeDataSet = defaultEmployeeDataSet
 ): CreateEmployeeResult {
-  if (!isValidPhone(input.personalPhone)) {
+  if (input.personalPhone && !isValidPhone(input.personalPhone)) {
     throw new AppError("VALIDATION_ERROR", "Số điện thoại chưa hợp lệ.");
   }
 
@@ -654,8 +657,8 @@ export function createEmployeeRecord(
     employeeCode: input.employeeCode,
     fullName: input.fullName,
     displayName: optionalTrim(input.displayName) ?? input.fullName,
-    personalPhone: input.personalPhone,
-    normalizedPhone: normalizePhone(input.personalPhone),
+    personalPhone: input.personalPhone ?? "",
+    normalizedPhone: input.personalPhone ? normalizePhone(input.personalPhone) : "",
     personalEmail: optionalTrim(input.personalEmail),
     companyEmail: optionalTrim(input.companyEmail),
     currentAddress: optionalTrim(input.currentAddress),
@@ -668,6 +671,7 @@ export function createEmployeeRecord(
     contractorName: optionalTrim(input.contractorName),
     joinDate: input.joinDate,
     probationStartDate: input.probationStartDate,
+    probationEndDate: input.probationEndDate,
     officialDate: input.officialDate,
     employmentStatus: input.employmentStatus,
     profileStatus: "pending_hr_completion",
@@ -843,6 +847,11 @@ export function updateEmployeeProfile(
   }
 
   const nextJoinDate = input.joinDate ?? employee.joinDate;
+  const nextProbationStartDate = input.probationStartDate ?? employee.probationStartDate;
+  const nextProbationEndDate = input.probationEndDate ?? employee.probationEndDate;
+  if (nextProbationStartDate && nextProbationEndDate && nextProbationEndDate < nextProbationStartDate) {
+    throw new AppError("VALIDATION_ERROR", "Ngày kết thúc thử việc không được trước ngày bắt đầu.");
+  }
   const nextOfficialDate = input.officialDate ?? employee.officialDate;
   if (nextOfficialDate && nextOfficialDate < nextJoinDate) {
     throw new AppError("VALIDATION_ERROR", "Ngày chính thức không được trước ngày vào làm.");
@@ -866,6 +875,7 @@ export function updateEmployeeProfile(
     contractorName: input.contractorName ?? employee.contractorName,
     joinDate: input.joinDate ?? employee.joinDate,
     probationStartDate: input.probationStartDate ?? employee.probationStartDate,
+    probationEndDate: input.probationEndDate ?? employee.probationEndDate,
     officialDate: input.officialDate ?? employee.officialDate,
     terminationDate: input.terminationDate ?? employee.terminationDate,
     terminationReason: input.terminationReason ?? employee.terminationReason,
@@ -1077,11 +1087,13 @@ export function provisionAccountForEmployee(
     id: globalThis.crypto.randomUUID(),
     employeeId: employee.id,
     displayName: employee.displayName ?? employee.fullName,
+    username: input.username,
     loginEmail,
     loginPhone,
     employeeCodeIdentifier: employee.employeeCode,
-    status: "pending_activation",
+    status: "active",
     roleIds: Array.from(new Set(input.roleIds)),
+    activatedAt: now,
     createdAt: now,
     updatedAt: now
   };

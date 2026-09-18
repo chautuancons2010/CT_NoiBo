@@ -1,6 +1,124 @@
 "use client";
-import Link from "next/link";import { useCallback,useEffect,useMemo,useState } from "react";import { Card } from "@/components/shared/Card";import { StatusBadge } from "@/components/shared/StatusBadge";import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";import type { DailyTimesheet,ReportTemplate,TimesheetPeriod,TimesheetSummary } from "../types/timesheetTypes";
-type Detail={period:TimesheetPeriod;summaries:TimesheetSummary[];daily:DailyTimesheet[]};
-const labels:Record<string,string>={open:"Mở",reviewing:"Đang rà soát",locked:"Đã khóa",reopened:"Đã mở lại",full_work:"Đủ công",late:"Đi trễ",early_leave:"Về sớm",missing_check_in:"Thiếu vào",missing_check_out:"Thiếu ra",annual_leave:"Phép năm",unpaid_leave:"Nghỉ không lương",absent:"Vắng",business_trip:"Công tác",holiday:"Ngày lễ",rest_day:"Ngày nghỉ",worker_site:"Công trường",needs_review:"Cần rà soát"};
-export function TimesheetPeriodDetail({periodId,employeeId}:{periodId:string;employeeId?:string}){const [detail,setDetail]=useState<Detail>();const [templates,setTemplates]=useState<ReportTemplate[]>([]);const [templateId,setTemplateId]=useState("");const [tab,setTab]=useState<"summary"|"daily">(employeeId?"daily":"summary");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const load=useCallback(async()=>{const response=await fetch(`/api/v1/timesheet-periods/${periodId}`);const body=await response.json();if(!response.ok)throw new Error(body.error?.message);setDetail(body.data);},[periodId]);useEffect(()=>{const timer=window.setTimeout(()=>{load().catch(value=>setError(value.message));fetch("/api/v1/report-templates").then(response=>response.json()).then(body=>{const items=(body.data??[]).filter((item:ReportTemplate)=>item.reportType==="timesheet");setTemplates(items);setTemplateId(items[0]?.id??"");}).catch(()=>{});},0);return()=>window.clearTimeout(timer);},[load]);useDomainReconciliation("timesheets",load);const daily=useMemo(()=>detail?.daily.filter(item=>!employeeId||item.employeeId===employeeId)??[],[detail,employeeId]);const summaries=useMemo(()=>detail?.summaries.filter(item=>!employeeId||item.employeeId===employeeId)??[],[detail,employeeId]);async function action(kind:"recompute"|"lock"|"unlock"){if(!detail)return;let payload:Record<string,unknown>={rowVersion:detail.period.rowVersion};if(kind==="unlock"){const reason=window.prompt("Lý do mở khóa");if(!reason)return;payload={...payload,reason};}setBusy(true);setError("");try{const response=await fetch(`/api/v1/timesheet-periods/${periodId}/${kind}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});const body=await response.json();if(!response.ok)throw new Error(body.error?.message);await load();}catch(value){setError(value instanceof Error?value.message:"Có lỗi xảy ra.");}finally{setBusy(false);}}async function exportExcel(){setBusy(true);try{const response=await fetch("/api/v1/report-exports",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({templateId,periodId})});const body=await response.json();if(!response.ok)throw new Error(body.error?.message);window.open(`/api/v1/report-exports/${body.data.id}/download`,"_self");}catch(value){setError(value instanceof Error?value.message:"Không thể xuất tệp.");}finally{setBusy(false);}}
-if(!detail)return <Card>{error||"Đang tải…"}</Card>;const p=detail.period;return <div className="page-stack"><div className="timesheet-period-bar"><div><strong>{p.name}</strong><span>{p.startDate} – {p.endDate}</span><StatusBadge tone={p.status==="locked"?"success":"warning"}>{labels[p.status]}</StatusBadge><span>v{p.version}</span></div><div>{p.status!=="locked"?<button disabled={busy} className="button button--secondary" onClick={()=>action("recompute")}>Tính lại</button>:null}{p.status!=="locked"?<button disabled={busy} className="button button--primary" onClick={()=>action("lock")}>Khóa kỳ</button>:<button disabled={busy} className="button button--secondary" onClick={()=>action("unlock")}>Mở khóa</button>}<select className="select" aria-label="Mẫu xuất" value={templateId} onChange={event=>setTemplateId(event.target.value)}>{templates.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select><button disabled={busy||!templateId} className="button button--secondary" onClick={exportExcel}>Xuất Excel</button></div></div>{error?<p className="form-error">{error}</p>:null}<div className="timesheet-tabs"><button className={tab==="summary"?"is-active":""} onClick={()=>setTab("summary")}>Tổng hợp ({summaries.length})</button><button className={tab==="daily"?"is-active":""} onClick={()=>setTab("daily")}>Chi tiết ({daily.length})</button><Link href={`/timesheets/exceptions?periodId=${periodId}`}>Ngoại lệ</Link></div><Card>{tab==="summary"?<div className="data-table-scroll"><table className="data-table"><thead><tr><th>Nhân viên</th><th>Ngày chuẩn</th><th>Ngày công</th><th>Phút làm</th><th>Trễ</th><th>Phép năm</th><th>Vắng</th><th>Ngoại lệ</th></tr></thead><tbody>{summaries.map(item=><tr key={item.id}><td><Link href={`/timesheets/periods/${periodId}/employees/${item.employeeId}`}><strong>{item.employeeName}</strong><br/><small>{item.employeeCode}</small></Link></td><td>{item.scheduledWorkdays}</td><td>{item.actualWorkdays}</td><td>{item.workedMinutes}</td><td>{item.lateDays} / {item.lateMinutes}&apos;</td><td>{item.annualLeaveDays}</td><td>{item.absentDays}</td><td>{item.exceptionCount}</td></tr>)}</tbody></table></div>:<div className="data-table-scroll"><table className="data-table"><thead><tr><th>Ngày</th>{!employeeId?<th>Nhân viên</th>:null}<th>Ca</th><th>Vào</th><th>Ra</th><th>Công</th><th>Trễ</th><th>Trạng thái</th><th></th></tr></thead><tbody>{daily.map(item=><tr key={item.id}><td>{item.workDate}</td>{!employeeId?<td>{item.employeeName}<br/><small>{item.employeeCode}</small></td>:null}<td>{item.shiftName||"—"}</td><td>{item.effectiveCheckIn?new Date(item.effectiveCheckIn).toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}):"—"}</td><td>{item.effectiveCheckOut?new Date(item.effectiveCheckOut).toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}):"—"}</td><td>{item.workFraction}</td><td>{item.lateMinutes}&apos;</td><td><StatusBadge tone={item.exceptionCount?"warning":"neutral"}>{labels[item.status]??item.status}</StatusBadge></td><td>{p.status!=="locked"?<Link href={`/timesheets/adjustments?periodId=${periodId}&employeeId=${item.employeeId}&date=${item.workDate}&rowVersion=${p.rowVersion}`}>Điều chỉnh</Link>:null}</td></tr>)}</tbody></table></div>}</Card></div>}
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { Card } from "@/components/shared/Card";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { DropdownMenu } from "@/components/shared/DropdownMenu";
+import { DataSurface, DetailPageLayout } from "@/components/shared/PageLayouts";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+import type { DailyTimesheet, ReportTemplate, TimesheetPeriod, TimesheetSummary } from "../types/timesheetTypes";
+
+type Detail = { period: TimesheetPeriod; summaries: TimesheetSummary[]; daily: DailyTimesheet[] };
+type Props = {
+  periodId: string; employeeId?: string; canAdjust?: boolean; canExport?: boolean;
+  canLock?: boolean; canRecompute?: boolean; canUnlock?: boolean; canViewExceptions?: boolean;
+};
+const labels: Record<string, string> = {
+  open: "Mở", reviewing: "Đang rà soát", locked: "Đã khóa", reopened: "Đã mở lại",
+  full_work: "Đủ công", late: "Đi trễ", early_leave: "Về sớm", missing_check_in: "Thiếu vào",
+  missing_check_out: "Thiếu ra", annual_leave: "Phép năm", unpaid_leave: "Nghỉ không lương",
+  absent: "Vắng", business_trip: "Công tác", holiday: "Ngày lễ", rest_day: "Ngày nghỉ",
+  worker_site: "Công trường", needs_review: "Cần rà soát"
+};
+const displayTime = (value?: string) => value ? new Date(value).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—";
+
+export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false, canExport = false, canLock = false, canRecompute = false, canUnlock = false, canViewExceptions = false }: Props) {
+  const [detail, setDetail] = useState<Detail>();
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [templateId, setTemplateId] = useState("");
+  const [tab, setTab] = useState<"summary" | "daily">(employeeId ? "daily" : "summary");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    const response = await fetch(`/api/v1/timesheet-periods/${periodId}`, { cache: "no-store" });
+    const body = await response.json() as { data?: Detail; error?: { message: string } };
+    if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể tải kỳ công.");
+    setDetail(body.data);
+    setError("");
+  }, [periodId]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Không thể tải kỳ công."));
+      if (canExport) void fetch("/api/v1/report-templates").then((response) => response.json()).then((body: { data?: ReportTemplate[] }) => {
+        const items = (body.data ?? []).filter((item) => item.reportType === "timesheet");
+        setTemplates(items);
+        setTemplateId(items[0]?.id ?? "");
+      }).catch(() => {});
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [canExport, load]);
+  useDomainReconciliation("timesheets", load);
+
+  const daily = useMemo(() => detail?.daily.filter((item) => !employeeId || item.employeeId === employeeId) ?? [], [detail, employeeId]);
+  const summaries = useMemo(() => detail?.summaries.filter((item) => !employeeId || item.employeeId === employeeId) ?? [], [detail, employeeId]);
+
+  async function action(kind: "recompute" | "lock" | "unlock") {
+    if (!detail) return;
+    let payload: Record<string, unknown> = { rowVersion: detail.period.rowVersion };
+    if (kind === "unlock") {
+      const reason = window.prompt("Lý do mở khóa");
+      if (!reason) return;
+      payload = { ...payload, reason };
+    }
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(`/api/v1/timesheet-periods/${periodId}/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const body = await response.json() as { error?: { message: string } };
+      if (!response.ok) throw new Error(body.error?.message ?? "Không thể cập nhật kỳ công.");
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể cập nhật kỳ công.");
+    } finally { setBusy(false); }
+  }
+
+  async function exportExcel() {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/v1/report-exports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateId, periodId }) });
+      const body = await response.json() as { data?: { id: string }; error?: { message: string } };
+      if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể xuất tệp.");
+      window.open(`/api/v1/report-exports/${body.data.id}/download`, "_self");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể xuất tệp.");
+    } finally { setBusy(false); }
+  }
+
+  if (!detail) return <Card>{error ? <p className="form-error" role="alert">{error}</p> : "Đang tải…"}</Card>;
+  const period = detail.period;
+  const summaryColumns: DataTableColumn<TimesheetSummary>[] = [
+    { id: "employee", header: "Nhân viên", cell: (item) => <><strong>{item.employeeName}</strong><br /><small>{item.employeeCode}</small></> },
+    { id: "scheduled", header: "Ngày chuẩn", cell: (item) => String(item.scheduledWorkdays) },
+    { id: "actual", header: "Ngày công", cell: (item) => String(item.actualWorkdays) },
+    { id: "minutes", header: "Phút làm", cell: (item) => String(item.workedMinutes), hiddenOnMobile: true },
+    { id: "late", header: "Trễ", cell: (item) => `${item.lateDays} / ${item.lateMinutes}'`, hiddenOnMobile: true },
+    { id: "leave", header: "Phép năm", cell: (item) => String(item.annualLeaveDays), hiddenOnMobile: true },
+    { id: "absent", header: "Vắng", cell: (item) => String(item.absentDays) },
+    { id: "exception", header: "Ngoại lệ", cell: (item) => String(item.exceptionCount) }
+  ];
+  const dailyColumns: DataTableColumn<DailyTimesheet>[] = [
+    { id: "date", header: "Ngày", accessor: "workDate" },
+    ...(!employeeId ? [{ id: "employee", header: "Nhân viên", cell: (item: DailyTimesheet) => <>{item.employeeName}<br /><small>{item.employeeCode}</small></> }] : []),
+    { id: "shift", header: "Ca", cell: (item) => item.shiftName || "—" },
+    { id: "in", header: "Vào", cell: (item) => displayTime(item.effectiveCheckIn) },
+    { id: "out", header: "Ra", cell: (item) => displayTime(item.effectiveCheckOut) },
+    { id: "fraction", header: "Công", cell: (item) => String(item.workFraction) },
+    { id: "late", header: "Trễ", cell: (item) => `${item.lateMinutes}'`, hiddenOnMobile: true },
+    { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge tone={item.exceptionCount ? "warning" : "neutral"}>{labels[item.status] ?? item.status}</StatusBadge> }
+  ];
+  return <DetailPageLayout>
+    <div className="timesheet-period-bar"><div><strong>{period.name}</strong><span>{period.startDate} – {period.endDate}</span><StatusBadge tone={period.status === "locked" ? "success" : "warning"}>{labels[period.status]}</StatusBadge><span>v{period.version}</span></div>
+      <div>
+        {period.status !== "locked" && canRecompute ? <button className="button button--secondary" disabled={busy} onClick={() => void action("recompute")} type="button">Tính lại</button> : null}
+        {period.status !== "locked" && canLock ? <button className="button button--primary" disabled={busy} onClick={() => void action("lock")} type="button">Chốt kỳ công</button> : null}
+        {period.status === "locked" && canUnlock ? <button className="button button--secondary" disabled={busy} onClick={() => void action("unlock")} type="button">Mở khóa</button> : null}
+        {canExport ? <><select aria-label="Mẫu xuất" className="select" onChange={(event) => setTemplateId(event.target.value)} value={templateId}>{templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="button button--secondary" disabled={busy || !templateId} onClick={() => void exportExcel()} type="button">Xuất Excel</button></> : null}
+      </div>
+    </div>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    <div className="timesheet-tabs"><button className={tab === "summary" ? "is-active" : ""} onClick={() => setTab("summary")} type="button">Tổng hợp ({summaries.length})</button><button className={tab === "daily" ? "is-active" : ""} onClick={() => setTab("daily")} type="button">Chi tiết ({daily.length})</button>{canViewExceptions ? <Link href={`/timesheets/exceptions?periodId=${periodId}`}>Ngoại lệ</Link> : null}</div>
+    <DataSurface>{tab === "summary" ? <DataTable columns={summaryColumns} data={summaries} emptyDescription="" emptyTitle="Chưa có tổng hợp" getRowId={(item) => item.employeeId} rowHrefPrefix={`/timesheets/periods/${periodId}/employees/`} /> : <DataTable actions={period.status !== "locked" && canAdjust ? (item) => <DropdownMenu label={`Thao tác công ${item.employeeName}`}><Link href={`/timesheets/adjustments?periodId=${periodId}&employeeId=${item.employeeId}&date=${item.workDate}&rowVersion=${period.rowVersion}`}>Điều chỉnh</Link></DropdownMenu> : undefined} columns={dailyColumns} data={daily} emptyDescription="" emptyTitle="Chưa có dữ liệu ngày công" getRowId={(item) => item.id} />}</DataSurface>
+  </DetailPageLayout>;
+}

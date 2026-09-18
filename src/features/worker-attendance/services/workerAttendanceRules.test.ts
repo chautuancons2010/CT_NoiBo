@@ -9,7 +9,7 @@ describe("worker attendance rules", () => {
     expect(countWorkerAttendance([entry("present"), entry("absent"), entry("present", true)])).toMatchObject({ total: 3, present: 2, absent: 1, unplanned: 1 });
   });
   it("blocks submit with unconfirmed workers or missing photos", () => {
-    const errors = validateSessionForSubmit({ entries: [entry("unconfirmed")], photoCount: 0, geofenceStatus: "valid" }, { minimumPhotos: 1, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 });
+    const errors = validateSessionForSubmit({ entries: [entry("unconfirmed")], photoCount: 0, geofenceStatus: "valid", checklist: [], checklistResponses: [] }, { minimumPhotos: 1, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 });
     expect(errors).toHaveLength(2);
   });
   it("detects overlapping effective assignments", () => {

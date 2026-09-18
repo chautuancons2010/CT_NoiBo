@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { PageActionBar } from "@/components/shared/ActionBars";
+
 export interface PageHeaderProps {
   title: string;
   description?: string;
@@ -12,7 +14,7 @@ export function PageHeader({ title, action }: PageHeaderProps) {
       <div className="page-header__copy">
         <h1>{title}</h1>
       </div>
-      {action ? <div>{action}</div> : null}
+      {action ? <PageActionBar>{action}</PageActionBar> : null}
     </div>
   );
 }

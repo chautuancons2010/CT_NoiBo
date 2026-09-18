@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Eye, Pencil } from "lucide-react";
 import { Card } from "@/components/shared/Card";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { DropdownMenu } from "@/components/shared/DropdownMenu";
+import { DataSurface, ReportPageTemplate } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { reportFieldRegistry } from "../services/reportFieldRegistry";
 import type { ReportExport, ReportSheetDefinition, ReportTemplate } from "../types/timesheetTypes";
@@ -50,6 +53,21 @@ export function ReportTemplateDesigner() {
 
   const sheet = editing?.definition.sheets[activeSheet];
   const orderedColumns = useMemo(() => [...(sheet?.columns ?? [])].sort((a, b) => a.order - b.order), [sheet]);
+  const templateColumns = useMemo<DataTableColumn<ReportTemplate>[]>(() => [
+    { id: "code", header: "Mã", accessor: "code" },
+    { id: "name", header: "Tên", accessor: "name" },
+    { id: "type", header: "Loại", cell: (item) => reportTypeLabel[item.reportType] },
+    { id: "version", header: "Phiên bản", cell: (item) => `v${item.version}` },
+    { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge tone={item.active ? "success" : "neutral"}>{item.active ? "Đang dùng" : "Tắt"}</StatusBadge> }
+  ], []);
+  const exportColumns = useMemo<DataTableColumn<ReportExport>[]>(() => [
+    { id: "file", header: "Tệp", cell: (item) => item.fileName || item.id },
+    { id: "type", header: "Loại", cell: (item) => reportTypeLabel[item.reportType] },
+    { id: "template", header: "Mẫu", cell: (item) => `v${item.templateVersion}` },
+    { id: "period", header: "Kỳ", cell: (item) => item.periodVersion == null ? "—" : `v${item.periodVersion}` },
+    { id: "time", header: "Thời gian", cell: (item) => new Date(item.requestedAt).toLocaleString("vi-VN"), hiddenOnMobile: true },
+    { id: "status", header: "Trạng thái", accessor: "status" }
+  ], []);
 
   function edit(item: ReportTemplate, duplicate = false) {
     const copy: EditableTemplate = structuredClone(item);
@@ -90,13 +108,9 @@ export function ReportTemplateDesigner() {
     await load();
   }
 
-  return <div className="page-stack">
+  return <ReportPageTemplate>
     {message ? <p className="save-feedback">{message}</p> : null}
-    <Card>
-      <div className="data-table-scroll"><table className="data-table"><thead><tr><th>Mã</th><th>Tên</th><th>Loại</th><th>Phiên bản</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-        {templates.map(item => <tr key={item.id}><td>{item.code}</td><td>{item.name}</td><td>{reportTypeLabel[item.reportType]}</td><td>v{item.version}</td><td><StatusBadge tone={item.active ? "success" : "neutral"}>{item.active ? "Đang dùng" : "Tắt"}</StatusBadge></td><td><div className="action-row"><button aria-label="Sửa mẫu" className="icon-button icon-button--secondary" onClick={() => edit(item)}><Pencil size={16}/></button><button aria-label="Nhân bản mẫu" className="icon-button icon-button--secondary" onClick={() => edit(item, true)}><Copy size={16}/></button></div></td></tr>)}
-      </tbody></table></div>
-    </Card>
+    <DataSurface><DataTable actions={(item) => <DropdownMenu label={`Thao tác mẫu ${item.name}`}><button onClick={() => edit(item)} type="button"><Pencil size={16}/>Sửa</button><button onClick={() => edit(item, true)} type="button"><Copy size={16}/>Nhân bản</button></DropdownMenu>} columns={templateColumns} data={templates} emptyDescription="" emptyTitle="Chưa có mẫu xuất" getRowId={(item) => item.id} /></DataSurface>
     {editing ? <Card><form className="leave-form" onSubmit={event => { event.preventDefault(); void save(); }}>
       <div className="form-grid"><label>Mã mẫu<input className="input" value={editing.code} onChange={event => setEditing({ ...editing, code: event.target.value.toUpperCase() })}/></label><label>Tên mẫu<input className="input" value={editing.name} onChange={event => setEditing({ ...editing, name: event.target.value })}/></label></div>
       <label className="choice-field"><input className="checkbox" type="checkbox" checked={editing.active} onChange={event => setEditing({ ...editing, active: event.target.checked })}/>Đang dùng</label>
@@ -106,6 +120,6 @@ export function ReportTemplateDesigner() {
       <div className="form-actions"><button className="button button--secondary" type="button" onClick={() => setPreview(value => !value)}><Eye size={16}/>Xem trước</button><button className="button button--secondary" type="button" onClick={() => setEditing(undefined)}>Hủy</button><button className="button button--primary">Lưu mẫu</button></div>
       {preview ? <div className="template-preview">{editing.definition.sheets.filter(item => item.enabled).map(item => <section key={item.key}><strong>{item.name}</strong><div>{[...(item.columns ?? [])].filter(column => column.enabled).sort((a, b) => a.order - b.order).map(column => <span key={column.key}>{column.label}</span>)}</div></section>)}</div> : null}
     </form></Card> : null}
-    <Card><h3 className="section-title">Lịch sử xuất</h3><div className="data-table-scroll"><table className="data-table"><thead><tr><th>Tệp</th><th>Loại</th><th>Mẫu</th><th>Kỳ</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr></thead><tbody>{exports.map(item => <tr key={item.id}><td>{item.fileName || item.id}</td><td>{reportTypeLabel[item.reportType]}</td><td>v{item.templateVersion}</td><td>{item.periodVersion == null ? "—" : `v${item.periodVersion}`}</td><td>{new Date(item.requestedAt).toLocaleString("vi-VN")}</td><td title={item.errorMessage}>{item.status}</td><td>{item.status === "completed" ? <a href={`/api/v1/report-exports/${item.id}/download`}>Tải xuống</a> : null}</td></tr>)}</tbody></table></div></Card>
-  </div>;
+    <DataSurface><header className="data-surface__toolbar"><h3 className="section-title">Lịch sử xuất</h3></header><DataTable actions={(item) => item.status === "completed" ? <DropdownMenu label={`Thao tác tệp ${item.fileName || item.id}`}><a href={`/api/v1/report-exports/${item.id}/download`}>Tải xuống</a></DropdownMenu> : null} columns={exportColumns} data={exports} emptyDescription="" emptyTitle="Chưa có tệp xuất" getRowId={(item) => item.id} /></DataSurface>
+  </ReportPageTemplate>;
 }

@@ -1,11 +1,13 @@
 import "server-only";
 
-import { getAttendanceDashboard } from "@/features/attendance/services/attendanceRepository";
+import { getAttendanceAdminToday, getAttendanceDashboard } from "@/features/attendance/services/attendanceRepository";
 import { normalizeAttention } from "@/features/dashboard/attention";
 import {
   canUseDashboardProfile,
   dashboardProfiles,
+  dashboardWidgetRegistry,
   enabledWidgetsFor,
+  matchesAnyPermission,
   resolveDashboardProfile,
   visibleQuickActions
 } from "@/features/dashboard/registry";
@@ -88,6 +90,29 @@ function localDate(): string {
   return `${map.year}-${map.month}-${map.day}`;
 }
 
+async function loadAttendanceOverview(user: AuthenticatedUser): Promise<DashboardWidgetData> {
+  const today = await getAttendanceAdminToday(user);
+  const client = getSupabaseServiceClient();
+  if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình.");
+  const cursor = new Date(`${localDate()}T12:00:00Z`);
+  const dates = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(cursor);
+    date.setUTCDate(date.getUTCDate() - 6 + index);
+    return date.toISOString().slice(0, 10);
+  });
+  const counts = await Promise.all(dates.map((date) => client.from("attendance_events")
+    .select("id", { count: "exact", head: true }).eq("attendance_date", date).eq("event_type", "check_in")));
+  if (counts.some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải biểu đồ chấm công.");
+  return {
+    metrics: [
+      { label: "Có mặt hôm nay", value: today.present, href: "/attendance/today", tone: "success" },
+      { label: "Thiếu lượt", value: today.missingCheck, href: "/attendance/today", tone: today.missingCheck ? "warning" : "success" }
+    ],
+    charts: [{ key: "attendance-seven-days", title: "Chấm công 7 ngày", kind: "line", series: dates.map((date, index) => ({ label: date.slice(5), value: counts[index].count ?? 0 })) }],
+    items: today.rows.filter((row) => row.status === "missing_check").slice(0, 5).map((row) => ({ id: row.employeeId, type: "attendance_missing", title: row.employeeName, context: "Thiếu lượt chấm ra", priority: "MEDIUM", href: `/attendance/logs?employeeId=${row.employeeId}` }))
+  };
+}
+
 async function loadSupervisorToday(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình.");
@@ -130,9 +155,16 @@ async function loadProjectAttention(user: AuthenticatedUser): Promise<DashboardW
     metrics: [
       { label: "Đang hoạt động", value: summary.active, href: "/project-monitoring" },
       { label: "Có rủi ro", value: summary.atRisk + summary.delayed, href: "/project-monitoring", tone: summary.atRisk + summary.delayed ? "warning" : "success" },
+      { label: "Hoàn thành trung bình", value: `${summary.averageCompletion}%`, href: "/project-monitoring" },
       { label: "Vấn đề mức cao", value: summary.attention.filter((item) => item.severity === "critical" || item.severity === "high").length, href: "/project-monitoring/issues", tone: "error" }
     ],
-    items: summary.attention.slice(0, 8).map((item) => ({ id: item.id, type: "project_issue", title: item.title, context: item.projectName, priority: item.severity === "critical" ? "CRITICAL" : item.severity === "high" ? "HIGH" : item.severity === "medium" ? "MEDIUM" : "LOW", dueOrAge: formatAge(item.createdAt), href: `/projects/${item.projectId}/updates/${item.sourceUpdateId}`, status: item.status }))
+    items: summary.attention.slice(0, 8).map((item) => ({ id: item.id, type: "project_issue", title: item.title, context: item.projectName, priority: item.severity === "critical" ? "CRITICAL" : item.severity === "high" ? "HIGH" : item.severity === "medium" ? "MEDIUM" : "LOW", dueOrAge: formatAge(item.createdAt), href: `/projects/${item.projectId}/updates/${item.sourceUpdateId}`, status: item.status })),
+    charts: [{ key: "project-health", title: "Tình trạng dự án", series: [
+      { label: "Đúng tiến độ", value: summary.onTrack, tone: "success" },
+      { label: "Có rủi ro", value: summary.atRisk, tone: "warning" },
+      { label: "Chậm", value: summary.delayed, tone: "error" },
+      { label: "Tạm dừng", value: summary.paused }
+    ] }]
   };
 }
 
@@ -184,14 +216,17 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
   if (!can(user.permissions, "employee.view")) throw new AppError("PERMISSION_DENIED");
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình.");
-  const [active, probation, incomplete, departmentRows, pendingHr] = await Promise.all([
+  const contractCutoff = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  const [total, active, probation, incomplete, departmentRows, pendingHr, expiringContracts] = await Promise.all([
+    client.from("employees").select("id", { count: "exact", head: true }).in("employment_status", ["active", "probation", "pending_onboarding"]),
     client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "active"),
     client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "probation"),
     client.from("employees").select("id", { count: "exact", head: true }).lt("profile_completeness", 100).in("employment_status", ["active", "probation", "pending_onboarding"]),
     client.from("employees").select("department_id,departments(name)").in("employment_status", ["active", "probation"]),
-    client.from("employees").select("id", { count: "exact", head: true }).eq("profile_status", "pending_hr_completion")
+    client.from("employees").select("id", { count: "exact", head: true }).eq("profile_status", "pending_hr_completion"),
+    can(user.permissions, "contract.view") ? client.from("employee_contracts").select("id", { count: "exact", head: true }).eq("status", "active").is("archived_at", null).gte("end_date", localDate()).lte("end_date", contractCutoff) : Promise.resolve({ count: 0, error: null })
   ]);
-  if ([active, probation, incomplete, pendingHr, departmentRows].some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
+  if ([total, active, probation, incomplete, pendingHr, departmentRows, expiringContracts].some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
   const byDepartment = new Map<string, number>();
   for (const row of departmentRows.data ?? []) {
     const relation = Array.isArray(row.departments) ? row.departments[0] : row.departments;
@@ -200,19 +235,27 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
   }
   return {
     metrics: [
+      { label: "Tổng nhân viên", value: total.count ?? 0, href: "/employees" },
       { label: "Đang làm việc", value: active.count ?? 0, href: "/employees?status=active" },
       { label: "Thử việc", value: probation.count ?? 0, href: "/employees?status=probation" },
       { label: "Hồ sơ chưa hoàn thiện", value: incomplete.count ?? 0, href: "/employees?profile=incomplete", tone: incomplete.count ? "warning" : "success" },
-      { label: "Chờ HR hoàn thiện", value: pendingHr.count ?? 0, href: "/employees?profile=pending_hr_completion", tone: pendingHr.count ? "warning" : "success" }
+      ...(can(user.permissions, "contract.view") ? [{ label: "Hợp đồng sắp hết hạn", value: expiringContracts.count ?? 0, href: "/employees/contracts", tone: expiringContracts.count ? "warning" as const : "success" as const }] : [])
     ],
-    charts: byDepartment.size ? [{
-      key: "hr-by-department",
-      title: "Nhân sự theo phòng ban",
-      series: [...byDepartment.entries()]
-        .map(([label, value]) => ({ label, value }))
-        .sort((first, second) => second.value - first.value)
-        .slice(0, 8)
-    }] : undefined
+    items: pendingHr.count ? [{ id: "pending-hr", type: "hr_task", title: `${pendingHr.count} hồ sơ chờ hoàn thiện`, href: "/employees?profile=pending_hr_completion", priority: "MEDIUM" }] : [],
+    charts: [
+      ...(byDepartment.size ? [{
+        key: "hr-by-department",
+        title: "Nhân sự theo phòng ban",
+        series: [...byDepartment.entries()]
+          .map(([label, value]) => ({ label, value }))
+          .sort((first, second) => second.value - first.value)
+          .slice(0, 8)
+      }] : []),
+      { key: "hr-employment", title: "Cơ cấu nhân sự", series: [
+        { label: "Đang làm", value: active.count ?? 0 },
+        { label: "Thử việc", value: probation.count ?? 0 }
+      ] }
+    ]
   };
 }
 
@@ -230,6 +273,7 @@ async function loadNotifications(user: AuthenticatedUser): Promise<DashboardWidg
 }
 
 const loaders: Record<DashboardWidgetKey, (user: AuthenticatedUser) => Promise<DashboardWidgetData>> = {
+  attendance_overview: loadAttendanceOverview,
   employee_today: loadEmployeeToday,
   supervisor_today: loadSupervisorToday,
   my_approvals: loadApprovals,
@@ -243,11 +287,13 @@ const loaders: Record<DashboardWidgetKey, (user: AuthenticatedUser) => Promise<D
   quick_actions: async (user) => ({ actions: visibleQuickActions(user) })
 };
 
-export async function getDashboardReadModel(user: AuthenticatedUser, requestedProfile?: DashboardProfileKey, requestedWidget?: DashboardWidgetKey): Promise<DashboardReadModel> {
+export async function getDashboardReadModel(user: AuthenticatedUser, requestedProfile?: DashboardProfileKey, requestedWidget?: DashboardWidgetKey, scope?: "global"): Promise<DashboardReadModel> {
   const settings = await readSettingsGroup("dashboard");
   const contextual = resolveDashboardProfile(user, settings);
   const profile = requestedProfile && canUseDashboardProfile(user, requestedProfile) ? requestedProfile : contextual;
-  const enabled = enabledWidgetsFor(user, profile, settings);
+  const enabled = scope === "global"
+    ? dashboardWidgetRegistry.filter((widget) => matchesAnyPermission(user.permissions, widget.requiredAny))
+    : enabledWidgetsFor(user, profile, settings);
   const definitions = requestedWidget ? enabled.filter((definition) => definition.key === requestedWidget) : enabled;
   const settled = await Promise.allSettled(definitions.map((definition) => loaders[definition.key](user)));
   const widgets: DashboardWidgetResult[] = settled.map((result, index) => ({
@@ -260,7 +306,7 @@ export async function getDashboardReadModel(user: AuthenticatedUser, requestedPr
   const attention = normalizeAttention(widgets.flatMap((widget) => widget.status === "ready" ? widget.data?.items?.filter((item) => item.priority && item.priority !== "INFO") ?? [] : []));
   return {
     profile,
-    profileLabel: dashboardProfiles.find((item) => item.key === profile)?.label ?? "Tổng quan",
+    profileLabel: scope === "global" ? "Toàn hệ thống" : dashboardProfiles.find((item) => item.key === profile)?.label ?? "Tổng quan",
     generatedAt: new Date().toISOString(),
     widgets,
     attention

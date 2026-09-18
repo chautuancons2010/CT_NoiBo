@@ -6,20 +6,26 @@ import {
   ArrowRight,
   BarChart3,
   Bell,
-  ChevronDown,
+  CalendarDays,
   ClipboardCheck,
   Clock3,
   FolderKanban,
   PackageSearch,
   Plus,
   RefreshCw,
+  Save,
+  StickyNote,
+  Trash2,
   Users,
   type LucideIcon
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { Button } from "@/components/shared/Button";
-import { DropdownMenu } from "@/components/shared/DropdownMenu";
+import { AnalyticsCard, ChartCard, MetricCard } from "@/components/shared/DashboardCards";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { DashboardPageTemplate, DataSurface } from "@/components/shared/PageLayouts";
+import { ModuleLauncher } from "@/components/shared/ModuleLauncher";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { OperationalSection } from "@/components/shared/Workbench";
 import { dataVisualizationPalette, semanticChartColors } from "@/config/dataVisualization";
@@ -34,6 +40,7 @@ import type {
   DashboardWidgetResult
 } from "@/features/dashboard/types";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 
 interface ApiBody {
   ok: boolean;
@@ -50,6 +57,12 @@ const queueKeys = new Set<DashboardWidgetKey>([
   "project_attention", "warehouse_low_stock", "shipment_attention"
 ]);
 const activityKeys = new Set<DashboardWidgetKey>(["recent_activity", "recent_notifications"]);
+
+const recentActivityColumns: DataTableColumn<DashboardItem>[] = [
+  { id: "title", header: "Bản ghi", cell: (item) => <Link className="table-link" href={item.href}>{item.title}</Link> },
+  { id: "context", header: "Ngữ cảnh", cell: (item) => item.context ?? "—" },
+  { id: "dueOrAge", header: "Cập nhật", cell: (item) => item.dueOrAge ?? "—" }
+];
 
 interface OverviewMetric extends DashboardMetric {
   id: string;
@@ -89,6 +102,19 @@ function collectOverviewMetrics(widgets: DashboardWidgetResult[]): OverviewMetri
   );
 }
 
+function pickMetrics(metrics: OverviewMetric[], context: string): OverviewMetric[] {
+  if (context === "hr") return metrics.filter((metric) => metric.id.startsWith("hr_summary-")).slice(0, 5);
+  if (context === "warehouse") return metrics.filter((metric) => metric.id.startsWith("warehouse_low_stock-")).slice(0, 4);
+  if (context === "import_export") return metrics.filter((metric) => metric.id.startsWith("shipment_attention-")).slice(0, 5);
+  if (context !== "global" && context !== "management") return metrics.slice(0, 5);
+  const preferred = [
+    ["hr_summary", "Tổng nhân viên"], ["attendance_overview", "Có mặt hôm nay"],
+    ["project_attention", "Có rủi ro"], ["warehouse_low_stock", "Sắp hết"],
+    ["shipment_attention", "Đang vận chuyển"], ["my_approvals", "Chờ duyệt"]
+  ];
+  return preferred.flatMap(([key, label]) => metrics.find((metric) => metric.id.startsWith(`${key}-`) && metric.label === label) ?? []).slice(0, 6);
+}
+
 function MetricStrip({ metrics }: { metrics: OverviewMetric[] }) {
   if (!metrics.length) return null;
 
@@ -98,13 +124,13 @@ function MetricStrip({ metrics }: { metrics: OverviewMetric[] }) {
         {metrics.slice(0, 6).map((metric) => {
           const { accent, Icon } = metricVisual(metric);
           return (
-            <div className={`dashboard-overview__metric dashboard-overview__metric--${accent}`} key={metric.id}>
+            <MetricCard accent={accent} key={metric.id}>
               <span className="dashboard-overview__icon"><Icon aria-hidden="true" size={17} /></span>
               <dt>{metric.label}</dt>
               <dd>{metric.value}</dd>
               <span className="dashboard-overview__note">{metric.group}</span>
               {metric.href ? <Link aria-label={`Mở ${metric.label}`} href={metric.href}><ArrowRight aria-hidden="true" size={15} /></Link> : null}
-            </div>
+            </MetricCard>
           );
         })}
       </dl>
@@ -149,13 +175,102 @@ function hasAnalyticsData(metrics: OverviewMetric[]): boolean {
   return [...counts.values()].some((count) => count >= 2);
 }
 
+function CircularAnalytics({ metrics }: { metrics: OverviewMetric[] }) {
+  const numericMetrics = metrics.flatMap((metric) => {
+    const numericValue = typeof metric.value === "number" ? metric.value : Number(metric.value);
+    return Number.isFinite(numericValue) && numericValue >= 0 ? [{ ...metric, numericValue }] : [];
+  }).slice(0, 4);
+
+  if (numericMetrics.length < 2) return null;
+
+  const total = numericMetrics.reduce((sum, metric) => sum + metric.numericValue, 0);
+  const segments = numericMetrics.map((metric, index) => {
+    const shareFor = (value: number) => total > 0 ? value / total * 100 : 100 / numericMetrics.length;
+    const start = numericMetrics.slice(0, index).reduce((sum, item) => sum + shareFor(item.numericValue), 0);
+    const end = start + shareFor(metric.numericValue);
+    return `${dataVisualizationPalette[index % dataVisualizationPalette.length]} ${start}% ${end}%`;
+  });
+  const style = { "--dashboard-donut": `conic-gradient(${segments.join(", ")})` } as CSSProperties;
+
+  return (
+    <AnalyticsCard className="dashboard-radial">
+      <header><BarChart3 aria-hidden="true" size={17} /><h2>Phân bổ chỉ số</h2></header>
+      <div className="dashboard-radial__content">
+        <div
+          aria-label={numericMetrics.map((metric) => `${metric.label}: ${metric.value}`).join(", ")}
+          className="dashboard-radial__chart"
+          role="img"
+          style={style}
+        >
+          <span><strong>{total.toLocaleString("vi-VN")}</strong><small>Tổng</small></span>
+        </div>
+        <ul>
+          {numericMetrics.map((metric, index) => (
+            <li key={metric.id}>
+              <i aria-hidden="true" style={{ background: dataVisualizationPalette[index % dataVisualizationPalette.length] }} />
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </AnalyticsCard>
+  );
+}
+
+function CircularDataChart({ chart }: { chart: DashboardChart }) {
+  const series = chart.series.filter((item) => Number.isFinite(item.value) && item.value >= 0).slice(0, 6);
+  if (series.length < 2) return null;
+  const total = series.reduce((sum, item) => sum + item.value, 0);
+  const segments = series.map((item, index) => {
+    const shareFor = (value: number) => total > 0 ? value / total * 100 : 100 / series.length;
+    const start = series.slice(0, index).reduce((sum, current) => sum + shareFor(current.value), 0);
+    return `${item.tone ? semanticChartColors[item.tone] : dataVisualizationPalette[index % dataVisualizationPalette.length]} ${start}% ${start + shareFor(item.value)}%`;
+  });
+  const style = { "--dashboard-donut": `conic-gradient(${segments.join(", ")})` } as CSSProperties;
+
+  return (
+    <AnalyticsCard className="dashboard-radial">
+      <header><BarChart3 aria-hidden="true" size={17} /><h2>{chart.title}</h2></header>
+      <div className="dashboard-radial__content">
+        <div aria-label={series.map((item) => `${item.label}: ${item.value}`).join(", ")} className="dashboard-radial__chart" role="img" style={style}>
+          <span><strong>{total.toLocaleString("vi-VN")}</strong><small>Tổng</small></span>
+        </div>
+        <ul>
+          {series.map((item, index) => (
+            <li key={item.label}>
+              <i aria-hidden="true" style={{ background: item.tone ? semanticChartColors[item.tone] : dataVisualizationPalette[index % dataVisualizationPalette.length] }} />
+              <span>{item.label}</span><strong>{item.value.toLocaleString("vi-VN")}</strong>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </AnalyticsCard>
+  );
+}
+
 function DataChart({ chart }: { chart: DashboardChart }) {
   const safeSeries = chart.series.filter((item) => Number.isFinite(item.value) && item.value >= 0);
   if (!safeSeries.length) return null;
   const maximum = Math.max(...safeSeries.map((item) => item.value), 1);
 
+  if (chart.kind === "line") {
+    const points = safeSeries.map((item, index) => ({
+      x: 30 + index * (440 / Math.max(1, safeSeries.length - 1)),
+      y: 112 - item.value / maximum * 82,
+      item
+    }));
+    return <ChartCard className="dashboard-data-chart--line">
+      <header><BarChart3 aria-hidden="true" size={17} /><h2>{chart.title}</h2></header>
+      <div className="dashboard-line-chart" role="img" aria-label={`${chart.title}: ${safeSeries.map((item) => `${item.label} ${item.value}`).join(", ")}`}>
+        <svg aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 500 140"><path className="dashboard-line-chart__baseline" d="M30 112H470" /><polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} />{points.map((point) => <circle cx={point.x} cy={point.y} key={point.item.label} r="4"><title>{point.item.label}: {point.item.value}</title></circle>)}</svg>
+        <div>{safeSeries.map((item) => <span key={item.label}>{item.label}</span>)}</div>
+      </div>
+    </ChartCard>;
+  }
+
   return (
-    <section className="dashboard-data-chart">
+    <ChartCard>
       <header><BarChart3 aria-hidden="true" size={17} /><h2>{chart.title}</h2></header>
       <div aria-label={chart.title} className="dashboard-data-chart__plot" role="img">
         {safeSeries.map((item, index) => {
@@ -169,7 +284,7 @@ function DataChart({ chart }: { chart: DashboardChart }) {
           );
         })}
       </div>
-    </section>
+    </ChartCard>
   );
 }
 
@@ -200,7 +315,7 @@ function WorkItems({ items, variant = "default" }: { items: DashboardItem[]; var
   );
 }
 
-function BriefingSection({ widget, onRetry, excludedItems, variant = "default" }: { widget: DashboardWidgetResult; onRetry: (key: DashboardWidgetKey) => void; excludedItems: ReadonlySet<string>; variant?: "default" | "timeline" }) {
+function BriefingSection({ widget, onRetry, excludedItems, variant = "default", showMetrics = true }: { widget: DashboardWidgetResult; onRetry: (key: DashboardWidgetKey) => void; excludedItems: ReadonlySet<string>; variant?: "default" | "timeline"; showMetrics?: boolean }) {
   if (widget.status === "error") {
     return <OperationalSection className="operational-section--error dashboard-widget--compact" title={widget.label}><div className="widget-error" role="status"><AlertTriangle aria-hidden="true" size={17} /><span>Không thể tải dữ liệu</span><Button onClick={() => onRetry(widget.key)} size="sm">Thử lại</Button></div></OperationalSection>;
   }
@@ -210,7 +325,7 @@ function BriefingSection({ widget, onRetry, excludedItems, variant = "default" }
 
   const data = widget.data;
   const items = (data.items ?? []).filter((item) => !excludedItems.has(`${item.type}:${item.id}`));
-  const metrics = (data.metrics ?? []).filter((metric) => metric.value !== 0 && metric.value !== "0");
+  const metrics = showMetrics ? (data.metrics ?? []).filter((metric) => metric.value !== 0 && metric.value !== "0") : [];
   const primaryAction = typeof data.state?.primaryAction === "string" ? data.state.primaryAction : undefined;
   const primaryHref = typeof data.state?.primaryHref === "string" ? data.state.primaryHref : undefined;
 
@@ -225,10 +340,138 @@ function BriefingSection({ widget, onRetry, excludedItems, variant = "default" }
   );
 }
 
-export function DashboardView({ profile }: { profile?: DashboardProfileKey }) {
+function ScheduleWidget({ items }: { items: DashboardItem[] }) {
+  return (
+    <OperationalSection className="dashboard-schedule" title="Lịch & deadline">
+      {items.length ? <WorkItems items={items.slice(0, 5)} variant="timeline" /> : <p className="dashboard-stable">Hôm nay chưa có lịch hoặc deadline cần xử lý.</p>}
+    </OperationalSection>
+  );
+}
+
+type PersonalTodo = { id: string; title: string; dueDate?: string; priority: "low" | "medium" | "high"; completed: boolean };
+
+function PersonalNoteWidget() {
+  const [note, setNote] = useState("");
+  const [saved, setSaved] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch("/api/v1/workspace/note", { cache: "no-store", signal: controller.signal })
+        .then(async (response) => {
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error?.message);
+          setNote(body.data.content ?? "");
+        })
+        .catch((reason) => { if (!(reason instanceof DOMException && reason.name === "AbortError")) setError(reason instanceof Error ? reason.message : "Không thể tải ghi chú."); });
+    }, 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, []);
+
+  async function saveNote() {
+    setSaving(true); setError("");
+    try {
+      const response = await fetch("/api/v1/workspace/note", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: note }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error?.message);
+      setSaved(true);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể lưu ghi chú."); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <section className="dashboard-note">
+      <header><span><StickyNote aria-hidden="true" size={17} /><h2>Ghi chú nhanh</h2></span><Button disabled={saved || saving} leftIcon={<Save aria-hidden="true" size={15} />} onClick={() => void saveNote()} size="sm" variant="ghost">Lưu</Button></header>
+      <textarea aria-label="Ghi chú cá nhân" onChange={(event) => { setNote(event.target.value); setSaved(false); }} placeholder="Ghi lại việc cần nhớ…" value={note} />
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+    </section>
+  );
+}
+
+function PersonalTodoWidget() {
+  const [todos, setTodos] = useState<PersonalTodo[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const loadTodos = useCallback(async (signal?: AbortSignal) => {
+    const response = await fetch("/api/v1/workspace/todos", { cache: "no-store", signal });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error?.message);
+    setTodos(body.data ?? []);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void loadTodos(controller.signal).catch((reason) => {
+      if (!(reason instanceof DOMException && reason.name === "AbortError")) setError(reason instanceof Error ? reason.message : "Không thể tải việc cá nhân.");
+    }), 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [loadTodos]);
+
+  async function createTodo(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget, form = new FormData(formElement);
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/v1/workspace/todos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: form.get("title"), dueDate: form.get("dueDate") || undefined, priority: form.get("priority") }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error?.message);
+      setTodos((current) => [body.data, ...current]);
+      formElement.reset();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể tạo việc cá nhân."); }
+    finally { setBusy(false); }
+  }
+
+  async function patchTodo(todo: PersonalTodo, patch: Partial<Pick<PersonalTodo, "completed" | "title" | "dueDate" | "priority">>) {
+    const response = await fetch(`/api/v1/workspace/todos/${todo.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+    const body = await response.json();
+    if (!response.ok) { setError(body.error?.message ?? "Không thể cập nhật việc cá nhân."); return; }
+    setTodos((current) => current.map((item) => item.id === todo.id ? body.data : item));
+  }
+
+  async function removeTodo(todo: PersonalTodo) {
+    const response = await fetch(`/api/v1/workspace/todos/${todo.id}`, { method: "DELETE" });
+    const body = await response.json();
+    if (!response.ok) { setError(body.error?.message ?? "Không thể xóa việc cá nhân."); return; }
+    setTodos((current) => current.filter((item) => item.id !== todo.id));
+  }
+
+  return (
+    <OperationalSection className="dashboard-personal-todos" title="Việc cá nhân">
+      <form className="dashboard-personal-todos__form" onSubmit={createTodo}>
+        <input aria-label="Tên việc" className="input" maxLength={240} name="title" placeholder="Thêm việc" required />
+        <input aria-label="Hạn hoàn thành" className="input" name="dueDate" type="date" />
+        <select aria-label="Mức ưu tiên" className="select" defaultValue="medium" name="priority"><option value="low">Thấp</option><option value="medium">Vừa</option><option value="high">Cao</option></select>
+        <Button aria-label="Thêm việc" disabled={busy} size="sm" type="submit" variant="soft"><Plus size={15} /></Button>
+      </form>
+      <ul className="dashboard-personal-todos__list">
+        {todos.slice(0, 8).map((todo) => <li className={todo.completed ? "is-complete" : ""} key={todo.id}><input aria-label={todo.completed ? "Mở lại việc" : "Hoàn thành việc"} checked={todo.completed} onChange={() => void patchTodo(todo, { completed: !todo.completed })} type="checkbox" /><span><strong>{todo.title}</strong><small>{todo.dueDate ?? "Không có hạn"} · {todo.priority === "high" ? "Cao" : todo.priority === "low" ? "Thấp" : "Vừa"}</small></span><button aria-label="Xóa việc" onClick={() => void removeTodo(todo)} type="button"><Trash2 size={15} /></button></li>)}
+        {!todos.length ? <li className="dashboard-personal-todos__empty">Chưa có việc cá nhân.</li> : null}
+      </ul>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+    </OperationalSection>
+  );
+}
+
+function RealtimeClock() {
+  const [now, setNow] = useState<Date>();
+  useEffect(() => {
+    const update = () => setNow(new Date());
+    const initial = window.setTimeout(update, 0);
+    const interval = window.setInterval(update, 1_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, []);
+  return <time dateTime={now?.toISOString()}>{now ? new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" }).format(now) : "--:--:--"}</time>;
+}
+
+export function DashboardView({ profile, scope }: { profile?: DashboardProfileKey; scope?: "global" }) {
+  const currentUser = useCurrentUser();
   const [model, setModel] = useState<DashboardReadModel>();
   const [error, setError] = useState("");
-  const endpoint = useMemo(() => `/api/v1/dashboard${profile ? `?profile=${profile}` : ""}`, [profile]);
+  const [widgetPreferences, setWidgetPreferences] = useState<{ visibility: Record<string, boolean>; order: string[] }>({ visibility: {}, order: [] });
+  const endpoint = useMemo(() => `/api/v1/dashboard${scope === "global" ? "?scope=global" : profile ? `?profile=${profile}` : ""}`, [profile, scope]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const response = await fetch(endpoint, { cache: "no-store", signal });
@@ -246,6 +489,15 @@ export function DashboardView({ profile }: { profile?: DashboardProfileKey }) {
     }); }, 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [load]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/v1/workspace/preferences", { cache: "no-store", signal: controller.signal }).then(async (response) => {
+      if (!response.ok) return;
+      const body = await response.json();
+      setWidgetPreferences({ visibility: body.data?.dashboardWidgetVisibility ?? {}, order: body.data?.dashboardWidgetOrder ?? [] });
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, []);
 
   async function retryWidget(key: DashboardWidgetKey) {
     const separator = endpoint.includes("?") ? "&" : "?";
@@ -266,27 +518,43 @@ export function DashboardView({ profile }: { profile?: DashboardProfileKey }) {
   if (!model) return null;
 
   const attentionIds = new Set(model.attention.map((item) => `${item.type}:${item.id}`));
-  const visibleWidgets = model.widgets.filter((widget) => widget.key !== "quick_actions");
+  const visibleWidgets = model.widgets.filter((widget) => widget.key !== "quick_actions" && widgetPreferences.visibility[widget.key] !== false).sort((first, second) => {
+    const firstIndex = widgetPreferences.order.indexOf(first.key), secondIndex = widgetPreferences.order.indexOf(second.key);
+    if (firstIndex >= 0 && secondIndex >= 0) return firstIndex - secondIndex;
+    if (firstIndex >= 0) return -1;
+    if (secondIndex >= 0) return 1;
+    return 0;
+  });
   const quickActions = model.widgets.find((widget) => widget.key === "quick_actions")?.data?.actions ?? [];
   const overviewMetrics = collectOverviewMetrics(visibleWidgets);
-  const charts = visibleWidgets.flatMap((widget) => widget.data?.charts ?? []);
-  const hasVisualizations = charts.length > 0 || hasAnalyticsData(overviewMetrics);
+  const context = scope === "global" ? "global" : profile ?? model.profile;
+  const displayedMetrics = pickMetrics(overviewMetrics, context);
+  const allCharts = visibleWidgets.flatMap((widget) => widget.data?.charts ?? []);
+  const trendChart = allCharts.find((chart) => chart.kind === "line") ?? allCharts[0];
+  const donutChart = allCharts.find((chart) => chart.key !== trendChart?.key && chart.series.length > 1);
+  const hasVisualizations = Boolean(trendChart || donutChart) || hasAnalyticsData(displayedMetrics);
   const featuredActions = quickActions.slice(0, 4);
-  const additionalActions = quickActions.slice(4);
   const queueWidgets = visibleWidgets.filter((widget) => queueKeys.has(widget.key));
   const activityWidgets = visibleWidgets.filter((widget) => activityKeys.has(widget.key));
-  const summaryWidgets = visibleWidgets.filter((widget) => !queueKeys.has(widget.key) && !activityKeys.has(widget.key));
-  const zeroQueueWidgets = queueWidgets.filter((widget) => widget.status === "ready" && widget.data?.items?.length === 0 && (widget.data.metrics ?? []).every((metric) => metric.value === 0 || metric.value === "0"));
+  const recentItems = (activityWidgets.find((widget) => widget.key === "recent_activity")?.data?.items ?? []).filter((item) => !attentionIds.has(`${item.type}:${item.id}`));
+  const notificationWidget = activityWidgets.find((widget) => widget.key === "recent_notifications");
+  const operationalKeys = new Set<DashboardWidgetKey>(["warehouse_low_stock", "project_attention", "hr_summary", "attendance_overview", "shipment_attention"]);
+  const operationalWidgets = visibleWidgets.filter((widget) => operationalKeys.has(widget.key));
+  const taskWidgets = queueWidgets.filter((widget) => !operationalKeys.has(widget.key));
+  const scheduleItems = visibleWidgets.flatMap((widget) => widget.data?.items ?? []).filter((item) => item.dueOrAge).slice(0, 5);
+  const pendingCount = model.attention.length;
+  const formattedDate = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "full" }).format(new Date(model.generatedAt));
 
   return (
-    <div className="dashboard-page">
+    <DashboardPageTemplate className={model.profile === "supervisor" ? "dashboard-page--supervisor" : undefined}>
       <header className="dashboard-heading">
         <div>
-          <h1>Bản tin vận hành</h1>
-          <span className="dashboard-eyebrow">{new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "full" }).format(new Date(model.generatedAt))} · {model.profileLabel}</span>
+          <h1>Chào, {currentUser.displayName} <span aria-hidden="true">👋</span></h1>
+          <span className="dashboard-eyebrow">Hôm nay bạn có {pendingCount} việc cần xử lý.</span>
         </div>
-        <Link className="dashboard-search-link" href="/search">Tìm trong hệ thống</Link>
+        <div className="dashboard-date-card"><CalendarDays aria-hidden="true" size={18} /><span><strong>{formattedDate}</strong><small><RealtimeClock /> · {model.profileLabel}</small></span></div>
       </header>
+      <ModuleLauncher />
       {quickActions.length ? (
         <nav aria-label="Tác vụ thường dùng" className="dashboard-command-bar">
           <strong>Tác vụ nhanh</strong>
@@ -295,37 +563,41 @@ export function DashboardView({ profile }: { profile?: DashboardProfileKey }) {
               const ActionIcon = quickActionIcon(action.label);
               return <Link className={`button dashboard-quick-action ${index === 0 ? "button--primary" : "button--secondary"}`} href={action.href} key={action.key}><ActionIcon aria-hidden="true" size={15} />{action.label}</Link>;
             })}
-            {additionalActions.length ? <DropdownMenu label="Mở thêm tác vụ" trigger={<span className="dashboard-more-actions">Thêm tác vụ <ChevronDown aria-hidden="true" size={14} /></span>}>{additionalActions.map((action) => <Link href={action.href} key={action.key}>{action.label}</Link>)}</DropdownMenu> : null}
           </div>
         </nav>
       ) : null}
-      <MetricStrip metrics={overviewMetrics} />
-      <div className={`dashboard-primary-grid${hasVisualizations ? "" : " has-no-visualization"}`}>
-        {hasVisualizations ? <section aria-label="Tổng quan trực quan" className="dashboard-visuals">
-          <div className="dashboard-column-heading"><h2>Tổng quan trực quan</h2></div>
+      <MetricStrip metrics={displayedMetrics} />
+      <section aria-label="Không gian cá nhân" className="dashboard-personal-grid">
+        <ScheduleWidget items={scheduleItems} />
+        <OperationalSection className="dashboard-attention" meta={model.attention.length ? <StatusBadge tone="warning">{model.attention.length} mục</StatusBadge> : <StatusBadge tone="success">Ổn định</StatusBadge>} title="Việc cần làm">
+          {model.attention.length ? <WorkItems items={model.attention.slice(0, 6)} /> : <p className="dashboard-stable">Không có ngoại lệ cần xử lý.</p>}
+        </OperationalSection>
+        <PersonalTodoWidget />
+        <PersonalNoteWidget />
+        {notificationWidget ? <BriefingSection excludedItems={new Set()} onRetry={(key) => void retryWidget(key)} variant="timeline" widget={notificationWidget} /> : null}
+      </section>
+      {hasVisualizations ? <section aria-label="Phân tích vận hành" className="dashboard-visuals">
+          <div className="dashboard-section-heading"><h2>Phân tích vận hành</h2></div>
           <div className="dashboard-chart-grid">
-            <AnalyticsPanel metrics={overviewMetrics} />
-            {charts.slice(0, 2).map((chart) => <DataChart chart={chart} key={chart.key} />)}
+            {trendChart ? <DataChart chart={trendChart} /> : <AnalyticsPanel metrics={displayedMetrics} />}
+            {donutChart ? <CircularDataChart chart={donutChart} /> : hasAnalyticsData(displayedMetrics) ? <CircularAnalytics metrics={displayedMetrics} /> : null}
           </div>
         </section> : null}
-        <OperationalSection className="dashboard-attention" meta={model.attention.length ? <StatusBadge tone="warning">{model.attention.length} mục</StatusBadge> : <StatusBadge tone="success">Ổn định</StatusBadge>} title="Cần xử lý">
-          {model.attention.length ? <WorkItems items={model.attention} /> : <p className="dashboard-stable">Không có ngoại lệ cần xử lý.</p>}
-        </OperationalSection>
+      {operationalWidgets.length ? <section className="dashboard-operations" aria-labelledby="dashboard-operations-title">
+        <div className="dashboard-section-heading"><h2 id="dashboard-operations-title">Tình hình theo phân hệ</h2></div>
+        <div className="dashboard-operations-grid">
+          {operationalWidgets.map((widget) => <BriefingSection excludedItems={attentionIds} key={widget.key} onRetry={(key) => void retryWidget(key)} widget={widget} />)}
+        </div>
+      </section> : null}
+      <div className="dashboard-bottom-grid dashboard-bottom-grid--single">
+        <div className="dashboard-bottom-grid__main">
+          {recentItems.length ? <DataSurface className="dashboard-recent-table">
+            <header className="dashboard-recent-table__header"><h2>Dữ liệu gần đây</h2><Link href="/search">Xem tất cả <ArrowRight aria-hidden="true" size={15} /></Link></header>
+            <DataTable ariaLabel="Dữ liệu gần đây" columns={recentActivityColumns} data={recentItems} getRowId={(item) => `${item.type}-${item.id}`} />
+          </DataSurface> : null}
+          {taskWidgets.map((widget) => <BriefingSection excludedItems={attentionIds} key={widget.key} onRetry={(key) => void retryWidget(key)} widget={widget} />)}
+        </div>
       </div>
-      <div className="dashboard-secondary-grid">
-        <section aria-label="Công việc của tôi" className="dashboard-queue">
-          <div className="dashboard-column-heading"><h2>Công việc của tôi</h2></div>
-          {zeroQueueWidgets.length ? <dl className="dashboard-zero-summary">{zeroQueueWidgets.map((widget) => <div key={widget.key}><dt>{widget.label}</dt><dd>0</dd></div>)}</dl> : null}
-          {queueWidgets.map((widget) => <BriefingSection excludedItems={attentionIds} key={widget.key} onRetry={(key) => void retryWidget(key)} widget={widget} />)}
-          {!queueWidgets.length ? <p className="dashboard-empty-inline">Không có hàng đợi phù hợp với quyền hiện tại.</p> : null}
-        </section>
-        <aside className="dashboard-activity" aria-label="Hoạt động và tổng hợp">
-          <div className="dashboard-column-heading"><h2>Hoạt động gần đây</h2></div>
-          {activityWidgets.map((widget) => <BriefingSection excludedItems={attentionIds} key={widget.key} onRetry={(key) => void retryWidget(key)} variant="timeline" widget={widget} />)}
-          {summaryWidgets.map((widget) => <BriefingSection excludedItems={attentionIds} key={widget.key} onRetry={(key) => void retryWidget(key)} widget={widget} />)}
-          {!activityWidgets.length && !summaryWidgets.length ? <p className="dashboard-empty-inline">Chưa có dữ liệu tổng hợp phù hợp.</p> : null}
-        </aside>
-      </div>
-    </div>
+    </DashboardPageTemplate>
   );
 }

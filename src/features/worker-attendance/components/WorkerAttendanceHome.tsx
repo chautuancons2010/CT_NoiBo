@@ -38,7 +38,7 @@ function makeLocalSession(task: WorkerAttendanceTask, clientSessionId: string): 
     worksiteId: task.worksiteId, worksiteName: task.worksiteName, date: task.date, shiftCode: task.shiftCode,
     shiftName: task.shiftName, sessionType: "morning", supervisorEmployeeId: "local", supervisorName: "",
     startedAt: now, capturedAtClient: now, geofenceStatus: "unavailable", status: "in_progress", syncStatus: "local_pending",
-    photoStatus: "pending_upload", version: 1, photos: [], adjustments: [],
+    photoStatus: "pending_upload", version: 1, photos: [], adjustments: [], checklist: task.checklist, checklistResponses: [],
     entries: task.roster.map((worker) => ({ id: `local-${worker.workerId}`, sessionId: `local-${clientSessionId}`, workerId: worker.workerId, employeeCode: worker.employeeCode, workerName: worker.workerName, assignmentRole: worker.assignmentRole, status: worker.approvedLeave ? "leave" : "unconfirmed", exceptionReason: worker.approvedLeave ? "approved_leave" : undefined, note: worker.approvedLeave ? `${worker.approvedLeave.leaveTypeName} · ${worker.approvedLeave.requestNumber}` : undefined, dayException: "none", isUnplanned: false }))
   };
 }

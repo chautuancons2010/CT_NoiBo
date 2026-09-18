@@ -148,7 +148,7 @@ export function InventoryItemEditor({ id }: { id?: string }) {
             )}
             <input
               accept="image/jpeg,image/png,image/webp"
-              className="visually-hidden"
+              className="sr-only"
               onChange={chooseImage}
               ref={fileInput}
               type="file"

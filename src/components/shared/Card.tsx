@@ -5,10 +5,13 @@ import { cn } from "@/lib/utils/cn";
 export interface CardProps {
   children: ReactNode;
   className?: string;
+  variant?: "neutral" | "blue" | "mint" | "lavender" | "orange" | "yellow" | "cyan" | "rose";
+  padding?: "none" | "sm" | "md" | "lg";
+  interactive?: boolean;
 }
 
-export function Card({ children, className }: CardProps) {
-  return <section className={cn("card", className)}>{children}</section>;
+export function Card({ children, className, variant = "neutral", padding = "md", interactive = false }: CardProps) {
+  return <section className={cn("card", `card--${variant}`, `card--padding-${padding}`, interactive && "card--interactive", className)}>{children}</section>;
 }
 
 export interface StatCardProps {

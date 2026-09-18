@@ -5,8 +5,10 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { DropdownMenu } from "@/components/shared/DropdownMenu";
 import { Input, Textarea } from "@/components/shared/FormControls";
 import { Modal } from "@/components/shared/Overlays";
+import { DataSurface, ListPageLayout } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type {
   PermissionDefinition,
@@ -83,18 +85,20 @@ export function RoleTable({ roles, permissionGroups, canManage }: { roles: RoleD
   const currentRole = editingRole === "new" ? undefined : editingRole ?? undefined;
 
   return (
-    <div className="role-manager">
-      {canManage ? (
-        <div className="action-row">
-          <Button onClick={() => openEditor("new")} variant="primary">Thêm vai trò</Button>
-        </div>
-      ) : null}
-      <DataTable
-        actions={canManage ? (role) => <Button onClick={() => openEditor(role)} size="sm">Chỉnh sửa</Button> : undefined}
-        columns={roleColumns}
-        data={roles}
-        getRowId={(role) => role.id}
-      />
+    <ListPageLayout className="role-manager">
+      <DataSurface>
+        {canManage ? (
+          <div className="data-surface__toolbar action-row">
+            <Button onClick={() => openEditor("new")} variant="primary">Thêm vai trò</Button>
+          </div>
+        ) : null}
+        <DataTable
+          actions={canManage ? (role) => <DropdownMenu label={`Thao tác ${role.name}`}><button onClick={() => openEditor(role)} type="button">Chỉnh sửa</button></DropdownMenu> : undefined}
+          columns={roleColumns}
+          data={roles}
+          getRowId={(role) => role.id}
+        />
+      </DataSurface>
 
       <Modal open={editingRole !== null} title={editingRole === "new" ? "Thêm vai trò" : "Chỉnh sửa vai trò"} onClose={() => setEditingRole(null)}>
         <form className="overlay-form" onSubmit={handleSubmit}>
@@ -124,6 +128,6 @@ export function RoleTable({ roles, permissionGroups, canManage }: { roles: RoleD
           </footer>
         </form>
       </Modal>
-    </div>
+    </ListPageLayout>
   );
 }

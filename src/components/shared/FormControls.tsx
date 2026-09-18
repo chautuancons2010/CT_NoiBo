@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Eye,
+  EyeOff,
   Search,
   type LucideIcon
 } from "lucide-react";
@@ -10,7 +12,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes
 } from "react";
-import { useId } from "react";
+import { useId, useState } from "react";
 
 import { cn } from "@/lib/utils/cn";
 
@@ -76,6 +78,40 @@ export function Input({ label, labelHidden, helperText, error, required, classNa
           required={required}
           {...props}
         />
+      )}
+    </FieldChrome>
+  );
+}
+
+export type PasswordInputProps = Omit<InputProps, "type">;
+
+export function PasswordInput({ label, labelHidden, helperText, error, required, className, ...props }: PasswordInputProps) {
+  const [visible, setVisible] = useState(false);
+  const actionLabel = visible ? "Ẩn mật khẩu" : "Hiển thị mật khẩu";
+  return (
+    <FieldChrome label={label} labelHidden={labelHidden} helperText={helperText} error={error} required={required}>
+      {(fieldId, describedBy) => (
+        <span className="password-input">
+          <input
+            aria-describedby={describedBy}
+            aria-invalid={Boolean(error)}
+            className={cn("input", className)}
+            id={fieldId}
+            required={required}
+            type={visible ? "text" : "password"}
+            {...props}
+          />
+          <button
+            aria-label={actionLabel}
+            className="password-input__toggle"
+            onClick={() => setVisible((current) => !current)}
+            onMouseDown={(event) => event.preventDefault()}
+            title={actionLabel}
+            type="button"
+          >
+            {visible ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}
+          </button>
+        </span>
       )}
     </FieldChrome>
   );

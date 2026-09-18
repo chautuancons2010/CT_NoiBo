@@ -18,6 +18,9 @@ export const workerEntryPatchSchema = z.object({
 export const workerSessionDraftSchema = z.object({
   version: z.number().int().positive(), entries: z.array(workerEntryPatchSchema).max(500),
   workNote: z.string().trim().max(1500).nullable().optional(), note: z.string().trim().max(1000).nullable().optional(),
+  checklistResponses: z.array(z.object({
+    itemId: z.string().uuid(), checked: z.boolean(), note: z.string().trim().max(500).nullable().optional()
+  })).max(100).default([]),
   location: locationSchema.optional()
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getBreadcrumbs, getRouteMeta } from "@/config/routeRegistry";
+import { getBackHref, getBreadcrumbs, getRouteMeta } from "@/config/routeRegistry";
 
 describe("route registry", () => {
   it("returns metadata for exact routes", () => {
@@ -27,5 +27,12 @@ describe("route registry", () => {
       title: "Chỉnh sửa hàng hóa",
       module: "Kho"
     });
+  });
+
+  it("resolves a stable return route for every navigation depth", () => {
+    expect(getBackHref("/employees/NV001/contracts")).toBe("/employees/NV001/profile");
+    expect(getBackHref("/warehouse/items/57/edit")).toBe("/warehouse/items/57");
+    expect(getBackHref("/employees")).toBe("/dashboard");
+    expect(getBackHref("/dashboard")).toBeNull();
   });
 });

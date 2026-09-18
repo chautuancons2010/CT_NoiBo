@@ -1,5 +1,6 @@
 import "server-only";
 
+import { BackLink } from "@/components/shared/BackLink";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { PermissionDeniedState } from "@/components/shared/States";
 import { InventoryDocumentEditor } from "@/features/warehouse/components/InventoryDocumentEditor";
@@ -25,6 +26,7 @@ export async function WarehouseDocumentRoute({ type, id, title }: { type: Docume
 
   return (
     <div className="page-stack">
+      <BackLink href={`/warehouse/${type === "receipt" ? "receipts" : type === "issue" ? "issues" : type === "transfer" ? "transfers" : "adjustments"}`} />
       <PageHeader title={title} />
       <InventoryDocumentEditor
         canCreate={can(user.permissions, permissions.create)}

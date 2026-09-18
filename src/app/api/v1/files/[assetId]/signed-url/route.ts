@@ -50,11 +50,23 @@ export async function GET(
       .eq("attachment_file_id", assetId)
       .maybeSingle();
 
-    if ((document || sensitiveProfile || contract) && !can(user.permissions, "employee.view")) {
+    if (document && !can(user.permissions, "employee.view")) {
+      throw new AppError("PERMISSION_DENIED");
+    }
+    if (sensitiveProfile && !can(user.permissions, "employee.identity_document.view")) {
+      throw new AppError("PERMISSION_DENIED");
+    }
+    if (asset.owner_entity_type === "employee_contract") {
+      if (!can(user.permissions, "contract.file.view")) throw new AppError("PERMISSION_DENIED");
+      const { data: owner } = await client.from("employee_contracts").select("id").eq("id", asset.owner_entity_id).maybeSingle();
+      if (!owner) throw new AppError("NOT_FOUND", "Hợp đồng chứa file không tồn tại.");
+    }
+    if (contract && !can(user.permissions, "contract.file.view")) throw new AppError("PERMISSION_DENIED");
+    if (asset.owner_entity_type === "insurance_event" && !can(user.permissions, "insurance.document.view")) {
       throw new AppError("PERMISSION_DENIED");
     }
     const sensitiveAccess = Boolean(document?.sensitive || sensitiveProfile);
-    if (sensitiveAccess && !can(user.permissions, "employee.view_sensitive")) {
+    if (document?.sensitive && !can(user.permissions, "employee.view_sensitive")) {
       throw new AppError("PERMISSION_DENIED");
     }
 

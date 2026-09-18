@@ -32,7 +32,7 @@ export function UserMenu({ user }: { user: AuthenticatedUser }) {
       label="Mở menu người dùng"
       trigger={
         <span className="user-menu__trigger">
-          <Avatar name={user.displayName} />
+          <Avatar imageUrl="/api/v1/workspace/avatar" name={user.displayName} />
           <span>{user.displayName}</span>
         </span>
       }

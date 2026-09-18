@@ -13,6 +13,7 @@ import {
   listEmployees
 } from "@/features/employees/services/employeeService";
 import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
+import { getEmployeeListFromSupabase } from "@/features/employees/services/employeeSupabaseRepository";
 import { createEmployee } from "@/features/employees/services/employeeMutationService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
@@ -32,8 +33,9 @@ export async function GET(request: Request) {
       page: url.searchParams.get("page") ?? undefined,
       pageSize: url.searchParams.get("pageSize") ?? undefined
     });
+    const persisted = await getEmployeeListFromSupabase(query, authorizedUser.permissions);
+    if (persisted) return successResponse(persisted);
     const dataSet = await getEmployeeDataSetAsync();
-
     return successResponse({
       employees: listEmployees(query, authorizedUser.permissions, dataSet),
       filterOptions: getEmployeeFilterOptions(dataSet)

@@ -12,12 +12,7 @@ import { AdminPage } from "@/features/system-admin/components/AdminPage";
 import { useSettingsEditor } from "@/features/system-admin/components/editorUtils";
 
 const landingOptions = [
-  { label: "Trang chủ", value: "/home" },
-  { label: "Bản tin chung", value: "/dashboard" },
-  { label: "Bản tin nhân sự", value: "/dashboard/hr" },
-  { label: "Bản tin kho", value: "/dashboard/warehouse" },
-  { label: "Bản tin xuất nhập khẩu", value: "/dashboard/import-export" },
-  { label: "Bản tin quản lý", value: "/dashboard/management" },
+  { label: "Dashboard cá nhân", value: "/dashboard" },
   { label: "Chấm công", value: "/attendance" },
   { label: "Điểm danh hôm nay", value: "/worker-attendance/today" },
   { label: "Dự án", value: "/projects" }

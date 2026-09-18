@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shared/PageHeader";
+import { BackLink } from "@/components/shared/BackLink";
 import { PermissionDeniedState } from "@/components/shared/States";
 import { EmployeeEditForm } from "@/features/employees/components/EmployeeEditForm";
 import {
@@ -26,6 +27,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   return (
     <div className="page-stack">
+      <BackLink href={`/employees/${id}`} />
       <PageHeader title={`Chỉnh sửa ${employee.fullName}`} />
       <EmployeeEditForm
         departments={options.departments}

@@ -29,7 +29,9 @@ type InvalidationListener = (event: RealtimeInvalidation) => void;
 const stateListeners = new Set<() => void>();
 const invalidationListeners = new Map<RealtimeDomain, Set<InvalidationListener>>();
 const seen = new Map<string, number>();
+const lastLifecycleReconcile = new Map<RealtimeDomain, number>();
 const SEEN_TTL_MS = 5 * 60_000;
+const LIFECYCLE_RECONCILE_GAP_MS = 3_000;
 const FALLBACK_RECONCILE_MS = 60_000;
 const realtimeDomains = new Set<RealtimeDomain>([
   "approvals", "attendance", "dashboard", "employees", "import-export", "leave", "notifications",
@@ -62,7 +64,9 @@ function accept(event: RealtimeInvalidation): boolean {
 
 function notify(event: RealtimeInvalidation): void {
   invalidationListeners.get(event.domain)?.forEach((listener) => listener(event));
-  if (event.domain !== "dashboard") invalidationListeners.get("dashboard")?.forEach((listener) => listener(event));
+  if (event.domain !== "dashboard" && (event.source === "postgres" || event.source === "remote-tab")) {
+    invalidationListeners.get("dashboard")?.forEach((listener) => listener(event));
+  }
 }
 
 export function isRealtimeDomain(value: unknown): value is RealtimeDomain {
@@ -100,6 +104,9 @@ export function emitRealtimeInvalidation(event: RealtimeInvalidation, broadcast?
 }
 
 export function reconcileRealtimeDomain(domain: RealtimeDomain, source: Exclude<RealtimeInvalidationSource, "postgres" | "remote-tab">): void {
+  const now = Date.now();
+  if (now - (lastLifecycleReconcile.get(domain) ?? 0) < LIFECYCLE_RECONCILE_GAP_MS) return;
+  lastLifecycleReconcile.set(domain, now);
   const bucket = Math.floor(Date.now() / 1_000);
   emitRealtimeInvalidation({ version: 1, domain, key: `reconcile:${domain}:${source}:${bucket}`, source, occurredAt: new Date().toISOString() });
 }
@@ -167,6 +174,7 @@ export function startRealtimeCoordinator(accountId: string): () => void {
     lifecycleAccountId = undefined;
     lifecycleReferences = 0;
     seen.clear();
+    lastLifecycleReconcile.clear();
   };
   return () => {
     lifecycleReferences -= 1;
@@ -185,6 +193,7 @@ export function resetRealtimeCoordinatorForTests(): void {
   stopLifecycle?.();
   state = "connecting";
   seen.clear();
+  lastLifecycleReconcile.clear();
   stateListeners.clear();
   invalidationListeners.clear();
 }

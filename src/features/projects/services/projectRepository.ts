@@ -6,8 +6,8 @@ import type { z } from "zod";
 import { AppError } from "@/lib/api/errors";
 import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
-import type { assignmentInputSchema, projectInputSchema, worksiteInputSchema } from "@/features/projects/schemas/projectSchemas";
-import type { DailySchedule, ProjectAssignment, ProjectDetail, ProjectSummary, Worksite } from "@/features/projects/types/projectTypes";
+import type { assignmentInputSchema, projectInputSchema, projectProgressInputSchema, worksiteInputSchema } from "@/features/projects/schemas/projectSchemas";
+import type { DailySchedule, ProjectAssignment, ProjectDetail, ProjectProgressNode, ProjectSummary, Worksite } from "@/features/projects/types/projectTypes";
 import { recordAuditLog } from "@/services/audit/auditLog";
 import { getApprovedLeaveForEmployeesDate } from "@/features/leave/services/leaveRepository";
 
@@ -57,6 +57,11 @@ function mapAssignment(row: Row): ProjectAssignment {
     shiftStart: required(row, "shift_start").slice(0, 5), shiftEnd: required(row, "shift_end").slice(0, 5),
     status: required(row, "status") as ProjectAssignment["status"], rowVersion: Number(row.row_version)
   };
+}
+
+function mapProgressNode(row: Row): ProjectProgressNode {
+  const assignee = nested(row, "employees");
+  return { id: required(row, "id"), projectId: required(row, "project_id"), parentId: optional(row, "parent_id"), nodeType: required(row, "node_type") as ProjectProgressNode["nodeType"], name: required(row, "name"), status: required(row, "status") as ProjectProgressNode["status"], completionPercent: Number(row.completion_percent), deadline: optional(row, "deadline"), assigneeEmployeeId: optional(row, "assignee_employee_id"), assigneeName: assignee ? optional(assignee, "full_name") : undefined, sortOrder: Number(row.sort_order), rowVersion: Number(row.row_version) };
 }
 
 const projectSelect = "*,manager:employees!projects_project_manager_employee_id_fkey(full_name)";
@@ -142,6 +147,54 @@ export async function getProject(projectId: string, user?: AuthenticatedUser): P
   const summary = (await listProjects(user)).find((project) => project.id === projectId);
   if (!summary) throw new AppError("NOT_FOUND", "Không tìm thấy dự án.");
   return { ...summary, note: optional(data as Row, "note"), worksites: (sites ?? []).map((row) => mapWorksite(row as Row)), assignments: (assignments ?? []).map((row) => mapAssignment(row as Row)) };
+}
+
+export async function listProjectProgress(user: AuthenticatedUser, projectId: string): Promise<ProjectProgressNode[]> {
+  if (!can(user.permissions, "project.view")) throw new AppError("PERMISSION_DENIED");
+  await getProject(projectId, user);
+  const { data, error } = await db().from("project_progress_nodes").select("*,employees(full_name)").eq("project_id", projectId).order("sort_order").order("created_at");
+  if (error) throw new AppError("SERVER_ERROR", "Không thể đọc cây tiến độ.");
+  return (data ?? []).map((row) => mapProgressNode(row as Row));
+}
+
+async function refreshProgressParents(client: SupabaseClient, projectId: string, parentId?: string | null): Promise<void> {
+  let current = parentId ?? undefined;
+  for (let depth = 0; current && depth < 12; depth += 1) {
+    const [{ data: children }, { data: node }] = await Promise.all([client.from("project_progress_nodes").select("completion_percent,status").eq("project_id", projectId).eq("parent_id", current), client.from("project_progress_nodes").select("parent_id").eq("id", current).maybeSingle()]);
+    if (children?.length) {
+      const completion = Math.round(children.reduce((sum, child) => sum + Number(child.completion_percent), 0) / children.length);
+      const status = children.every((child) => child.status === "completed") ? "completed" : children.some((child) => child.status === "blocked") ? "blocked" : completion > 0 ? "in_progress" : "not_started";
+      await client.from("project_progress_nodes").update({ completion_percent: completion, status, updated_at: new Date().toISOString() }).eq("id", current);
+    }
+    current = node?.parent_id ? String(node.parent_id) : undefined;
+  }
+}
+
+export async function saveProjectProgress(user: AuthenticatedUser, projectId: string, input: z.infer<typeof projectProgressInputSchema>): Promise<ProjectProgressNode[]> {
+  if (!can(user.permissions, "project.edit") && !can(user.permissions, "project.manage_schedule")) throw new AppError("PERMISSION_DENIED");
+  const client = db(); await getProject(projectId, user); const actor = await actorAccountId(client, user);
+  if (input.parentId) { const { data: parent } = await client.from("project_progress_nodes").select("id").eq("id", input.parentId).eq("project_id", projectId).maybeSingle(); if (!parent) throw new AppError("VALIDATION_ERROR", "Hạng mục cha không thuộc dự án."); }
+  const values = { parent_id: input.parentId ?? null, node_type: input.nodeType, name: input.name, status: input.status, completion_percent: input.completionPercent, deadline: input.deadline ?? null, assignee_employee_id: input.assigneeEmployeeId ?? null, sort_order: input.sortOrder, updated_at: new Date().toISOString() };
+  if (input.id) {
+    if (input.parentId === input.id) throw new AppError("VALIDATION_ERROR", "Hạng mục không thể là cấp cha của chính nó.");
+    let ancestorId = input.parentId;
+    for (let depth = 0; ancestorId && depth < 24; depth += 1) {
+      if (ancestorId === input.id) throw new AppError("VALIDATION_ERROR", "Cấu trúc cấp cha tạo thành vòng lặp.");
+      const { data: ancestor } = await client.from("project_progress_nodes").select("parent_id").eq("id", ancestorId).eq("project_id", projectId).maybeSingle();
+      ancestorId = ancestor?.parent_id ? String(ancestor.parent_id) : undefined;
+    }
+    const { data: before } = await client.from("project_progress_nodes").select("*").eq("id", input.id).eq("project_id", projectId).maybeSingle();
+    if (!before) throw new AppError("NOT_FOUND", "Không tìm thấy hạng mục.");
+    const { data, error } = await client.from("project_progress_nodes").update({ ...values, row_version: input.rowVersion! + 1 }).eq("id", input.id).eq("row_version", input.rowVersion!).select("id").maybeSingle();
+    if (error || !data) throw new AppError("CONFLICT", "Hạng mục vừa được cập nhật. Vui lòng tải lại.");
+    await refreshProgressParents(client, projectId, before.parent_id ? String(before.parent_id) : undefined); await refreshProgressParents(client, projectId, input.parentId);
+    await recordAuditLog({ actorId: actor ?? user.id, action: "project.progress.updated", entityType: "project_progress_node", entityId: input.id, before, after: values });
+  } else {
+    const { data, error } = await client.from("project_progress_nodes").insert({ project_id: projectId, ...values, created_by: actor }).select("id").single();
+    if (error || !data) throw new AppError("SERVER_ERROR", "Không thể tạo hạng mục tiến độ.");
+    await refreshProgressParents(client, projectId, input.parentId); await recordAuditLog({ actorId: actor ?? user.id, action: "project.progress.created", entityType: "project_progress_node", entityId: String(data.id), after: values });
+  }
+  return listProjectProgress(user, projectId);
 }
 
 export async function createProject(user: AuthenticatedUser, input: z.infer<typeof projectInputSchema>): Promise<ProjectDetail> {

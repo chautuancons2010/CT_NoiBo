@@ -104,3 +104,19 @@ export const projectUpdateQuerySchema = z.object({
   cursor: optionalText(200),
   limit: z.coerce.number().int().min(1).max(100).default(25)
 });
+
+export const projectProgressInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  parentId: optionalUuid,
+  nodeType: z.enum(["phase", "work_item", "task", "milestone", "acceptance"]),
+  name: z.string().trim().min(2).max(200),
+  status: z.enum(["not_started", "in_progress", "blocked", "completed", "cancelled"]),
+  completionPercent: z.number().int().min(0).max(100),
+  deadline: optionalDate,
+  assigneeEmployeeId: optionalUuid,
+  sortOrder: z.number().int().min(0).max(10000).default(0),
+  rowVersion: z.number().int().positive().optional()
+}).superRefine((value, context) => {
+  if (value.id && !value.rowVersion) context.addIssue({ code: "custom", path: ["rowVersion"], message: "Thiếu phiên bản dữ liệu." });
+  if (value.status === "completed" && value.completionPercent !== 100) context.addIssue({ code: "custom", path: ["completionPercent"], message: "Hạng mục hoàn thành phải đạt 100%." });
+});

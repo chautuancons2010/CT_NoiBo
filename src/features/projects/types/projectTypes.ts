@@ -96,11 +96,13 @@ export interface ProjectHealthEntry {
 
 export interface ProjectMonitoringSummary {
   active: number;
+  averageCompletion: number;
   onTrack: number;
   atRisk: number;
   delayed: number;
   paused: number;
   projects: Array<ProjectSummary & {
+    completionPercent: number;
     latestUpdate?: ProjectUpdate;
     openHighIssues: number;
     stale: boolean;
@@ -155,4 +157,19 @@ export interface DailySchedule {
   supervisorNames: string[];
   peopleCount: number;
   workerCount: number;
+}
+
+export interface ProjectProgressNode {
+  id: string;
+  projectId: string;
+  parentId?: string;
+  nodeType: "phase" | "work_item" | "task" | "milestone" | "acceptance";
+  name: string;
+  status: "not_started" | "in_progress" | "blocked" | "completed" | "cancelled";
+  completionPercent: number;
+  deadline?: string;
+  assigneeEmployeeId?: string;
+  assigneeName?: string;
+  sortOrder: number;
+  rowVersion: number;
 }

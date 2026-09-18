@@ -14,11 +14,17 @@ import { getSupabaseServiceClient } from "@/lib/supabase/server";
 export const ACCESS_COOKIE = "ct_access_token";
 export const REFRESH_COOKIE = "ct_refresh_token";
 export const SESSION_COOKIE = "ct_session_id";
+export const SESSION_INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
 type CookieWriter = { set: (name: string, value: string, options: Record<string, unknown>) => void };
 
 const validStatuses = new Set<AccountStatus>(["pending_activation", "active", "disabled", "locked", "invited"]);
 const validPermissions = new Set<string>(allFoundationPermissions);
+
+export function isSessionInactive(lastSeenAt: string, now = Date.now()): boolean {
+  const lastSeen = Date.parse(lastSeenAt);
+  return !Number.isFinite(lastSeen) || now - lastSeen >= SESSION_INACTIVITY_TIMEOUT_MS;
+}
 
 function publicAuthClient() {
   const env = getServerEnv();
@@ -157,12 +163,17 @@ export async function resolveRequestUser(): Promise<AuthenticatedUser | null> {
   try {
     const { data, error } = await publicAuthClient().auth.getUser(accessToken);
     if (error || !data.user) return null;
-    const account = await resolveAccount(data.user.id, data.user.email || "");
-    if (account.status !== "active") return null;
     const client = getSupabaseServiceClient();
     if (!client) return null;
-    const { data: session } = await client.from("app_sessions").select("id").eq("id", sessionId).eq("account_id", account.id).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
-    if (!session) return null;
+    const [account, { data: session, error: sessionError }] = await Promise.all([
+      resolveAccount(data.user.id, data.user.email || ""),
+      client.from("app_sessions").select("id,account_id,last_seen_at").eq("id", sessionId).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle()
+    ]);
+    if (account.status !== "active" || sessionError || !session || session.account_id !== account.id) return null;
+    if (isSessionInactive(String(session.last_seen_at))) {
+      await client.from("app_sessions").update({ revoked_at: new Date().toISOString() }).eq("id", sessionId).is("revoked_at", null);
+      return null;
+    }
     void client.from("app_sessions").update({ last_seen_at: new Date().toISOString() }).eq("id", sessionId);
     return account;
   } catch (error) {

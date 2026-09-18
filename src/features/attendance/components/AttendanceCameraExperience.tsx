@@ -20,7 +20,6 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { Button, IconButton } from "@/components/shared/Button";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Tabs } from "@/components/shared/Tabs";
 import { captureAttendancePhoto, type ProcessedAttendancePhoto } from "@/features/attendance/client/imageProcessing";
 import { countPendingAttendance, listPendingAttendance, savePendingAttendance } from "@/features/attendance/client/attendanceQueue";
 import { AttendanceSyncError, syncAttendanceItem } from "@/features/attendance/client/attendanceSync";
@@ -233,19 +232,15 @@ export function AttendanceCameraExperience() {
   };
 
   if (!dashboard && !loadError) return <LoadingState title="Đang tải chấm công" description="Đang kiểm tra ca làm và trạng thái hôm nay." />;
-  if (!dashboard) return <ErrorState title="Không thể mở chấm công" description={loadError} action={<Button onClick={() => void loadDashboard()}>Thử lại</Button>} />;
+  if (!dashboard) return loadError?.includes("chưa liên kết")
+    ? <ErrorState title="Tài khoản này chưa được liên kết với hồ sơ nhân viên" description="Chức năng chấm công cá nhân chưa khả dụng." />
+    : <ErrorState title="Không thể mở chấm công" description={loadError} action={<Button onClick={() => void loadDashboard()}>Thử lại</Button>} />;
 
   const match = matchAttendanceLocation(coordinates, dashboard.locations, dashboard.policy);
   const nextLabel = dashboard.nextAction === "check_in" ? "Chấm vào" : dashboard.nextAction === "check_out" ? "Chấm ra" : "Đã hoàn tất";
 
   return (
     <div className="attendance-page">
-      <Tabs label="Chấm công cá nhân" items={[
-        { label: "Hôm nay", href: "/attendance", active: true },
-        { label: "Lịch sử", href: "/attendance/history" },
-        { label: "Kiểm tra", href: "/attendance/records" }
-      ]} />
-
       {notice ? <div className="attendance-notice" role="alert"><span>{notice}</span><IconButton label="Đóng thông báo" onClick={() => setNotice(undefined)}><X size={16} /></IconButton></div> : null}
       {dashboard.incompletePreviousDate ? <div className="attendance-warning">Bạn đang có một ngày chấm công chưa hoàn tất: {dashboard.incompletePreviousDate}.</div> : null}
       {pendingCount > 0 ? (

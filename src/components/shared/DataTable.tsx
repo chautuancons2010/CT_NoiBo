@@ -31,6 +31,7 @@ export interface DataTableProps<TData extends object> {
   rowHrefPrefix?: string;
   rowHrefSuffix?: string;
   actions?: (row: TData) => ReactNode;
+  actionLabel?: string;
   className?: string;
 }
 
@@ -65,6 +66,7 @@ export function DataTable<TData extends object>({
   rowHrefPrefix,
   rowHrefSuffix = "",
   actions,
+  actionLabel = "Thao tác",
   className
 }: DataTableProps<TData>) {
   const [activeRowId, setActiveRowId] = useState<string>();
@@ -99,12 +101,13 @@ export function DataTable<TData extends object>({
                     column.sortable && "data-table__sortable",
                     column.align && `text-${column.align}`
                   )}
+                  data-column={column.id}
                   scope="col"
                 >
                   {column.header}
                 </th>
               ))}
-              {actions ? <th className="data-table__actions">Thao tác</th> : null}
+              {actions ? <th className="data-table__actions" scope="col">{actionLabel}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -141,7 +144,7 @@ export function DataTable<TData extends object>({
                     </td>
                   ) : null}
                   {columns.map((column, columnIndex) => (
-                    <td key={column.id} className={column.align ? `text-${column.align}` : undefined}>
+                    <td data-column={column.id} key={column.id} className={column.align ? `text-${column.align}` : undefined}>
                       {columnIndex === 0 && rowHref ? <Link className="data-table__row-link sr-only" href={rowHref}>Mở bản ghi {rowId}</Link> : null}
                       {renderCell(row, column)}
                     </td>

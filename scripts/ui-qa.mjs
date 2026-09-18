@@ -63,6 +63,30 @@ try {
     await context.close();
   }
 
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 1100 }]) {
+    const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: "vi-VN" });
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/ui-preview`, { waitUntil: "networkidle" });
+    const visual = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      return {
+        viewport: document.documentElement.clientWidth,
+        content: document.documentElement.scrollWidth,
+        appBackground: root.getPropertyValue("--app-bg").trim(),
+        cardRadius: root.getPropertyValue("--radius-card").trim(),
+        controlHeight: root.getPropertyValue("--control-height-md").trim(),
+        pastelCards: document.querySelectorAll(".dashboard-overview__metric").length,
+        dataTables: document.querySelectorAll(".data-table").length
+      };
+    });
+    if (visual.content > visual.viewport) throw new Error(`UI preview tràn ngang tại ${viewport.width}px: ${visual.content}px > ${visual.viewport}px`);
+    if (visual.appBackground !== "#efeeec" || visual.cardRadius !== "22px" || visual.controlHeight !== "44px") throw new Error(`UI preview không nhận đúng token: ${JSON.stringify(visual)}`);
+    if (visual.pastelCards < 4 || visual.dataTables !== 1) throw new Error(`UI preview thiếu primitive bắt buộc: ${JSON.stringify(visual)}`);
+    await page.screenshot({ path: path.join(output, `ui-preview-${viewport.width}x${viewport.height}-playwright.png`), fullPage: true });
+    console.log(`PASS UI preview ${viewport.width}x${viewport.height} · warm pastel tokens and shared primitives`);
+    await context.close();
+  }
+
   for (const zoom of [0.8, 1, 1.25, 1.5]) {
     const context = await browser.newContext({ viewport: { width: 1366, height: 768 }, locale: "vi-VN" });
     const page = await context.newPage();

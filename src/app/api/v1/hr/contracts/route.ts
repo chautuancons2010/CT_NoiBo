@@ -1,0 +1,13 @@
+import { listAllEmployeeContracts } from "@/features/employees/services/organizationService";
+import { errorResponse } from "@/lib/api/errors";
+import { successResponse } from "@/lib/api/responses";
+import { getRequestUser } from "@/services/auth/getRequestUser";
+import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
+
+export async function GET() {
+  try {
+    return successResponse(await listAllEmployeeContracts(requireAuthenticatedUser(await getRequestUser())));
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

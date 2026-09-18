@@ -9,7 +9,9 @@ import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { matchAttendanceLocation, getNextAttendanceAction } from "@/features/attendance/services/attendanceRules";
 import type {
   AttendanceDashboard,
+  AttendanceAdminToday,
   AttendanceEvent,
+  AttendanceEventAdjustment,
   AttendanceHistoryDay,
   AttendanceLocation,
   AttendancePolicy,
@@ -17,6 +19,8 @@ import type {
   AttendanceRecordResult
 } from "@/features/attendance/types/attendanceTypes";
 import { recordAuditLog } from "@/services/audit/auditLog";
+import type { z } from "zod";
+import type { attendanceAdjustmentSchema } from "@/features/attendance/schemas/attendanceSchemas";
 
 type Row = Record<string, unknown>;
 
@@ -151,6 +155,14 @@ async function resolveIdentity(client: SupabaseClient, user: AuthenticatedUser):
   };
 }
 
+async function resolveAccountId(client: SupabaseClient, user: AuthenticatedUser): Promise<string> {
+  let query = client.from("app_accounts").select("id,status").limit(1);
+  query = /^[0-9a-f-]{36}$/i.test(user.id) ? query.eq("id", user.id) : query.eq("primary_email", user.email);
+  const { data } = await query.maybeSingle();
+  if (!data?.id || data.status !== "active") throw new AppError("PERMISSION_DENIED");
+  return String(data.id);
+}
+
 async function readPolicy(client: SupabaseClient): Promise<AttendancePolicy> {
   const { data, error } = await client.from("attendance_policies").select("*").eq("active", true).maybeSingle();
   if (error || !data) throw new AppError("SERVER_ERROR", "Chưa có chính sách chấm công đang hoạt động.");
@@ -185,10 +197,19 @@ async function readEvents(
   if (filters.date) query = query.eq("attendance_date", filters.date);
   if (filters.from) query = query.gte("attendance_date", filters.from);
   if (filters.to) query = query.lte("attendance_date", filters.to);
-  if (filters.limit) query = query.limit(filters.limit);
-  const { data, error } = await query;
-  if (error) throw new AppError("SERVER_ERROR", "Không thể đọc dữ liệu chấm công.");
-  return (data ?? []).map((row) => mapEvent(row as Row));
+  if (filters.limit) {
+    const { data, error } = await query.limit(filters.limit);
+    if (error) throw new AppError("SERVER_ERROR", "Không thể đọc dữ liệu chấm công.");
+    return (data ?? []).map((row) => mapEvent(row as Row));
+  }
+  const events: AttendanceEvent[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await query.range(offset, offset + 999);
+    if (error) throw new AppError("SERVER_ERROR", "Không thể đọc dữ liệu chấm công.");
+    events.push(...(data ?? []).map((row) => mapEvent(row as Row)));
+    if ((data ?? []).length < 1000) break;
+  }
+  return events;
 }
 
 export async function getAttendanceDashboard(user: AuthenticatedUser): Promise<AttendanceDashboard> {
@@ -214,6 +235,56 @@ export async function getAttendanceDashboard(user: AuthenticatedUser): Promise<A
     nextAction: getNextAttendanceAction(todayEvents),
     incompletePreviousDate
   };
+}
+
+export async function getAttendanceAdminToday(user: AuthenticatedUser, selectedDate?: string): Promise<AttendanceAdminToday> {
+  if (!can(user.permissions, "attendance.view_all") && !can(user.permissions, "attendance.manage")) throw new AppError("PERMISSION_DENIED");
+  const client = clientOrThrow(), policy = await readPolicy(client), today = selectedDate ?? localDate(new Date(), policy.timezone);
+  const [{ data: employees, error: employeeError }, events, { data: leaves, error: leaveError }, { data: departments, error: departmentError }, { data: shifts, error: shiftError }, { data: assignments, error: assignmentError }] = await Promise.all([
+    client.from("employees").select("id,employee_code,full_name,department_id").in("employment_status", ["active", "probation", "pending_onboarding"]).order("employee_code").range(0, 999),
+    readEvents(client, { date: today }),
+    client.from("leave_requests").select("employee_id").eq("status", "approved").lte("start_date", today).gte("end_date", today),
+    client.from("departments").select("id,name"),
+    client.from("shifts").select("id,name,start_time,end_time,late_grace_minutes,early_leave_grace_minutes").eq("active", true),
+    client.from("shift_assignments").select("shift_id,scope_type,scope_id,effective_from,effective_to,weekdays").eq("active", true).lte("effective_from", today).or(`effective_to.is.null,effective_to.gte.${today}`)
+  ]);
+  if (employeeError || leaveError || departmentError || shiftError || assignmentError) throw new AppError("SERVER_ERROR", "Không thể đọc dữ liệu chấm công nhân viên.");
+  const employeeRows = [...(employees ?? [])];
+  if (employeeRows.length === 1000) {
+    for (let offset = 1000; ; offset += 1000) {
+      const { data, error } = await client.from("employees").select("id,employee_code,full_name,department_id").in("employment_status", ["active", "probation", "pending_onboarding"]).order("employee_code").range(offset, offset + 999);
+      if (error) throw new AppError("SERVER_ERROR", "Không thể đọc nhân viên chấm công.");
+      employeeRows.push(...(data ?? []));
+      if ((data ?? []).length < 1000) break;
+    }
+  }
+  const departmentNames = new Map((departments ?? []).map((item) => [String(item.id), String(item.name)]));
+  const shiftById = new Map((shifts ?? []).map((item) => [String(item.id), item]));
+  const weekday = new Date(`${today}T12:00:00`).getDay() || 7;
+  const activeAssignments = (assignments ?? []).filter((item) => Array.isArray(item.weekdays) && item.weekdays.includes(weekday));
+  const leaveIds = new Set((leaves ?? []).map((row) => String(row.employee_id)));
+  const byEmployee = new Map<string, AttendanceEvent[]>();
+  for (const event of events) byEmployee.set(event.employeeId, [...(byEmployee.get(event.employeeId) ?? []), event]);
+  const minute = (value:string) => { const date = new Date(value); return Number(new Intl.DateTimeFormat("en-GB",{timeZone:policy.timezone,hour:"2-digit",minute:"2-digit",hour12:false}).format(date).slice(0,2))*60+Number(new Intl.DateTimeFormat("en-GB",{timeZone:policy.timezone,minute:"2-digit"}).format(date)); };
+  const rows = employeeRows.map((employee) => {
+    const assignment = activeAssignments
+      .filter((item) => item.scope_type === "company" || item.scope_type === "department" && item.scope_id === employee.department_id || item.scope_type === "employee" && item.scope_id === employee.id)
+      .sort((a, b) => ({ employee: 3, department: 2, company: 1 }[String(b.scope_type) as "employee" | "department" | "company"] ?? 0) - ({ employee: 3, department: 2, company: 1 }[String(a.scope_type) as "employee" | "department" | "company"] ?? 0) || String(b.effective_from).localeCompare(String(a.effective_from)))[0];
+    const shift = assignment ? shiftById.get(String(assignment.shift_id)) : undefined;
+    const start = String(shift?.start_time ?? policy.shiftStart).slice(0, 5);
+    const end = String(shift?.end_time ?? policy.shiftEnd).slice(0, 5);
+    const shiftStartMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5));
+    const shiftEndMinutes = Number(end.slice(0, 2)) * 60 + Number(end.slice(3, 5));
+    const daily = (byEmployee.get(String(employee.id)) ?? []).sort((a,b)=>a.effectiveAt.localeCompare(b.effectiveAt));
+    const checkIn = daily.find((event)=>event.eventType==="check_in"), checkOut = [...daily].reverse().find((event)=>event.eventType==="check_out");
+    const lateMinutes = checkIn ? Math.max(0, minute(checkIn.effectiveAt)-shiftStartMinutes-Number(shift?.late_grace_minutes ?? policy.lateThresholdMinutes)) : 0;
+    const earlyLeaveMinutes = checkOut ? Math.max(0, shiftEndMinutes-minute(checkOut.effectiveAt)-Number(shift?.early_leave_grace_minutes ?? 0)) : 0;
+    const totalMinutes = checkIn&&checkOut ? Math.max(0,Math.round((new Date(checkOut.effectiveAt).getTime()-new Date(checkIn.effectiveAt).getTime())/60000)) : 0;
+    const shiftHasEnded = today < localDate(new Date(), policy.timezone) || today === localDate(new Date(), policy.timezone) && minute(new Date().toISOString()) > shiftEndMinutes;
+    const status = leaveIds.has(String(employee.id)) ? "leave" : checkIn&&!checkOut&&shiftHasEnded ? "missing_check" : lateMinutes>0 ? "late" : checkIn ? "present" : "not_checked";
+    return { employeeId:String(employee.id),employeeCode:String(employee.employee_code),employeeName:String(employee.full_name),departmentId:employee.department_id ? String(employee.department_id) : undefined,departmentName:departmentNames.get(String(employee.department_id)) ?? "Chưa phân phòng",shiftId:shift ? String(shift.id) : undefined,shiftName:String(shift?.name ?? policy.shiftName),checkIn:checkIn?.effectiveAt,checkOut:checkOut?.effectiveAt,lateMinutes,earlyLeaveMinutes,totalMinutes,status } as const;
+  });
+  return { date:today,totalEmployees:rows.length,present:rows.filter((row)=>row.status==="present"||row.status==="late"||row.status==="missing_check").length,late:rows.filter((row)=>row.status==="late").length,leave:rows.filter((row)=>row.status==="leave").length,notChecked:rows.filter((row)=>row.status==="not_checked").length,missingCheck:rows.filter((row)=>row.status==="missing_check").length,rows };
 }
 
 export async function recordAttendance(
@@ -395,23 +466,44 @@ export async function uploadAttendancePhoto(
 export async function listAttendanceHistory(user: AuthenticatedUser, from?: string, to?: string): Promise<AttendanceHistoryDay[]> {
   const client = clientOrThrow();
   const identity = await resolveIdentity(client, user);
-  const events = await readEvents(client, { employeeId: identity.employeeId, from, to, limit: 180 });
+  const policy = await readPolicy(client);
+  const current = localDate(new Date(), policy.timezone);
+  const first = from ?? `${current.slice(0, 7)}-01`;
+  const last = to ?? current;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(first) || !/^\d{4}-\d{2}-\d{2}$/.test(last) || first > last || (Date.parse(last) - Date.parse(first)) / 86400000 > 62) throw new AppError("VALIDATION_ERROR", "Khoảng ngày không hợp lệ.");
+  const [events, leavesResult, calendarResult, tripResult] = await Promise.all([
+    readEvents(client, { employeeId: identity.employeeId, from: first, to: last, limit: 180 }),
+    client.from("leave_requests").select("start_date,end_date").eq("employee_id", identity.employeeId).eq("status", "approved").lte("start_date", last).gte("end_date", first),
+    client.from("work_calendar_days").select("calendar_date,day_type,scope_type,scope_id").eq("active", true).gte("calendar_date", first).lte("calendar_date", last),
+    client.from("daily_timesheets").select("work_date").eq("employee_id", identity.employeeId).eq("status", "business_trip").gte("work_date", first).lte("work_date", last)
+  ]);
+  if (leavesResult.error || calendarResult.error || tripResult.error) throw new AppError("SERVER_ERROR", "Không thể tải lịch công cá nhân.");
   const grouped = new Map<string, AttendanceEvent[]>();
   for (const event of events) grouped.set(event.attendanceDate, [...(grouped.get(event.attendanceDate) ?? []), event]);
-  const policy = await readPolicy(client);
-  return [...grouped.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([date, dayEvents]) => {
+  const leaveDates = new Set<string>();
+  const cursor = new Date(`${first}T12:00:00Z`), end = new Date(`${last}T12:00:00Z`);
+  const dates: string[] = [];
+  while (cursor <= end) { dates.push(cursor.toISOString().slice(0, 10)); cursor.setUTCDate(cursor.getUTCDate() + 1); }
+  for (const leave of leavesResult.data ?? []) for (const date of dates) if (date >= leave.start_date && date <= leave.end_date) leaveDates.add(date);
+  const holidays = new Set((calendarResult.data ?? []).filter((day) => (day.day_type === "holiday" || day.day_type === "company_holiday") && (day.scope_type === "company" || day.scope_type === "employee" && day.scope_id === identity.employeeId)).map((day) => String(day.calendar_date)));
+  const trips = new Set((tripResult.data ?? []).map((day) => String(day.work_date)));
+  return dates.reverse().flatMap((date): AttendanceHistoryDay[] => {
+    const dayEvents = grouped.get(date) ?? [];
     const checkIn = dayEvents.find((event) => event.eventType === "check_in");
     const checkOut = dayEvents.find((event) => event.eventType === "check_out");
     const isPending = dayEvents.some((event) => event.syncStatus !== "synced");
     const start = checkIn ? new Date(checkIn.effectiveAt) : undefined;
     const shiftStart = new Date(`${date}T${policy.shiftStart}:00+07:00`);
     const late = start ? start.getTime() > shiftStart.getTime() + policy.lateThresholdMinutes * 60_000 : false;
-    return { date, checkIn, checkOut, status: isPending ? "pending" : !checkOut ? "missing_check_out" : late ? "late" : "complete" };
+    const weekend = [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
+    const status = dayEvents.length ? isPending ? "pending" : !checkOut ? "missing_check_out" : late ? "late" : "complete"
+      : leaveDates.has(date) ? "leave" : trips.has(date) ? "business_trip" : holidays.has(date) ? "holiday" : weekend ? "rest_day" : undefined;
+    return status ? [{ date, checkIn, checkOut, status, shiftName: policy.shiftName, shiftStart: policy.shiftStart, shiftEnd: policy.shiftEnd }] : [];
   });
 }
 
 export async function listAttendanceRecords(user: AuthenticatedUser, filters: { from?: string; to?: string; employeeId?: string; locationId?: string; status?: string; photo?: string }): Promise<AttendanceEvent[]> {
-  if (!can(user.permissions, "attendance.view_all") && !can(user.permissions, "attendance.view_team")) throw new AppError("PERMISSION_DENIED");
+  if (!can(user.permissions, "attendance.view_all") && !can(user.permissions, "attendance.view_team") && !can(user.permissions, "attendance.manage") && !can(user.permissions, "attendance.log.view")) throw new AppError("PERMISSION_DENIED");
   const client = clientOrThrow();
   let query = client.from("attendance_events").select(eventSelect).order("effective_at", { ascending: false }).limit(300);
   if (filters.from) query = query.gte("attendance_date", filters.from);
@@ -429,27 +521,45 @@ export async function listAttendanceRecords(user: AuthenticatedUser, filters: { 
 
 export async function getAttendanceEvent(user: AuthenticatedUser, eventId: string): Promise<AttendanceEvent> {
   const client = clientOrThrow();
-  const identity = await resolveIdentity(client, user);
   const { data, error } = await client.from("attendance_events").select(eventSelect).eq("id", eventId).maybeSingle();
   if (error || !data) throw new AppError("NOT_FOUND", "Không tìm thấy lượt chấm công.");
   const event = mapEvent(data as Row);
-  if (event.employeeId !== identity.employeeId && !can(user.permissions, "attendance.view_all") && !can(user.permissions, "attendance.view_team")) {
-    throw new AppError("PERMISSION_DENIED");
-  }
+  if (!can(user.permissions, "attendance.view_all") && !can(user.permissions, "attendance.view_team") && !can(user.permissions, "attendance.manage") && !can(user.permissions, "attendance.log.view")) { const identity = await resolveIdentity(client, user); if (event.employeeId !== identity.employeeId) throw new AppError("PERMISSION_DENIED"); }
   return event;
 }
 
+export async function listAttendanceAdjustments(user: AuthenticatedUser, eventId: string): Promise<AttendanceEventAdjustment[]> {
+  if (!can(user.permissions, "attendance.adjust") && !can(user.permissions, "attendance.manage") && !can(user.permissions, "attendance.log.view")) throw new AppError("PERMISSION_DENIED");
+  await getAttendanceEvent(user, eventId);
+  const { data, error } = await clientOrThrow().from("attendance_event_adjustments").select("*,app_accounts(display_name)").eq("attendance_event_id", eventId).order("changed_at", { ascending: false });
+  if (error) throw new AppError("SERVER_ERROR", "Không thể đọc lịch sử điều chỉnh.");
+  return (data ?? []).map((row) => { const raw = row.app_accounts as Row | Row[] | null, actor = (Array.isArray(raw) ? raw[0] : raw) as Row | null; return { id: String(row.id), oldValue: row.old_value as Row, newValue: row.new_value as Row, reason: String(row.reason), changedByName: actor ? optionalString(actor, "display_name") : undefined, changedAt: String(row.changed_at) }; });
+}
+
+export async function adjustAttendanceEvent(user: AuthenticatedUser, eventId: string, input: z.infer<typeof attendanceAdjustmentSchema>): Promise<AttendanceEvent> {
+  if (!can(user.permissions, "attendance.adjust") && !can(user.permissions, "attendance.manage")) throw new AppError("PERMISSION_DENIED");
+  const client = clientOrThrow(), actorId = await resolveAccountId(client, user), current = await getAttendanceEvent(user, eventId), policy = await readPolicy(client);
+  const next = { effectiveAt: input.effectiveAt, attendanceDate: localDate(new Date(input.effectiveAt), policy.timezone), attendanceStatus: input.attendanceStatus };
+  const { data, error } = await client.from("attendance_events").update({ effective_at: next.effectiveAt, attendance_date: next.attendanceDate, attendance_status: next.attendanceStatus, updated_at: new Date().toISOString() }).eq("id", eventId).select(eventSelect).single();
+  if (error || !data) throw new AppError("SERVER_ERROR", "Không thể điều chỉnh lượt chấm công.");
+  const oldValue = { effectiveAt: current.effectiveAt, attendanceDate: current.attendanceDate, attendanceStatus: current.attendanceStatus };
+  const { error: historyError } = await client.from("attendance_event_adjustments").insert({ attendance_event_id: eventId, old_value: oldValue, new_value: next, reason: input.reason, changed_by: actorId });
+  if (historyError) { await client.from("attendance_events").update({ effective_at: current.effectiveAt, attendance_date: current.attendanceDate, attendance_status: current.attendanceStatus }).eq("id", eventId); throw new AppError("SERVER_ERROR", "Không thể ghi lịch sử điều chỉnh."); }
+  await recordAuditLog({ actorId, action: "attendance.event_adjusted", entityType: "attendance_event", entityId: eventId, before: oldValue, after: next, reason: input.reason });
+  return mapEvent(data as Row);
+}
+
 export async function getAttendancePhotoAsset(user: AuthenticatedUser, photoId: string, thumbnail: boolean): Promise<{ bucket: string; path: string }> {
-  if (!can(user.permissions, "attendance.view_photo") && !can(user.permissions, "attendance.self.view")) throw new AppError("PERMISSION_DENIED");
+  if (!can(user.permissions, "attendance.view_photo") && !can(user.permissions, "attendance.self.view") && !can(user.permissions, "attendance.self")) throw new AppError("PERMISSION_DENIED");
   const client = clientOrThrow();
-  const identity = await resolveIdentity(client, user);
   const { data, error } = await client
     .from("attendance_photos")
-    .select("id,attendance_events(employee_id),file_assets!attendance_photos_file_id_fkey(bucket,object_path),thumbnail:file_assets!attendance_photos_thumbnail_file_id_fkey(bucket,object_path)")
+    .select("id,evidence_status,attendance_events(employee_id),file_assets!attendance_photos_file_id_fkey(bucket,object_path),thumbnail:file_assets!attendance_photos_thumbnail_file_id_fkey(bucket,object_path)")
     .eq("id", photoId).maybeSingle();
   if (error || !data) throw new AppError("NOT_FOUND", "Không tìm thấy ảnh chấm công.");
+  if (data.evidence_status === "expired") throw new AppError("NOT_FOUND", "Ảnh chấm công đã hết thời hạn lưu 45 ngày.");
   const event = data.attendance_events as unknown as Row;
-  if (String(event.employee_id) !== identity.employeeId && !can(user.permissions, "attendance.view_photo")) throw new AppError("PERMISSION_DENIED");
+  if (!can(user.permissions, "attendance.view_photo")) { const identity = await resolveIdentity(client,user); if (String(event.employee_id) !== identity.employeeId) throw new AppError("PERMISSION_DENIED"); }
   const asset = (thumbnail ? data.thumbnail : data.file_assets) as unknown as Row | null;
   if (!asset) throw new AppError("NOT_FOUND", "Ảnh chưa đồng bộ.");
   return { bucket: requiredString(asset, "bucket"), path: requiredString(asset, "object_path") };

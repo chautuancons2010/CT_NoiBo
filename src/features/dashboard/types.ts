@@ -12,6 +12,7 @@ export const dashboardProfileKeys = [
 export type DashboardProfileKey = (typeof dashboardProfileKeys)[number];
 
 export const dashboardWidgetKeys = [
+  "attendance_overview",
   "employee_today",
   "supervisor_today",
   "my_approvals",
@@ -78,6 +79,7 @@ export interface DashboardChart {
   key: string;
   title: string;
   series: DashboardChartSeries[];
+  kind?: "bar" | "line";
 }
 
 export interface DashboardWidgetData {

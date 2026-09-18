@@ -59,6 +59,7 @@ export function EmployeeEditForm({
       managerEmployeeId: value(formData, "managerEmployeeId"),
       joinDate: value(formData, "joinDate"),
       probationStartDate: value(formData, "probationStartDate"),
+      probationEndDate: value(formData, "probationEndDate"),
       officialDate: value(formData, "officialDate"),
       terminationDate: employmentStatus === "terminated" ? value(formData, "terminationDate") : undefined,
       terminationReason: employmentStatus === "terminated" ? value(formData, "reason") : undefined,
@@ -107,6 +108,7 @@ export function EmployeeEditForm({
         <Select defaultValue={employee.managerEmployeeId ?? ""} label="Quản lý trực tiếp" name="managerEmployeeId" options={managers.map((item) => ({ label: `${item.displayName} · ${item.employeeCode}`, value: item.id }))} placeholder="Chưa gán" />
         <DatePicker defaultValue={employee.joinDate} label="Ngày vào làm" name="joinDate" required />
         <DatePicker defaultValue={employee.probationStartDate} label="Ngày thử việc" name="probationStartDate" />
+        <DatePicker defaultValue={employee.probationEndDate} label="Ngày kết thúc thử việc" name="probationEndDate" />
         <DatePicker defaultValue={employee.officialDate} label="Ngày chính thức" name="officialDate" />
         <Select defaultValue={employee.employmentStatus} label="Trạng thái" name="employmentStatus" options={Object.entries(employeeStatusMeta).map(([value, meta]) => ({ label: meta.label, value }))} required />
         <DatePicker defaultValue={employee.terminationDate} label="Ngày nghỉ việc" name="terminationDate" />
