@@ -14,13 +14,17 @@
     "test:watch": "vitest",
     "validate:migrations": "node scripts/validate-migrations.mjs",
     "smoke": "node scripts/smoke-test.mjs",
+    "smoke:authenticated": "node scripts/authenticated-smoke.mjs",
+    "audit:data-health": "node scripts/data-health-audit.mjs",
     "ui:audit": "node scripts/ui-route-audit.mjs",
     "ui:qa": "node scripts/ui-qa.mjs",
     "migration:dry-run": "node scripts/migration/dry-run.mjs",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs",
     "seed:storage": "node scripts/seed-development-storage.mjs",
     "seed:storage:reset": "node scripts/seed-development-storage.mjs --reset",
-    "seed:dev": "supabase db reset && node scripts/seed-development-storage.mjs",
+    "seed:coverage": "node scripts/seed-development-coverage.mjs",
+    "seed:coverage:reset": "node scripts/seed-development-coverage.mjs --reset",
+    "seed:dev": "supabase db reset && node scripts/seed-development-coverage.mjs && node scripts/seed-development-storage.mjs",
     "seed:reset": "supabase db reset --no-seed"
   },
   "dependencies": {

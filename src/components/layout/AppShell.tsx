@@ -18,6 +18,7 @@ import { RealtimeProvider, useRealtimeConnectionState } from "@/components/provi
 import { ChatDock } from "@/features/messaging/ChatDock";
 import { can } from "@/lib/auth/permissions";
 import { CurrentUserProvider } from "@/components/providers/CurrentUserProvider";
+import { visibleApplications } from "@/config/moduleRegistry";
 
 const INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
@@ -29,11 +30,13 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
   const connectionState = useRealtimeConnectionState();
   const breadcrumbs = getBreadcrumbs(pathname);
   const backHref = getBackHref(pathname);
+  const hasChatAccess = can(user.permissions, "chat.access");
 
   useEffect(() => {
     if (!isPathEnabled(pathname, settings.modules)) {
       const contextualLanding = resolveLandingPage(user, settings.dashboard);
-      router.replace(isPathEnabled(contextualLanding, settings.modules) ? contextualLanding : "/dashboard");
+      const enabledLanding = visibleApplications(user, settings.modules)[0]?.defaultRoute ?? "/profile";
+      router.replace(isPathEnabled(contextualLanding, settings.modules) ? contextualLanding : enabledLanding);
     }
   }, [pathname, router, settings.dashboard, settings.modules, user]);
 
@@ -102,7 +105,7 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
         pathname={pathname}
         user={user}
       />
-      <div className="app-content">
+      <div className={hasChatAccess ? "app-content app-content--chat" : "app-content"}>
         <AppHeader connectionState={connectionState} pathname={pathname} user={user} />
         <SystemNoticeBanner />
         <main className="page-main" id="main-content" tabIndex={-1}>
@@ -115,7 +118,7 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
           {children}
         </main>
         <MobileBottomNav pathname={pathname} user={user} />
-        {can(user.permissions, "chat.access") ? <ChatDock /> : null}
+        {hasChatAccess ? <ChatDock /> : null}
       </div>
     </div>
   );

@@ -1,17 +1,25 @@
-import { loadEnvConfig } from "@next/env";
+import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 
+const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL và SUPABASE_SERVICE_ROLE_KEY là bắt buộc.");
+const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL và Supabase secret/service-role key là bắt buộc.");
+
+const targetHost = new URL(url).hostname;
+const isLocalTarget = targetHost === "127.0.0.1" || targetHost === "localhost";
+if (!isLocalTarget && !process.argv.includes("--allow-remote")) {
+  throw new Error("Từ chối seed Auth/storage trên remote. Chỉ dùng --allow-remote khi đã xác nhận môi trường.");
+}
 
 const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 const testPassword = process.env.SEED_TEST_PASSWORD || "12345678";
 if (testPassword.length < 8) throw new Error("SEED_TEST_PASSWORD phải có tối thiểu 8 ký tự.");
 const testUsers = [
   { accountId: "91000000-0000-4000-8000-000000000001", email: "supervisor.test@chautuan.local", name: "Nguyễn Minh Giám Sát" },
-  { accountId: "91000000-0000-4000-8000-000000000002", email: "employee.test@chautuan.local", name: "Trần Thu Nhân Viên" }
+  { accountId: "91000000-0000-4000-8000-000000000002", email: "employee.test@chautuan.local", name: "Trần Thu Nhân Viên" },
+  { accountId: "91000000-0000-4000-8000-000000000003", email: "payroll.test@chautuan.local", name: "Lê Anh Kế Toán Test" }
 ];
 const files = [
   { id: "98800000-0000-4000-8000-000000000001", bucket: "message-attachments", path: "test-data/98610000-0000-4000-8000-000000000001/preview.png", ownerType: "message", ownerId: "98610000-0000-4000-8000-000000000001", mime: "image/png", kind: "png", name: "anh-tien-do-test.png" },

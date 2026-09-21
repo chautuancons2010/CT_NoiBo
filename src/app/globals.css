@@ -823,6 +823,11 @@ ol {
   text-align: right;
 }
 
+.data-table td.data-table__empty {
+  height: auto;
+  padding: var(--space-4);
+}
+
 .data-table__sortable {
   cursor: pointer;
 }
@@ -7151,6 +7156,18 @@ body {
 .data-table-shell {
   min-width: 0;
   max-width: 100%;
+}
+
+/* Reserve a real gutter for the fixed chat launcher so table actions stay reachable. */
+.app-content--chat .page-main {
+  padding-right: calc(var(--page-padding-inline) + 76px);
+}
+
+@media (max-width: 900px) {
+  .app-content--chat .page-main {
+    padding-right: var(--page-padding-inline);
+    padding-bottom: calc(152px + env(safe-area-inset-bottom));
+  }
 }
 
 .app-rail {
