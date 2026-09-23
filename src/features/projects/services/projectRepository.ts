@@ -7,7 +7,7 @@ import { AppError } from "@/lib/api/errors";
 import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import type { assignmentInputSchema, projectInputSchema, projectProgressInputSchema, worksiteInputSchema } from "@/features/projects/schemas/projectSchemas";
-import type { DailySchedule, ProjectAssignment, ProjectDetail, ProjectProgressNode, ProjectSummary, Worksite } from "@/features/projects/types/projectTypes";
+import type { DailySchedule, EmployeeProjectAssignment, ProjectAssignment, ProjectDetail, ProjectProgressNode, ProjectSummary, Worksite } from "@/features/projects/types/projectTypes";
 import { recordAuditLog } from "@/services/audit/auditLog";
 import { getApprovedLeaveForEmployeesDate } from "@/features/leave/services/leaveRepository";
 
@@ -70,7 +70,8 @@ const assignmentSelect = "*,employees!project_assignments_employee_id_fkey(emplo
 async function actorAccountId(client: SupabaseClient, user: AuthenticatedUser): Promise<string | undefined> {
   let query = client.from("app_accounts").select("id").limit(1);
   query = /^[0-9a-f-]{36}$/i.test(user.id) ? query.eq("id", user.id) : query.eq("primary_email", user.email);
-  const { data } = await query.maybeSingle();
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new AppError("SERVER_ERROR", "Không thể xác định tài khoản dự án.");
   return data?.id ? String(data.id) : undefined;
 }
 
@@ -112,13 +113,19 @@ async function assertProjectScope(client: SupabaseClient, user: AuthenticatedUse
 
 export async function listProjects(user?: AuthenticatedUser): Promise<ProjectSummary[]> {
   const client = db();
-  const [{ data, error }, { data: worksites }, { data: assignments }, scope] = await Promise.all([
-    client.from("projects").select(projectSelect).order("updated_at", { ascending: false }),
+  let projectResult = await client.from("projects").select(projectSelect).order("updated_at", { ascending: false });
+  if (projectResult.error) {
+    projectResult = await client.from("projects").select("*").order("updated_at", { ascending: false });
+  }
+  if (projectResult.error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách dự án.");
+  const [worksiteResult, assignmentResult, scope] = await Promise.all([
     client.from("worksites").select("project_id,id"),
     client.from("project_assignments").select("project_id,employee_id").eq("status", "active"),
     user ? scopedProjectIds(client, user) : Promise.resolve(undefined)
   ]);
-  if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách dự án.");
+  const data = projectResult.data;
+  const worksites = worksiteResult.error ? [] : worksiteResult.data;
+  const assignments = assignmentResult.error ? [] : assignmentResult.data;
   return (data ?? []).filter((item) => !scope || scope.has(String(item.id))).map((item) => {
     const row = item as Row;
     const manager = nested(row, "manager");
@@ -131,6 +138,38 @@ export async function listProjects(user?: AuthenticatedUser): Promise<ProjectSum
       worksiteCount: (worksites ?? []).filter((worksite) => worksite.project_id === row.id).length,
       rowVersion: Number(row.row_version)
     };
+  });
+}
+
+export async function listEmployeeProjects(user: AuthenticatedUser, employeeId: string): Promise<EmployeeProjectAssignment[]> {
+  if (!can(user.permissions, "project.view")) throw new AppError("PERMISSION_DENIED");
+  const client = db();
+  const projects = await listProjects(user);
+  if (!projects.length) return [];
+
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const { data, error } = await client
+    .from("project_assignments")
+    .select("id,project_id,assignment_role,start_date,end_date,status,worksites(name)")
+    .eq("employee_id", employeeId)
+    .in("project_id", projects.map((project) => project.id))
+    .order("start_date", { ascending: false });
+  if (error) throw new AppError("SERVER_ERROR", "Không thể đọc dự án của nhân viên.");
+
+  return (data ?? []).flatMap((value): EmployeeProjectAssignment[] => {
+    const row = value as Row;
+    const project = projectById.get(required(row, "project_id"));
+    if (!project) return [];
+    const worksite = nested(row, "worksites");
+    return [{
+      project,
+      assignmentId: required(row, "id"),
+      assignmentRole: required(row, "assignment_role") as EmployeeProjectAssignment["assignmentRole"],
+      worksiteName: worksite ? optional(worksite, "name") : undefined,
+      startDate: required(row, "start_date"),
+      endDate: optional(row, "end_date"),
+      status: required(row, "status") as EmployeeProjectAssignment["status"]
+    }];
   });
 }
 

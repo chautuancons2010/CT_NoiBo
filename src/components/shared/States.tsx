@@ -1,7 +1,7 @@
-import { AlertTriangle, Ban, Inbox, Loader2, WifiOff } from "lucide-react";
+import { AlertTriangle, Ban, Inbox, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Button } from "@/components/shared/Button";
+import { RetryButton } from "@/components/shared/RetryButton";
 import { cn } from "@/lib/utils/cn";
 
 interface StateProps {
@@ -24,14 +24,15 @@ export function EmptyState({ title, description, action, className }: StateProps
 
 export function LoadingState({
   title = "Đang tải dữ liệu",
-  description = "Vui lòng chờ trong giây lát.",
   className
 }: Partial<StateProps>) {
   return (
-    <div aria-live="polite" className={cn("state-box", className)}>
-      <Loader2 aria-hidden="true" className="state-box__spinner" size={22} />
-      <h2>{title}</h2>
-      {description ? <p>{description}</p> : null}
+    <div aria-label={title} aria-live="polite" className={cn("state-box state-box--loading-pattern", className)} role="status">
+      <span className="sr-only">{title}</span>
+      <div aria-hidden="true" className="state-loading-skeleton">
+        <span className="skeleton" />
+        {Array.from({ length: 5 }, (_, index) => <i className="skeleton" key={index} />)}
+      </div>
     </div>
   );
 }
@@ -51,14 +52,14 @@ export function ErrorState({
       <AlertTriangle aria-hidden="true" size={22} />
       <h2>{title}</h2>
       {description ? <p>{description}</p> : null}
-      {action ?? <Button variant="secondary">Tải lại</Button>}
+      {action ?? <RetryButton />}
     </div>
   );
 }
 
 export function PermissionDeniedState({
   title = "Không có quyền truy cập",
-  description = "Bạn cần quyền phù hợp để xem nội dung này.",
+  description = "Bạn không có quyền xem nội dung này.",
   className
 }: Partial<StateProps>) {
   return (

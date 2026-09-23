@@ -1,0 +1,291 @@
+/*
+ * Central UI token source of truth.
+ *
+ * Components and layouts must consume these semantic variables instead of
+ * introducing page-level sizes, colors, radii or shadows. Runtime branding
+ * in app/layout.tsx may override the --color-primary family only.
+ */
+:root {
+  /* Typography */
+  --font-family-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+  --font-meta: 12px;
+  --font-body: 14px;
+  --font-card: 15px;
+  --font-section: 20px;
+  --font-page: clamp(32px, 2.35vw, 40px);
+
+  /* Spacing and sizing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --page-padding-x: 32px;
+  --page-padding-y: 24px;
+  --page-padding-inline: clamp(20px, 2.2vw, 40px);
+  --page-padding-block: 24px;
+  --section-gap: 24px;
+  --grid-gap: 16px;
+  --card-padding: 20px;
+  --container-max-width: 1600px;
+  --inspector-width: clamp(270px, 22vw, 340px);
+  --control-height-sm: 36px;
+  --control-height-md: 44px;
+  --control-height-lg: 50px;
+  --table-header-height: 44px;
+  --table-row-height: 52px;
+  --table-cell-padding-x: 16px;
+  --sidebar-width: 232px;
+  --sidebar-collapsed-width: 64px;
+  --app-navigation-width: var(--sidebar-width);
+  --app-rail-width: var(--sidebar-collapsed-width);
+  --topbar-height: 60px;
+  --header-height: var(--topbar-height);
+  --breakpoint-mobile: 768px;
+  --breakpoint-desktop: 1024px;
+  --mobile-page-padding: 16px;
+  --mobile-section-gap: 20px;
+  --mobile-control-height: 44px;
+
+  /* Shape and elevation */
+  --radius-sm: 7px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-control: 9px;
+  --radius-input: var(--radius-control);
+  --radius-button: 9px;
+  --radius-nav: 9px;
+  --radius-card: 12px;
+  --radius-card-large: 16px;
+  --radius-panel: 16px;
+  --radius-modal: var(--radius-panel);
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 5%);
+  --shadow-md: 0 1px 2px rgb(36 49 61 / 6%);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 6%), 0 6px 18px rgb(15 118 110 / 4%);
+  --shadow-card-hover: 0 4px 10px rgb(15 23 42 / 8%), 0 14px 28px rgb(15 118 110 / 8%);
+  --shadow-floating: 0 20px 50px rgb(15 23 42 / 18%), 0 6px 16px rgb(15 23 42 / 9%);
+
+  /* Semantic color */
+  --color-primary: #2e9b67;
+  --color-primary-hover: #27875a;
+  --color-primary-active: #21734d;
+  --color-primary-soft: #eaf7f0;
+  --color-primary-border: #b8ddca;
+  --color-primary-foreground: #ffffff;
+  /* Sidebar primitives and semantic navigation aliases. Keep navigation
+     independent from module accents so all areas share one calm shell. */
+  --color-slate-700: #334155;
+  --color-slate-500: #70808c;
+  --color-sky-50: #eaf4f8;
+  --color-sky-100: #ddeef4;
+  --color-sky-700: #1f5e73;
+  --color-sky-600: #2e8aa6;
+  --sidebar-bg: var(--color-sky-50);
+  --sidebar-hover: var(--color-sky-100);
+  --sidebar-active: #ffffff;
+  --sidebar-text: var(--color-slate-700);
+  --sidebar-muted: var(--color-slate-500);
+  --sidebar-text-active: var(--color-sky-700);
+  --sidebar-icon: #527c8e;
+  --sidebar-icon-active: var(--color-sky-600);
+  --page-bg: #f4f7f8;
+  --border-soft: #dde6ea;
+  --erp-primary: #0f766e;
+  --erp-secondary: #14b8a6;
+  --erp-accent: #0369a1;
+  --erp-data-blue: #2563eb;
+  --erp-attention: #ea580c;
+  --shell-dark: #0f766e;
+  --shell-dark-soft: #0b5a54;
+  --surface-navigation: #0f766e;
+  --surface-navigation-strong: #0b5a54;
+  --shell-canvas: #eef2f5;
+  --app-bg: #f0fdfa;
+  --app-bg-soft: #f8fafc;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-1: var(--surface);
+  --surface-2: var(--app-bg-soft);
+  --surface-toolbar: #ffffff;
+  --surface-toolbar-hover: #fbfdff;
+  --surface-hover: #e9f7f4;
+  --surface-selected: #e0f2fe;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-disabled: #94a3b8;
+  --border-subtle: #e2e8f0;
+  --border-default: #cbd5e1;
+  --border-focus: var(--color-primary);
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  --primary-soft: var(--color-primary-soft);
+  --success: #0f766e;
+  --success-soft: #dcf7f1;
+  --warning: #c2410c;
+  --warning-soft: #fff9e8;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  --info: #1d4ed8;
+  --info-soft: #e8f0ff;
+  --blue-50: #f4f8ff;
+  --blue-100: #e8f0ff;
+  --blue-200: #bfdbfe;
+  --blue-500: #2563eb;
+  --blue-600: #1d4ed8;
+  --mint-50: #f0fdfa;
+  --mint-100: #dcf7f1;
+  --mint-200: #99f6e4;
+  --mint-500: #0f766e;
+  --mint-600: #0f766e;
+  --lavender-50: #faf8ff;
+  --lavender-100: #f2efff;
+  --lavender-200: #d8ceff;
+  --lavender-500: #7c3aed;
+  --lavender-600: #5e43c3;
+  --orange-50: #fff7ed;
+  --orange-100: #ffedd5;
+  --orange-200: #fed7aa;
+  --orange-500: #ea580c;
+  --orange-600: #c2410c;
+  --yellow-50: #fffdf5;
+  --yellow-100: #fff9e8;
+  --yellow-200: #fff1bd;
+  --yellow-500: #c28a05;
+  --yellow-600: #876006;
+  --cyan-50: #f4fdfe;
+  --cyan-100: #e8fbfd;
+  --cyan-200: #b8e9ed;
+  --cyan-500: #14b8a6;
+  --cyan-600: #056c75;
+  --rose-50: #fff7f7;
+  --rose-100: #fee2e2;
+  --rose-200: #fecaca;
+  --rose-500: #dc2626;
+  --rose-600: #b91c1c;
+  --pastel-cream: var(--yellow-100);
+  --pastel-yellow: var(--yellow-200);
+  --pastel-lime: var(--color-primary-soft);
+  --pastel-lavender: var(--lavender-100);
+  --pastel-violet: #e8e2ff;
+  --pastel-mint: #e9fbf2;
+  --pastel-cyan: var(--cyan-100);
+  --pastel-blue: #eaf4ff;
+  --pastel-peach: #fff2e6;
+  --pastel-rose: #fff0f2;
+  --pastel-neutral: #eef3f8;
+  --accent-violet: var(--lavender-500);
+  --accent-cyan: var(--erp-secondary);
+  --accent-green: var(--erp-primary);
+  --accent-orange: var(--erp-attention);
+  --accent-blue: var(--erp-data-blue);
+  --accent-red: var(--rose-500);
+  --color-bg: var(--app-bg);
+  --color-surface: var(--surface-1);
+  --color-surface-muted: var(--surface-2);
+  --surface-page: var(--app-bg);
+  --surface-card: var(--surface-1);
+  --color-border: var(--border-default);
+  --color-border-strong: var(--border-default);
+  --color-text: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-focus-ring: color-mix(in srgb, var(--color-primary) 25%, transparent);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-error: var(--danger);
+  --color-error-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  /* Compatibility aliases retained while feature styles are migrated. */
+  --color-blue: var(--blue-500);
+  --color-blue-soft: var(--blue-100);
+  --color-purple: var(--lavender-500);
+  --color-purple-soft: var(--lavender-100);
+  --color-amber: var(--orange-500);
+  --color-amber-soft: var(--orange-100);
+  --color-amber-text: var(--orange-600);
+  --color-coral: var(--rose-500);
+  --color-coral-soft: var(--rose-100);
+  --color-coral-text: var(--rose-600);
+  --color-danger: var(--rose-500);
+  --color-danger-soft: var(--rose-100);
+  --color-danger-text: var(--rose-600);
+  --color-teal: var(--cyan-500);
+  --color-teal-soft: var(--cyan-100);
+  --chart-green: var(--mint-500);
+  --chart-blue: var(--blue-500);
+  --chart-purple: var(--lavender-500);
+  --chart-amber: var(--orange-500);
+  --chart-coral: var(--rose-500);
+  --chart-red: var(--rose-500);
+  --chart-teal: var(--cyan-500);
+  --chart-track: var(--surface-2);
+  --color-nav-hover: var(--surface-hover);
+  --ct-green: var(--color-primary);
+  --ct-green-hover: var(--color-primary-hover);
+  --ct-green-active: var(--color-primary-active);
+  --ct-green-50: var(--color-primary-soft);
+  --ct-green-100: #d9efe3;
+  --ct-red: var(--color-danger);
+  --ct-red-hover: #c85e68;
+  --ct-red-50: var(--color-danger-soft);
+  --ct-red-100: #f8dadd;
+
+  /* Layer and responsive policy. CSS media queries use these documented tiers. */
+  --z-content: 1;
+  --z-sticky: 20;
+  --z-header: 30;
+  --z-navigation: 30;
+  --z-dropdown: 60;
+  --z-overlay: 80;
+  --z-modal: 90;
+  --z-toast: 100;
+  --layer-content: var(--z-content);
+  --layer-sticky: var(--z-sticky);
+  --layer-navigation: var(--z-navigation);
+  --layer-overlay: var(--z-overlay);
+  --breakpoint-sm: 700px;
+  --breakpoint-md: 1100px;
+  --breakpoint-lg: 1250px;
+  --motion-fast: 150ms;
+  --motion-normal: 190ms;
+  --motion-slow: 250ms;
+  --ease-standard: cubic-bezier(.2, .8, .2, 1);
+  --ease-exit: cubic-bezier(.4, 0, 1, 1);
+}
+
+html[data-table-density="compact"] { --table-row-height: 48px; }
+html[data-density="compact"] { --section-gap: 20px; --grid-gap: 16px; --card-padding: 20px; }
+html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card-padding: 28px; }
+
+@media (max-width: 700px) {
+  :root {
+    --page-padding-x: 16px;
+    --page-padding-y: 20px;
+    --section-gap: 20px;
+    --grid-gap: 16px;
+    --card-padding: 18px;
+    --font-body: 16px;
+    --font-meta: 13px;
+    --font-page: clamp(30px, 9vw, 36px);
+    --font-section: 19px;
+  }
+}

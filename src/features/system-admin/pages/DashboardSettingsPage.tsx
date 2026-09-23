@@ -12,8 +12,8 @@ import { AdminPage } from "@/features/system-admin/components/AdminPage";
 import { useSettingsEditor } from "@/features/system-admin/components/editorUtils";
 
 const landingOptions = [
-  { label: "Dashboard cá nhân", value: "/dashboard" },
-  { label: "Chấm công", value: "/attendance" },
+  { label: "Dashboard tổng", value: "/dashboard" },
+  { label: "Chấm công", value: "/attendance/me" },
   { label: "Điểm danh hôm nay", value: "/worker-attendance/today" },
   { label: "Dự án", value: "/projects" }
 ] as const;

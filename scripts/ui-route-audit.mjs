@@ -47,15 +47,15 @@ for (const file of pages) {
   else throw new Error(`Route ${route} không có title owner trực tiếp, redirect hoặc component được ủy quyền.`);
 }
 
-const [header, shell, rail, breadcrumb, registry, layout, css, themeCss, employeePage, employeeFilters, employeeTable, dashboardView, workbench, dataTable, moduleRegistry, moduleIconRegistry, moduleLauncher, backLink, overlays, warehouseViews, importExportViews] = await Promise.all([
+const [header, shell, rail, registry, layout, css, themeCss, tokenCss, employeePage, employeeFilters, employeeTable, dashboardView, workbench, dataTable, moduleRegistry, moduleIconRegistry, moduleLauncher, backLink, overlays, warehouseViews, importExportViews] = await Promise.all([
   readFile(path.join(root, "src/components/layout/AppHeader.tsx"), "utf8"),
   readFile(path.join(root, "src/components/layout/AppShell.tsx"), "utf8"),
   readFile(path.join(root, "src/components/layout/AppRail.tsx"), "utf8"),
-  readFile(path.join(root, "src/components/layout/Breadcrumb.tsx"), "utf8"),
   readFile(path.join(root, "src/config/routeRegistry.ts"), "utf8"),
   readFile(path.join(root, "src/app/layout.tsx"), "utf8"),
   readFile(path.join(root, "src/app/globals.css"), "utf8"),
   readFile(path.join(root, "src/app/theme.css"), "utf8"),
+  readFile(path.join(root, "src/styles/tokens.css"), "utf8"),
   readFile(path.join(root, "src/features/employees/pages/EmployeeListPage.tsx"), "utf8"),
   readFile(path.join(root, "src/features/employees/components/EmployeeListFilters.tsx"), "utf8"),
   readFile(path.join(root, "src/features/employees/components/EmployeeListTable.tsx"), "utf8"),
@@ -71,7 +71,7 @@ const [header, shell, rail, breadcrumb, registry, layout, css, themeCss, employe
   readFile(path.join(root, "src/features/import-export/components/ImportExportViews.tsx"), "utf8")
 ]);
 
-const [actionBars, pageHeader, filterBar, imageUploader, workerAttendanceWizard, loadingExperience, formControls, loginForm, passwordForm] = await Promise.all([
+const [actionBars, pageHeader, filterBar, imageUploader, workerAttendanceWizard, loadingExperience, formControls, formLayout, uiPlayground, loginForm, passwordForm] = await Promise.all([
   readFile(path.join(root, "src/components/shared/ActionBars.tsx"), "utf8"),
   readFile(path.join(root, "src/components/shared/PageHeader.tsx"), "utf8"),
   readFile(path.join(root, "src/components/shared/FilterBar.tsx"), "utf8"),
@@ -79,14 +79,15 @@ const [actionBars, pageHeader, filterBar, imageUploader, workerAttendanceWizard,
   readFile(path.join(root, "src/features/worker-attendance/components/WorkerAttendanceWizard.tsx"), "utf8"),
   readFile(path.join(root, "src/components/shared/LoadingExperience.tsx"), "utf8"),
   readFile(path.join(root, "src/components/shared/FormControls.tsx"), "utf8"),
+  readFile(path.join(root, "src/components/shared/FormLayout.tsx"), "utf8"),
+  readFile(path.join(root, "src/components/shared/UiPlayground.tsx"), "utf8"),
   readFile(path.join(root, "src/features/auth/components/LoginForm.tsx"), "utf8"),
   readFile(path.join(root, "src/features/auth/components/ChangePasswordForm.tsx"), "utf8")
 ]);
 
 assert(!/applicationForPath/.test(header), "Topbar đang sở hữu lại tên ứng dụng/route.");
 assert(!/app-header__(?:identity|title|application)/.test(header), "Topbar đang render lại khối định danh route.");
-assert(/breadcrumbs\.length\s*>\s*1/.test(shell), "AppShell chưa bỏ breadcrumb một cấp.");
-assert(/items\.length\s*<\s*2/.test(breadcrumb), "Breadcrumb chưa tự ẩn khi chỉ có một mục.");
+assert(!/\bBreadcrumb\b|\bgetBreadcrumbs\b|page-breadcrumb/.test(shell), "AppShell vẫn render đường dẫn breadcrumb.");
 assert(/getBackHref/.test(shell) && /<BackLink\s+href=\{backHref\}/.test(shell), "AppShell chưa bảo đảm nút Trở lại cho mọi route nghiệp vụ.");
 assert(/href\s*=\s*\{href\}/.test(backLink), "BackLink chưa dùng route cha an toàn được truyền vào.");
 assert(!/<AppSidebar/.test(shell), "AppShell vẫn render sidebar trắng thứ hai.");
@@ -97,7 +98,7 @@ assert(/@fontsource\/inter\/500\.css/.test(layout), "Thiếu Inter đầy đủ 
 assert(/@fontsource\/inter\/600\.css/.test(layout), "Thiếu Inter đầy đủ Latin + Vietnamese 600.");
 assert(!/@fontsource\/inter\/700\.css/.test(layout), "Visual direction mới không tải Inter 700 mặc định.");
 assert(!/@fontsource\/inter\/vietnamese-(?:400|500|600)\.css/.test(layout), "Không được dùng riêng subset Vietnamese vì sẽ thiếu glyph Latin.");
-assert(/--topbar-height:\s*64px/.test(themeCss), "Thiếu token chiều cao topbar mới.");
+assert(/--topbar-height:\s*60px/.test(tokenCss), "Thiếu token chiều cao topbar mới.");
 assert(!/top:\s*(?:58|66)px/.test(css), "Vẫn còn sticky offset hardcode 58/66px.");
 assert(/<EmployeeListFilters/.test(employeePage) && /className=["']employee-filter-bar["']/.test(employeeFilters), "Màn Nhân viên chưa dùng compact filter toolbar trên đầu bảng.");
 assert((employeeFilters.match(/\blabelHidden\b/g) ?? []).length === 4, "Bốn select lọc Nhân viên chưa giữ label accessible dạng compact.");
@@ -111,18 +112,19 @@ assert(/featuredActions\s*=\s*quickActions\.slice\(0,\s*4\)/.test(dashboardView)
 assert(/dashboard-chart-grid/.test(dashboardView) && /trendChart/.test(dashboardView) && /donutChart/.test(dashboardView), "Dashboard chưa chọn trend và donut từ dữ liệu thật.");
 assert(/function CircularDataChart/.test(dashboardView) && /conic-gradient/.test(dashboardView), "Dashboard chưa có circular analytics từ dữ liệu thật.");
 assert(/dashboard-personal-grid/.test(dashboardView) && /dashboard-visuals/.test(dashboardView) && /dashboard-operations-grid/.test(dashboardView) && /dashboard-bottom-grid/.test(dashboardView), "Dashboard chưa có composition control center nhiều nhịp.");
-assert(/<ModuleLauncher/.test(dashboardView) && /PersonalNoteWidget/.test(dashboardView) && /ScheduleWidget/.test(dashboardView), "Dashboard cá nhân thiếu launcher, lịch hoặc ghi chú.");
+assert(/<ModuleLauncher/.test(dashboardView) && /PersonalTodoWidget/.test(dashboardView) && /PersonalNoteWidget/.test(dashboardView), "Dashboard cá nhân thiếu launcher, việc cá nhân hoặc ghi chú.");
+assert(!/recentActivityColumns|ScheduleWidget|dashboard-recent-table/.test(dashboardView), "Dashboard vẫn hiển thị bảng dữ liệu hoặc lịch tóm tắt không có giá trị thao tác.");
 assert(/currentUser\.displayName/.test(dashboardView), "Greeting Dashboard chưa dùng người đang đăng nhập.");
 assert(/visibleApplications/.test(moduleLauncher) && /application\.id\s*!==\s*["']overview["']/.test(moduleLauncher), "Ứng dụng của tôi chưa lọc theo quyền hoặc vẫn tự liên kết Dashboard.");
 assert(/moduleIconRegistry/.test(moduleIconRegistry) && /ModuleIconDefinition/.test(moduleIconRegistry), "Thiếu ModuleIconRegistry tập trung.");
-assert(/\.module-icon-card:hover/.test(themeCss) && /translateY\(-3px\)/.test(themeCss), "Module card thiếu hover theo visual reference.");
+assert(/\.module-icon-card:hover/.test(themeCss) && /translateY\(-2px\)/.test(themeCss), "Module card thiếu phản hồi hover ổn định.");
 assert(!/WarehouseDashboardView/.test(warehouseViews) && !/ImportExportDashboardView/.test(importExportViews), "Dashboard module cũ chưa được loại bỏ.");
 assert(/operational-section__body/.test(workbench), "Panel nghiệp vụ chưa tách header và body.");
-assert(/--app-bg:\s*#efeeec/.test(themeCss), "App background chưa dùng warm neutral theo visual reference.");
-assert(/--radius-card:\s*22px/.test(themeCss) && /--radius-card-large:\s*26px/.test(themeCss), "Card radius chưa được khóa ở token 22/26px.");
-assert(/--radius-control:\s*14px/.test(themeCss) && /--control-height-md:\s*44px/.test(themeCss), "Control geometry chưa đi qua token chung.");
-assert(/--sidebar-width:\s*236px/.test(themeCss) && /--sidebar-collapsed-width:\s*80px/.test(themeCss), "Sidebar expanded/collapsed chưa đi qua token chung.");
-assert(/--pastel-lime:\s*#eaf778/.test(themeCss) && /--accent-violet:\s*#8b6cf5/.test(themeCss), "Thiếu palette pastel/accent theo visual reference.");
+assert(/--app-bg:\s*#f0fdfa/.test(tokenCss), "App background chưa dùng trust-teal enterprise token.");
+assert(/--radius-card:\s*12px/.test(tokenCss) && /--radius-card-large:\s*16px/.test(tokenCss), "Card radius chưa được khóa ở token enterprise 12/16px.");
+assert(/--radius-control:\s*9px/.test(tokenCss) && /--control-height-md:\s*44px/.test(tokenCss), "Control geometry chưa đi qua token chung.");
+assert(/--sidebar-width:\s*232px/.test(tokenCss) && /--sidebar-collapsed-width:\s*64px/.test(tokenCss), "Sidebar expanded/collapsed chưa đi qua token chung.");
+assert(/--erp-primary:\s*#0f766e/.test(tokenCss) && /--erp-data-blue:\s*#2563eb/.test(tokenCss) && /--erp-attention:\s*#ea580c/.test(tokenCss), "Thiếu trust teal/blue/orange palette theo design system.");
 assert(/\.page-main \.page-header/.test(themeCss) && /font-weight:\s*600/.test(themeCss), "Thiếu theme chung nhẹ cho tiêu đề trang.");
 assert(/onDoubleClick/.test(dataTable) && /event\.key\s*===\s*["']Enter["']/.test(dataTable), "Bảng dữ liệu chưa hỗ trợ mở bản ghi bằng double-click và Enter.");
 assert(/actionLabel\s*=\s*["']Thao tác["']/.test(dataTable), "Cột thao tác chưa có nhãn nhất quán.");
@@ -136,6 +138,12 @@ assert(/URL\.createObjectURL/.test(imageUploader) && /URL\.revokeObjectURL/.test
 assert(/<ImageUploader/.test(workerAttendanceWizard) && /capture=["']environment["']/.test(workerAttendanceWizard), "Ảnh điểm danh công trường chưa dùng ImageUploader chung.");
 assert(/GlobalRouteLoader\s*=/.test(loadingExperience) && /function PageSkeleton/.test(loadingExperience) && /function TableSkeleton/.test(loadingExperience) && /function ChartSkeleton/.test(loadingExperience), "Thiếu loading experience dùng chung.");
 assert(/function PasswordInput/.test(formControls) && /<PasswordInput/.test(loginForm) && /<PasswordInput/.test(passwordForm), "PasswordInput chưa được dùng nhất quán.");
+assert(/id \?\? generatedId/.test(formControls) && /role=["']alert["']/.test(formControls), "Form controls chưa giữ custom id hoặc chưa công bố lỗi nội tuyến.");
+assert(/data-readonly/.test(formControls) && /data-disabled/.test(formControls), "Form controls chưa phân biệt read-only và disabled.");
+assert(/function FormErrorSummary/.test(formLayout) && /href=\{`#\$\{error\.fieldId\}`\}/.test(formLayout), "Thiếu error summary liên kết về trường lỗi.");
+assert(/\.field__required/.test(themeCss) && /:read-only/.test(themeCss) && /:disabled/.test(themeCss), "Theme chưa bao phủ trạng thái trường ERP.");
+assert(/\.form-error-summary/.test(themeCss) && /\.erp-choice-group/.test(themeCss), "Theme thiếu validation summary hoặc nhóm lựa chọn ERP.");
+assert(/<FormErrorSummary/.test(uiPlayground) && /<StickyActionBar/.test(uiPlayground) && /<FilterBar/.test(uiPlayground), "UI preview chưa bao phủ form, bộ lọc và thanh lưu ERP.");
 
 const featureFiles = await collectTsxFiles(path.join(root, "src", "features"));
 const nativeTableAllowlist = new Set([
@@ -156,5 +164,5 @@ console.log(`PASS ${pages.length} authenticated routes`);
 console.log(`  title trực tiếp: ${classifications.direct.length}`);
 console.log(`  title trong component được ủy quyền: ${classifications.delegated.length}`);
 console.log(`  redirect: ${classifications.redirect.length}`);
-console.log("PASS warm pastel theme, data-rich dashboard, responsive tables và Inter contract");
+console.log("PASS UI/UX Pro Max enterprise ERP theme, data-rich dashboard, responsive tables và Inter contract");
 console.log("PASS standard tables use DataTable; 3 specialized calendar/matrix/editor tables remain native");

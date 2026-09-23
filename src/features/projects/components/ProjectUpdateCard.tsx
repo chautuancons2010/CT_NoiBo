@@ -15,7 +15,7 @@ export function ProjectUpdateCard({ update, showProject = false }: { update: Pro
       <div className="project-update-card__identity"><span className={`update-type update-type--${update.updateType}`}>{updateTypeLabels[update.updateType]}</span>{update.pinned ? <span className="pinned-label"><Pin size={13} /> Đã ghim</span> : null}</div>
       <time dateTime={update.createdAt}>{new Date(update.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</time>
     </header>
-    {showProject ? <Link className="project-update-card__project" href={`/projects/${update.projectId}/overview`}>{update.projectName}</Link> : null}
+    {showProject ? <Link className="project-update-card__project" href={`/projects/${update.projectId}/progress`}>{update.projectName}</Link> : null}
     <Link href={`/projects/${update.projectId}/updates/${update.id}`}><h3>{update.title}</h3></Link>
     <p className="project-update-card__content">{update.content}</p>
     <div className="project-update-card__meta">

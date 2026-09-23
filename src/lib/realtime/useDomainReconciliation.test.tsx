@@ -33,6 +33,7 @@ describe("useDomainReconciliation", () => {
   });
 
   it("contains a rejected background reconciliation", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const reconcile = vi.fn(async () => { throw new Error("temporary failure"); });
     render(<Consumer reconcile={reconcile} />);
     await act(async () => {
@@ -40,5 +41,6 @@ describe("useDomainReconciliation", () => {
       await Promise.resolve();
     });
     expect(reconcile).toHaveBeenCalledOnce();
+    expect(warning).toHaveBeenCalledOnce();
   });
 });

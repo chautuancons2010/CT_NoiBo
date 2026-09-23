@@ -15,16 +15,48 @@ export type NavigationIcon =
   | "Repeat"
   | "Boxes"
   | "Ship"
-  | "FileText"
   | "CheckSquare"
-  | "BarChart3"
   | "UserCog"
   | "ShieldCheck"
   | "Settings"
   | "Bell"
   | "UserRound"
   | "WalletCards"
-  | "MessageCircle";
+  | "MessageCircle"
+  | "Building2"
+  | "IdCard"
+  | "FileSignature"
+  | "HeartPulse"
+  | "CalendarOff"
+  | "CalendarCheck"
+  | "Send"
+  | "TableProperties"
+  | "CalendarRange"
+  | "CalendarClock"
+  | "Timer"
+  | "History"
+  | "FileClock"
+  | "Newspaper"
+  | "HardHat"
+  | "Package"
+  | "ClipboardPenLine"
+  | "Scale"
+  | "ScanLine"
+  | "BookOpenCheck"
+  | "Truck"
+  | "Handshake"
+  | "FolderArchive"
+  | "Landmark"
+  | "SlidersHorizontal"
+  | "UsersRound"
+  | "Calculator"
+  | "ReceiptText"
+  | "Library"
+  | "ChartNoAxesCombined"
+  | "ChartSpline"
+  | "Cable"
+  | "PackageCheck"
+  | "ShieldAlert";
 
 export interface NavigationItem {
   label: string;
@@ -67,90 +99,36 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Phòng ban",
         href: "/employees/departments",
-        icon: "Users",
+        icon: "Building2",
         requiredPermission: "employee.view",
         alternativePermission: "department.manage"
       },
       {
         label: "Chức vụ",
         href: "/employees/positions",
-        icon: "UserCog",
+        icon: "IdCard",
         requiredPermission: "employee.view",
         alternativePermission: "position.manage"
       },
       {
         label: "Hợp đồng",
         href: "/employees/contracts",
-        icon: "FileText",
+        icon: "FileSignature",
         requiredPermission: "contract.view"
       },
       {
         label: "Bảo hiểm xã hội",
         href: "/employees/insurance",
-        icon: "ShieldCheck",
+        icon: "HeartPulse",
         requiredPermission: "insurance.view"
       },
-      {
-        label: "Chấm công hôm nay",
-        href: "/attendance/today",
-        icon: "Clock3",
-        requiredPermission: "attendance.view_all",
-        alternativePermission: "attendance.manage"
-      },
-      {
-        label: "Bảng công",
-        href: "/timesheets/matrix",
-        icon: "CalendarDays",
-        requiredPermission: "timesheet.view",
-        alternativePermissions: ["attendance.view_all", "attendance.period.manage"]
-      },
-      {
-        label: "Kỳ công",
-        href: "/timesheets",
-        icon: "CalendarDays",
-        requiredPermission: "timesheet.view",
-        alternativePermissions: ["attendance.view_all", "attendance.period.manage"],
-        exact: true
-      },
-      {
-        label: "Ca làm",
-        href: "/shifts",
-        icon: "CalendarDays",
-        requiredPermission: "shift.view"
-      },
-      {
-        label: "Nghỉ phép",
-        href: "/leave/manage",
-        icon: "FileText",
-        requiredPermission: "leave.view_all"
-      },
-      {
-        label: "Điều chỉnh công",
-        href: "/timesheets/adjustments",
-        icon: "ClipboardCheck",
-        requiredPermission: "timesheet.adjust",
-        alternativePermissions: ["attendance.adjust", "attendance.manage", "attendance.view_all"]
-      },
-      {
-        label: "Nhật ký công",
-        href: "/attendance/logs",
-        icon: "Clock3",
-        requiredPermission: "attendance.log.view",
-        alternativePermission: "attendance.view_all"
-      },
-      {
-        label: "Lịch làm việc",
-        href: "/shifts/calendar",
-        icon: "CalendarDays",
-        requiredPermission: "shift.view"
-      }
     ]
   },
   {
-    label: "Chấm công",
+    label: "Cá nhân",
     items: [
       {
-        label: "Hôm nay",
+        label: "Chấm công",
         href: "/attendance/me",
         icon: "Clock3",
         requiredPermission: "attendance.self",
@@ -159,14 +137,21 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Lịch công của tôi",
         href: "/attendance/history",
-        icon: "CalendarDays",
+        icon: "CalendarRange",
         requiredPermission: "attendance.self.view",
         alternativePermission: "attendance.self_history"
       },
       {
+        label: "Nghỉ phép",
+        href: "/leave",
+        icon: "CalendarOff",
+        requiredPermission: "leave.self.view",
+        alternativePermission: "leave.self.create"
+      },
+      {
         label: "Đơn của tôi",
         href: "/attendance/requests",
-        icon: "FileText",
+        icon: "Send",
         requiredPermission: "attendance.self",
         alternativePermission: "attendance.self_request"
       },
@@ -180,33 +165,62 @@ export const desktopNavigation: NavigationGroup[] = [
     ]
   },
   {
-    label: "Dự án",
+    label: "Quản trị công",
     items: [
       {
-        label: "Dự án / Công trường",
+        label: "Chấm công hôm nay",
+        href: "/attendance/today",
+        icon: "Timer",
+        requiredPermission: "attendance.view_all",
+        alternativePermission: "attendance.manage"
+      },
+      {
+        label: "Bảng công",
+        href: "/timesheets/matrix",
+        icon: "TableProperties",
+        requiredPermission: "timesheet.view",
+        alternativePermissions: ["timesheet.view_team", "timesheet.view_all", "attendance.view_all", "attendance.period.manage"]
+      },
+      {
+        label: "Kỳ công",
+        href: "/timesheets",
+        icon: "CalendarRange",
+        requiredPermission: "timesheet.view",
+        alternativePermissions: ["timesheet.view_team", "timesheet.view_all", "attendance.view_all", "attendance.period.manage"],
+        exact: true
+      },
+      {
+        label: "Ca làm",
+        href: "/shifts",
+        icon: "CalendarClock",
+        requiredPermission: "shift.view"
+      },
+      {
+        label: "Quản lý nghỉ phép",
+        href: "/leave/manage",
+        icon: "CalendarCheck",
+        requiredPermission: "leave.view_all",
+        exact: true
+      },
+      {
+        label: "Điều chỉnh công",
+        href: "/timesheets/adjustments",
+        icon: "ClipboardPenLine",
+        requiredPermission: "timesheet.adjust",
+        alternativePermissions: ["attendance.adjust", "attendance.manage", "attendance.view_all"]
+      },
+    ]
+  },
+  {
+    label: "Gói / Công trường",
+    items: [
+      {
+        label: "Gói / Công trường",
         href: "/projects",
         icon: "BriefcaseBusiness",
         requiredPermission: "project.view",
         exact: true
       },
-      {
-        label: "Cập nhật dự án",
-        href: "/projects/updates",
-        icon: "ClipboardCheck",
-        requiredPermission: "project.view"
-      },
-      {
-        label: "Theo dõi dự án",
-        href: "/project-monitoring",
-        icon: "BarChart3",
-        requiredPermission: "project_monitoring.view"
-      },
-      {
-        label: "Điểm danh công nhân",
-        href: "/worker-attendance",
-        icon: "ClipboardCheck",
-        requiredPermission: "worker_attendance.view"
-      }
     ]
   },
   {
@@ -221,7 +235,7 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Hàng hóa",
         href: "/warehouse/items",
-        icon: "Warehouse",
+        icon: "Package",
         requiredPermission: "warehouse.item.view"
       },
       {
@@ -251,19 +265,19 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Điều chỉnh tồn",
         href: "/warehouse/adjustments",
-        icon: "FileText",
+        icon: "Scale",
         requiredPermission: "warehouse.adjustment.view"
       },
       {
         label: "Kiểm kê",
         href: "/warehouse/stock-counts",
-        icon: "ClipboardCheck",
+        icon: "ScanLine",
         requiredPermission: "warehouse.stock_count.view"
       },
       {
         label: "Sổ kho",
         href: "/warehouse/ledger",
-        icon: "FileText",
+        icon: "BookOpenCheck",
         requiredPermission: "warehouse.ledger.view"
       }
     ]
@@ -280,31 +294,31 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Vận chuyển",
         href: "/import-export/transport",
-        icon: "Ship",
+        icon: "Truck",
         requiredPermission: "shipment.view"
       },
       {
         label: "Hợp đồng mua hàng",
         href: "/import-export/contracts",
-        icon: "FileText",
+        icon: "Handshake",
         requiredPermission: "import_contract.view"
       },
       {
         label: "Chứng từ",
         href: "/import-export/documents",
-        icon: "FileText",
+        icon: "FolderArchive",
         requiredPermission: "shipment_document.view"
       },
       {
         label: "Thông quan",
         href: "/import-export/customs",
-        icon: "CheckSquare",
+        icon: "Landmark",
         requiredPermission: "customs.view"
       },
       {
         label: "Đối tác",
         href: "/import-export/partners",
-        icon: "Users",
+        icon: "UsersRound",
         requiredPermission: "partner.view"
       }
     ]
@@ -312,11 +326,8 @@ export const desktopNavigation: NavigationGroup[] = [
   {
     label: "Kế toán",
     items: [
-      { label: "Tổng quan kế toán", href: "/accounting", icon: "LayoutDashboard", requiredPermission: "accounting.access", exact: true },
-      { label: "Hồ sơ lương", href: "/accounting/salaries", icon: "WalletCards", requiredPermission: "salary.view" },
-      { label: "Bảng lương", href: "/accounting/payroll", icon: "FileText", requiredPermission: "payroll.view" },
-      { label: "Phiếu lương", href: "/accounting/payslips", icon: "WalletCards", requiredPermission: "payslip.self.view" },
-      { label: "Nhật ký lương", href: "/accounting/salary-history", icon: "FileText", requiredPermission: "salary.history.view" }
+      { label: "Kỳ lương", href: "/accounting/payroll", icon: "Calculator", requiredPermission: "payroll.view", alternativePermission: "payroll.create" },
+      { label: "Hồ sơ lương", href: "/accounting/salaries", icon: "WalletCards", requiredPermission: "salary.view" }
     ]
   },
   {
@@ -332,18 +343,19 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Phê duyệt",
         href: "/approvals",
         icon: "CheckSquare",
-        requiredPermission: "approval.inbox.view"
+        requiredPermission: "approval.inbox.view",
+        alternativePermissions: ["approval.view", "approval.view_assigned", "approval.view_all", "leave.approve"]
       },
       {
         label: "Tài liệu",
         href: "/documents",
-        icon: "FileText",
+        icon: "Library",
         requiredPermission: "document.view"
       },
       {
         label: "Báo cáo",
         href: "/reports",
-        icon: "BarChart3",
+        icon: "ChartNoAxesCombined",
         requiredPermission: "report.view"
       }
     ]
@@ -354,7 +366,7 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Cấu hình nghiệp vụ",
         href: "/settings",
-        icon: "Settings",
+        icon: "SlidersHorizontal",
         requiredPermission: "settings.view",
         exact: true
       },
@@ -379,7 +391,7 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Tích hợp",
         href: "/settings/integrations",
-        icon: "Settings",
+        icon: "Cable",
         requiredPermission: "integration.view"
       },
       {
@@ -391,13 +403,13 @@ export const desktopNavigation: NavigationGroup[] = [
       {
         label: "Cấu hình XNK",
         href: "/settings/import-export",
-        icon: "Ship",
+        icon: "PackageCheck",
         requiredPermission: "module.manage"
       },
       {
         label: "Nhật ký hệ thống",
         href: "/settings/audit-log",
-        icon: "FileText",
+        icon: "ShieldAlert",
         requiredPermission: "audit.view"
       }
     ]

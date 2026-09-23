@@ -7,5 +7,5 @@ import { getRequestUser } from "@/services/auth/getRequestUser";
 export default async function Page(){
   const user=await getRequestUser();
   const canEdit=Boolean(user&&(can(user.permissions,"shift.manage")||can(user.permissions,"shift.edit")));
-  return <div className="page-stack"><BackLink href="/timesheets"/><PageHeader title="Ca làm"/><ShiftSettings canEdit={canEdit}/></div>;
+  return <div className="page-stack"><BackLink href="/settings/attendance"/><PageHeader title="Ca làm"/><ShiftSettings canEdit={canEdit}/></div>;
 }

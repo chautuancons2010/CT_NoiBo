@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
+import { Select } from "@/components/shared/FormControls";
 import { DataSurface, DetailPageLayout } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
@@ -32,6 +33,7 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
   const [tab, setTab] = useState<"summary" | "daily">(employeeId ? "daily" : "summary");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [employeeGroup, setEmployeeGroup] = useState<"all" | "office" | "worker">("all");
   const load = useCallback(async () => {
     const response = await fetch(`/api/v1/timesheet-periods/${periodId}`, { cache: "no-store" });
     const body = await response.json() as { data?: Detail; error?: { message: string } };
@@ -52,8 +54,13 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
   }, [canExport, load]);
   useDomainReconciliation("timesheets", load);
 
-  const daily = useMemo(() => detail?.daily.filter((item) => !employeeId || item.employeeId === employeeId) ?? [], [detail, employeeId]);
-  const summaries = useMemo(() => detail?.summaries.filter((item) => !employeeId || item.employeeId === employeeId) ?? [], [detail, employeeId]);
+  const matchesEmployeeGroup = useCallback((employmentTypeName: string) => {
+    if (employeeGroup === "all") return true;
+    const isWorker = /công nhân|công trường/i.test(employmentTypeName);
+    return employeeGroup === "worker" ? isWorker : !isWorker;
+  }, [employeeGroup]);
+  const daily = useMemo(() => detail?.daily.filter((item) => (!employeeId || item.employeeId === employeeId) && matchesEmployeeGroup(item.employmentTypeName)) ?? [], [detail, employeeId, matchesEmployeeGroup]);
+  const summaries = useMemo(() => detail?.summaries.filter((item) => (!employeeId || item.employeeId === employeeId) && matchesEmployeeGroup(item.employmentTypeName)) ?? [], [detail, employeeId, matchesEmployeeGroup]);
 
   async function action(kind: "recompute" | "lock" | "unlock") {
     if (!detail) return;
@@ -119,6 +126,7 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     <div className="timesheet-tabs"><button className={tab === "summary" ? "is-active" : ""} onClick={() => setTab("summary")} type="button">Tổng hợp ({summaries.length})</button><button className={tab === "daily" ? "is-active" : ""} onClick={() => setTab("daily")} type="button">Chi tiết ({daily.length})</button>{canViewExceptions ? <Link href={`/timesheets/exceptions?periodId=${periodId}`}>Ngoại lệ</Link> : null}</div>
+    {!employeeId ? <div className="timesheet-period-filter"><Select label="Nhóm nhân viên" name="employeeGroup" onChange={(event) => setEmployeeGroup(event.target.value as "all" | "office" | "worker")} options={[{ value: "all", label: "Tất cả nhân viên" }, { value: "office", label: "Nhân viên văn phòng" }, { value: "worker", label: "Công nhân" }]} value={employeeGroup} /></div> : null}
     <DataSurface>{tab === "summary" ? <DataTable columns={summaryColumns} data={summaries} emptyDescription="" emptyTitle="Chưa có tổng hợp" getRowId={(item) => item.employeeId} rowHrefPrefix={`/timesheets/periods/${periodId}/employees/`} /> : <DataTable actions={period.status !== "locked" && canAdjust ? (item) => <DropdownMenu label={`Thao tác công ${item.employeeName}`}><Link href={`/timesheets/adjustments?periodId=${periodId}&employeeId=${item.employeeId}&date=${item.workDate}&rowVersion=${period.rowVersion}`}>Điều chỉnh</Link></DropdownMenu> : undefined} columns={dailyColumns} data={daily} emptyDescription="" emptyTitle="Chưa có dữ liệu ngày công" getRowId={(item) => item.id} />}</DataSurface>
   </DetailPageLayout>;
 }

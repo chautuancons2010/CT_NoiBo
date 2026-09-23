@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { subscribeRealtimeDomain, type RealtimeDomain } from "@/lib/realtime/coordinator";
+import { errorFingerprint, logger } from "@/lib/logger";
 
 export function useDomainReconciliation(domain: RealtimeDomain, reconcile: () => unknown | Promise<unknown>): void {
   const latest = useRef(reconcile);
@@ -23,9 +24,10 @@ export function useDomainReconciliation(domain: RealtimeDomain, reconcile: () =>
           queued.current = false;
           try {
             await latest.current();
-          } catch {
-            // A domain consumer owns its visible error state. Realtime must never
-            // create an unhandled rejection that tears down the current route.
+          } catch (error) {
+            logger.warn("realtime.reconciliation_failed", {
+              metadata: { domain, fingerprint: errorFingerprint(error) }
+            });
           }
         } while (mounted && queued.current);
       } finally {

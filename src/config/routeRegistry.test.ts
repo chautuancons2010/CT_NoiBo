@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getBackHref, getBreadcrumbs, getRouteMeta } from "@/config/routeRegistry";
+import { employeeDetailSections, getBackHref, getBreadcrumbs, getRouteMeta, projectDetailSections } from "@/config/routeRegistry";
 
 describe("route registry", () => {
   it("returns metadata for exact routes", () => {
@@ -18,6 +18,27 @@ describe("route registry", () => {
     ]);
   });
 
+  it("keeps attendance and project history as route-backed employee tabs", () => {
+    expect(employeeDetailSections).toEqual(expect.arrayContaining([
+      { value: "attendance", label: "Chấm công" },
+      { value: "history", label: "Lịch sử" }
+    ]));
+  });
+
+  it("uses the four package workspaces in business order", () => {
+    expect(projectDetailSections).toEqual([
+      { value: "progress", label: "Thi công" },
+      { value: "team", label: "Chấm công" },
+      { value: "profile", label: "Hồ sơ" },
+      { value: "documents", label: "Tài liệu" }
+    ]);
+    expect(getBreadcrumbs("/projects/package-1/documents")).toEqual([
+      { label: "Gói / Công trường", href: "/projects" },
+      { label: "package-1", href: "/projects/package-1/progress" },
+      { label: "Tài liệu" }
+    ]);
+  });
+
   it("hides a breadcrumb that only repeats the current page", () => {
     expect(getBreadcrumbs("/dashboard")).toEqual([]);
   });
@@ -32,7 +53,12 @@ describe("route registry", () => {
   it("resolves a stable return route for every navigation depth", () => {
     expect(getBackHref("/employees/NV001/contracts")).toBe("/employees/NV001/profile");
     expect(getBackHref("/warehouse/items/57/edit")).toBe("/warehouse/items/57");
+    expect(getBackHref("/timesheets/periods/period-1/employees/employee-1")).toBe("/timesheets/periods/period-1");
     expect(getBackHref("/employees")).toBe("/dashboard");
+    expect(getBackHref("/attendance/me")).toBe("/dashboard");
+    expect(getBackHref("/attendance/history")).toBe("/dashboard");
+    expect(getBackHref("/attendance/today")).toBe("/dashboard");
+    expect(getBackHref("/warehouse/inventory")).toBe("/dashboard");
     expect(getBackHref("/dashboard")).toBeNull();
   });
 });

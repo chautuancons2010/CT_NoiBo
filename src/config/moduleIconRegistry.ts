@@ -23,14 +23,14 @@ export interface ModuleIconDefinition {
 
 /** Single source of truth for module icon and color treatment. */
 export const moduleIconRegistry: Record<ApplicationId, ModuleIconDefinition> = {
-  overview: { icon: "LayoutDashboard", tone: "teal", accentColor: "#197c83", accentSoft: "var(--pastel-cyan)" },
-  "human-resources": { icon: "Users", tone: "green", accentColor: "#218554", accentSoft: "var(--pastel-mint)" },
-  attendance: { icon: "Clock3", tone: "blue", accentColor: "#386fc7", accentSoft: "var(--pastel-blue)" },
-  projects: { icon: "BriefcaseBusiness", tone: "purple", accentColor: "#684fc4", accentSoft: "var(--pastel-lavender)" },
-  warehouse: { icon: "Boxes", tone: "amber", accentColor: "#a56519", accentSoft: "var(--pastel-cream)" },
-  "import-export": { icon: "Ship", tone: "teal", accentColor: "#197c83", accentSoft: "var(--pastel-cyan)" },
-  accounting: { icon: "WalletCards", tone: "green", accentColor: "#218554", accentSoft: "var(--pastel-mint)" },
-  messaging: { icon: "MessageCircle", tone: "blue", accentColor: "#386fc7", accentSoft: "var(--pastel-blue)" },
-  operations: { icon: "CheckSquare", tone: "red", accentColor: "#ae3d49", accentSoft: "var(--pastel-rose)" },
-  system: { icon: "Settings", tone: "slate", accentColor: "#5f6070", accentSoft: "var(--pastel-neutral)" }
+  overview: { icon: "LayoutDashboard", tone: "teal", accentColor: "var(--accent-cyan)", accentSoft: "var(--pastel-cyan)" },
+  "human-resources": { icon: "Users", tone: "green", accentColor: "var(--accent-green)", accentSoft: "var(--pastel-mint)" },
+  attendance: { icon: "Clock3", tone: "blue", accentColor: "var(--accent-blue)", accentSoft: "var(--pastel-blue)" },
+  projects: { icon: "BriefcaseBusiness", tone: "purple", accentColor: "var(--accent-violet)", accentSoft: "var(--pastel-lavender)" },
+  warehouse: { icon: "Boxes", tone: "amber", accentColor: "var(--accent-orange)", accentSoft: "var(--pastel-cream)" },
+  "import-export": { icon: "Ship", tone: "teal", accentColor: "var(--accent-cyan)", accentSoft: "var(--pastel-cyan)" },
+  accounting: { icon: "WalletCards", tone: "green", accentColor: "var(--accent-green)", accentSoft: "var(--pastel-mint)" },
+  messaging: { icon: "MessageCircle", tone: "blue", accentColor: "var(--accent-blue)", accentSoft: "var(--pastel-blue)" },
+  operations: { icon: "CheckSquare", tone: "red", accentColor: "var(--accent-red)", accentSoft: "var(--pastel-rose)" },
+  system: { icon: "Settings", tone: "slate", accentColor: "var(--text-secondary)", accentSoft: "var(--pastel-neutral)" }
 };

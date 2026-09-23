@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type MouseEvent, type ReactNode } from "react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
 
 import { Checkbox } from "@/components/shared/FormControls";
@@ -33,6 +33,13 @@ export interface DataTableProps<TData extends object> {
   actions?: (row: TData) => ReactNode;
   actionLabel?: string;
   className?: string;
+  sort?: DataTableSort;
+  onSortChange?: (sort: DataTableSort) => void;
+}
+
+export interface DataTableSort {
+  columnId: string;
+  direction: "ascending" | "descending";
 }
 
 function renderCell<TData extends object>(row: TData, column: DataTableColumn<TData>): ReactNode {
@@ -59,7 +66,7 @@ export function DataTable<TData extends object>({
   loading,
   error,
   emptyTitle = "Chưa có dữ liệu",
-  emptyDescription = "Module sẽ được triển khai ở bước tiếp theo.",
+  emptyDescription = "Không có bản ghi phù hợp.",
   getRowId,
   selectedRowIds,
   onSelectRow,
@@ -67,9 +74,36 @@ export function DataTable<TData extends object>({
   rowHrefSuffix = "",
   actions,
   actionLabel = "Thao tác",
-  className
+  className,
+  sort,
+  onSortChange
 }: DataTableProps<TData>) {
   const [activeRowId, setActiveRowId] = useState<string>();
+  const [internalSort, setInternalSort] = useState<DataTableSort>();
+  const activeSort = sort ?? internalSort;
+
+  const shownData = useMemo(() => {
+    if (!activeSort) return data;
+    const column = columns.find((item) => item.id === activeSort.columnId);
+    if (!column?.sortable) return data;
+    const key = column.accessor ?? column.id as keyof TData;
+    return [...data].sort((left, right) => {
+      const comparison = String(left[key] ?? "").localeCompare(String(right[key] ?? ""), "vi", {
+        numeric: true,
+        sensitivity: "base"
+      });
+      return activeSort.direction === "ascending" ? comparison : -comparison;
+    });
+  }, [activeSort, columns, data]);
+
+  function changeSort(columnId: string) {
+    const next: DataTableSort = {
+      columnId,
+      direction: activeSort?.columnId === columnId && activeSort.direction === "ascending" ? "descending" : "ascending"
+    };
+    if (onSortChange) onSortChange(next);
+    else setInternalSort(next);
+  }
 
   function isDirectAction(event: MouseEvent<HTMLElement>): boolean {
     return event.target instanceof Element && Boolean(event.target.closest("a, button, input, select, textarea, summary"));
@@ -83,14 +117,13 @@ export function DataTable<TData extends object>({
     return <ErrorState description={error} />;
   }
 
-  if (data.length === 0) {
-    return <EmptyState description={emptyDescription} title={emptyTitle} />;
-  }
+  const isEmpty = shownData.length === 0;
+  const columnCount = columns.length + (onSelectRow ? 1 : 0) + (actions ? 1 : 0);
 
   return (
     <div className={cn("data-table-shell", className)}>
       <div className="data-table-scroll">
-        <table aria-label={ariaLabel} className="data-table">
+        <table aria-label={ariaLabel} className="data-table data-table--workspace">
           <thead>
             <tr>
               {onSelectRow ? <th className="data-table__select">Chọn</th> : null}
@@ -102,16 +135,23 @@ export function DataTable<TData extends object>({
                     column.align && `text-${column.align}`
                   )}
                   data-column={column.id}
+                  aria-sort={column.sortable && activeSort?.columnId === column.id ? activeSort.direction : undefined}
                   scope="col"
                 >
-                  {column.header}
+                  {column.sortable ? <button className="data-table__sort" onClick={() => changeSort(column.id)} type="button">{column.header}<span aria-hidden="true">{activeSort?.columnId === column.id ? activeSort.direction === "ascending" ? "↑" : "↓" : "↕"}</span></button> : column.header}
                 </th>
               ))}
               {actions ? <th className="data-table__actions" scope="col">{actionLabel}</th> : null}
             </tr>
           </thead>
           <tbody>
-            {data.map((row, index) => {
+            {isEmpty ? (
+              <tr>
+                <td className="data-table__empty" colSpan={columnCount}>
+                  <EmptyState description={emptyDescription} title={emptyTitle} />
+                </td>
+              </tr>
+            ) : shownData.map((row, index) => {
               const rowId = getRowId?.(row, index) ?? String(index);
               const selected = selectedRowIds?.has(rowId) ?? false;
               const active = selected || activeRowId === rowId;
@@ -157,7 +197,9 @@ export function DataTable<TData extends object>({
         </table>
       </div>
       <div className="mobile-record-list">
-        {data.map((row, index) => {
+        {isEmpty ? (
+          <EmptyState description={emptyDescription} title={emptyTitle} />
+        ) : shownData.map((row, index) => {
           const rowId = getRowId?.(row, index) ?? String(index);
           return (
             <article className="mobile-record" key={rowId}>

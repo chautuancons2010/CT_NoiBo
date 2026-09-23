@@ -51,3 +51,8 @@ export const closeWorkerDaySchema = z.object({
     exceptionTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional()
   })).max(500)
 });
+
+export const workerAttendanceReminderSchema = z.object({
+  projectId: z.string().uuid(),
+  date: z.string().date()
+});

@@ -17,7 +17,7 @@
 
 ## First admin
 
-Sau khi chạy migrations: đặt mật khẩu mạnh trong biến tiến trình `BOOTSTRAP_ADMIN_PASSWORD`, rồi chạy `npm run bootstrap:admin -- --username=<username> --name=<name>`. Script tạo tài khoản active, gán role admin và không gửi email. Không có password mặc định.
+Sau khi chạy migrations: đặt mật khẩu mạnh trong biến tiến trình `BOOTSTRAP_ADMIN_PASSWORD`, rồi chạy `npm run bootstrap:admin -- --username=<username> --name=<name>`. Với admin hiện hữu, dùng `npm run bootstrap:admin -- --existing-email=<email>` để giữ username và tên hiển thị. Script tạo/cập nhật tài khoản active, gán role admin và không gửi email. Không có password mặc định.
 
 ## File/malware
 

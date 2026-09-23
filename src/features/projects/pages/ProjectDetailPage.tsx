@@ -1,26 +1,90 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
-import { BackLink } from "@/components/shared/BackLink";
-import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Tabs } from "@/components/shared/Tabs";
 import { projectDetailSections } from "@/config/routeRegistry";
-import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
-import { getEmployeePickerOptions } from "@/features/employees/services/employeeService";
-import { ProjectDetailView } from "@/features/projects/components/ProjectDetailView";
-import { getProject, getProjectSchedule } from "@/features/projects/services/projectRepository";
-import { listProjectHealthHistory, listProjectUpdates } from "@/features/projects/services/projectUpdateRepository";
+import { PackageWorkspace } from "@/features/projects/components/package-workspace/PackageWorkspace";
+import { getProject, getProjectRoster, getProjectSchedule, listProjectProgress } from "@/features/projects/services/projectRepository";
+import { listProjectUpdates } from "@/features/projects/services/projectUpdateRepository";
+import type { DailySchedule, ProjectProgressNode } from "@/features/projects/types/projectTypes";
+import { listWorkerSessions } from "@/features/worker-attendance/services/workerAttendanceRepository";
+import { can } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
-import { can } from "@/lib/auth/permissions";
 
 export async function ProjectDetailPage({ projectId, section }: { projectId: string; section: string }) {
+  const legacySections: Record<string, string> = {
+    overview: "profile",
+    updates: "progress",
+    schedule: "progress",
+    "worker-attendance": "team",
+    history: "profile"
+  };
+  if (legacySections[section]) redirect(`/projects/${projectId}/${legacySections[section]}`);
   if (!projectDetailSections.some((item) => item.value === section)) notFound();
+
   const user = requireAuthenticatedUser(await getRequestUser());
   const project = await getProject(projectId, user);
-  const employeeOptions = getEmployeePickerOptions(await getEmployeeDataSetAsync(), { activeOnly: true });
-  const today = new Date(); const end = new Date(today); end.setDate(today.getDate() + 6);
-  const schedule = section === "schedule" ? await getProjectSchedule(projectId, today.toISOString().slice(0, 10), end.toISOString().slice(0, 10), user) : [];
-  const overviewUpdates = section === "overview" ? (await listProjectUpdates(user, projectId, { limit: 5 })).items : [];
-  const healthHistory = section === "history" ? await listProjectHealthHistory(user, projectId) : [];
-  return <div className="page-stack"><BackLink href="/projects" label="Danh sách dự án" /><header className="project-detail-header"><span>{project.code}</span><h1>{project.name}</h1><StatusBadge tone={project.status === "active" ? "success" : "neutral"}>{project.status === "active" ? "Đang thực hiện" : project.status}</StatusBadge><small>{project.startDate} → {project.expectedEndDate ?? "—"}</small></header><Tabs items={projectDetailSections.map((item) => ({ label: item.label, href: `/projects/${projectId}/${item.value}`, active: item.value === section }))} label="Dự án" /><ProjectDetailView canEditProgress={can(user.permissions, "project.edit") || can(user.permissions, "project.manage_schedule")} employeeOptions={employeeOptions} healthHistory={healthHistory} overviewUpdates={overviewUpdates} project={project} schedule={schedule} section={section} /></div>;
+  const today = new Date();
+  const end = new Date(today);
+  end.setDate(today.getDate() + 6);
+  const todayKey = today.toISOString().slice(0, 10);
+  const monthStart = `${todayKey.slice(0, 7)}-01`;
+
+  let schedule: DailySchedule[] = [];
+  let progressNodes: ProjectProgressNode[] = [];
+  let progressLoadError: string | undefined;
+  let scheduleLoadError: string | undefined;
+  if (section === "progress") {
+    const [progressResult, scheduleResult] = await Promise.allSettled([
+      listProjectProgress(user, projectId),
+      getProjectSchedule(projectId, todayKey, end.toISOString().slice(0, 10), user),
+    ]);
+    if (progressResult.status === "fulfilled") progressNodes = progressResult.value;
+    else progressLoadError = "Không thể tải tiến độ thi công.";
+    if (scheduleResult.status === "fulfilled") schedule = scheduleResult.value;
+    else scheduleLoadError = "Không thể tải kế hoạch 7 ngày.";
+  }
+
+  const canViewUpdates = can(user.permissions, "project_update.view_project") || can(user.permissions, "project_update.view_all");
+  const documentUpdates = canViewUpdates && (section === "documents" || section === "profile")
+    ? (await listProjectUpdates(user, projectId, { limit: 100 })).items
+    : [];
+  const canViewAttendance = can(user.permissions, "worker_attendance.view")
+    || can(user.permissions, "worker_attendance.view_all")
+    || can(user.permissions, "worker_attendance.view_project");
+  const [todayRoster, attendanceSessions] = section === "team"
+    ? await Promise.all([
+      getProjectRoster(projectId, todayKey, undefined, user),
+      canViewAttendance
+        ? listWorkerSessions(user, { from: monthStart, to: todayKey, projectId }).catch(() => [])
+        : Promise.resolve([])
+    ])
+    : [[], []];
+
+  const editProgress = can(user.permissions, "project.edit") || can(user.permissions, "project.manage_schedule");
+  return <PackageWorkspace
+    attendanceSessions={attendanceSessions}
+    permissions={{
+      editProgress,
+      fieldUpdate: editProgress && can(user.permissions, "project_update.create"),
+      manageTeam: can(user.permissions, "project.manage_team"),
+      manageWorksites: can(user.permissions, "worksite.manage"),
+      openAttendance: can(user.permissions, "worker_attendance.create"),
+      adjustAttendance: can(user.permissions, "worker_attendance.adjust"),
+      exportAttendance: can(user.permissions, "timesheet.export"),
+      viewAttendance: canViewAttendance,
+      updateHealth: can(user.permissions, "project_health.update"),
+      uploadDocuments: can(user.permissions, "project_update.create"),
+      viewRecords: canViewUpdates,
+      viewDocuments: canViewUpdates
+    }}
+    progressLoadError={progressLoadError}
+    progressNodes={progressNodes}
+    project={project}
+    schedule={schedule}
+    scheduleLoadError={scheduleLoadError}
+    section={section}
+    today={todayKey}
+    todayRoster={todayRoster}
+    updates={documentUpdates}
+  />;
 }

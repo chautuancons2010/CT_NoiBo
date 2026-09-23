@@ -23,6 +23,9 @@ export function ImageUpload(props: Omit<InputHTMLAttributes<HTMLInputElement>, "
   );
 }
 
+/** Shared file-field name used by feature forms. */
+export const UploadField = FileUpload;
+
 export interface AttachmentItem {
   id: string;
   name: string;

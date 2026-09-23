@@ -10,7 +10,7 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Áp dụng toàn bộ `supabase/migrations` trước khi đăng nhập. Tạo admin trực tiếp bằng tên tài khoản: đặt mật khẩu trong biến tạm `BOOTSTRAP_ADMIN_PASSWORD`, rồi chạy `npm run bootstrap:admin -- --username=<username> --name=<name>`. Script không gửi email và không có mật khẩu mặc định.
+Áp dụng toàn bộ `supabase/migrations` trước khi đăng nhập. Tạo admin trực tiếp bằng tên tài khoản: đặt mật khẩu trong biến tạm `BOOTSTRAP_ADMIN_PASSWORD`, rồi chạy `npm run bootstrap:admin -- --username=<username> --name=<name>`. Để đổi mật khẩu admin hiện hữu mà giữ nguyên username và tên hiển thị, dùng `npm run bootstrap:admin -- --existing-email=<email>`. Script không gửi email và không có mật khẩu mặc định.
 
 ## Quality gate
 

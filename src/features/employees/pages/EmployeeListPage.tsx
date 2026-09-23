@@ -93,6 +93,9 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
   const selectedEmployee = result.items.find((employee) => employee.id === selectedId);
   const firstRecord = result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1;
   const lastRecord = Math.min(result.page * result.pageSize, result.total);
+  const activeEmployees = result.items.filter((employee) => employee.employmentStatus === "active").length;
+  const probationEmployees = result.items.filter((employee) => employee.employmentStatus === "probation").length;
+  const unlinkedEmployees = result.items.filter((employee) => !employee.hasAccount).length;
 
   return (
     <ListPageLayout>
@@ -110,8 +113,18 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
         title="Nhân viên"
       />
 
+      <section aria-label="Tổng quan nhân sự" className="employee-overview">
+        <div className="employee-overview__primary"><span>Hồ sơ nhân sự</span><strong>{result.total}</strong><b>nhân viên</b></div>
+        <div className="employee-overview__metrics">
+          <div><span>Đang làm việc</span><strong>{activeEmployees}</strong></div>
+          <div><span>Thử việc</span><strong>{probationEmployees}</strong></div>
+          <div><span>Chưa liên kết tài khoản</span><strong>{unlinkedEmployees}</strong></div>
+        </div>
+      </section>
+
       <WorkbenchLayout className={selectedEmployee ? "employee-roster" : "employee-roster workbench-layout--solo"}>
         <WorkCanvas className="employee-roster__canvas">
+          <header className="employee-roster__heading"><div><span>Danh sách</span><strong>Nhân viên đang quản lý</strong></div><span>{firstRecord}–{lastRecord} / {result.total} bản ghi</span></header>
           <EmployeeListFilters
             defaults={filters}
             departments={filterOptions.departments.map((item) => ({ label: item.name, value: item.id }))}

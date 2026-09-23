@@ -1,1 +1,13 @@
-import{PageHeader}from"@/components/shared/PageHeader";import{AccountingOverview}from"@/features/accounting/components/AccountingOverview";export default function Page(){return <div className="page-stack"><PageHeader title="Tổng quan kế toán"/><AccountingOverview/></div>;}
+import { redirect } from "next/navigation";
+
+import { visibleApplications } from "@/config/moduleRegistry";
+import { PermissionDeniedState } from "@/components/shared/States";
+import { getRequestUser } from "@/services/auth/getRequestUser";
+
+export default async function Page() {
+  const user = await getRequestUser();
+  if (!user) return <PermissionDeniedState />;
+  const accounting = visibleApplications(user).find((application) => application.id === "accounting");
+  if (!accounting) return <PermissionDeniedState />;
+  redirect(accounting.defaultRoute);
+}

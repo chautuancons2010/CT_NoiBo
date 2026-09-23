@@ -64,6 +64,17 @@ describe("realtime coordinator", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
+  it("reconciles mounted data when a page is restored from the browser back-forward cache", () => {
+    const listener = vi.fn();
+    subscribeRealtimeDomain("employees", listener);
+    const stop = startRealtimeCoordinator("account-1");
+
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+
+    expect(listener).toHaveBeenCalledOnce();
+    stop();
+  });
+
   it("keeps lifecycle listeners balanced across repeated mount and unmount cycles", () => {
     const added = vi.spyOn(window, "addEventListener");
     const removed = vi.spyOn(window, "removeEventListener");

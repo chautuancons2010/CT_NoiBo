@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { BadgeCheck, BriefcaseBusiness, FileText, ShieldCheck } from "lucide-react";
 
 import { employeeDetailSections } from "@/config/routeRegistry";
@@ -24,9 +24,7 @@ import {
   getEmployeeContracts,
   getEmployeeDetail,
   getEmployeeDocuments,
-  getEmployeeHistory,
   getEmployeePickerOptions,
-  historyEventLabels,
   maskSensitiveValue
 } from "@/features/employees/services/employeeService";
 import type { EmployeeDataSet } from "@/features/employees/services/employeeService";
@@ -36,6 +34,8 @@ import { getRequestUser } from "@/services/auth/getRequestUser";
 import { roleCatalog } from "@/services/authorization/rbacService";
 import { EmployeeLeavePanel } from "@/features/leave/components/EmployeeLeavePanel";
 import { listEmployeeSalaries } from "@/features/accounting/service";
+import { listAttendanceRecords } from "@/features/attendance/services/attendanceRepository";
+import { listEmployeeProjects } from "@/features/projects/services/projectRepository";
 
 export interface EmployeeDetailPageProps {
   employeeId: string;
@@ -106,12 +106,18 @@ function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: Em
             { label: "Mã nhân viên", value: detail.profile.employeeCode },
             { label: "Họ và tên", value: detail.profile.fullName },
             { label: "Tên hiển thị", value: detail.profile.displayName },
-            { label: "Ngày sinh", value: formatDate(detail.profile.dateOfBirth) },
-            { label: "Hồ sơ", value: employeeProfileStatusLabels[detail.profile.profileStatus] },
-            { label: "Hoàn thành", value: `${detail.profile.profileCompleteness}%` }
+            { label: "Ngày sinh", value: formatDate(detail.profile.dateOfBirth) }
           ]}
         />
-        <div className="profile-completeness" aria-label="Mức độ hoàn thiện hồ sơ">
+      </Card>
+
+      <Card className="employee-profile-assessment">
+        <h2 className="section-title">Đánh giá hồ sơ</h2>
+        <FieldList items={[
+          { label: "Tình trạng hồ sơ", value: employeeProfileStatusLabels[detail.profile.profileStatus] },
+          { label: "Mức độ hoàn thành", value: `${detail.profile.profileCompleteness}%` }
+        ]} />
+        <div className="profile-completeness" aria-label={`Mức độ hoàn thiện hồ sơ ${detail.profile.profileCompleteness}%`}>
           <span style={{ width: `${detail.profile.profileCompleteness}%` }} />
         </div>
       </Card>
@@ -274,7 +280,7 @@ async function EmployeeSalaryTab({ employeeId, user }: { employeeId: string; use
   );
 }
 
-function EmployeeDocumentsTab({
+export function EmployeeDocumentsTab({
   employeeId,
   permissions,
   dataSet
@@ -317,7 +323,55 @@ function EmployeeDocumentsTab({
   );
 }
 
-function describeHistoryEvent(event: EmployeeHistoryEvent): string {
+async function EmployeeAttendanceTab({ employeeId, user }: { employeeId: string; user: NonNullable<Awaited<ReturnType<typeof getRequestUser>>> }) {
+  const events = await listAttendanceRecords(user, { employeeId });
+  if (!events.length) return <EmptyState title="Chưa có lượt chấm công" />;
+
+  const eventLabels = { check_in: "Chấm vào", check_out: "Chấm ra" } as const;
+  const syncLabels = { local_pending: "Chờ đồng bộ", syncing: "Đang đồng bộ", synced: "Đã đồng bộ", sync_failed: "Đồng bộ lỗi" } as const;
+  return (
+    <Card>
+      <h2 className="section-title">Lịch sử chấm công</h2>
+      <ul className="foundation-list">
+        {events.map((event) => (
+          <li key={event.id}>
+            <span>
+              <strong>{eventLabels[event.eventType]} · {new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(event.effectiveAt))}</strong>
+              <small>{event.locationName ?? "Không ghi nhận địa điểm"} · {event.geofenceStatus}</small>
+            </span>
+            <StatusBadge tone={event.syncStatus === "synced" ? "success" : event.syncStatus === "sync_failed" ? "error" : "warning"}>{syncLabels[event.syncStatus]}</StatusBadge>
+            <Link href={`/attendance/records/${event.id}`}>Xem</Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+export async function EmployeeProjectsTab({ employeeId, user }: { employeeId: string; user: NonNullable<Awaited<ReturnType<typeof getRequestUser>>> }) {
+  const assignments = await listEmployeeProjects(user, employeeId);
+  if (!assignments.length) return <EmptyState title="Chưa có phân công dự án" />;
+
+  return (
+    <Card>
+      <h2 className="section-title">Dự án đã phân công</h2>
+      <ul className="foundation-list">
+        {assignments.map((assignment) => (
+          <li key={assignment.assignmentId}>
+            <span>
+              <strong>{assignment.project.code} · {assignment.project.name}</strong>
+              <small>{assignment.assignmentRole} · {assignment.worksiteName ?? "Toàn dự án"} · {formatDate(assignment.startDate)}{assignment.endDate ? ` – ${formatDate(assignment.endDate)}` : ""}</small>
+            </span>
+            <StatusBadge tone={assignment.status === "active" ? "success" : "neutral"}>{assignment.status}</StatusBadge>
+            <Link href={`/projects/${assignment.project.id}/team`}>Xem</Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+export function describeHistoryEvent(event: EmployeeHistoryEvent): string {
   const beforeValue = event.before?.value;
   const afterValue = event.after?.value;
 
@@ -334,38 +388,21 @@ function describeHistoryEvent(event: EmployeeHistoryEvent): string {
   return "Đã ghi nhận thay đổi.";
 }
 
-function EmployeeHistoryTab({ employeeId, dataSet }: { employeeId: string; dataSet: EmployeeDataSet }) {
-  const history = getEmployeeHistory(employeeId, dataSet);
-
-  if (history.length === 0) {
-    return <EmptyState title="Chưa có lịch sử" />;
-  }
-
-  return (
-    <Card className="employee-history-panel">
-      <h2 className="section-title">Quá trình công tác</h2>
-      <ol className="employee-history">
-        {history.map((event) => (
-          <li key={event.id}>
-            <span className="employee-history__marker">
-              <BadgeCheck aria-hidden="true" size={16} />
-            </span>
-            <article>
-              <header>
-                <h3>{historyEventLabels[event.eventType]}</h3>
-                <StatusBadge>{formatDate(event.eventDate)}</StatusBadge>
-              </header>
-              <p>{describeHistoryEvent(event)}</p>
-              <small>
-                Người thực hiện: {event.actorAccountId}
-                {event.reason ? ` · Lý do: ${event.reason}` : ""}
-              </small>
-            </article>
-          </li>
-        ))}
-      </ol>
+async function EmployeeHistoryTab({ detail, user, canViewProjects }: { detail: EmployeeDetail; user: NonNullable<Awaited<ReturnType<typeof getRequestUser>>>; canViewProjects: boolean }) {
+  const assignments = canViewProjects ? await listEmployeeProjects(user, detail.profile.id) : [];
+  return <div className="content-grid content-grid--two">
+    <Card>
+      <h2 className="section-title">Gia nhập công ty</h2>
+      <FieldList items={[
+        { label: "Ngày tạo hồ sơ", value: formatDate(detail.profile.createdAt.slice(0, 10)) },
+        { label: "Ngày bắt đầu làm việc", value: formatDate(detail.profile.joinDate) }
+      ]} />
     </Card>
-  );
+    <Card className="employee-history-panel">
+      <h2 className="section-title">Dự án đã tham gia</h2>
+      {!canViewProjects ? <PermissionDeniedState /> : assignments.length ? <ul className="foundation-list">{assignments.map((assignment) => <li key={assignment.assignmentId}><span><strong>{assignment.project.code} · {assignment.project.name}</strong><small>{assignment.worksiteName ?? "Toàn dự án"} · {formatDate(assignment.startDate)}{assignment.endDate ? ` – ${formatDate(assignment.endDate)}` : ""}</small></span><StatusBadge tone={assignment.status === "active" ? "success" : "neutral"}>{assignment.status === "active" ? "Đang tham gia" : "Đã kết thúc"}</StatusBadge><Link href={`/projects/${assignment.project.id}/team`}>Xem</Link></li>)}</ul> : <EmptyState title="Chưa có dự án đã tham gia" />}
+    </Card>
+  </div>;
 }
 
 function EmployeeAccountTab({
@@ -440,6 +477,8 @@ function EmployeeAccountTab({
 }
 
 export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetailPageProps) {
+  if (section === "projects") redirect(`/employees/${employeeId}/history`);
+  if (section === "documents") redirect(`/employees/${employeeId}/profile`);
   const currentSection = employeeDetailSections.find((item) => item.value === section);
 
   if (!currentSection) {
@@ -468,6 +507,8 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
   const identityProfile = can(user.permissions, "employee.identity_document.view")
     ? dataSet.sensitiveProfiles.find((profile) => profile.employeeId === employeeId)
     : undefined;
+  const canViewEmployeeAttendance = can(user.permissions, "attendance.view_all") || can(user.permissions, "attendance.view_team") || can(user.permissions, "attendance.manage") || can(user.permissions, "attendance.log.view");
+  const canViewEmployeeProjects = can(user.permissions, "project.view");
 
   return (
     <DetailPageLayout>
@@ -496,7 +537,7 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
       </section>
 
       <Tabs
-        items={employeeDetailSections.filter((item) => item.value !== "salary" || can(user.permissions, "salary.view") || can(user.permissions, "salary.history.view")).filter((item) => item.value !== "contracts" || can(user.permissions, "contract.view")).map((item) => ({
+        items={employeeDetailSections.filter((item) => item.value !== "salary" || can(user.permissions, "salary.view") || can(user.permissions, "salary.history.view")).filter((item) => item.value !== "contracts" || can(user.permissions, "contract.view")).filter((item) => item.value !== "attendance" || canViewEmployeeAttendance).map((item) => ({
           label: item.label,
           href: `/employees/${employeeId}/${item.value}`,
           active: item.value === section
@@ -508,8 +549,8 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
       {section === "employment" ? <EmployeeEmploymentTab dataSet={dataSet} detail={detail} /> : null}
       {section === "contracts" ? <EmployeeContractsTab dataSet={dataSet} employeeId={employeeId} permissions={user.permissions} /> : null}
       {section === "salary" ? <EmployeeSalaryTab employeeId={employeeId} user={user} /> : null}
-      {section === "documents" ? <EmployeeDocumentsTab dataSet={dataSet} employeeId={employeeId} permissions={user.permissions} /> : null}
-      {section === "history" ? <EmployeeHistoryTab dataSet={dataSet} employeeId={employeeId} /> : null}
+      {section === "attendance" ? canViewEmployeeAttendance ? <EmployeeAttendanceTab employeeId={employeeId} user={user} /> : <PermissionDeniedState /> : null}
+      {section === "history" ? <EmployeeHistoryTab detail={detail} user={user} canViewProjects={canViewEmployeeProjects} /> : null}
       {section === "leave" ? <EmployeeLeavePanel employeeId={employeeId} /> : null}
       {section === "account" ? <EmployeeAccountTab detail={detail} permissions={user.permissions} /> : null}
     </DetailPageLayout>

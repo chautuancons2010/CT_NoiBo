@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 
-import { navigationIconMap } from "@/components/layout/icons";
+import { navigationIconMap, navigationIconSizes } from "@/components/layout/icons";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { visibleApplications, type ApplicationDefinition } from "@/config/moduleRegistry";
@@ -18,9 +18,9 @@ export function ModuleIconCard({ application }: { application: ApplicationDefini
 
   return (
     <Link className="module-icon-card" href={application.defaultRoute} style={style}>
-      <span className="module-icon-card__icon"><Icon aria-hidden="true" size={23} strokeWidth={1.9} /></span>
+      <span className="module-icon-card__icon"><Icon aria-hidden="true" size={navigationIconSizes.module} strokeWidth={1.9} /></span>
       <strong>{application.label}</strong>
-      <ArrowRight aria-hidden="true" className="module-icon-card__arrow" size={16} />
+      <ArrowRight aria-hidden="true" className="module-icon-card__arrow" size={navigationIconSizes.launcherArrow} />
     </Link>
   );
 }

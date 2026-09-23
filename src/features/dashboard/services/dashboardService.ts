@@ -28,6 +28,7 @@ import { listNotifications } from "@/features/shared-platforms/services/notifica
 import { resolvePlatformIdentity } from "@/features/shared-platforms/services/platformIdentity";
 import { listExceptions } from "@/features/timesheets/services/timesheetRepository";
 import { getWarehouseDashboard } from "@/features/warehouse/services/warehouseRepository";
+import { accountingSummary } from "@/features/accounting/service";
 import { AppError } from "@/lib/api/errors";
 import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
@@ -92,24 +93,21 @@ function localDate(): string {
 
 async function loadAttendanceOverview(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const today = await getAttendanceAdminToday(user);
-  const client = getSupabaseServiceClient();
-  if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình.");
-  const cursor = new Date(`${localDate()}T12:00:00Z`);
-  const dates = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(cursor);
-    date.setUTCDate(date.getUTCDate() - 6 + index);
-    return date.toISOString().slice(0, 10);
-  });
-  const counts = await Promise.all(dates.map((date) => client.from("attendance_events")
-    .select("id", { count: "exact", head: true }).eq("attendance_date", date).eq("event_type", "check_in")));
-  if (counts.some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải biểu đồ chấm công.");
+  const checkedIn = today.present + today.late + today.missingCheck;
   return {
     metrics: [
-      { label: "Có mặt hôm nay", value: today.present, href: "/attendance/today", tone: "success" },
-      { label: "Thiếu lượt", value: today.missingCheck, href: "/attendance/today", tone: today.missingCheck ? "warning" : "success" }
+      { label: "Tổng nhân sự", value: today.totalEmployees, href: "/attendance/today" },
+      { label: "Đã chấm công", value: checkedIn, href: "/attendance/today", tone: "success" },
+      { label: "Chưa chấm công", value: today.notChecked, href: "/attendance/today", tone: today.notChecked ? "warning" : "success" },
+      { label: "Cần bổ sung", value: today.missingCheck + today.late, href: "/attendance/today", tone: today.missingCheck + today.late ? "warning" : "success" }
     ],
-    charts: [{ key: "attendance-seven-days", title: "Chấm công 7 ngày", kind: "line", series: dates.map((date, index) => ({ label: date.slice(5), value: counts[index].count ?? 0 })) }],
-    items: today.rows.filter((row) => row.status === "missing_check").slice(0, 5).map((row) => ({ id: row.employeeId, type: "attendance_missing", title: row.employeeName, context: "Thiếu lượt chấm ra", priority: "MEDIUM", href: `/attendance/logs?employeeId=${row.employeeId}` }))
+    charts: [{ key: "attendance-today", title: "Tình trạng chấm công hôm nay", kind: "bar", series: [
+      { label: "Đã chấm công", value: checkedIn, tone: "success" },
+      { label: "Chưa chấm công", value: today.notChecked, tone: "warning" },
+      { label: "Thiếu lượt", value: today.missingCheck, tone: "error" },
+      { label: "Nghỉ phép", value: today.leave, tone: "info" }
+    ] }],
+    items: today.rows.filter((row) => ["not_checked", "missing_check", "late"].includes(row.status)).slice(0, 8).map((row) => ({ id: row.employeeId, type: "attendance_follow_up", title: row.employeeName, context: row.status === "not_checked" ? "Chưa chấm công" : row.status === "missing_check" ? "Thiếu lượt chấm ra" : `Đi muộn ${row.lateMinutes} phút`, priority: row.status === "not_checked" ? "HIGH" : "MEDIUM", href: `/attendance/logs?employeeId=${row.employeeId}` }))
   };
 }
 
@@ -259,6 +257,28 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
   };
 }
 
+async function loadAccountingSummary(user: AuthenticatedUser): Promise<DashboardWidgetData> {
+  const summary = await accountingSummary(user);
+  const pendingPayrolls = summary.recentPayrolls.filter((period) => !["locked", "published"].includes(period.status));
+  return {
+    metrics: [
+      { label: "Hồ sơ lương", value: summary.salaryProfiles, href: "/accounting/salaries" },
+      { label: "Kỳ đang xử lý", value: summary.openPayrolls, href: "/accounting/payroll", tone: summary.openPayrolls ? "warning" : "success" },
+      { label: "Kỳ đã khóa", value: summary.lockedPayrolls, href: "/accounting/payroll" },
+      { label: "Phiếu lương chưa xem", value: summary.unseenPayslips, href: "/accounting/payslips", tone: summary.unseenPayslips ? "info" : "success" }
+    ],
+    items: pendingPayrolls.map((period) => ({
+      id: period.id,
+      type: "payroll",
+      title: `Kỳ lương ${period.periodMonth.slice(0, 7)}`,
+      context: `${period.lineCount} nhân sự`,
+      priority: period.status === "draft" ? "HIGH" as const : "MEDIUM" as const,
+      href: `/accounting/payroll/${period.id}`,
+      status: period.status
+    }))
+  };
+}
+
 async function loadRecentActivity(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const { entries } = await listAuditLogs(user, { page: 1 });
   return { items: entries.slice(0, 8).map((entry) => ({ id: entry.id, type: entry.entityType, title: entry.actorName, context: entry.entityReference ? `${entry.actionLabel} · ${String(entry.entityReference)}` : entry.actionLabel, dueOrAge: formatAge(entry.happenedAt), href: `/settings/audit-log?q=${encodeURIComponent(entry.entityId)}`, status: entry.severity === "critical" ? "Quan trọng" : undefined })) };
@@ -281,6 +301,7 @@ const loaders: Record<DashboardWidgetKey, (user: AuthenticatedUser) => Promise<D
   project_attention: loadProjectAttention,
   warehouse_low_stock: loadWarehouse,
   shipment_attention: loadShipments,
+  accounting_summary: loadAccountingSummary,
   hr_summary: loadHrSummary,
   recent_activity: loadRecentActivity,
   recent_notifications: loadNotifications,

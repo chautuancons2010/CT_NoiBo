@@ -28,6 +28,7 @@ import type {
   WorkerAttendanceTask
 } from "@/features/worker-attendance/types/workerAttendanceTypes";
 import { recordAuditLog } from "@/services/audit/auditLog";
+import { publishNotificationEvent } from "@/features/shared-platforms/services/notificationRepository";
 
 type Row = Record<string, unknown>;
 
@@ -163,7 +164,8 @@ function distanceMeters(latitude: number, longitude: number, targetLatitude: num
 
 async function assertProjectScope(client: SupabaseClient, user: AuthenticatedUser, employeeId: string, projectId: string, worksiteId: string, date: string) {
   if (can(user.permissions, "worker_attendance.view_all")) return;
-  const { data } = await client.from("project_assignments").select("id").eq("project_id", projectId).eq("worksite_id", worksiteId).eq("employee_id", employeeId).in("assignment_role", ["supervisor_main", "supervisor_replacement", "project_manager"]).eq("status", "active").lte("start_date", date).or("end_date.is.null,end_date.gte." + date).limit(1);
+  const { data, error } = await client.from("project_assignments").select("id").eq("project_id", projectId).eq("worksite_id", worksiteId).eq("employee_id", employeeId).in("assignment_role", ["supervisor_main", "supervisor_replacement", "project_manager"]).eq("status", "active").lte("start_date", date).or("end_date.is.null,end_date.gte." + date).limit(1);
+  if (error) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi điểm danh công trường.");
   if (!data?.length) throw new AppError("PERMISSION_DENIED", "Bạn không được phân công điểm danh công trường này trong ngày đã chọn.");
 }
 
@@ -180,7 +182,8 @@ export async function listTodayTasks(user: AuthenticatedUser, date: string): Pro
     const worksite = nested(row as Row, "worksites");
     if (!row.worksite_id || !project || !worksite || project.status === "closed" || worksite.status !== "active") continue;
     const roster = await getProjectRoster(String(row.project_id), date, String(row.worksite_id));
-    const { data: session } = await client.from("worker_attendance_sessions").select("id,status").eq("project_id", row.project_id).eq("worksite_id", row.worksite_id).eq("attendance_date", date).eq("shift_code", row.shift_code).eq("session_type", "morning").maybeSingle();
+    const { data: session, error: sessionError } = await client.from("worker_attendance_sessions").select("id,status").eq("project_id", row.project_id).eq("worksite_id", row.worksite_id).eq("attendance_date", date).eq("shift_code", row.shift_code).eq("session_type", "morning").maybeSingle();
+    if (sessionError) throw new AppError("SERVER_ERROR", "Không thể đọc phiên điểm danh hiện có.");
     const workers = roster.filter((item) => item.assignmentRole === "worker");
     tasks.push({ projectId: String(row.project_id), projectName: required(project, "name"), worksiteId: String(row.worksite_id), worksiteName: required(worksite, "name"), date, shiftCode: String(row.shift_code), shiftName: String(row.shift_name), expectedWorkers: workers.length, existingSessionId: session?.id, existingStatus: session?.status, checklist, roster: workers.map((worker) => ({ workerId: worker.employeeId, employeeCode: worker.employeeCode, workerName: worker.employeeName, assignmentRole: worker.assignmentRole, approvedLeave: worker.approvedLeave })) });
   }
@@ -412,6 +415,40 @@ export async function adjustWorkerEntry(user: AuthenticatedUser, sessionId: stri
   await client.from("worker_attendance_adjustments").insert({ session_id: sessionId, entry_id: entry.id, actor_account_id: actor.accountId, reason: input.reason, before_data: before, after_data: after });
   await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.adjusted", entityType: "worker_attendance_session", entityId: sessionId, before, after, reason: input.reason });
   return getWorkerSession(user, sessionId);
+}
+
+export async function remindWorkerAttendanceSupervisor(user: AuthenticatedUser, input: { projectId: string; date: string }) {
+  if (!can(user.permissions, "worker_attendance.adjust")) throw new AppError("PERMISSION_DENIED");
+  const client = db();
+  const actor = await identity(client, user);
+  const project = await getProject(input.projectId, user);
+  const { data: assignments, error: assignmentError } = await client.from("project_assignments")
+    .select("employee_id")
+    .eq("project_id", input.projectId)
+    .eq("status", "active")
+    .in("assignment_role", ["supervisor_main", "supervisor_replacement", "project_manager"])
+    .lte("start_date", input.date)
+    .or(`end_date.is.null,end_date.gte.${input.date}`);
+  if (assignmentError) throw new AppError("SERVER_ERROR", "Không thể tìm kỹ sư phụ trách.");
+  const employeeIds = [...new Set((assignments ?? []).map((item) => String(item.employee_id)))];
+  if (!employeeIds.length) throw new AppError("NOT_FOUND", "Chưa phân công kỹ sư phụ trách.");
+  const { data: accounts, error: accountError } = await client.from("app_accounts").select("id").in("employee_id", employeeIds).eq("status", "active");
+  if (accountError) throw new AppError("SERVER_ERROR", "Không thể tìm tài khoản kỹ sư.");
+  const recipients = (accounts ?? []).map((item) => String(item.id));
+  if (!recipients.length) throw new AppError("NOT_FOUND", "Kỹ sư phụ trách chưa có tài khoản hoạt động.");
+  const result = await publishNotificationEvent({
+    eventKey: "worker_attendance.reminder",
+    aggregateType: "project",
+    aggregateId: input.projectId,
+    actorAccountId: actor.accountId,
+    idempotencyKey: `worker-attendance:${input.projectId}:${input.date}:reminder`,
+    recipients,
+    values: { project_name: project.name, attendance_date: input.date },
+    deepLink: `/projects/${input.projectId}/team`,
+    priority: "important"
+  }, client);
+  await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.reminder_sent", entityType: "project", entityId: input.projectId, metadata: { date: input.date, recipients: recipients.length } });
+  return { ...result, recipients: recipients.length };
 }
 
 export async function getWorkerPhotoAsset(user: AuthenticatedUser, photoId: string, thumbnail: boolean) {

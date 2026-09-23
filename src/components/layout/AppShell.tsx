@@ -1,19 +1,18 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppRail } from "@/components/layout/AppRail";
-import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileContextNav } from "@/components/layout/MobileContextNav";
 import { BackLink } from "@/components/shared/BackLink";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { isPathEnabled } from "@/config/systemSettings";
 import { SystemNoticeBanner } from "@/features/shared-platforms/components/SystemNoticeBanner";
 import { resolveLandingPage } from "@/features/dashboard/registry";
-import { getBackHref, getBreadcrumbs } from "@/config/routeRegistry";
+import { getBackHref } from "@/config/routeRegistry";
 import { RealtimeProvider, useRealtimeConnectionState } from "@/components/providers/RealtimeProvider";
 import { ChatDock } from "@/features/messaging/ChatDock";
 import { can } from "@/lib/auth/permissions";
@@ -27,9 +26,13 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
   const router = useRouter();
   const { settings } = useSystemSettings();
   const [collapsed, setCollapsed] = useState(settings.appearance.sidebarDefault === "collapsed");
+  const [hasLocalBackLink, setHasLocalBackLink] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   const connectionState = useRealtimeConnectionState();
-  const breadcrumbs = getBreadcrumbs(pathname);
-  const backHref = getBackHref(pathname);
+  // The shared shell owns the fallback return control. A locally-declared
+  // BackLink (for a wizard or a record with a specific parent) wins, so users
+  // never see two competing return actions.
+  const backHref = pathname === "/dashboard" ? null : getBackHref(pathname) ?? "/dashboard";
   const hasChatAccess = can(user.permissions, "chat.access");
 
   useEffect(() => {
@@ -97,6 +100,18 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
     };
   }, [pathname, router, user.id]);
 
+  useLayoutEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    const findLocalBackLink = () => {
+      setHasLocalBackLink(Boolean(main.querySelector(":scope > :not(.page-context-navigation) .back-link")));
+    };
+    findLocalBackLink();
+    const observer = new MutationObserver(findLocalBackLink);
+    observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [pathname]);
+
   return (
     <div className="app-shell">
       <AppRail
@@ -108,16 +123,11 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
       <div className={hasChatAccess ? "app-content app-content--chat" : "app-content"}>
         <AppHeader connectionState={connectionState} pathname={pathname} user={user} />
         <SystemNoticeBanner />
-        <main className="page-main" id="main-content" tabIndex={-1}>
-          {backHref || breadcrumbs.length > 1 ? (
-            <div className="page-context-navigation">
-              {backHref ? <BackLink href={backHref} /> : null}
-              {breadcrumbs.length > 1 ? <div className="page-breadcrumb"><Breadcrumb items={breadcrumbs} /></div> : null}
-            </div>
-          ) : null}
+        <MobileContextNav pathname={pathname} user={user} />
+        <main className="page-main" id="main-content" ref={mainRef} tabIndex={-1}>
+          {backHref && !hasLocalBackLink ? <nav aria-label="Điều hướng quay lại" className="page-context-navigation"><BackLink href={backHref} /></nav> : null}
           {children}
         </main>
-        <MobileBottomNav pathname={pathname} user={user} />
         {hasChatAccess ? <ChatDock /> : null}
       </div>
     </div>

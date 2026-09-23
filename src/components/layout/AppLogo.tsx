@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { useBranding, useOrganizationSettings } from "@/components/providers/SystemSettingsProvider";
 
-export function AppLogo({ compact = false }: { compact?: boolean }) {
+export function AppLogo({ compact = false, href = "/dashboard" }: { compact?: boolean; href?: string }) {
   const branding = useBranding();
   const organization = useOrganizationSettings();
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -13,7 +13,7 @@ export function AppLogo({ compact = false }: { compact?: boolean }) {
   const officialLogo = imageUrl === "/brand/chau-tuan-logo.png";
 
   return (
-    <Link aria-label="Về Tổng quan" className="app-logo" href="/dashboard">
+    <Link aria-label="Về Dashboard" className="app-logo" href={href}>
       {imageUrl && failedUrl !== imageUrl ? (
         compact && officialLogo ? <span className="app-logo__compact-crop"><Image alt={organization.shortName} height={559} onError={() => setFailedUrl(imageUrl)} src={imageUrl} unoptimized width={441} /></span> : <Image
           alt={organization.shortName}

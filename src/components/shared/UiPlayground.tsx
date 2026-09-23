@@ -1,11 +1,23 @@
 "use client";
 
+import { useState } from "react";
+
 import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
 import { MetricCard } from "@/components/shared/DashboardCards";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
-import { Input, Select, Textarea } from "@/components/shared/FormControls";
-import { FormSection } from "@/components/shared/FormLayout";
+import { FilterBar } from "@/components/shared/FilterBar";
+import {
+  Checkbox,
+  DatePicker,
+  Input,
+  Radio,
+  SearchInput,
+  Select,
+  Switch,
+  Textarea
+} from "@/components/shared/FormControls";
+import { FormErrorSummary, FormSection, StickyActionBar } from "@/components/shared/FormLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataSurface, PageContainer, Section, SectionHeader } from "@/components/shared/PageLayouts";
 import { Skeleton } from "@/components/shared/States";
@@ -23,9 +35,11 @@ const columns: DataTableColumn<(typeof rows)[number]>[] = [
 ];
 
 export function UiPlayground() {
+  const [autoApprove, setAutoApprove] = useState(true);
+
   return (
     <PageContainer>
-      <PageHeader title="UI Playground" />
+      <PageHeader title="Hệ thống giao diện" />
       <Section>
         <SectionHeader title="Màu và card" />
         <div className="ui-playground-grid">
@@ -33,7 +47,7 @@ export function UiPlayground() {
         </div>
       </Section>
       <Section>
-        <SectionHeader title="KPI pastel" />
+        <SectionHeader title="Chỉ số vận hành" />
         <dl className="dashboard-overview__grid">
           <MetricCard accent="amber"><dt>Chờ xử lý</dt><dd>12</dd><span className="dashboard-overview__note">Kho hàng</span></MetricCard>
           <MetricCard accent="purple"><dt>Dự án</dt><dd>24</dd><span className="dashboard-overview__note">Đang triển khai</span></MetricCard>
@@ -50,12 +64,64 @@ export function UiPlayground() {
           <StatusBadge tone="error">Quá hạn</StatusBadge><StatusBadge tone="info">Thông tin</StatusBadge>
         </div>
       </Section>
-      <FormSection title="Form">
-        <Input label="Tên" placeholder="Nhập tên" />
-        <Select label="Trạng thái" options={[{ label: "Đang hoạt động", value: "active" }]} />
-        <Textarea label="Ghi chú" />
-      </FormSection>
-      <DataSurface><header className="data-surface__toolbar"><h2>Data table</h2></header><DataTable columns={columns} data={rows} getRowId={(row) => row.id} /></DataSurface>
+      <form className="erp-form-preview" onSubmit={(event) => event.preventDefault()}>
+        <FormErrorSummary
+          errors={[{ fieldId: "erp-counterparty", message: "Chọn đối tượng giao dịch" }]}
+        />
+        <FormSection title="Thông tin chứng từ">
+          <Input defaultValue="CT-2026-00128" label="Mã chứng từ" readOnly />
+          <DatePicker defaultValue="2026-09-19" label="Ngày chứng từ" required />
+          <Input
+            error="Chọn đối tượng giao dịch"
+            id="erp-counterparty"
+            label="Đối tượng"
+            placeholder="Nhập mã hoặc tên đối tượng"
+            required
+          />
+          <Select
+            label="Đơn vị thực hiện"
+            options={[
+              { label: "Khối vận hành", value: "operations" },
+              { label: "Khối tài chính", value: "finance" }
+            ]}
+            placeholder="Chọn đơn vị"
+          />
+          <Input defaultValue="12500000" label="Giá trị" min="0" step="1000" type="number" />
+          <Input defaultValue="VND" disabled label="Loại tiền" />
+          <Textarea label="Nội dung" placeholder="Nhập nội dung chứng từ" rows={4} />
+          <div className="erp-choice-group">
+            <span className="erp-choice-group__label">Phương thức xử lý</span>
+            <div className="erp-choice-group__items">
+              <Radio defaultChecked label="Xử lý ngay" name="processing-mode" value="now" />
+              <Radio label="Lưu nháp" name="processing-mode" value="draft" />
+            </div>
+          </div>
+          <div className="erp-choice-group">
+            <Checkbox defaultChecked label="Gửi thông báo" />
+            <Switch checked={autoApprove} label="Tự động duyệt" onCheckedChange={setAutoApprove} />
+          </div>
+        </FormSection>
+        <StickyActionBar>
+          <Button variant="secondary">Hủy</Button>
+          <Button variant="soft">Lưu nháp</Button>
+          <Button type="submit" variant="primary">Lưu chứng từ</Button>
+        </StickyActionBar>
+      </form>
+      <DataSurface>
+        <header className="data-surface__toolbar"><h2>Danh sách bản ghi</h2></header>
+        <FilterBar
+          actions={<><Button variant="secondary">Xuất dữ liệu</Button><Button variant="primary">Tạo mới</Button></>}
+        >
+          <SearchInput label="Tìm bản ghi" placeholder="Tìm mã, tên" />
+          <Select
+            label="Trạng thái"
+            labelHidden
+            options={[{ label: "Đang hoạt động", value: "active" }]}
+            placeholder="Tất cả trạng thái"
+          />
+        </FilterBar>
+        <DataTable columns={columns} data={rows} getRowId={(row) => row.id} />
+      </DataSurface>
       <Section><SectionHeader title="Loading" /><Card><Skeleton /></Card></Section>
     </PageContainer>
   );

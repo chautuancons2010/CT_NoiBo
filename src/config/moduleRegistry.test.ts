@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applicationForPath, applicationsForLauncher, contextualNavigationGroups, visibleApplications, visibleApplicationShortcuts } from "@/config/moduleRegistry";
+import { applicationForPath, applicationRegistry, applicationsForLauncher, contextualNavigationGroups, visibleApplications, visibleApplicationShortcuts } from "@/config/moduleRegistry";
 import { defaultSystemSettings } from "@/config/systemSettings";
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
 
@@ -9,6 +9,10 @@ function user(permissions: Permission[]): AuthenticatedUser {
 }
 
 describe("application registry", () => {
+  it("gives every application a distinct semantic identity", () => {
+    expect(new Set(applicationRegistry.map((application) => application.icon)).size).toBe(applicationRegistry.length);
+  });
+
   it("resolves nested routes to one application", () => {
     expect(applicationForPath("/warehouse/receipts/new").id).toBe("warehouse");
     expect(applicationForPath("/dashboard/hr").id).toBe("human-resources");
@@ -24,6 +28,14 @@ describe("application registry", () => {
   it("shows launcher applications by permission", () => {
     const applications = visibleApplications(user(["warehouse.view", "profile.view"]), defaultSystemSettings.modules);
     expect(applications.map((item) => item.id)).toEqual(["warehouse"]);
+  });
+
+  it("keeps only the global dashboard in the application switcher and sidebar", () => {
+    const currentUser = user(["dashboard.view", "warehouse.view"]);
+    expect(applicationsForLauncher(currentUser, defaultSystemSettings.modules).some((item) => item.id === "overview")).toBe(true);
+    expect(contextualNavigationGroups("/warehouse/inventory", currentUser, defaultSystemSettings.modules, defaultSystemSettings.navigation)
+      .flatMap((group) => group.items)
+      .filter((item) => item.href === "/dashboard")).toHaveLength(1);
   });
 
   it("does not treat attendance management permission as access to the personal app", () => {
@@ -73,7 +85,7 @@ describe("application registry", () => {
 
   it("keeps HR administration and personal attendance separate", () => {
     const hr = contextualNavigationGroups("/attendance/today", user(["attendance.view_all", "timesheet.view", "shift.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
-    expect(hr.flatMap((group) => group.items).map((item) => item.href)).toEqual(["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/timesheets/adjustments", "/attendance/logs", "/shifts/calendar"]);
+    expect(hr.flatMap((group) => group.items).map((item) => item.href)).toEqual(["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/timesheets/adjustments"]);
     const personal = contextualNavigationGroups("/attendance/me", user(["attendance.self", "attendance.self.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
     expect(personal[0].items.map((item) => item.href)).toEqual(["/attendance/me", "/attendance/history", "/attendance/requests", "/attendance/notifications"]);
   });
@@ -85,5 +97,12 @@ describe("application registry", () => {
     expect(manager[0].defaultRoute).toBe("/timesheets");
     expect(personal.map((item) => item.id)).toEqual(["attendance"]);
     expect(personal[0].defaultRoute).toBe("/attendance/history");
+  });
+
+  it("opens every application on a function the user can access", () => {
+    expect(visibleApplications(user(["warehouse.issue.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/warehouse/issues");
+    expect(visibleApplications(user(["payslip.self.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/accounting/payslips");
+    expect(visibleApplications(user(["approval.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/approvals");
+    expect(visibleApplications(user(["role.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/settings/roles");
   });
 });

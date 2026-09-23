@@ -11,7 +11,7 @@ export interface CardProps {
 }
 
 export function Card({ children, className, variant = "neutral", padding = "md", interactive = false }: CardProps) {
-  return <section className={cn("card", `card--${variant}`, `card--padding-${padding}`, interactive && "card--interactive", className)}>{children}</section>;
+  return <section className={cn("card", "card--workspace", `card--${variant}`, `card--padding-${padding}`, interactive && "card--interactive", className)}>{children}</section>;
 }
 
 export interface StatCardProps {

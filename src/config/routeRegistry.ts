@@ -1,3 +1,5 @@
+import { desktopNavigation, mobileNavigation } from "@/config/navigation";
+
 export interface RouteMeta {
   title: string;
   description: string;
@@ -49,17 +51,17 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/attendance": {
     title: "Chấm công",
     description: "Nền tảng chấm công cá nhân qua mobile, GPS, ảnh và trạng thái đồng bộ.",
-    module: "Chấm công"
+    module: "Cá nhân"
   },
-  "/attendance/me": { title: "Chấm công của tôi", description: "", module: "Chấm công" },
-  "/attendance/today": { title: "Chấm công hôm nay", description: "", module: "Nhân sự" },
-  "/attendance/logs": { title: "Nhật ký công", description: "", module: "Nhân sự" },
-  "/attendance/requests": { title: "Đơn của tôi", description: "", module: "Chấm công" },
-  "/attendance/notifications": { title: "Thông báo", description: "", module: "Chấm công" },
+  "/attendance/me": { title: "Chấm công của tôi", description: "", module: "Cá nhân" },
+  "/attendance/today": { title: "Chấm công hôm nay", description: "", module: "Quản trị công" },
+  "/attendance/logs": { title: "Nhật ký công", description: "", module: "Quản trị công" },
+  "/attendance/requests": { title: "Đơn của tôi", description: "", module: "Cá nhân" },
+  "/attendance/notifications": { title: "Thông báo", description: "", module: "Cá nhân" },
   "/attendance/history": {
     title: "Lịch sử chấm công",
     description: "",
-    module: "Chấm công"
+    module: "Cá nhân"
   },
   "/attendance/records": {
     title: "Kiểm tra chấm công",
@@ -69,26 +71,27 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/timesheets": {
     title: "Kỳ công",
     description: "Tầng tổng hợp dữ liệu công từ chấm công, điểm danh, đơn nghỉ và điều chỉnh.",
-    module: "Nhân sự"
+    module: "Quản trị công"
   },
-  "/timesheets/matrix": { title: "Bảng công", description: "", module: "Nhân sự" },
-  "/timesheets/exceptions": { title: "Ngoại lệ bảng công", description: "", module: "Nhân sự" },
-  "/timesheets/adjustments": { title: "Điều chỉnh bảng công", description: "", module: "Nhân sự" },
+  "/timesheets/matrix": { title: "Bảng công", description: "", module: "Quản trị công" },
+  "/timesheets/exceptions": { title: "Ngoại lệ bảng công", description: "", module: "Quản trị công" },
+  "/timesheets/adjustments": { title: "Điều chỉnh bảng công", description: "", module: "Quản trị công" },
   "/shifts": {
     title: "Ca làm",
     description: "Cấu hình ca làm và chính sách liên quan sẽ nằm trong dữ liệu cấu hình.",
-    module: "Nhân sự"
+    module: "Quản trị công"
   },
-  "/shifts/calendar": { title: "Lịch ngày làm việc và ngày nghỉ", description: "", module: "Nhân sự" },
+  "/shifts/calendar": { title: "Lịch ngày làm việc và ngày nghỉ", description: "", module: "Quản trị công" },
   "/leave": {
     title: "Nghỉ phép",
     description: "Nền tảng route cho đơn từ, phê duyệt và xuất PDF ở bước sau.",
-    module: "Nhân sự"
+    module: "Cá nhân"
   },
+  "/leave/manage": { title: "Quản lý nghỉ phép", description: "", module: "Quản trị công" },
   "/projects": {
-    title: "Dự án / Công trường",
+    title: "Gói / Công trường",
     description: "Quản lý project, worksite, phân công và roster theo cấu trúc mở rộng.",
-    module: "Dự án"
+    module: "Gói / Công trường"
   },
   "/projects/updates": {
     title: "Cập nhật dự án",
@@ -269,21 +272,17 @@ const employeeSectionLabels: Record<string, string> = {
   employment: "Công việc",
   contracts: "Hợp đồng",
   salary: "Lương & phúc lợi",
-  documents: "Tài liệu",
+  attendance: "Chấm công",
   history: "Lịch sử",
   leave: "Nghỉ phép",
   account: "Tài khoản"
 };
 
 const projectSectionLabels: Record<string, string> = {
-  overview: "Tổng quan",
-  progress: "Tiến độ",
-  updates: "Cập nhật",
-  team: "Nhân sự",
-  schedule: "Lịch",
-  "worker-attendance": "Điểm danh",
-  documents: "Tài liệu",
-  history: "Lịch sử"
+  progress: "Thi công",
+  team: "Chấm công",
+  profile: "Hồ sơ",
+  documents: "Tài liệu"
 };
 
 function getEmployeeSectionLabel(section: string) {
@@ -345,9 +344,9 @@ export function getRouteMeta(pathname: string): RouteMeta {
   if (projectMatch) {
     const section = projectSectionLabels[projectMatch[2]] ?? "Chi tiết";
     return {
-      title: `Dự án ${projectMatch[1]} · ${section}`,
+      title: `Gói ${projectMatch[1]} · ${section}`,
       description: "Route-backed tab cho dự án/công trường.",
-      module: "Dự án"
+      module: "Gói / Công trường"
     };
   }
 
@@ -379,14 +378,14 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
   const projectUpdateMatch = pathname.match(/^\/projects\/([^/]+)\/updates\/(new|[^/]+)$/);
   if (projectUpdateMatch) {
-    return [{ label: "Dự án", href: "/projects" }, { label: projectUpdateMatch[1], href: `/projects/${projectUpdateMatch[1]}/overview` }, { label: "Cập nhật", href: `/projects/${projectUpdateMatch[1]}/updates` }, { label: projectUpdateMatch[2] === "new" ? "Tạo mới" : "Chi tiết" }];
+    return [{ label: "Gói / Công trường", href: "/projects" }, { label: projectUpdateMatch[1], href: `/projects/${projectUpdateMatch[1]}/progress` }, { label: "Cập nhật", href: `/projects/${projectUpdateMatch[1]}/updates` }, { label: projectUpdateMatch[2] === "new" ? "Tạo mới" : "Chi tiết" }];
   }
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/([^/]+)$/);
   if (projectMatch) {
     return [
-      { label: "Dự án", href: "/projects" },
-      { label: projectMatch[1], href: `/projects/${projectMatch[1]}/overview` },
+      { label: "Gói / Công trường", href: "/projects" },
+      { label: projectMatch[1], href: `/projects/${projectMatch[1]}/progress` },
       { label: projectSectionLabels[projectMatch[2]] ?? "Chi tiết" }
     ];
   }
@@ -400,7 +399,29 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
 }
 
 export function getBackHref(pathname: string): string | null {
-  if (pathname === "/dashboard" || pathname === "/workspace") return null;
+  const functionRoutes = new Set([
+    ...desktopNavigation.flatMap((group) => group.items.map((item) => item.href)),
+    ...mobileNavigation.map((item) => item.href),
+    "/accounting",
+    "/command",
+    "/home",
+    "/import-export",
+    "/messages",
+    "/notifications",
+    "/profile",
+    "/search",
+    "/settings",
+    "/system-admin",
+    "/warehouse",
+    "/workspace",
+    "/dashboard"
+  ]);
+  // Dashboard is the only true root of the application. A screen that is
+  // reachable from the rail is still a working context, not a dead end: it
+  // must offer a predictable way back when the user arrives from search,
+  // notifications, or a direct URL.
+  if (pathname === "/dashboard") return null;
+  if (functionRoutes.has(pathname)) return "/dashboard";
 
   const breadcrumbParent = [...getBreadcrumbs(pathname)]
     .reverse()
@@ -415,7 +436,7 @@ export function getBackHref(pathname: string): string | null {
     }
   }
 
-  return "/dashboard";
+  return null;
 }
 
 export const employeeDetailSections = Object.entries(employeeSectionLabels).map(

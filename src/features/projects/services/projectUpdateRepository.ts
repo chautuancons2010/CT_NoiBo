@@ -40,7 +40,8 @@ function nested(row: Row, key: string): Row | undefined {
 async function actor(client: SupabaseClient, user: AuthenticatedUser) {
   let query = client.from("app_accounts").select("id,employee_id").limit(1);
   query = /^[0-9a-f-]{36}$/i.test(user.id) ? query.eq("id", user.id) : query.eq("primary_email", user.email);
-  const { data } = await query.maybeSingle();
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new AppError("SERVER_ERROR", "Không thể xác định tài khoản vận hành.");
   return { accountId: data?.id ? String(data.id) : undefined, employeeId: data?.employee_id ? String(data.employee_id) : undefined };
 }
 
@@ -50,7 +51,8 @@ async function assertProjectAccess(client: SupabaseClient, user: AuthenticatedUs
   if (!write && !can(user.permissions, "project_update.view_project") && !can(user.permissions, "project_monitoring.view") && !can(user.permissions, "project_issue.view")) throw new AppError("PERMISSION_DENIED");
   const identity = await actor(client, user);
   if (!identity.employeeId) throw new AppError("PERMISSION_DENIED");
-  const { data } = await client.from("project_assignments").select("id").eq("project_id", projectId).eq("employee_id", identity.employeeId).eq("status", "active").limit(1).maybeSingle();
+  const { data, error } = await client.from("project_assignments").select("id").eq("project_id", projectId).eq("employee_id", identity.employeeId).eq("status", "active").limit(1).maybeSingle();
+  if (error) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi dự án.");
   if (!data) throw new AppError("PERMISSION_DENIED", "Bạn không thuộc phạm vi dự án này.");
   return identity;
 }
@@ -59,7 +61,8 @@ async function scopedProjectIds(client: SupabaseClient, user: AuthenticatedUser)
   if (can(user.permissions, "project_update.view_all") || can(user.permissions, "project_monitoring.view_all")) return undefined;
   const identity = await actor(client, user);
   if (!identity.employeeId) return [];
-  const { data } = await client.from("project_assignments").select("project_id").eq("employee_id", identity.employeeId).eq("status", "active");
+  const { data, error } = await client.from("project_assignments").select("project_id").eq("employee_id", identity.employeeId).eq("status", "active");
+  if (error) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi dự án.");
   return [...new Set((data ?? []).map((item) => String(item.project_id)))];
 }
 
@@ -91,10 +94,11 @@ function mapIssue(row: Row): ProjectIssue {
 async function loadRelations(client: SupabaseClient, rows: Row[]) {
   const ids = rows.map((row) => text(row, "id"));
   if (!ids.length) return { attachments: new Map<string, ProjectUpdateAttachment[]>(), issues: new Map<string, ProjectIssue>() };
-  const [{ data: attachments }, { data: issues }] = await Promise.all([
+  const [{ data: attachments, error: attachmentError }, { data: issues, error: issueError }] = await Promise.all([
     client.from("project_update_attachments").select(attachmentSelect).in("update_id", ids).order("sort_order"),
     client.from("project_issues").select(issueSelect).in("source_update_id", ids)
   ]);
+  if (attachmentError || issueError) throw new AppError("SERVER_ERROR", "Không thể đọc dữ liệu liên quan của cập nhật dự án.");
   const attachmentMap = new Map<string, ProjectUpdateAttachment[]>();
   for (const item of attachments ?? []) {
     const updateId = String(item.update_id); attachmentMap.set(updateId, [...(attachmentMap.get(updateId) ?? []), mapAttachment(item as Row)]);
@@ -262,15 +266,20 @@ export async function listProjectIssues(user: AuthenticatedUser, filters: { proj
 
 async function transitionIssue(user: AuthenticatedUser, issueId: string, status: "resolved" | "open", note: string) {
   if (!can(user.permissions, "project_issue.resolve")) throw new AppError("PERMISSION_DENIED");
-  const client = db(); const { data: row } = await client.from("project_issues").select(issueSelect).eq("id", issueId).maybeSingle();
+  const client = db(); const { data: row, error: readError } = await client.from("project_issues").select(issueSelect).eq("id", issueId).maybeSingle();
+  if (readError) throw new AppError("SERVER_ERROR", "Không thể đọc vấn đề dự án.");
   if (!row) throw new AppError("NOT_FOUND", "Không tìm thấy vấn đề.");
   const current = mapIssue(row as Row); await assertProjectAccess(client, user, current.projectId, true); const identity = await actor(client, user);
   if (current.status === status) return current;
   const patch = status === "resolved" ? { status, resolution_note: note, resolved_by: identity.accountId ?? null, resolved_at: new Date().toISOString() } : { status, resolution_note: null, resolved_by: null, resolved_at: null };
   const { error } = await client.from("project_issues").update(patch).eq("id", issueId);
   if (error) throw new AppError("SERVER_ERROR", "Không thể cập nhật vấn đề.");
-  await client.from("project_issue_history").insert({ issue_id: issueId, from_status: current.status, to_status: status, from_severity: current.severity, to_severity: current.severity, note, changed_by: identity.accountId ?? null });
-  if (status === "resolved") await client.from("project_domain_events").insert({ event_type: "project.issue.resolved", project_id: current.projectId, aggregate_id: issueId, payload: {} });
+  const { error: historyError } = await client.from("project_issue_history").insert({ issue_id: issueId, from_status: current.status, to_status: status, from_severity: current.severity, to_severity: current.severity, note, changed_by: identity.accountId ?? null });
+  if (historyError) throw new AppError("SERVER_ERROR", "Không thể lưu lịch sử vấn đề dự án.");
+  if (status === "resolved") {
+    const { error: eventError } = await client.from("project_domain_events").insert({ event_type: "project.issue.resolved", project_id: current.projectId, aggregate_id: issueId, payload: {} });
+    if (eventError) throw new AppError("SERVER_ERROR", "Không thể phát sự kiện vấn đề dự án.");
+  }
   await recordAuditLog({ actorId: identity.accountId ?? user.id, action: status === "resolved" ? "project.issue.resolved" : "project.issue.reopened", entityType: "project_issue", entityId: issueId, reason: note, before: { status: current.status }, after: { status } });
   const { data: updated } = await client.from("project_issues").select(issueSelect).eq("id", issueId).single();
   return mapIssue(updated as Row);
@@ -282,12 +291,15 @@ export function reopenProjectIssue(user: AuthenticatedUser, issueId: string, inp
 export async function updateProjectHealth(user: AuthenticatedUser, projectId: string, input: z.infer<typeof projectHealthInputSchema>) {
   if (!can(user.permissions, "project_health.update")) throw new AppError("PERMISSION_DENIED");
   const client = db(); await assertProjectAccess(client, user, projectId, true); const identity = await actor(client, user);
-  const { data: project } = await client.from("projects").select("health").eq("id", projectId).maybeSingle();
+  const { data: project, error: projectError } = await client.from("projects").select("health").eq("id", projectId).maybeSingle();
+  if (projectError) throw new AppError("SERVER_ERROR", "Không thể đọc tình trạng dự án.");
   if (!project) throw new AppError("NOT_FOUND", "Không tìm thấy dự án.");
   const { error } = await client.from("projects").update({ health: input.health }).eq("id", projectId);
   if (error) throw new AppError("SERVER_ERROR", "Không thể cập nhật tình trạng dự án.");
-  const { data: history } = await client.from("project_health_history").insert({ project_id: projectId, from_health: project.health, to_health: input.health, reason: input.reason ?? null, changed_by: identity.accountId ?? null, changed_by_name_snapshot: user.displayName }).select("*").single();
-  await client.from("project_domain_events").insert({ event_type: "project.health.changed", project_id: projectId, aggregate_id: history?.id ?? projectId, payload: { from: project.health, to: input.health } });
+  const { data: history, error: historyError } = await client.from("project_health_history").insert({ project_id: projectId, from_health: project.health, to_health: input.health, reason: input.reason ?? null, changed_by: identity.accountId ?? null, changed_by_name_snapshot: user.displayName }).select("*").single();
+  if (historyError || !history) throw new AppError("SERVER_ERROR", "Không thể lưu lịch sử tình trạng dự án.");
+  const { error: eventError } = await client.from("project_domain_events").insert({ event_type: "project.health.changed", project_id: projectId, aggregate_id: history.id, payload: { from: project.health, to: input.health } });
+  if (eventError) throw new AppError("SERVER_ERROR", "Không thể phát sự kiện tình trạng dự án.");
   await recordAuditLog({ actorId: identity.accountId ?? user.id, action: "project.health.changed", entityType: "project", entityId: projectId, reason: input.reason, before: { health: project.health }, after: { health: input.health } });
   return { projectId, health: input.health };
 }
@@ -301,15 +313,15 @@ export async function listProjectHealthHistory(user: AuthenticatedUser, projectI
 
 export async function getProjectMonitoring(user: AuthenticatedUser): Promise<ProjectMonitoringSummary> {
   if (!can(user.permissions, "project_monitoring.view") && !can(user.permissions, "project_monitoring.view_all")) throw new AppError("PERMISSION_DENIED");
-  const client = db(); const scope = await scopedProjectIds(client, user); const projects = (await listProjects()).filter((project) => project.status !== "closed" && (!scope || scope.includes(project.id)));
+  const client = db(); const scope = await scopedProjectIds(client, user); const projects = (await listProjects(user)).filter((project) => project.status !== "closed" && (!scope || scope.includes(project.id)));
   const projectIds = projects.map((project) => project.id);
   if (!projectIds.length) return { active: 0, averageCompletion: 0, onTrack: 0, atRisk: 0, delayed: 0, paused: 0, projects: [], attention: [], recentUpdates: [] };
-  const [{ data: updateRows }, issues, { data: progressRows, error: progressError }] = await Promise.all([
+  const [{ data: updateRows, error: updateError }, issues, { data: progressRows, error: progressError }] = await Promise.all([
     client.from("project_updates").select("*").in("project_id", projectIds).eq("publish_status", "published").order("created_at", { ascending: false }).limit(100),
     listProjectIssues(user, {}),
     client.from("project_progress_nodes").select("project_id,completion_percent").in("project_id", projectIds).is("parent_id", null)
   ]);
-  if (progressError) throw new AppError("SERVER_ERROR", "Không thể đọc tiến độ dự án.");
+  if (updateError || progressError) throw new AppError("SERVER_ERROR", "Không thể đọc dữ liệu theo dõi dự án.");
   const progressByProject = new Map<string, number[]>();
   for (const row of progressRows ?? []) progressByProject.set(String(row.project_id), [...(progressByProject.get(String(row.project_id)) ?? []), Number(row.completion_percent)]);
   const rows = (updateRows ?? []) as Row[]; const relations = await loadRelations(client, rows); const updates = rows.map((row) => mapUpdate(row, relations));

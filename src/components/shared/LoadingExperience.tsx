@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 
 import { navigationIconMap } from "@/components/layout/icons";
 import { applicationForPath } from "@/config/moduleRegistry";
@@ -25,14 +25,8 @@ export function PageSkeleton() {
 
 export function ModuleTransition() {
   const pathname = usePathname();
-  const [visible, setVisible] = useState(false);
   const application = applicationForPath(pathname);
   const Icon = navigationIconMap[application.icon];
-  useEffect(() => {
-    const timer = window.setTimeout(() => setVisible(true), 200);
-    return () => window.clearTimeout(timer);
-  }, [pathname]);
-  if (!visible) return null;
   return (
     <div className="module-transition" role="status" style={{ "--module-accent": application.accentColor, "--module-surface": application.accentSoft } as CSSProperties}>
       <span><Icon aria-hidden="true" size={26} strokeWidth={1.8} /></span>

@@ -7,10 +7,10 @@ export default function NotFoundPage() {
     <ErrorState
       action={
         <Link className="button button--primary button--md" href="/dashboard">
-          Về Tổng quan
+          Về Dashboard
         </Link>
       }
-      description="Đường dẫn không tồn tại hoặc chưa được triển khai."
+      description="Đường dẫn không tồn tại hoặc bạn không có quyền truy cập."
       title="Không tìm thấy trang"
     />
   );

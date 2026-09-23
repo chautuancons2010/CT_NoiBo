@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
+import { navigationIconSizes } from "@/components/layout/icons";
+
 import type { BreadcrumbItem } from "@/config/routeRegistry";
 
 export function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
@@ -14,7 +16,7 @@ export function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
           return (
             <li key={`${item.label}-${index}`}>
               {item.href && !isLast ? <Link href={item.href}>{item.label}</Link> : <span>{item.label}</span>}
-              {!isLast ? <ChevronRight aria-hidden="true" size={14} /> : null}
+              {!isLast ? <ChevronRight aria-hidden="true" size={navigationIconSizes.compact} /> : null}
             </li>
           );
         })}

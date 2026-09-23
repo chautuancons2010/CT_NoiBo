@@ -46,10 +46,11 @@ export function EmployeeContractManager({ employeeId, initialContracts, canEdit,
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
-    const response = await fetch(`/api/v1/employees/${employeeId}/contracts`, { method: "POST", body: new FormData(event.currentTarget) });
+    const formElement = event.currentTarget;
+    const response = await fetch(`/api/v1/employees/${employeeId}/contracts`, { method: "POST", body: new FormData(formElement) });
     const body = await response.json(); setBusy(false);
     if (!response.ok) { setError(body.error?.message ?? "Không thể tạo hợp đồng."); return; }
-    setOpen(false); event.currentTarget.reset(); await reload();
+    setOpen(false); formElement.reset(); await reload();
   }
 
   async function replaceFile(contract: EmployeeContract, file?: File) {
@@ -78,7 +79,7 @@ export function EmployeeContractManager({ employeeId, initialContracts, canEdit,
     { id: "signed", header: "Ngày ký", cell: (item) => date(item.signedDate), hiddenOnMobile: true },
     { id: "effective", header: "Hiệu lực", cell: (item) => date(item.effectiveDate ?? item.startDate) },
     { id: "end", header: "Hết hạn", cell: (item) => date(item.endDate), hiddenOnMobile: true },
-    { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge tone={item.status === "active" ? "success" : "neutral"}>{statusLabels[item.status]}</StatusBadge> },
+    { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge status={item.status}>{statusLabels[item.status]}</StatusBadge> },
     { id: "file", header: "Tài liệu", cell: (item) => item.attachmentFileId && canViewFile ? <Link className="private-file-link" href={buildInternalFileUrl(item.attachmentFileId)}>Xem PDF</Link> : "—" }
   ];
 

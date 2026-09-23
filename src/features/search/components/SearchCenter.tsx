@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { SearchResultList } from "@/features/search/components/SearchResultList";
 import type { GlobalSearchResponse, RecentEntity, SearchEntityType, SearchResult } from "@/features/search/types";
 
@@ -72,7 +73,7 @@ export function SearchCenter() {
   const recentResults: SearchResult[] = recent.map((item) => ({ ...item, icon: "file", score: 0 }));
   return (
     <div className="search-center page-stack">
-      <div className="search-center-heading"><h1>Tìm kiếm toàn hệ thống</h1></div>
+      <PageHeader title="Tìm kiếm toàn hệ thống" />
       <form className="search-center-form" onSubmit={(event) => { event.preventDefault(); updateUrl(query, urlTab, 0); }} role="search"><Search aria-hidden="true" size={20} /><input aria-label="Từ khóa tìm kiếm" autoFocus onChange={(event) => setQuery(event.target.value)} placeholder="Nhân viên, dự án, lô hàng, chứng từ..." type="search" value={query} /><Button type="submit" variant="primary">Tìm kiếm</Button></form>
       <div aria-label="Loại kết quả" className="search-tabs" role="tablist">{tabs.map((item, index) => <button aria-selected={urlTab === index} className={urlTab === index ? "is-active" : undefined} key={item.label} onClick={() => updateUrl(urlQuery, index, 0)} role="tab" type="button">{item.label}</button>)}</div>
       <Card className="search-results-card">

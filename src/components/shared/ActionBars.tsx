@@ -25,8 +25,20 @@ export function PageActionBar({ children, className, label = "Thao tác trang" }
   return <ActionBar className={cn("page-action-bar", className)} label={label}>{children}</ActionBar>;
 }
 
+export function PageToolbar({ children, className, label = "Công cụ trang" }: ActionBarProps) {
+  return <ActionBar className={cn("page-toolbar", className)} label={label}>{children}</ActionBar>;
+}
+
 export function TableActionBar({ children, className, label = "Thao tác dữ liệu" }: ActionBarProps) {
   return <ActionBar className={cn("table-action-bar", className)} label={label}>{children}</ActionBar>;
+}
+
+export function TableToolbar({ children, className, label = "Table toolbar" }: ActionBarProps) {
+  return <div aria-label={label} className={cn("table-toolbar", className)} role="toolbar">{children}</div>;
+}
+
+export function RowActions({ children, className, label = "Row actions" }: ActionBarProps) {
+  return <ActionBar className={cn("row-actions", className)} label={label}>{children}</ActionBar>;
 }
 
 export interface ActionButtonProps extends ButtonProps {

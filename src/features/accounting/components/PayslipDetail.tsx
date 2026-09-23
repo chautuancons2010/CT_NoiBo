@@ -28,7 +28,7 @@ export function PayslipDetail({ id }: { id: string }) {
       <Card>
         <div className="panel-header">
           <h2>Phiếu lương tháng {item.periodMonth.slice(0, 7)}</h2>
-          <StatusBadge tone={item.status === "published" ? "success" : "error"}>{item.status === "published" ? "Đã phát hành" : "Đã thu hồi"}</StatusBadge>
+          <StatusBadge status={item.status} />
         </div>
         <dl className="detail-field-list">
           <div><dt>Nhân viên</dt><dd>{item.employeeName}</dd></div>

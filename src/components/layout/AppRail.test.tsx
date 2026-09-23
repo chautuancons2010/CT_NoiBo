@@ -34,4 +34,15 @@ describe("AppRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Thu gọn điều hướng" }));
     expect(onCollapsedChange).toHaveBeenCalledWith(true);
   });
+
+  it("keeps every accessible function available when the rail is collapsed", () => {
+    render(<AppRail collapsed onCollapsedChange={vi.fn()} pathname="/employees" user={user} />);
+
+    const employeeLink = screen.getByRole("link", { name: "Nhân viên" });
+    expect(employeeLink).toHaveAttribute("href", "/employees");
+    expect(screen.getByRole("link", { name: "Phòng ban" })).toHaveAttribute("href", "/employees/departments");
+    expect(screen.getByRole("link", { name: "Chức vụ" })).toHaveAttribute("href", "/employees/positions");
+    fireEvent.focus(employeeLink);
+    expect(employeeLink).toHaveAttribute("aria-describedby", screen.getByRole("tooltip", { name: "Nhân viên" }).id);
+  });
 });

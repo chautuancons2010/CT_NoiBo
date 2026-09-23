@@ -26,3 +26,35 @@ export function FormSection({ title, description, children, columns = 2 }: FormS
 export function StickyActionBar({ children }: { children: ReactNode }) {
   return <div className="sticky-action-bar">{children}</div>;
 }
+
+export function FormActions({ children, className }: { children: ReactNode; className?: string }) {
+  return <footer className={cn("form-actions", className)}>{children}</footer>;
+}
+
+export interface FormErrorSummaryItem {
+  fieldId: string;
+  message: string;
+}
+
+export function FormErrorSummary({
+  errors,
+  title = "Vui lòng kiểm tra thông tin"
+}: {
+  errors: FormErrorSummaryItem[];
+  title?: string;
+}) {
+  if (errors.length === 0) return null;
+
+  return (
+    <section aria-label={title} className="form-error-summary" role="alert" tabIndex={-1}>
+      <strong>{title}</strong>
+      <ul>
+        {errors.map((error) => (
+          <li key={`${error.fieldId}-${error.message}`}>
+            <a href={`#${error.fieldId}`}>{error.message}</a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

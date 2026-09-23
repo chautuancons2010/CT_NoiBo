@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- accounting data is loaded from the API. */
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Banknote, Plus } from "lucide-react";
 
 import { Button } from "@/components/shared/Button";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -44,7 +45,8 @@ export function SalaryConsole({ canEdit, canViewHistory }: { canEdit: boolean; c
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/v1/accounting/salaries", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -52,7 +54,7 @@ export function SalaryConsole({ canEdit, canViewHistory }: { canEdit: boolean; c
     });
     const body = await response.json();
     if (!response.ok) { setError(body.error?.message); return; }
-    setError(""); event.currentTarget.reset(); setSelected(""); setDrawerOpen(false); await load();
+    setError(""); formElement.reset(); setSelected(""); setDrawerOpen(false); await load();
   }
 
   const columns = useMemo<DataTableColumn<SalaryRecord>[]>(() => [
@@ -65,9 +67,15 @@ export function SalaryConsole({ canEdit, canViewHistory }: { canEdit: boolean; c
   ], []);
 
   return (
-    <ListPageLayout>
-      <DataSurface>
-        <div className="data-surface__toolbar panel-header"><h2>Hồ sơ lương hiện tại</h2>{canEdit ? <Button onClick={() => setDrawerOpen(true)} variant="primary">Ghi nhận mức lương</Button> : null}</div>
+    <ListPageLayout className="salary-console">
+      <DataSurface className="salary-console__surface">
+        <div className="data-surface__toolbar panel-header salary-console__toolbar">
+          <div className="salary-console__heading">
+            <span aria-hidden="true" className="salary-console__icon"><Banknote size={21} /></span>
+            <div><h2>Hồ sơ lương hiện tại</h2><span>{latest.length} hồ sơ</span></div>
+          </div>
+          {canEdit ? <Button leftIcon={<Plus aria-hidden="true" size={18} />} onClick={() => setDrawerOpen(true)} size="lg" variant="primary">Ghi nhận mức lương</Button> : null}
+        </div>
         <DataTable
           actions={canViewHistory ? (item) => <DropdownMenu label={`Thao tác lương ${item.employeeName}`}><button onClick={() => setHistoryEmployeeId(item.employeeId)} type="button">Lịch sử</button></DropdownMenu> : undefined}
           columns={columns}

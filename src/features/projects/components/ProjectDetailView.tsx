@@ -1,23 +1,21 @@
 "use client";
 
-import { MapPin, Plus, Users } from "lucide-react";
-import Link from "next/link";
+import { MapPin, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/shared/Button";
-import { Card, StatCard } from "@/components/shared/Card";
-import { Input, Select } from "@/components/shared/FormControls";
+import { Card } from "@/components/shared/Card";
+import { Input } from "@/components/shared/FormControls";
+import { EmptyState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ProjectDocumentWorkspace } from "@/features/projects/components/ProjectDocumentWorkspace";
 import { ProjectHealthControl } from "@/features/projects/components/ProjectHealthControl";
+import { ProjectPeopleAttendanceWorkspace } from "@/features/projects/components/ProjectPeopleAttendanceWorkspace";
 import { ProjectProgressTree } from "@/features/projects/components/ProjectProgressTree";
-import { ProjectUpdateCard } from "@/features/projects/components/ProjectUpdateCard";
-import { EmployeePicker } from "@/features/employees/components/EmployeePicker";
-import type { EmployeePickerOption } from "@/features/employees/types";
-import type { DailySchedule, ProjectDetail, ProjectHealthEntry, ProjectUpdate } from "@/features/projects/types/projectTypes";
-
-const roleLabels = { project_manager: "Quản lý dự án", engineer: "Kỹ sư", supervisor_main: "Giám sát chính", supervisor_replacement: "Giám sát thay thế", worker: "Công nhân", support: "Hỗ trợ" };
-const statusLabels = { preparing: "Chuẩn bị", active: "Đang thực hiện", paused: "Tạm dừng", completed: "Hoàn thành", closed: "Đã đóng" };
+import { ProjectRecordWorkspace } from "@/features/projects/components/ProjectRecordWorkspace";
+import type { DailySchedule, ProjectAssignment, ProjectDetail, ProjectProgressNode, ProjectUpdate } from "@/features/projects/types/projectTypes";
+import type { WorkerAttendanceSession } from "@/features/worker-attendance/types/workerAttendanceTypes";
 
 async function postJson(url: string, payload: unknown) {
   const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -25,17 +23,72 @@ async function postJson(url: string, payload: unknown) {
   if (!response.ok) throw new Error(body.error?.message ?? "Không thể lưu dữ liệu.");
 }
 
-export function ProjectDetailView({ project, section, employeeOptions, schedule, overviewUpdates = [], todayAttendance = 0, healthHistory = [], canEditProgress = false }: { project: ProjectDetail; section: string; employeeOptions: EmployeePickerOption[]; schedule: DailySchedule[]; overviewUpdates?: ProjectUpdate[]; todayAttendance?: number; healthHistory?: ProjectHealthEntry[]; canEditProgress?: boolean }) {
-  const router = useRouter(); const [error, setError] = useState<string>(); const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>();
-  if (section === "overview") { const pinned = overviewUpdates.find((item) => item.pinned); return <div className="project-overview"><div className="project-stats"><StatCard label="Công trường" value={String(project.worksiteCount)} /><StatCard label="Nhân sự hiện tại" value={String(project.currentPeople)} /><StatCard label="Điểm danh hôm nay" value={String(todayAttendance)} /><StatCard label="Trạng thái" value={statusLabels[project.status]} /></div><Card><dl className="project-meta"><div><dt>Khách hàng</dt><dd>{project.customerName ?? "—"}</dd></div><div><dt>Người phụ trách</dt><dd>{project.projectManagerName ?? "—"}</dd></div><div><dt>Ngày bắt đầu</dt><dd>{project.startDate}</dd></div><div><dt>Kết thúc dự kiến</dt><dd>{project.expectedEndDate ?? "—"}</dd></div></dl><ProjectHealthControl health={project.health} projectId={project.id} /></Card>{pinned ? <Card className="project-pinned"><div className="panel-header"><h3>Cần chú ý</h3></div><ProjectUpdateCard update={pinned} /></Card> : null}<Card><div className="panel-header"><h3>Cập nhật gần đây</h3><Link href={`/projects/${project.id}/updates`}>Xem tất cả</Link></div><div className="monitoring-recent">{overviewUpdates.filter((item) => item.id !== pinned?.id).slice(0, 3).map((update) => <ProjectUpdateCard key={update.id} update={update} />)}</div></Card><WorksitePanel project={project} onError={setError} onSaved={() => router.refresh()} />{error ? <div className="attendance-notice">{error}</div> : null}</div>; }
-  if (section === "team") return <div className="project-team-layout"><Card><div className="panel-header"><h3>Nhân sự dự án</h3><StatusBadge>{project.assignments.length} người</StatusBadge></div><div className="project-team-groups">{Object.entries(roleLabels).map(([role, label]) => { const members = project.assignments.filter((item) => item.assignmentRole === role && item.status === "active"); return members.length ? <section key={role}><h4>{label}</h4>{members.map((member) => <div className="project-member" key={member.id}><Users size={17} /><span><strong>{member.employeeName}</strong><small>{member.employeeCode} · {member.worksiteName ?? "Toàn dự án"}</small></span><span>{member.startDate} → {member.endDate ?? "Hiện tại"}</span></div>)}</section> : null; })}</div></Card><Card><h3>Phân công nhân sự</h3><form action={async (form) => { try { await postJson(`/api/v1/projects/${project.id}/assignments`, { employeeId: selectedEmployeeId, worksiteId: form.get("worksiteId") || undefined, assignmentRole: form.get("assignmentRole"), startDate: form.get("startDate"), endDate: form.get("endDate") || undefined, shiftCode: "DAY", shiftName: "Ca ngày", shiftStart: "07:00", shiftEnd: "17:00" }); setError(undefined); router.refresh(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể phân công."); } }} className="project-assignment-form"><EmployeePicker label="Tìm nhân sự" onSelect={(option) => setSelectedEmployeeId(option.id)} options={employeeOptions} selectedId={selectedEmployeeId} /><Select label="Vai trò trong dự án" name="assignmentRole" options={Object.entries(roleLabels).map(([value, label]) => ({ value, label }))} required /><Select label="Công trường" name="worksiteId" options={project.worksites.filter((site) => site.status === "active").map((site) => ({ value: site.id, label: site.name }))} required /><Input label="Từ ngày" name="startDate" required type="date" /><Input label="Đến ngày" name="endDate" type="date" />{error ? <div className="attendance-notice">{error}</div> : null}<Button disabled={!selectedEmployeeId} leftIcon={<Plus size={16} />} type="submit" variant="primary">Phân công</Button></form></Card></div>;
-  if (section === "schedule") return <div className="project-schedule">{schedule.map((day) => <Card key={`${day.date}-${day.worksiteId}`}><strong>{day.date}</strong><span>{day.worksiteName}</span><span>{day.supervisorNames.join(", ") || "Chưa có giám sát"}</span><StatusBadge tone={day.workerCount ? "success" : "warning"}>{day.workerCount} công nhân</StatusBadge></Card>)}</div>;
-  if (section === "progress") return <ProjectProgressTree canEdit={canEditProgress} employees={employeeOptions} projectId={project.id} />;
-  if (section === "worker-attendance") return <Card><div className="project-worker-attendance-link"><span><strong>Điểm danh công nhân</strong><small>{project.name}</small></span><Link href="/worker-attendance/today"><Button variant="primary">Mở điểm danh hôm nay</Button></Link></div></Card>;
-  if (section === "documents") return <Card><h3>Tài liệu</h3><span>Chưa có tài liệu.</span></Card>;
-  return <Card><h3 className="section-title">Lịch sử dự án</h3>{healthHistory.length ? <ol className="project-history-list">{healthHistory.map((item) => <li key={item.id}><time>{new Date(item.changedAt).toLocaleString("vi-VN")}</time><strong>Cập nhật tình trạng: {item.toHealth === "on_track" ? "Đúng tiến độ" : item.toHealth === "at_risk" ? "Có rủi ro" : item.toHealth === "delayed" ? "Chậm tiến độ" : item.toHealth === "paused" ? "Tạm dừng" : "Hoàn thành"}</strong><span>{item.changedByName}</span>{item.reason ? <p>{item.reason}</p> : null}</li>)}</ol> : <span>Chưa có thay đổi.</span>}</Card>;
+interface ProjectDetailViewProps {
+  project: ProjectDetail;
+  section: string;
+  schedule: DailySchedule[];
+  progressNodes?: ProjectProgressNode[];
+  progressLoadError?: string;
+  scheduleLoadError?: string;
+  documentUpdates?: ProjectUpdate[];
+  canEditProgress?: boolean;
+  canFieldUpdate?: boolean;
+  canManageTeam?: boolean;
+  canOpenAttendance?: boolean;
+  canAdjustAttendance?: boolean;
+  canExportAttendance?: boolean;
+  canViewAttendance?: boolean;
+  canManageWorksites?: boolean;
+  canUpdateHealth?: boolean;
+  canUploadDocuments?: boolean;
+  today: string;
+  todayRoster?: ProjectAssignment[];
+  attendanceSessions?: WorkerAttendanceSession[];
 }
 
-function WorksitePanel({ project, onSaved, onError }: { project: ProjectDetail; onSaved: () => void; onError: (message: string) => void }) {
-  return <Card><div className="panel-header"><h3>Công trường</h3><StatusBadge>{project.worksites.length}</StatusBadge></div><div className="worksite-list">{project.worksites.map((site) => <div key={site.id}><MapPin size={18} /><span><strong>{site.name}</strong><small>{site.address ?? "Chưa có địa chỉ"}</small></span><span>{site.radiusMeters} m</span><StatusBadge tone={site.status === "active" ? "success" : "neutral"}>{site.status === "active" ? "Hoạt động" : "Ngừng"}</StatusBadge></div>)}</div><form action={async (form) => { try { await postJson(`/api/v1/projects/${project.id}/worksites`, { name: form.get("name"), address: form.get("address") || undefined, latitude: form.get("latitude") ? Number(form.get("latitude")) : undefined, longitude: form.get("longitude") ? Number(form.get("longitude")) : undefined, radiusMeters: Number(form.get("radiusMeters")), gpsRequired: true, allowedAccuracyThresholdMeters: 100 }); onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : "Không thể thêm công trường."); } }} className="worksite-form"><Input label="Tên địa điểm" name="name" required /><Input label="Địa chỉ" name="address" /><Input label="Vĩ độ" name="latitude" step="any" type="number" /><Input label="Kinh độ" name="longitude" step="any" type="number" /><Input defaultValue="200" label="Bán kính (m)" min={10} name="radiusMeters" type="number" /><Button leftIcon={<Plus size={16} />} type="submit">Thêm công trường</Button></form></Card>;
+export function ProjectDetailView({ project, section, schedule, progressNodes = [], progressLoadError, scheduleLoadError, documentUpdates = [], canEditProgress = false, canFieldUpdate = false, canManageTeam = false, canOpenAttendance = false, canAdjustAttendance = false, canExportAttendance = false, canViewAttendance = false, canManageWorksites = false, canUpdateHealth = false, canUploadDocuments = false, today, todayRoster = [], attendanceSessions = [] }: ProjectDetailViewProps) {
+  const router = useRouter();
+  const [error, setError] = useState<string>();
+
+  if (section === "profile") return <div className="project-profile-workspace">
+    <div className="project-profile-workspace__top">
+      <ProjectRecordWorkspace project={project} />
+      <Card className="project-profile-health"><header><span>Vận hành</span><h2>Tình trạng</h2></header>{canUpdateHealth ? <ProjectHealthControl health={project.health} projectId={project.id} /> : <StatusBadge>{project.health}</StatusBadge>}</Card>
+    </div>
+    <WorksitePanel canManage={canManageWorksites} project={project} onError={setError} onSaved={() => router.refresh()} />
+    {error ? <div className="attendance-notice" role="alert">{error}</div> : null}
+  </div>;
+  if (section === "documents") return <ProjectDocumentWorkspace canUpload={canUploadDocuments} projectId={project.id} updates={documentUpdates} />;
+  if (section === "progress") return <ProjectProgressTree canEdit={canEditProgress} canFieldUpdate={canFieldUpdate} initialLoadError={progressLoadError} initialNodes={progressNodes} projectId={project.id} schedule={schedule} scheduleLoadError={scheduleLoadError} />;
+  if (section === "team") return <ProjectPeopleAttendanceWorkspace attendanceSessions={attendanceSessions} canAdjustAttendance={canAdjustAttendance} canExportAttendance={canExportAttendance} canManageTeam={canManageTeam} canOpenAttendance={canOpenAttendance} canViewAttendance={canViewAttendance} project={project} today={today} todayRoster={todayRoster} />;
+  return <EmptyState title="Không tìm thấy nội dung gói" />;
+}
+
+function WorksitePanel({ project, canManage, onSaved, onError }: { project: ProjectDetail; canManage: boolean; onSaved: () => void; onError: (message: string) => void }) {
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function createWorksite(form: FormData) {
+    setSaving(true);
+    try {
+      await postJson(`/api/v1/projects/${project.id}/worksites`, {
+        name: form.get("name"), address: form.get("address") || undefined,
+        latitude: form.get("latitude") ? Number(form.get("latitude")) : undefined,
+        longitude: form.get("longitude") ? Number(form.get("longitude")) : undefined,
+        radiusMeters: Number(form.get("radiusMeters")), gpsRequired: true, allowedAccuracyThresholdMeters: 100
+      });
+      setShowCreateForm(false);
+      onSaved();
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : "Không thể thêm công trường.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Card className="project-worksite-panel">
+    <div className="panel-header"><div><h3>Công trường</h3><StatusBadge>{project.worksites.length}</StatusBadge></div>{canManage ? <Button onClick={() => setShowCreateForm((current) => !current)} size="sm" variant="secondary">{showCreateForm ? "Đóng" : "Thêm công trường"}</Button> : null}</div>
+    {project.worksites.length ? <div className="worksite-list">{project.worksites.map((site) => <div key={site.id}><MapPin aria-hidden="true" size={18} /><span><strong>{site.name}</strong>{site.address ? <small>{site.address}</small> : null}</span><span>{site.radiusMeters} m</span><StatusBadge tone={site.status === "active" ? "success" : "neutral"}>{site.status === "active" ? "Hoạt động" : "Ngừng"}</StatusBadge></div>)}</div> : <EmptyState title="Chưa có công trường" />}
+    {showCreateForm ? <form action={createWorksite} className="worksite-form"><Input label="Tên địa điểm" name="name" required /><Input label="Địa chỉ" name="address" /><Input label="Vĩ độ" name="latitude" step="any" type="number" /><Input label="Kinh độ" name="longitude" step="any" type="number" /><Input defaultValue="200" label="Bán kính (m)" min={10} name="radiusMeters" type="number" /><div className="form-actions"><Button onClick={() => setShowCreateForm(false)} type="button" variant="secondary">Hủy</Button><Button disabled={saving} leftIcon={<Plus aria-hidden="true" size={16} />} type="submit" variant="primary">{saving ? "Đang lưu" : "Lưu công trường"}</Button></div></form> : null}
+  </Card>;
 }

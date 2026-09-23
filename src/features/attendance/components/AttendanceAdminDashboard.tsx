@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { BadgeCheck, CircleAlert, Clock3, Timer, Umbrella, UsersRound } from "lucide-react";
 
 import { Button } from "@/components/shared/Button";
-import { Card, StatCard } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { DataSurface } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { AttendanceAdminToday, AttendanceAdminTodayRow } from "@/features/attendance/types/attendanceTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
@@ -14,6 +15,15 @@ const labels = { present: "Có mặt", late: "Đi muộn", leave: "Nghỉ", not_
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const time = (value?: string) => value ? new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value)) : "—";
 const duration = (minutes: number) => minutes ? `${Math.floor(minutes / 60)}g ${minutes % 60}p` : "—";
+
+const metricDefinitions = [
+  { key: "totalEmployees", label: "Tổng nhân viên", icon: UsersRound, tone: "neutral" },
+  { key: "present", label: "Có mặt", icon: BadgeCheck, tone: "success" },
+  { key: "late", label: "Đi muộn", icon: Timer, tone: "warning" },
+  { key: "leave", label: "Nghỉ", icon: Umbrella, tone: "info" },
+  { key: "notChecked", label: "Chưa chấm", icon: Clock3, tone: "neutral" },
+  { key: "missingCheck", label: "Thiếu lượt", icon: CircleAlert, tone: "danger" }
+] as const;
 
 export function AttendanceAdminDashboard() {
   const [date, setDate] = useState(today);
@@ -49,18 +59,22 @@ export function AttendanceAdminDashboard() {
     { id: "status", header: "Trạng thái", cell: (row) => <StatusBadge tone={row.status === "present" ? "success" : row.status === "late" || row.status === "missing_check" ? "warning" : row.status === "leave" ? "info" : "neutral"}>{labels[row.status]}</StatusBadge> }
   ];
 
-  return <div className="page-stack">
-    <div className="attendance-admin-kpis">
-      <StatCard label="Tổng nhân viên" value={String(data?.totalEmployees ?? 0)} />
-      <StatCard label="Có mặt" value={String(data?.present ?? 0)} />
-      <StatCard label="Đi muộn" value={String(data?.late ?? 0)} />
-      <StatCard label="Nghỉ" value={String(data?.leave ?? 0)} />
-      <StatCard label="Chưa chấm" value={String(data?.notChecked ?? 0)} />
-      <StatCard label="Thiếu lượt" value={String(data?.missingCheck ?? 0)} />
-    </div>
-    <Card>
-      <div className="panel-header"><h2>Chấm công hôm nay</h2><Link className="button button--secondary button--sm" href="/attendance/logs">Nhật ký công</Link></div>
-      <div className="attendance-admin-filters">
+  return <div className="page-stack attendance-admin-dashboard">
+    <section aria-label="Tổng quan chấm công" className="attendance-admin-kpis">
+      {metricDefinitions.map(({ key, label, icon: Icon, tone }) => (
+        <article className={`attendance-admin-metric attendance-admin-metric--${tone}`} key={key}>
+          <span className="attendance-admin-metric__icon"><Icon aria-hidden="true" size={19} /></span>
+          <span>{label}</span>
+          <strong>{data?.[key] ?? 0}</strong>
+        </article>
+      ))}
+    </section>
+    <DataSurface className="attendance-admin-board">
+      <header className="attendance-admin-board__header">
+        <div><span>Vận hành trong ngày</span><h2>Chấm công nhân viên</h2></div>
+        <Link className="button button--secondary button--sm" href="/attendance/logs">Nhật ký công</Link>
+      </header>
+      <div className="attendance-admin-filters" aria-label="Bộ lọc chấm công">
         <label>Ngày<input className="input" onChange={(event) => setDate(event.target.value)} type="date" value={date} /></label>
         <label>Phòng ban<select className="select" onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}><option value="">Tất cả</option>{departments.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
         <label>Ca<select className="select" onChange={(event) => setShiftId(event.target.value)} value={shiftId}><option value="">Tất cả</option>{shifts.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
@@ -69,6 +83,6 @@ export function AttendanceAdminDashboard() {
       </div>
       {error ? <p className="form-error">{error}</p> : null}
       <DataTable columns={columns} data={rows} emptyDescription="" emptyTitle="Chưa có nhân viên" getRowId={(row) => row.employeeId} loading={!data} rowHrefPrefix="/attendance/logs?employeeId=" />
-    </Card>
+    </DataSurface>
   </div>;
 }

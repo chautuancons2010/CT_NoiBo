@@ -144,6 +144,16 @@ export interface ProjectAssignment {
   approvedLeave?: { requestId: string; requestNumber: string; leaveTypeName: string; dayPart: string };
 }
 
+export interface EmployeeProjectAssignment {
+  project: ProjectSummary;
+  assignmentId: string;
+  assignmentRole: AssignmentRole;
+  worksiteName?: string;
+  startDate: string;
+  endDate?: string;
+  status: ProjectAssignment["status"];
+}
+
 export interface ProjectDetail extends ProjectSummary {
   note?: string;
   worksites: Worksite[];

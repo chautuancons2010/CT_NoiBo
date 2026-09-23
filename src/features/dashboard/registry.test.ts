@@ -11,6 +11,7 @@ function user(permissions: Permission[]): AuthenticatedUser {
 describe("permission-driven dashboard registry", () => {
   it("selects a preset from permissions rather than a role name", () => {
     expect(resolveDashboardProfile(user(["warehouse.view", "dashboard.view"]), defaultDashboardSettings)).toBe("warehouse");
+    expect(resolveDashboardProfile(user(["payroll.view", "dashboard.view"]), defaultDashboardSettings)).toBe("accounting");
     expect(resolveDashboardProfile(user(["worker_attendance.create", "dashboard.view"]), defaultDashboardSettings)).toBe("supervisor");
   });
 
@@ -24,6 +25,8 @@ describe("permission-driven dashboard registry", () => {
     settings.presets.find((preset) => preset.profile === "employee")!.landingPage = "/dashboard/management";
     expect(resolveLandingPage(user(["dashboard.view"]), settings)).toBe("/dashboard");
     expect(resolveLandingPage(user(["dashboard.view", "employee.view", "warehouse.view"]), settings)).toBe("/dashboard");
+    expect(resolveLandingPage(user(["timesheet.view_all"]), settings)).toBe("/timesheets/matrix");
+    expect(resolveLandingPage(user(["salary.history.view"]), settings)).toBe("/accounting/salary-history");
   });
 
   it("contains no destructive command types", () => {

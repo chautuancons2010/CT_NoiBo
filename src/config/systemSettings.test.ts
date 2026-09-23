@@ -24,7 +24,7 @@ describe("typed system settings", () => {
     })).toThrow();
     expect(() => navigationSettingsSchema.parse({
       ...defaultSystemSettings.navigation,
-      itemOrder: defaultSystemSettings.navigation.itemOrder.map((path, index) => index === 1 ? "/dashboard" : path)
+      itemOrder: defaultSystemSettings.navigation.itemOrder.map((path, index) => index === 2 ? "/employees" : path)
     })).toThrow();
   });
 

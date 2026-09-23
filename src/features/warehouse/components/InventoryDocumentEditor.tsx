@@ -198,14 +198,15 @@ function DocumentActions({ document, onChange, canCreate, canPost, canReverse }:
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const file = form.get("file");
     if (!(file instanceof File) || !file.size) return;
     setBusy(true);
     try {
       const attachment = await api<Attachment>(`/api/v1/warehouse/documents/${document.id}/attachments`, { method: "POST", body: form });
       setAttachments([...attachments, attachment]);
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (value) { setError(value instanceof Error ? value.message : "Không thể tải tệp."); }
     finally { setBusy(false); }
   }

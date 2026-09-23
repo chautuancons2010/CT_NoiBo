@@ -163,6 +163,26 @@ async function resolveAccountId(client: SupabaseClient, user: AuthenticatedUser)
   return String(data.id);
 }
 
+async function scopedAttendanceEmployeeIds(client: SupabaseClient, user: AuthenticatedUser): Promise<string[] | undefined> {
+  if (
+    can(user.permissions, "attendance.view_all") ||
+    can(user.permissions, "attendance.manage") ||
+    can(user.permissions, "attendance.log.view")
+  ) {
+    return undefined;
+  }
+
+  const identity = await resolveIdentity(client, user);
+  if (!can(user.permissions, "attendance.view_team")) return [identity.employeeId];
+
+  const { data, error } = await client
+    .from("employees")
+    .select("id")
+    .eq("manager_employee_id", identity.employeeId);
+  if (error) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi chấm công đội nhóm.");
+  return [identity.employeeId, ...(data ?? []).map((employee) => String(employee.id))];
+}
+
 async function readPolicy(client: SupabaseClient): Promise<AttendancePolicy> {
   const { data, error } = await client.from("attendance_policies").select("*").eq("active", true).maybeSingle();
   if (error || !data) throw new AppError("SERVER_ERROR", "Chưa có chính sách chấm công đang hoạt động.");
@@ -505,10 +525,13 @@ export async function listAttendanceHistory(user: AuthenticatedUser, from?: stri
 export async function listAttendanceRecords(user: AuthenticatedUser, filters: { from?: string; to?: string; employeeId?: string; locationId?: string; status?: string; photo?: string }): Promise<AttendanceEvent[]> {
   if (!can(user.permissions, "attendance.view_all") && !can(user.permissions, "attendance.view_team") && !can(user.permissions, "attendance.manage") && !can(user.permissions, "attendance.log.view")) throw new AppError("PERMISSION_DENIED");
   const client = clientOrThrow();
+  const employeeScope = await scopedAttendanceEmployeeIds(client, user);
+  if (filters.employeeId && employeeScope && !employeeScope.includes(filters.employeeId)) throw new AppError("PERMISSION_DENIED");
   let query = client.from("attendance_events").select(eventSelect).order("effective_at", { ascending: false }).limit(300);
   if (filters.from) query = query.gte("attendance_date", filters.from);
   if (filters.to) query = query.lte("attendance_date", filters.to);
   if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+  else if (employeeScope) query = query.in("employee_id", employeeScope);
   if (filters.locationId) query = query.eq("location_id", filters.locationId);
   if (filters.status) query = query.eq("attendance_status", filters.status);
   if (filters.photo === "missing") query = query.eq("photo_status", "not_required");
@@ -524,7 +547,8 @@ export async function getAttendanceEvent(user: AuthenticatedUser, eventId: strin
   const { data, error } = await client.from("attendance_events").select(eventSelect).eq("id", eventId).maybeSingle();
   if (error || !data) throw new AppError("NOT_FOUND", "Không tìm thấy lượt chấm công.");
   const event = mapEvent(data as Row);
-  if (!can(user.permissions, "attendance.view_all") && !can(user.permissions, "attendance.view_team") && !can(user.permissions, "attendance.manage") && !can(user.permissions, "attendance.log.view")) { const identity = await resolveIdentity(client, user); if (event.employeeId !== identity.employeeId) throw new AppError("PERMISSION_DENIED"); }
+  const employeeScope = await scopedAttendanceEmployeeIds(client, user);
+  if (employeeScope && !employeeScope.includes(event.employeeId)) throw new AppError("PERMISSION_DENIED");
   return event;
 }
 

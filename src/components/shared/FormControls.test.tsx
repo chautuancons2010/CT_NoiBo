@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { PasswordInput, Select } from "@/components/shared/FormControls";
+import { Input, PasswordInput, Select, Switch } from "@/components/shared/FormControls";
 
 describe("FormControls", () => {
   it("keeps a compact select label accessible when it is visually hidden", () => {
@@ -29,5 +29,38 @@ describe("FormControls", () => {
     expect(submit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Ẩn mật khẩu" }));
     expect(input.type).toBe("password");
+  });
+
+  it("keeps custom ids linked to labels, helper text and inline errors", () => {
+    render(
+      <Input
+        error="Mã đã tồn tại"
+        helperText="Dùng mã nội bộ"
+        id="employee-code"
+        label="Mã nhân viên"
+        required
+      />
+    );
+
+    const input = screen.getByRole("textbox", { name: "Mã nhân viên" });
+    expect(input).toHaveAttribute("id", "employee-code");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-describedby", "employee-code-helper employee-code-error");
+    expect(screen.getByRole("alert")).toHaveTextContent("Mã đã tồn tại");
+  });
+
+  it("exposes distinct read-only, disabled and switch helper states", () => {
+    render(
+      <>
+        <Input defaultValue="CT-001" label="Mã chứng từ" readOnly />
+        <Input defaultValue="VND" disabled label="Loại tiền" />
+        <Switch checked helperText="Áp dụng cho chứng từ hợp lệ" label="Tự động duyệt" />
+      </>
+    );
+
+    expect(screen.getByLabelText("Mã chứng từ")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Mã chứng từ")).not.toBeDisabled();
+    expect(screen.getByLabelText("Loại tiền")).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Tự động duyệt" })).toHaveAccessibleDescription("Áp dụng cho chứng từ hợp lệ");
   });
 });

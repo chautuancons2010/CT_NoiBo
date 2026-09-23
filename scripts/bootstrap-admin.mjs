@@ -4,22 +4,28 @@ const args = Object.fromEntries(process.argv.slice(2).map((value) => {
   const [key, ...rest] = value.replace(/^--/, "").split("=");
   return [key, rest.join("=")];
 }));
-const username = String(args.username || "").trim().toLowerCase();
-const displayName = String(args.name || "").trim();
+const requestedUsername = String(args.username || "").trim().toLowerCase();
+const requestedDisplayName = String(args.name || "").trim();
+const existingEmail = String(args["existing-email"] || "").trim().toLowerCase();
 const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key || !displayName || !/^[a-z][a-z0-9._-]{2,31}$/.test(username) || !password || password.length < 8) {
-  throw new Error("Cần Supabase URL/secret, --username hợp lệ, --name và BOOTSTRAP_ADMIN_PASSWORD có tối thiểu 8 ký tự.");
+if (!url || !key || (!existingEmail && !requestedUsername) || !password || password.length < 8) {
+  throw new Error("Cần Supabase URL/secret, --existing-email hoặc --username, và BOOTSTRAP_ADMIN_PASSWORD có tối thiểu 8 ký tự.");
 }
 
 const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-let accountQuery = client.from("app_accounts").select("id,auth_user_id,primary_email");
-accountQuery = args["existing-email"]
-  ? accountQuery.eq("primary_email", String(args["existing-email"]).trim().toLowerCase())
-  : accountQuery.eq("username", username);
+let accountQuery = client.from("app_accounts").select("id,auth_user_id,primary_email,username,display_name");
+accountQuery = existingEmail
+  ? accountQuery.eq("primary_email", existingEmail)
+  : accountQuery.eq("username", requestedUsername);
 const { data: existing, error: existingError } = await accountQuery.maybeSingle();
 if (existingError) throw existingError;
+const username = requestedUsername || String(existing?.username || "").trim().toLowerCase();
+const displayName = requestedDisplayName || String(existing?.display_name || "").trim();
+if (!displayName || !/^[a-z][a-z0-9._-]{2,31}$/.test(username)) {
+  throw new Error("Tài khoản mới cần --username hợp lệ và --name; tài khoản hiện hữu phải có username và tên hiển thị hợp lệ.");
+}
 
 let authUserId = existing?.auth_user_id;
 const internalEmail = existing?.primary_email || `${username}@accounts.chautuan.local`;
@@ -60,4 +66,4 @@ const { error: grantError } = await client.from("account_roles").upsert(
   { onConflict: "account_id,role_id" }
 );
 if (grantError) throw grantError;
-console.log(`Admin '${username}' đã được tạo trực tiếp; không gửi email.`);
+console.log(`Admin '${username}' đã được cập nhật an toàn; không gửi email.`);

@@ -8,6 +8,13 @@ import {
 import type { Permission } from "@/lib/auth/permissions";
 
 describe("permission-aware navigation", () => {
+  it("uses a distinct semantic icon for every sibling navigation item", () => {
+    for (const group of desktopNavigation) {
+      const icons = group.items.map((item) => item.icon);
+      expect(new Set(icons).size, `Nhóm ${group.label} có icon trùng`).toBe(icons.length);
+    }
+  });
+
   it("hides navigation items when permission is missing", () => {
     const permissions: Permission[] = ["dashboard.view", "employee.view"];
     const groups = filterGroupsByPermissions(desktopNavigation, permissions);
@@ -28,11 +35,13 @@ describe("permission-aware navigation", () => {
     expect(labels).not.toContain("Hồ sơ nhân viên");
   });
 
-  it("shows the salary log only to users allowed to view salary history", () => {
-    const withoutHistory = filterGroupsByPermissions(desktopNavigation, ["salary.view"]);
-    const withHistory = filterGroupsByPermissions(desktopNavigation, ["salary.history.view"]);
-    expect(withoutHistory.flatMap((group) => group.items.map((item) => item.href))).not.toContain("/accounting/salary-history");
-    expect(withHistory.flatMap((group) => group.items.map((item) => item.href))).toContain("/accounting/salary-history");
+  it("keeps payroll navigation focused on periods and salary profiles", () => {
+    const salaryProfile = filterGroupsByPermissions(desktopNavigation, ["salary.view"]);
+    const payroll = filterGroupsByPermissions(desktopNavigation, ["payroll.view"]);
+    const history = filterGroupsByPermissions(desktopNavigation, ["salary.history.view"]);
+    expect(salaryProfile.flatMap((group) => group.items.map((item) => item.href))).toContain("/accounting/salaries");
+    expect(payroll.flatMap((group) => group.items.map((item) => item.href))).toContain("/accounting/payroll");
+    expect(history.flatMap((group) => group.items.map((item) => item.href))).not.toContain("/accounting/salary-history");
   });
 
   it("shows attendance period management with its dedicated permission", () => {
@@ -51,7 +60,7 @@ describe("permission-aware navigation", () => {
     ).toBe(true);
     expect(
       isNavigationItemActive("/attendance", {
-        href: "/dashboard",
+        href: "/attendance/me",
         exact: true
       })
     ).toBe(false);

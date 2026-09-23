@@ -23,10 +23,10 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 
 import { Button } from "@/components/shared/Button";
 import { AnalyticsCard, ChartCard, MetricCard } from "@/components/shared/DashboardCards";
-import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
-import { DashboardPageTemplate, DataSurface } from "@/components/shared/PageLayouts";
+import { DashboardPageTemplate } from "@/components/shared/PageLayouts";
 import { ModuleLauncher } from "@/components/shared/ModuleLauncher";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { LoadingState } from "@/components/shared/States";
 import { OperationalSection } from "@/components/shared/Workbench";
 import { dataVisualizationPalette, semanticChartColors } from "@/config/dataVisualization";
 import type {
@@ -54,15 +54,9 @@ const priorityLabels: Record<AttentionPriority, string> = {
 
 const queueKeys = new Set<DashboardWidgetKey>([
   "employee_today", "supervisor_today", "my_approvals", "timesheet_exceptions",
-  "project_attention", "warehouse_low_stock", "shipment_attention"
+  "project_attention", "warehouse_low_stock", "shipment_attention", "accounting_summary"
 ]);
-const activityKeys = new Set<DashboardWidgetKey>(["recent_activity", "recent_notifications"]);
-
-const recentActivityColumns: DataTableColumn<DashboardItem>[] = [
-  { id: "title", header: "Bản ghi", cell: (item) => <Link className="table-link" href={item.href}>{item.title}</Link> },
-  { id: "context", header: "Ngữ cảnh", cell: (item) => item.context ?? "—" },
-  { id: "dueOrAge", header: "Cập nhật", cell: (item) => item.dueOrAge ?? "—" }
-];
+const activityKeys = new Set<DashboardWidgetKey>(["recent_notifications"]);
 
 interface OverviewMetric extends DashboardMetric {
   id: string;
@@ -106,6 +100,7 @@ function pickMetrics(metrics: OverviewMetric[], context: string): OverviewMetric
   if (context === "hr") return metrics.filter((metric) => metric.id.startsWith("hr_summary-")).slice(0, 5);
   if (context === "warehouse") return metrics.filter((metric) => metric.id.startsWith("warehouse_low_stock-")).slice(0, 4);
   if (context === "import_export") return metrics.filter((metric) => metric.id.startsWith("shipment_attention-")).slice(0, 5);
+  if (context === "accounting") return metrics.filter((metric) => metric.id.startsWith("accounting_summary-")).slice(0, 4);
   if (context !== "global" && context !== "management") return metrics.slice(0, 5);
   const preferred = [
     ["hr_summary", "Tổng nhân viên"], ["attendance_overview", "Có mặt hôm nay"],
@@ -299,8 +294,8 @@ const localizedStatus: Record<string, string> = {
 function WorkItems({ items, variant = "default" }: { items: DashboardItem[]; variant?: "default" | "timeline" }) {
   return (
     <ul className={`dashboard-worklist${variant === "timeline" ? " dashboard-worklist--timeline" : ""}`}>
-      {items.map((item) => (
-        <li data-priority={item.priority?.toLocaleLowerCase("vi") ?? "normal"} key={`${item.type}-${item.id}`}>
+      {items.map((item, index) => (
+        <li data-priority={item.priority?.toLocaleLowerCase("vi") ?? "normal"} key={`${item.type}-${item.id}-${item.href}-${index}`}>
           <Link href={item.href}>
             <span className="dashboard-worklist__main"><strong>{item.title}</strong>{item.context ? <small>{item.context}</small> : null}</span>
             <span className="dashboard-worklist__meta">
@@ -317,10 +312,10 @@ function WorkItems({ items, variant = "default" }: { items: DashboardItem[]; var
 
 function BriefingSection({ widget, onRetry, excludedItems, variant = "default", showMetrics = true }: { widget: DashboardWidgetResult; onRetry: (key: DashboardWidgetKey) => void; excludedItems: ReadonlySet<string>; variant?: "default" | "timeline"; showMetrics?: boolean }) {
   if (widget.status === "error") {
-    return <OperationalSection className="operational-section--error dashboard-widget--compact" title={widget.label}><div className="widget-error" role="status"><AlertTriangle aria-hidden="true" size={17} /><span>Không thể tải dữ liệu</span><Button onClick={() => onRetry(widget.key)} size="sm">Thử lại</Button></div></OperationalSection>;
+    return <OperationalSection className="dashboard-briefing operational-section--error dashboard-widget--compact" title={widget.label}><div className="widget-error" role="status"><AlertTriangle aria-hidden="true" size={17} /><span>Không thể tải dữ liệu</span><Button onClick={() => onRetry(widget.key)} size="sm">Thử lại</Button></div></OperationalSection>;
   }
   if (!widget.data) {
-    return <OperationalSection className="operational-section--loading" title={widget.label}><div className="widget-skeleton"><span /><span /></div></OperationalSection>;
+    return <OperationalSection className="dashboard-briefing operational-section--loading" title={widget.label}><div className="widget-skeleton"><span /><span /></div></OperationalSection>;
   }
 
   const data = widget.data;
@@ -332,18 +327,16 @@ function BriefingSection({ widget, onRetry, excludedItems, variant = "default", 
   if (!metrics.length && !items.length && !(primaryAction && primaryHref)) return null;
 
   return (
-    <OperationalSection title={widget.label}>
-      {metrics.length ? <dl className="dashboard-metrics">{metrics.map((metric) => <div className="dashboard-metric" key={`${metric.label}-${metric.href ?? "metric"}`}><dt>{metric.label}</dt><dd>{metric.value}</dd>{metric.href ? <Link href={metric.href}>Xem {metric.label.toLocaleLowerCase("vi")}</Link> : null}</div>)}</dl> : null}
+    <OperationalSection className="dashboard-briefing" title={widget.label}>
+      {metrics.length ? <dl className="dashboard-metrics">{metrics.map((metric) => (
+        <div className="dashboard-metric" key={`${metric.label}-${metric.href ?? "metric"}`}>
+          <dt>{metric.label}</dt>
+          <dd>{metric.value}</dd>
+          {metric.href ? <Link aria-label={`Mở ${metric.label}`} href={metric.href}><ArrowRight aria-hidden="true" size={15} /></Link> : null}
+        </div>
+      ))}</dl> : null}
       {primaryAction && primaryHref ? <Link className="dashboard-primary-action" href={primaryHref}>{primaryAction}<ArrowRight aria-hidden="true" size={17} /></Link> : null}
       {items.length ? <WorkItems items={items} variant={variant} /> : null}
-    </OperationalSection>
-  );
-}
-
-function ScheduleWidget({ items }: { items: DashboardItem[] }) {
-  return (
-    <OperationalSection className="dashboard-schedule" title="Lịch & deadline">
-      {items.length ? <WorkItems items={items.slice(0, 5)} variant="timeline" /> : <p className="dashboard-stable">Hôm nay chưa có lịch hoặc deadline cần xử lý.</p>}
     </OperationalSection>
   );
 }
@@ -483,11 +476,15 @@ export function DashboardView({ profile, scope }: { profile?: DashboardProfileKe
 
   useEffect(() => {
     const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      controller.abort();
+      setError("Dashboard tải quá lâu. Vui lòng thử lại.");
+    }, 12_000);
     const timer = window.setTimeout(() => { void load(controller.signal).catch((reason: unknown) => {
       if (reason instanceof DOMException && reason.name === "AbortError") return;
       setError(reason instanceof Error ? reason.message : "Không thể tải bản tin vận hành.");
-    }); }, 0);
-    return () => { window.clearTimeout(timer); controller.abort(); };
+    }).finally(() => window.clearTimeout(timeout)); }, 0);
+    return () => { window.clearTimeout(timer); window.clearTimeout(timeout); controller.abort(); };
   }, [load]);
   useEffect(() => {
     const controller = new AbortController();
@@ -513,7 +510,7 @@ export function DashboardView({ profile, scope }: { profile?: DashboardProfileKe
     }
   }
 
-  if (!model && !error) return <div className="dashboard-skeleton" aria-label="Đang tải bản tin vận hành"><span /><span /><span /></div>;
+  if (!model && !error) return <LoadingState description="" title="Đang tải Dashboard" />;
   if (error) return <div className="dashboard-load-error"><AlertTriangle aria-hidden="true" size={20} /><span>{error}</span><Button leftIcon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void load()}>Thử lại</Button></div>;
   if (!model) return null;
 
@@ -536,12 +533,10 @@ export function DashboardView({ profile, scope }: { profile?: DashboardProfileKe
   const featuredActions = quickActions.slice(0, 4);
   const queueWidgets = visibleWidgets.filter((widget) => queueKeys.has(widget.key));
   const activityWidgets = visibleWidgets.filter((widget) => activityKeys.has(widget.key));
-  const recentItems = (activityWidgets.find((widget) => widget.key === "recent_activity")?.data?.items ?? []).filter((item) => !attentionIds.has(`${item.type}:${item.id}`));
   const notificationWidget = activityWidgets.find((widget) => widget.key === "recent_notifications");
-  const operationalKeys = new Set<DashboardWidgetKey>(["warehouse_low_stock", "project_attention", "hr_summary", "attendance_overview", "shipment_attention"]);
+  const operationalKeys = new Set<DashboardWidgetKey>(["warehouse_low_stock", "project_attention", "hr_summary", "attendance_overview", "shipment_attention", "accounting_summary"]);
   const operationalWidgets = visibleWidgets.filter((widget) => operationalKeys.has(widget.key));
   const taskWidgets = queueWidgets.filter((widget) => !operationalKeys.has(widget.key));
-  const scheduleItems = visibleWidgets.flatMap((widget) => widget.data?.items ?? []).filter((item) => item.dueOrAge).slice(0, 5);
   const pendingCount = model.attention.length;
   const formattedDate = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "full" }).format(new Date(model.generatedAt));
 
@@ -549,7 +544,7 @@ export function DashboardView({ profile, scope }: { profile?: DashboardProfileKe
     <DashboardPageTemplate className={model.profile === "supervisor" ? "dashboard-page--supervisor" : undefined}>
       <header className="dashboard-heading">
         <div>
-          <h1>Chào, {currentUser.displayName} <span aria-hidden="true">👋</span></h1>
+          <h1>Chào, {currentUser.displayName}</h1>
           <span className="dashboard-eyebrow">Hôm nay bạn có {pendingCount} việc cần xử lý.</span>
         </div>
         <div className="dashboard-date-card"><CalendarDays aria-hidden="true" size={18} /><span><strong>{formattedDate}</strong><small><RealtimeClock /> · {model.profileLabel}</small></span></div>
@@ -568,7 +563,6 @@ export function DashboardView({ profile, scope }: { profile?: DashboardProfileKe
       ) : null}
       <MetricStrip metrics={displayedMetrics} />
       <section aria-label="Không gian cá nhân" className="dashboard-personal-grid">
-        <ScheduleWidget items={scheduleItems} />
         <OperationalSection className="dashboard-attention" meta={model.attention.length ? <StatusBadge tone="warning">{model.attention.length} mục</StatusBadge> : <StatusBadge tone="success">Ổn định</StatusBadge>} title="Việc cần làm">
           {model.attention.length ? <WorkItems items={model.attention.slice(0, 6)} /> : <p className="dashboard-stable">Không có ngoại lệ cần xử lý.</p>}
         </OperationalSection>
@@ -591,10 +585,6 @@ export function DashboardView({ profile, scope }: { profile?: DashboardProfileKe
       </section> : null}
       <div className="dashboard-bottom-grid dashboard-bottom-grid--single">
         <div className="dashboard-bottom-grid__main">
-          {recentItems.length ? <DataSurface className="dashboard-recent-table">
-            <header className="dashboard-recent-table__header"><h2>Dữ liệu gần đây</h2><Link href="/search">Xem tất cả <ArrowRight aria-hidden="true" size={15} /></Link></header>
-            <DataTable ariaLabel="Dữ liệu gần đây" columns={recentActivityColumns} data={recentItems} getRowId={(item) => `${item.type}-${item.id}`} />
-          </DataSurface> : null}
           {taskWidgets.map((widget) => <BriefingSection excludedItems={attentionIds} key={widget.key} onRetry={(key) => void retryWidget(key)} widget={widget} />)}
         </div>
       </div>

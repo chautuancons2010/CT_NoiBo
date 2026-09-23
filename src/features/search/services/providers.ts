@@ -66,7 +66,7 @@ export const projectSearchProvider: SearchProvider = {
     if (scopedIds) { projectQuery = projectQuery.in("id", scopedIds); worksiteQuery = worksiteQuery.in("project_id", scopedIds); }
     const [{ data: projects, error }, { data: worksites, error: worksiteError }] = await Promise.all([projectQuery, worksiteQuery]);
     if (error || worksiteError) throw new AppError("SERVER_ERROR", "Không thể tìm dự án.");
-    const projectResults = can(user.permissions, "project.view") ? (projects ?? []).map((row) => result({ entityType: "project", entityId: String(row.id), title: String(row.name), subtitle: row.customer_name ? String(row.customer_name) : undefined, reference: String(row.code), status: String(row.status), icon: "briefcase", deepLink: `/projects/${row.id}/overview` }, query)) : [];
+    const projectResults = can(user.permissions, "project.view") ? (projects ?? []).map((row) => result({ entityType: "project", entityId: String(row.id), title: String(row.name), subtitle: row.customer_name ? String(row.customer_name) : undefined, reference: String(row.code), status: String(row.status), icon: "briefcase", deepLink: `/projects/${row.id}/profile` }, query)) : [];
     const worksiteResults = can(user.permissions, "worksite.view") ? (worksites ?? []).map((row) => { const project = (Array.isArray(row.projects) ? row.projects[0] : row.projects) as { name?: string; code?: string } | null; return result({ entityType: "worksite", entityId: String(row.id), title: String(row.name), subtitle: project?.name, reference: project?.code, status: String(row.status), icon: "map-pin", deepLink: `/projects/${row.project_id}/worker-attendance` }, query); }) : [];
     return [...projectResults, ...worksiteResults].slice(0, limit);
   }

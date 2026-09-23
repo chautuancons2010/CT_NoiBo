@@ -9,6 +9,7 @@ const output = path.join(process.cwd(), "docs", "ui-evidence");
 const viewports = [
   { width: 320, height: 800 },
   { width: 360, height: 800 },
+  { width: 375, height: 812 },
   { width: 390, height: 844 },
   { width: 430, height: 932 },
   { width: 480, height: 900 },
@@ -75,15 +76,23 @@ try {
         appBackground: root.getPropertyValue("--app-bg").trim(),
         cardRadius: root.getPropertyValue("--radius-card").trim(),
         controlHeight: root.getPropertyValue("--control-height-md").trim(),
-        pastelCards: document.querySelectorAll(".dashboard-overview__metric").length,
-        dataTables: document.querySelectorAll(".data-table").length
+        metricCards: document.querySelectorAll(".dashboard-overview__metric").length,
+        dataTables: document.querySelectorAll(".data-table").length,
+        formFields: document.querySelectorAll(".erp-form-preview .field").length,
+        invalidFields: document.querySelectorAll('.erp-form-preview [aria-invalid="true"]').length,
+        readOnlyFields: document.querySelectorAll(".erp-form-preview :read-only").length,
+        disabledFields: document.querySelectorAll(".erp-form-preview :disabled").length,
+        filterBars: document.querySelectorAll(".filter-bar").length,
+        stickyActionBars: document.querySelectorAll(".sticky-action-bar").length
       };
     });
     if (visual.content > visual.viewport) throw new Error(`UI preview tràn ngang tại ${viewport.width}px: ${visual.content}px > ${visual.viewport}px`);
-    if (visual.appBackground !== "#efeeec" || visual.cardRadius !== "22px" || visual.controlHeight !== "44px") throw new Error(`UI preview không nhận đúng token: ${JSON.stringify(visual)}`);
-    if (visual.pastelCards < 4 || visual.dataTables !== 1) throw new Error(`UI preview thiếu primitive bắt buộc: ${JSON.stringify(visual)}`);
+    if (visual.appBackground !== "#f0fdfa" || visual.cardRadius !== "12px" || visual.controlHeight !== "44px") throw new Error(`UI preview không nhận đúng token: ${JSON.stringify(visual)}`);
+    if (visual.metricCards < 4 || visual.dataTables !== 1) throw new Error(`UI preview thiếu primitive bắt buộc: ${JSON.stringify(visual)}`);
+    if (visual.formFields < 7 || visual.invalidFields !== 1 || visual.readOnlyFields < 1 || visual.disabledFields < 1) throw new Error(`UI preview thiếu trạng thái field ERP: ${JSON.stringify(visual)}`);
+    if (visual.filterBars !== 1 || visual.stickyActionBars !== 1) throw new Error(`UI preview thiếu filter/action contract ERP: ${JSON.stringify(visual)}`);
     await page.screenshot({ path: path.join(output, `ui-preview-${viewport.width}x${viewport.height}-playwright.png`), fullPage: true });
-    console.log(`PASS UI preview ${viewport.width}x${viewport.height} · warm pastel tokens and shared primitives`);
+    console.log(`PASS UI preview ${viewport.width}x${viewport.height} · UI/UX Pro Max ERP tokens and shared primitives`);
     await context.close();
   }
 

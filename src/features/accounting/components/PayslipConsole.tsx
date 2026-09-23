@@ -59,7 +59,7 @@ export function PayslipConsole({ canRevoke }: { canRevoke: boolean }) {
     { id: "net", header: "Thực nhận", cell: (item) => <strong>{money(item.snapshot.netSalary)}</strong>, align: "right" },
     { id: "published", header: "Phát hành", cell: (item) => item.publishedAt ? new Intl.DateTimeFormat("vi-VN").format(new Date(item.publishedAt)) : "—", hiddenOnMobile: true },
     { id: "viewed", header: "Đã xem", cell: (item) => item.viewedAt ? new Intl.DateTimeFormat("vi-VN").format(new Date(item.viewedAt)) : <StatusBadge tone="info">Mới</StatusBadge>, hiddenOnMobile: true },
-    { id: "status", header: "Trạng thái", cell: (item) => <><StatusBadge tone={item.status === "published" ? "success" : item.status === "revoked" ? "error" : "neutral"}>{item.status === "published" ? "Đã phát hành" : item.status === "revoked" ? "Đã thu hồi" : "Nháp"}</StatusBadge>{item.status === "revoked" && item.revokeReason ? <small>{item.revokeReason}</small> : null}</> }
+    { id: "status", header: "Trạng thái", cell: (item) => <><StatusBadge status={item.status} />{item.status === "revoked" && item.revokeReason ? <small>{item.revokeReason}</small> : null}</> }
   ];
 
   return (

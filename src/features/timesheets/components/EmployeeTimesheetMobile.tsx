@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock3, TriangleAlert } from "lucide-react";
+import { CalendarDays, Clock3, TriangleAlert, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Card } from "@/components/shared/Card";
@@ -41,17 +41,25 @@ export function EmployeeTimesheetMobile({ periodId, employeeId, selectedDate }: 
   if (error) return <Card><p className="form-error" role="alert">{error}</p></Card>;
   if (!period) return <Card>Đang tải…</Card>;
   return <div className="employee-timesheet">
-    <Card className="employee-timesheet__summary"><div><strong>{period.name}</strong><span>{period.startDate} – {period.endDate}</span></div>
+    <Card className="employee-timesheet__summary">
+      <div className="employee-timesheet__summary-head">
+        <div className="employee-timesheet__identity">
+          <span className="employee-timesheet__eyebrow"><UserRound aria-hidden="true" size={15} /> Nhân viên</span>
+          <strong>{summary?.employeeName ?? daily[0]?.employeeName ?? "Nhân viên"}</strong>
+          <span>{summary?.employeeCode ?? daily[0]?.employeeCode ?? "—"} · {summary?.departmentName ?? daily[0]?.departmentName ?? "—"}</span>
+        </div>
+        <div className="employee-timesheet__period"><CalendarDays aria-hidden="true" size={18} /><div><span>{period.name}</span><strong>{period.startDate} – {period.endDate}</strong></div></div>
+      </div>
       {summary ? <div className="employee-timesheet__stats"><span><b>{summary.actualWorkdays}</b>Ngày công</span><span><b>{summary.lateDays}</b>Ngày trễ</span><span><b>{summary.annualLeaveDays}</b>Phép năm</span><span><b>{summary.exceptionCount}</b>Ngoại lệ</span></div> : null}
     </Card>
     {selectedDate ? <div className="timesheet-selected-date"><strong>{selectedDate}</strong><Link href={`/timesheets/periods/${periodId}/employees/${employeeId}`}>Xem tất cả ngày</Link></div> : null}
-    <div className="employee-timesheet__days">{grouped.map((item) => <Card className="employee-timesheet__day" key={item.id}>
+    <section className="employee-timesheet__days"><header className="employee-timesheet__list-head"><div><span>Lịch công</span><strong>{selectedDate ?? period.name}</strong></div><b>{grouped.length} ngày</b></header>{grouped.map((item) => <Card className="employee-timesheet__day" key={item.id}>
       <div className="employee-timesheet__date"><strong>{new Date(`${item.workDate}T00:00:00`).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}</strong><TimesheetStatus item={item} /></div>
       <div className="employee-timesheet__time"><Clock3 size={17} /><b>{time(item.effectiveCheckIn)} → {time(item.effectiveCheckOut)}</b><span>{item.shiftName || "—"}</span></div>
       {item.lateMinutes > 0 ? <span>Đi trễ {item.lateMinutes} phút</span> : null}
       {item.earlyLeaveMinutes > 0 ? <span>Về sớm {item.earlyLeaveMinutes} phút</span> : null}
       {item.exceptionCount > 0 ? <Link href={`/timesheets/exceptions?periodId=${periodId}`}><TriangleAlert size={16} />Ngoại lệ: {item.exceptionCount}</Link> : null}
-    </Card>)}{!grouped.length ? <Card>Chưa có dữ liệu công.</Card> : null}</div>
+    </Card>)}{!grouped.length ? <Card>Chưa có dữ liệu công.</Card> : null}</section>
   </div>;
 }
 

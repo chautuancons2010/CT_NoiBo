@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from "react";
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { Button, IconButton } from "@/components/shared/Button";
@@ -77,7 +78,7 @@ export function Modal({ open, title, children, onClose }: OverlayProps) {
     return null;
   }
 
-  return (
+  return createPortal(
     <div className="overlay" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }} role="presentation">
       <section aria-labelledby={titleId} aria-modal="true" className="modal" onKeyDown={keepFocusInside} ref={dialogRef} role="dialog" tabIndex={-1}>
         <header className="overlay__header">
@@ -88,9 +89,13 @@ export function Modal({ open, title, children, onClose }: OverlayProps) {
         </header>
         {children}
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }
+
+/** Dialog is the semantic public name; Modal remains for backwards compatibility. */
+export const Dialog = Modal;
 
 export function Drawer({ open, title, children, onClose }: OverlayProps) {
   const drawerRef = useOverlay(open, onClose);
@@ -100,7 +105,7 @@ export function Drawer({ open, title, children, onClose }: OverlayProps) {
     return null;
   }
 
-  return (
+  return createPortal(
     <div className="overlay overlay--drawer" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }} role="presentation">
       <aside aria-labelledby={titleId} aria-modal="true" className="drawer" onKeyDown={keepFocusInside} ref={drawerRef} role="dialog" tabIndex={-1}>
         <header className="overlay__header">
@@ -111,7 +116,8 @@ export function Drawer({ open, title, children, onClose }: OverlayProps) {
         </header>
         {children}
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -159,7 +165,7 @@ export function Lightbox({ open, title, children, onClose, mediaClassName }: Lig
     return null;
   }
 
-  return (
+  return createPortal(
     <div className="overlay overlay--lightbox" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }} role="presentation">
       <section aria-labelledby={titleId} aria-modal="true" className="lightbox" onKeyDown={keepFocusInside} ref={lightboxRef} role="dialog" tabIndex={-1}>
         <header className="overlay__header">
@@ -170,6 +176,7 @@ export function Lightbox({ open, title, children, onClose, mediaClassName }: Lig
         </header>
         <div className={cn("lightbox__media", mediaClassName)}>{children}</div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -43,7 +43,7 @@ function makeLocalSession(task: WorkerAttendanceTask, clientSessionId: string): 
   };
 }
 
-export function WorkerAttendanceToday() {
+export function WorkerAttendanceToday({ projectId }: { projectId?: string }) {
   const router = useRouter();
   const [data, setData] = useState<CachedWorkerTasks>();
   const [loading, setLoading] = useState(true);
@@ -52,6 +52,7 @@ export function WorkerAttendanceToday() {
   const [starting, setStarting] = useState<string>();
   const [localDrafts, setLocalDrafts] = useState<WorkerLocalDraft[]>([]);
   const date = localDate();
+  const visibleTasks = useMemo(() => data?.tasks.filter((task) => !projectId || task.projectId === projectId) ?? [], [data?.tasks, projectId]);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -105,7 +106,7 @@ export function WorkerAttendanceToday() {
         <span><CalendarDays aria-hidden="true" size={17} />{new Date(`${date}T00:00:00`).toLocaleDateString("vi-VN")}</span>
         {offline ? <StatusBadge tone="warning">Ngoại tuyến</StatusBadge> : <StatusBadge tone="success">Đã đồng bộ</StatusBadge>}
       </div>
-      {data?.tasks.length ? data.tasks.map((task) => {
+      {visibleTasks.length ? visibleTasks.map((task) => {
         const hasLocalDraft = localDrafts.some((item) => item.session.projectId === task.projectId && item.session.worksiteId === task.worksiteId && item.session.date === task.date && item.session.shiftCode === task.shiftCode);
         return (
         <Card className="worker-task-card" key={`${task.projectId}-${task.worksiteId}-${task.shiftCode}`}>

@@ -10,6 +10,9 @@ vi.mock("@/components/providers/SystemSettingsProvider", () => ({
 vi.mock("@/components/layout/AppLogo", () => ({
   AppLogo: () => <span aria-label="Châu Tuấn" />
 }));
+vi.mock("@/components/layout/MobileAppLauncher", () => ({
+  MobileAppLauncher: () => <button aria-label="Mở Ứng dụng của tôi" />
+}));
 vi.mock("@/features/search/components/CommandPalette", () => ({
   CommandPalette: () => <button>Tìm kiếm</button>
 }));

@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useTransition, type FormEvent } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -18,7 +18,7 @@ interface EmployeeListFiltersProps {
 
 export function EmployeeListFilters({ defaults, departments, positions, employmentTypes, statuses }: EmployeeListFiltersProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [loading, startTransition] = useTransition();
 
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,8 +30,7 @@ export function EmployeeListFilters({ defaults, departments, positions, employme
     }
     params.set("page", "1");
     params.set("pageSize", String(defaults.pageSize ?? 10));
-    setLoading(true);
-    router.push(`/employees?${params.toString()}`);
+    startTransition(() => router.push(`/employees?${params.toString()}`));
   }
 
   return (
@@ -40,7 +39,7 @@ export function EmployeeListFilters({ defaults, departments, positions, employme
         actions={
           <>
             <Button disabled={loading} leftIcon={<Search aria-hidden="true" size={16} />} type="submit" variant="primary">Lọc</Button>
-            <Button onClick={() => { setLoading(true); router.push("/employees"); }}>Xóa</Button>
+            <Button disabled={loading} onClick={() => startTransition(() => router.push("/employees"))} type="button">Xóa</Button>
           </>
         }
         className="employee-filter-bar"

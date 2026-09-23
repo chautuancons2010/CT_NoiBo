@@ -66,7 +66,7 @@ export function InventoryItemDetail({ id, canManage, canViewLedger }: { id: stri
     { id: "warehouse", header: "Kho", cell: (row) => `${row.warehouseCode} · ${row.warehouseName}` },
     { id: "onHand", header: "Tồn hiện tại", cell: (row) => `${number.format(row.onHand)} ${row.uomCode}`, align: "right" },
     { id: "minimum", header: "Tồn tối thiểu", cell: (row) => row.minimumStock === undefined ? "—" : number.format(row.minimumStock), align: "right" },
-    { id: "status", header: "Trạng thái", cell: (row) => <StatusBadge tone={row.status === "in_stock" ? "success" : row.status === "low_stock" ? "warning" : "error"}>{row.status === "in_stock" ? "Còn hàng" : row.status === "low_stock" ? "Sắp hết" : "Hết hàng"}</StatusBadge> }
+    { id: "status", header: "Trạng thái", cell: (row) => <StatusBadge status={row.status} /> }
   ];
   const ledgerColumns: DataTableColumn<StockLedgerEntry>[] = [
     { id: "date", header: "Ngày", accessor: "postingDate" },
@@ -89,7 +89,7 @@ export function InventoryItemDetail({ id, canManage, canViewLedger }: { id: stri
                 <span className="eyebrow">{item.itemCode}</span>
                 <h2>{item.name}</h2>
               </div>
-              <StatusBadge tone={item.status === "active" ? "success" : "neutral"}>{item.status === "active" ? "Hoạt động" : "Ngừng dùng"}</StatusBadge>
+              <StatusBadge status={item.status}>{item.status === "active" ? "Hoạt động" : "Ngừng dùng"}</StatusBadge>
             </div>
             <dl className="item-detail-grid">
               <DetailField label="Nhóm hàng" value={item.categoryName} />

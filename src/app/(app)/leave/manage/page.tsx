@@ -1,1 +1,24 @@
-import Link from "next/link";import { BackLink } from "@/components/shared/BackLink";import { PageHeader } from "@/components/shared/PageHeader";import { LeaveRequestList } from "@/features/leave";export default function Page(){return <div className="page-stack"><BackLink href="/leave"/><PageHeader title="Quản lý nghỉ phép"/><nav className="leave-quick-links"><Link href="/leave/manage/balances">Số dư nhân viên</Link><Link href="/leave/manage/adjustments">Điều chỉnh phép</Link><Link href="/settings/leave/types">Loại nghỉ</Link><Link href="/settings/leave/workflows">Quy trình</Link><Link href="/settings/leave/policies">Chính sách</Link></nav><LeaveRequestList scope="all"/></div>}
+import Link from "next/link";
+
+import { PageHeader } from "@/components/shared/PageHeader";
+import { LeaveRequestList } from "@/features/leave";
+
+const managementLinks = [
+  { href: "/leave/manage/balances", label: "Số dư nhân viên" },
+  { href: "/leave/manage/adjustments", label: "Điều chỉnh phép" },
+  { href: "/settings/leave/types", label: "Loại nghỉ" },
+  { href: "/settings/leave/workflows", label: "Quy trình" },
+  { href: "/settings/leave/policies", label: "Chính sách" }
+];
+
+export default function Page() {
+  return (
+    <div className="page-stack leave-management-page">
+      <PageHeader title="Quản lý nghỉ phép" />
+      <nav aria-label="Quản trị nghỉ phép" className="leave-quick-links">
+        {managementLinks.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
+      </nav>
+      <LeaveRequestList scope="all" />
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { Button } from "@/components/shared/Button";
 import { Card, StatCard } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -32,9 +33,10 @@ export function PayrollDetailConsole({id,permissions}:{id:string;permissions:{ca
     { id: "net", header: "Thực nhận", cell: (item) => <strong>{money(item.netSalary)}</strong> }
   ];
   return <DetailPageLayout>
-    <div className="panel-header"><div><h2>Kỳ {data.periodMonth.slice(0,7)}</h2><StatusBadge tone={data.status==="locked"||data.status==="published"?"success":data.status==="draft"?"neutral":"info"}>{labels[data.status]}</StatusBadge></div><div className="form-actions">
+    <div className="panel-header"><div><h2>Kỳ {data.periodMonth.slice(0,7)}</h2><StatusBadge status={data.status}>{labels[data.status]}</StatusBadge></div><div className="form-actions">
       {permissions.export?<a className="button button--secondary button--md" href={`/api/v1/accounting/payroll/${id}/export`}>Xuất Excel</a>:null}
-      {permissions.calculate&&["draft","calculated"].includes(data.status)?<Button onClick={()=>void patch({action:"calculate"})}>{data.status==="draft"?"Lấy dữ liệu công":"Tính lại"}</Button>:null}
+      {permissions.calculate&&["draft","calculated"].includes(data.status)?<Link className="button button--secondary button--md" href="/accounting/salaries">Nhập lương nhân viên</Link>:null}
+      {permissions.calculate&&["draft","calculated"].includes(data.status)?<Button onClick={()=>void patch({action:"calculate"})} variant="primary">{data.status==="draft"?"Tính lương từ bảng công":"Tính lại bảng lương"}</Button>:null}
       {permissions.edit&&data.status==="calculated"?<Button onClick={()=>void patch({action:"review"})}>Xác nhận kiểm tra</Button>:null}
       {permissions.lock&&data.status==="reviewed"?<Button onClick={()=>void patch({action:"lock"})} variant="primary">Khóa bảng lương</Button>:null}
       {permissions.publish&&data.status==="locked"?<Button onClick={()=>void patch({action:"publish"})} variant="primary">Tạo và phát hành phiếu lương</Button>:null}

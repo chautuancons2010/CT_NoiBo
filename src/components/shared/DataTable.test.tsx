@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -14,10 +14,13 @@ const columns: DataTableColumn<Row>[] = [
 ];
 
 describe("DataTable", () => {
-  it("renders empty state instead of a blank page", () => {
-    render(<DataTable columns={columns} data={[]} emptyTitle="Chưa có nhân viên" />);
+  it("keeps table headers visible with an empty state", () => {
+    render(<DataTable ariaLabel="Danh sách nhân viên" columns={columns} data={[]} emptyTitle="Chưa có nhân viên" />);
 
-    expect(screen.getByText("Chưa có nhân viên")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Danh sách nhân viên" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Mã" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Tên" })).toBeInTheDocument();
+    expect(screen.getAllByText("Chưa có nhân viên")).toHaveLength(2);
   });
 
   it("renders desktop table content for records", () => {
@@ -60,5 +63,22 @@ describe("DataTable", () => {
     fireEvent.click(row!);
     expect(row).toHaveClass("is-selected");
     expect(row).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("sorts sortable columns and announces the direction", () => {
+    const sortableColumns: DataTableColumn<Row>[] = [
+      { id: "code", header: "Mã", accessor: "code", sortable: true },
+      columns[1]
+    ];
+    render(<DataTable columns={sortableColumns} data={[{ code: "NV010", name: "B" }, { code: "NV002", name: "A" }]} />);
+
+    const sortButton = screen.getByRole("button", { name: /Mã/ });
+    fireEvent.click(sortButton);
+    expect(screen.getByRole("columnheader", { name: /Mã/ })).toHaveAttribute("aria-sort", "ascending");
+    expect(within(screen.getAllByRole("row")[1]).getByText("NV002")).toBeInTheDocument();
+
+    fireEvent.click(sortButton);
+    expect(screen.getByRole("columnheader", { name: /Mã/ })).toHaveAttribute("aria-sort", "descending");
+    expect(within(screen.getAllByRole("row")[1]).getByText("NV010")).toBeInTheDocument();
   });
 });

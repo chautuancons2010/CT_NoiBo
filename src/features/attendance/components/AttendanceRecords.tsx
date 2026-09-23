@@ -56,7 +56,7 @@ export function AttendanceRecords({ admin = false, employeeId }: { admin?: boole
     { id: "time", header: "Thời gian", cell: (row) => time(row.effectiveAt) },
     { id: "type", header: "Loại", cell: (row) => row.eventType === "check_in" ? "Chấm vào" : "Chấm ra" },
     { id: "location", header: "Địa điểm", cell: (row) => row.locationName ?? "—", hiddenOnMobile: true },
-    { id: "status", header: "Trạng thái", cell: (row) => <StatusBadge tone={row.attendanceStatus === "recorded" ? "success" : "warning"}>{row.attendanceStatus === "recorded" ? "Đã ghi nhận" : "Cần kiểm tra"}</StatusBadge> },
+    { id: "status", header: "Trạng thái", cell: (row) => <StatusBadge status={row.attendanceStatus} /> },
     { id: "photo", header: "Ảnh", cell: (row) => row.photoId ? <Button leftIcon={<Eye size={15} />} onClick={() => setActivePhotoId(row.photoId)} size="sm">Xem ảnh</Button> : <span className="attendance-no-photo"><ImageOff size={15} />{row.photoStatus === "not_required" ? "Không yêu cầu" : "Chưa đồng bộ"}</span> }
   ];
 

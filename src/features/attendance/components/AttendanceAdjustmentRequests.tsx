@@ -76,7 +76,7 @@ export function AttendanceAdjustmentRequests({ scope = "self", canReview = false
     {message ? <p className="form-success" role="status">{message}</p> : null}
     {loading ? <p>Đang tải…</p> : items.length ? <div className="attendance-request-list">{items.map((item) => <div className="attendance-request-list__item" key={item.id}>
       <div><strong>{item.employeeName !== "—" && scope === "all" ? `${item.employeeName} · ` : ""}{requestLabels[item.requestType]}</strong><span>{item.attendanceDate} · {item.requestedTime}</span><small>{item.reason}</small>{item.reviewNote ? <small>{item.reviewNote}</small> : null}</div>
-      <StatusBadge tone={item.status === "approved" ? "success" : item.status === "rejected" ? "error" : "warning"}>{statusLabels[item.status]}</StatusBadge>
+      <StatusBadge status={item.status}>{statusLabels[item.status]}</StatusBadge>
       {scope === "all" && canReview && item.status === "pending" ? <div className="attendance-request-list__actions"><Button disabled={busy} onClick={() => void review(item.id, true)} size="sm" variant="primary">Duyệt</Button><Button disabled={busy} onClick={() => void review(item.id, false)} size="sm" variant="secondary">Từ chối</Button></div> : null}
     </div>)}</div> : <p>Chưa có yêu cầu điều chỉnh công.</p>}
   </Card>;

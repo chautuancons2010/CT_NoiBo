@@ -1,6 +1,7 @@
 import {
   desktopNavigation,
   filterGroupsByAccess,
+  filterNavigationByPermissions,
   type NavigationGroup,
   type NavigationIcon,
   type NavigationItem
@@ -35,12 +36,12 @@ export interface LauncherApplication extends ApplicationDefinition {
 
 export const applicationRegistry: readonly ApplicationDefinition[] = [
   { id: "overview", label: "Dashboard", ...moduleIconRegistry.overview, baseRoute: "/dashboard", defaultRoute: "/dashboard", routePrefixes: ["/dashboard", "/home"], navigationGroups: ["Tổng quan"], requiredAny: applicationPermissionSets.overview, launcher: true },
-  { id: "human-resources", label: "Nhân sự", ...moduleIconRegistry["human-resources"], baseRoute: "/employees", defaultRoute: "/employees", routePrefixes: ["/dashboard/hr", "/employees", "/attendance/today", "/attendance/logs", "/timesheets", "/shifts", "/leave/manage"], navigationGroups: ["Nhân sự"], moduleFlag: "human_resources", requiredAny: applicationPermissionSets["human-resources"], launcher: true },
-  { id: "attendance", label: "Chấm công", ...moduleIconRegistry.attendance, baseRoute: "/attendance", defaultRoute: "/attendance/me", routePrefixes: ["/attendance"], navigationGroups: ["Chấm công"], moduleFlag: "attendance", requiredAny: applicationPermissionSets.attendance, launcher: true },
-  { id: "projects", label: "Dự án & Công trường", ...moduleIconRegistry.projects, baseRoute: "/projects", defaultRoute: "/projects", routePrefixes: ["/projects", "/project-monitoring", "/worker-attendance"], navigationGroups: ["Dự án"], moduleFlag: "projects", requiredAny: applicationPermissionSets.projects, launcher: true },
+  { id: "human-resources", label: "Nhân sự", ...moduleIconRegistry["human-resources"], baseRoute: "/employees", defaultRoute: "/employees", routePrefixes: ["/dashboard/hr", "/employees", "/attendance/today", "/attendance/logs", "/timesheets", "/shifts", "/leave/manage"], navigationGroups: ["Nhân sự", "Quản trị công"], moduleFlag: "human_resources", requiredAny: applicationPermissionSets["human-resources"], launcher: true },
+  { id: "attendance", label: "Cá nhân", ...moduleIconRegistry.attendance, baseRoute: "/attendance/me", defaultRoute: "/attendance/me", routePrefixes: ["/attendance", "/leave"], navigationGroups: ["Cá nhân"], moduleFlag: "attendance", requiredAny: applicationPermissionSets.attendance, launcher: true },
+  { id: "projects", label: "Gói / Công trường", ...moduleIconRegistry.projects, baseRoute: "/projects", defaultRoute: "/projects", routePrefixes: ["/projects", "/project-monitoring", "/worker-attendance"], navigationGroups: ["Gói / Công trường"], moduleFlag: "projects", requiredAny: applicationPermissionSets.projects, launcher: true },
   { id: "warehouse", label: "Kho", ...moduleIconRegistry.warehouse, baseRoute: "/warehouse", defaultRoute: "/warehouse/inventory", routePrefixes: ["/dashboard/warehouse", "/warehouse", "/settings/warehouse"], navigationGroups: ["Kho", "Hệ thống"], moduleFlag: "warehouse", requiredAny: applicationPermissionSets.warehouse, launcher: true },
   { id: "import-export", label: "Xuất nhập khẩu", ...moduleIconRegistry["import-export"], baseRoute: "/import-export", defaultRoute: "/import-export/shipments", routePrefixes: ["/dashboard/import-export", "/import-export", "/settings/import-export"], navigationGroups: ["Xuất nhập khẩu", "Hệ thống"], moduleFlag: "import_export", requiredAny: applicationPermissionSets["import-export"], launcher: true },
-  { id: "accounting", label: "Kế toán", ...moduleIconRegistry.accounting, baseRoute: "/accounting", defaultRoute: "/accounting", routePrefixes: ["/accounting"], navigationGroups: ["Kế toán"], requiredAny: applicationPermissionSets.accounting, launcher: true },
+  { id: "accounting", label: "Kế toán", ...moduleIconRegistry.accounting, baseRoute: "/accounting", defaultRoute: "/accounting/salaries", routePrefixes: ["/accounting"], navigationGroups: ["Kế toán"], requiredAny: applicationPermissionSets.accounting, launcher: true },
   { id: "messaging", label: "Tin nhắn", ...moduleIconRegistry.messaging, baseRoute: "/messages", defaultRoute: "/messages", routePrefixes: ["/messages"], navigationGroups: ["Tin nhắn"], requiredAny: applicationPermissionSets.messaging, launcher: true },
   { id: "operations", label: "Đơn từ & Điều hành", ...moduleIconRegistry.operations, baseRoute: "/approvals", defaultRoute: "/approvals", routePrefixes: ["/dashboard/management", "/approvals", "/documents", "/reports", "/notifications", "/profile"], navigationGroups: ["Quản lý"], requiredAny: applicationPermissionSets.operations, launcher: true },
   { id: "system", label: "Quản trị", ...moduleIconRegistry.system, baseRoute: "/system-admin", defaultRoute: "/system-admin", routePrefixes: ["/system-admin", "/settings"], navigationGroups: ["Hệ thống"], requiredAny: applicationPermissionSets.system, launcher: true }
@@ -78,21 +79,19 @@ export function visibleApplications(
 }
 
 function applicationDefaultRoute(application: ApplicationDefinition, user: AuthenticatedUser): string {
-  if (application.id === "attendance") {
-    if (can(user.permissions, "attendance.self") || can(user.permissions, "attendance.self.create") || can(user.permissions, "attendance.self.view")) return application.defaultRoute;
-    if (can(user.permissions, "attendance.self_history")) return "/attendance/history";
-    if (can(user.permissions, "attendance.self_request")) return "/attendance/requests";
+  if (application.id === "human-resources") {
+    if (can(user.permissions, "attendance.view_all") || can(user.permissions, "attendance.manage")) return "/attendance/today";
+    if (can(user.permissions, "attendance.period.manage")) return "/timesheets";
+    if (can(user.permissions, "attendance.adjust")) return "/timesheets/adjustments";
   }
-  if (application.id !== "human-resources" || can(user.permissions, "employee.view")) return application.defaultRoute;
-  if (can(user.permissions, "attendance.view_all") || can(user.permissions, "attendance.manage")) return "/attendance/today";
-  if (can(user.permissions, "attendance.period.manage")) return "/timesheets";
-  if (can(user.permissions, "attendance.adjust")) return "/timesheets/adjustments";
-  if (can(user.permissions, "timesheet.view")) return "/timesheets/matrix";
-  if (can(user.permissions, "shift.view")) return "/shifts";
-  if (can(user.permissions, "contract.view")) return "/employees/contracts";
-  if (can(user.permissions, "insurance.view")) return "/employees/insurance";
-  if (can(user.permissions, "department.manage")) return "/employees/departments";
-  return "/employees/positions";
+  if (application.id === "accounting" && can(user.permissions, "payslip.self.view") && !can(user.permissions, "payroll.view") && !can(user.permissions, "payroll.create") && !can(user.permissions, "salary.view")) {
+    return "/accounting/payslips";
+  }
+  const firstAccessibleItem = filterNavigationByPermissions(
+    desktopNavigation.flatMap((group) => group.items).filter((item) => itemBelongsToApplication(item, application)),
+    user.permissions
+  )[0];
+  return firstAccessibleItem?.href ?? application.defaultRoute;
 }
 
 export function applicationsForLauncher(
@@ -148,8 +147,7 @@ export function contextualNavigationGroups(
   if (application.id !== "human-resources") return [...dashboardGroup, ...(items.length ? [{ label: application.label, items }] : [])];
   const sections = [
     { label: "HỒ SƠ", paths: ["/employees", "/employees/departments", "/employees/positions", "/employees/contracts", "/employees/insurance"] },
-    { label: "QUẢN LÝ CÔNG", paths: ["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/leave/manage", "/timesheets/adjustments", "/attendance/logs"] },
-    { label: "THỜI GIAN LÀM VIỆC", paths: ["/shifts/calendar"] }
+    { label: "QUẢN LÝ CÔNG", paths: ["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/leave/manage", "/timesheets/adjustments"] }
   ];
   return [...dashboardGroup, ...sections.map((section) => ({ label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
     .filter((section) => section.items.length > 0)];
