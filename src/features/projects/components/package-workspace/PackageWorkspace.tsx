@@ -1,3 +1,4 @@
+import { PermissionDeniedState } from "@/components/shared/States";
 import type { DailySchedule, ProjectAssignment, ProjectDetail, ProjectProgressNode, ProjectUpdate } from "@/features/projects/types/projectTypes";
 import type { WorkerAttendanceSession } from "@/features/worker-attendance/types/workerAttendanceTypes";
 
@@ -9,7 +10,6 @@ import { PackageRecordWorkspace } from "./PackageRecordWorkspace";
 import { WorkspaceBody } from "./WorkspaceBody";
 import { WorkspaceNav } from "./WorkspaceNav";
 import type { PackageWorkspaceSection } from "./WorkspaceNav";
-import { PermissionDeniedState } from "@/components/shared/States";
 import styles from "./PackageWorkspace.module.css";
 
 export interface PackageWorkspacePermissions {
@@ -69,35 +69,37 @@ export function PackageWorkspace({
         completionPercent={completionPercent}
         project={project}
       />
-      <WorkspaceNav projectId={project.id} section={section} visibleSections={visibleSections} />
-      <WorkspaceBody>
-        {section === "progress" ? (
-          <PackageConstructionWorkspace
-            canEdit={permissions.editProgress}
-            canFieldUpdate={permissions.fieldUpdate}
-            initialLoadError={progressLoadError}
-            initialNodes={progressNodes}
-            projectId={project.id}
-            schedule={schedule}
-            scheduleLoadError={scheduleLoadError}
-          />
-        ) : null}
-        {section === "team" ? (
-          <PackageAttendanceWorkspace
-            attendanceSessions={attendanceSessions}
-            canAdjustAttendance={permissions.adjustAttendance}
-            canExportAttendance={permissions.exportAttendance}
-            canManageTeam={permissions.manageTeam}
-            canOpenAttendance={permissions.openAttendance}
-            canViewAttendance={permissions.viewAttendance}
-            project={project}
-            today={today}
-            todayRoster={todayRoster}
-          />
-        ) : null}
-        {section === "profile" ? permissions.viewRecords ? <PackageRecordWorkspace updates={updates} /> : <PermissionDeniedState /> : null}
-        {section === "documents" ? permissions.viewDocuments ? <PackageDocumentWorkspace canUpload={permissions.uploadDocuments} projectId={project.id} updates={updates} /> : <PermissionDeniedState /> : null}
-      </WorkspaceBody>
+      <div className={styles.workspaceShell}>
+        <WorkspaceNav projectId={project.id} section={section} visibleSections={visibleSections} />
+        <WorkspaceBody>
+          {section === "progress" ? (
+            <PackageConstructionWorkspace
+              canEdit={permissions.editProgress}
+              canFieldUpdate={permissions.fieldUpdate}
+              initialLoadError={progressLoadError}
+              initialNodes={progressNodes}
+              projectId={project.id}
+              schedule={schedule}
+              scheduleLoadError={scheduleLoadError}
+            />
+          ) : null}
+          {section === "team" ? (
+            <PackageAttendanceWorkspace
+              attendanceSessions={attendanceSessions}
+              canAdjustAttendance={permissions.adjustAttendance}
+              canExportAttendance={permissions.exportAttendance}
+              canManageTeam={permissions.manageTeam}
+              canOpenAttendance={permissions.openAttendance}
+              canViewAttendance={permissions.viewAttendance}
+              project={project}
+              today={today}
+              todayRoster={todayRoster}
+            />
+          ) : null}
+          {section === "profile" ? permissions.viewRecords ? <PackageRecordWorkspace updates={updates} /> : <PermissionDeniedState /> : null}
+          {section === "documents" ? permissions.viewDocuments ? <PackageDocumentWorkspace canUpload={permissions.uploadDocuments} projectId={project.id} updates={updates} /> : <PermissionDeniedState /> : null}
+        </WorkspaceBody>
+      </div>
     </div>
   );
 }
