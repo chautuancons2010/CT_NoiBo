@@ -111,7 +111,7 @@ export function PackageAttendanceWorkspace({
     <section className={styles.attendanceWorkspace}>
       <header className={styles.workspaceHeading}>
         <div>
-          <h2>Chấm công</h2>
+          <h2>Nhân lực &amp; chấm công</h2>
           <p>{activeMembers.length} nhân sự · {canViewAttendance ? unprocessed : "—"} chưa xử lý · {shift ? `${shift.shiftName} ${shift.shiftStart}–${shift.shiftEnd}` : "Chưa có ca"}</p>
         </div>
         <div className={styles.headingActions}>
