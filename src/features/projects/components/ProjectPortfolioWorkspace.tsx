@@ -111,11 +111,11 @@ export function ProjectPortfolioWorkspace() {
       </section>
 
       {!loading && !error ? (
-        <dl className={styles.summary}>
-          <button aria-pressed={group === "active"} onClick={() => setGroup(group === "active" ? "all" : "active")} type="button"><dt>Đang thi công</dt><dd>{counts.active}</dd></button>
-          <button aria-pressed={group === "upcoming"} onClick={() => setGroup(group === "upcoming" ? "all" : "upcoming")} type="button"><dt>Chuẩn bị</dt><dd>{counts.upcoming}</dd></button>
-          <button aria-pressed={group === "completed"} onClick={() => setGroup(group === "completed" ? "all" : "completed")} type="button"><dt>Đã hoàn thành</dt><dd>{counts.completed}</dd></button>
-        </dl>
+        <div className={styles.summary}>
+          <button aria-pressed={group === "active"} onClick={() => setGroup(group === "active" ? "all" : "active")} type="button"><span>Đang thi công</span><strong>{counts.active}</strong></button>
+          <button aria-pressed={group === "upcoming"} onClick={() => setGroup(group === "upcoming" ? "all" : "upcoming")} type="button"><span>Chuẩn bị</span><strong>{counts.upcoming}</strong></button>
+          <button aria-pressed={group === "completed"} onClick={() => setGroup(group === "completed" ? "all" : "completed")} type="button"><span>Đã hoàn thành</span><strong>{counts.completed}</strong></button>
+        </div>
       ) : null}
 
       {loading ? <LoadingState /> : error ? <ErrorState action={<Button onClick={() => void load()} variant="secondary">Tải lại</Button>} description={error} /> : filtered.length === 0 ? <EmptyState title="Không có gói phù hợp" /> : (
