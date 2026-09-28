@@ -27,8 +27,8 @@ describe("route registry", () => {
 
   it("uses the four package workspaces in business order", () => {
     expect(projectDetailSections).toEqual([
-      { value: "progress", label: "Thi công" },
-      { value: "team", label: "Chấm công" },
+      { value: "progress", label: "Điều hành" },
+      { value: "team", label: "Nhân lực" },
       { value: "profile", label: "Hồ sơ" },
       { value: "documents", label: "Tài liệu" }
     ]);
