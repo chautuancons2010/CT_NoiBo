@@ -28,16 +28,16 @@ try {
     await page.goto(`${baseUrl}/projects/${projectId}/progress`, { waitUntil: "networkidle" });
     const nav = page.getByRole("navigation", { name: "Không gian làm việc gói" });
     const labels = await nav.getByRole("link").allTextContents();
-    if (labels.map((value) => value.trim()).join("|") !== "Thi công|Chấm công|Hồ sơ|Tài liệu") throw new Error(`Sai WorkspaceNav: ${labels.join("|")}`);
+    if (labels.map((value) => value.trim()).join("|") !== "Điều hành|Nhân lực|Hồ sơ|Tài liệu") throw new Error(`Sai WorkspaceNav: ${labels.join("|")}`);
     const layout = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       content: document.documentElement.scrollWidth,
       statCards: document.querySelectorAll(".stat-card").length,
-      hasConstructionHeading: document.body.innerText.includes("Thi công & Tiến độ"),
-      hasFieldUpdate: document.body.innerText.includes("Cập nhật hiện trường")
+      hasConstructionHeading: document.body.innerText.includes("Điều hành công trường"),
+      hasFieldUpdate: document.body.innerText.includes("Ghi nhận hiện trường")
     }));
     if (layout.content > layout.viewport) throw new Error(`Thi công tràn ngang ${viewport.width}px: ${layout.content}px > ${layout.viewport}px`);
-    if (!layout.hasConstructionHeading) throw new Error(`Thiếu nội dung Thi công: ${JSON.stringify(layout)}`);
+    if (!layout.hasConstructionHeading) throw new Error(`Thiếu nội dung điều hành công trường: ${JSON.stringify(layout)}`);
     if (viewport.width === 390) {
       const sizes = await nav.getByRole("link").evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
       if (sizes.some((height) => height < 44)) throw new Error(`Touch target tab dưới 44px: ${sizes.join(",")}`);

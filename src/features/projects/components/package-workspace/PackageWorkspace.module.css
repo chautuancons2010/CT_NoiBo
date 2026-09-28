@@ -348,3 +348,775 @@
   .mobileActionBar > * { width: 100%; justify-content: center; }
   .workspaceBody { padding-bottom: 0; }
 }
+
+
+/* FIELD OPERATIONS REDESIGN 2026 */
+.packageWorkspace {
+  width: 100%;
+  max-width: none;
+  gap: 14px;
+}
+
+.contextHeader {
+  gap: 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 2px 4px;
+}
+
+.contextTopline {
+  min-height: 36px;
+}
+
+.contextStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contextMain {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(520px, 1.5fr);
+  align-items: end;
+  gap: 28px;
+}
+
+.contextIdentity h1 {
+  margin: 4px 0 0;
+  font-size: clamp(25px, 2.2vw, 34px);
+  letter-spacing: -.025em;
+}
+
+.contextIdentity p {
+  display: none;
+}
+
+.contextCode {
+  letter-spacing: .045em;
+}
+
+.contextFacts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.contextFacts > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.contextFacts > div:last-child {
+  border-right: 0;
+}
+
+.contextFacts dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: .035em;
+}
+
+.contextFacts dd {
+  overflow: hidden;
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspaceShell {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 172px minmax(0, 1fr);
+  align-items: start;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-1);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.workspaceNav {
+  position: sticky;
+  top: calc(var(--header-height) + 12px);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  padding: 12px 10px;
+}
+
+.workspaceNavItem {
+  min-height: 46px;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 11px;
+  font-size: 13px;
+}
+
+.workspaceNavItem svg {
+  flex: 0 0 auto;
+}
+
+.workspaceNavItem[data-active] {
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.workspaceNavItem[data-active]::after {
+  display: none;
+}
+
+.workspaceNavItem:nth-child(n)[data-active] {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.workspaceBody {
+  min-width: 0;
+  border: 0;
+  border-left: 1px solid var(--border-subtle);
+  border-radius: 0 12px 12px 0;
+  box-shadow: none;
+}
+
+.workspaceHeading {
+  min-height: 68px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1) !important;
+  padding: 13px 18px;
+}
+
+.workspaceHeading h2 {
+  margin-top: 2px;
+  font-size: 19px;
+  letter-spacing: -.015em;
+}
+
+.workspaceHeading p {
+  font-size: 12px;
+}
+
+.operationEyebrow {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.headingActions {
+  gap: 8px;
+}
+
+.operationStrip {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+}
+
+.progressSnapshot {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 14px 18px;
+}
+
+.progressSnapshot > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progressSnapshot span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.progressSnapshot strong {
+  color: var(--text-primary);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  display: block;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--border-subtle);
+}
+
+.progressTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.operationCounts {
+  display: grid;
+  min-width: 360px;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  margin: 0;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.operationCounts > div {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.operationCounts > div:last-child {
+  border-right: 0;
+}
+
+.operationCounts dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.operationCounts dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.operationCounts > div[data-tone="danger"] :is(dt, dd) {
+  color: var(--danger);
+}
+
+.operationCounts > div[data-tone="warning"] :is(dt, dd) {
+  color: var(--yellow-600);
+}
+
+.constructionLayout {
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
+  align-items: start;
+}
+
+.taskPanel {
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+}
+
+.taskToolbar {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 4;
+  grid-template-columns: minmax(170px, auto) minmax(340px, 1fr);
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-1) 97%, transparent);
+  padding: 10px 14px;
+}
+
+.taskFilters {
+  grid-template-columns: minmax(190px, 1fr) minmax(145px, 190px);
+  justify-self: stretch;
+}
+
+.taskList {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.taskBranch {
+  display: grid;
+  gap: 8px;
+}
+
+.taskRow {
+  min-height: 68px;
+  grid-template-columns: minmax(210px, 1.5fr) minmax(110px, .7fr) 86px minmax(110px, .65fr) auto 40px;
+  gap: 10px;
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--border-default);
+  border-radius: 9px;
+  background: var(--surface-1);
+  padding: 9px 10px;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.taskRow[data-status="in_progress"] {
+  border-left-color: var(--primary);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.taskRow[data-status="blocked"] {
+  border-left-color: var(--danger);
+  background: var(--surface-1);
+  box-shadow: none;
+}
+
+.taskRow[data-status="completed"] {
+  border-left-color: var(--success);
+}
+
+.taskName {
+  padding-left: calc(var(--task-depth) * 14px);
+}
+
+.taskName strong {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.taskName small {
+  margin-top: 2px;
+}
+
+.taskProgress > span {
+  background: var(--border-subtle);
+}
+
+.taskProgress i {
+  background: var(--primary);
+}
+
+.lookaheadPanel {
+  position: sticky;
+  top: calc(var(--header-height) + 12px);
+  max-height: calc(100dvh - var(--header-height) - 34px);
+  overflow-y: auto;
+  background: var(--surface-1);
+}
+
+.lookaheadPanel > .panelTitle {
+  min-height: 48px;
+  background: var(--surface-2);
+}
+
+.lookaheadList article {
+  min-height: 64px;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+}
+
+.blockedPanel,
+.overduePanel {
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  padding: 12px 14px;
+}
+
+.blockedPanel {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.overduePanel {
+  box-shadow: inset 3px 0 0 var(--yellow-500);
+}
+
+.blockedPanel h4,
+.overduePanel h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 7px;
+  font-size: 12px;
+}
+
+.blockedPanel h4 {
+  color: var(--danger);
+}
+
+.overduePanel h4 {
+  color: var(--yellow-600);
+}
+
+.blockedPanel button,
+.overduePanel button {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  padding: 5px 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.blockedPanel button strong,
+.overduePanel button time {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Nhân lực: ưu tiên phiên chấm công, danh sách nhân sự ở vùng làm việc lớn. */
+.attendanceLayout {
+  grid-template-columns: minmax(280px, .7fr) minmax(0, 1.3fr);
+  background: var(--surface-1);
+}
+
+.peoplePanel {
+  grid-column: 2;
+  grid-row: 1;
+  border-right: 0;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.sessionPanel {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--surface-2);
+}
+
+.peopleList {
+  border-top: 0;
+}
+
+.personRow {
+  min-height: 66px;
+  background: var(--surface-1);
+}
+
+.sessionCounts {
+  background: var(--surface-1);
+}
+
+.recordsWorkspace,
+.documentsWorkspace,
+.attendanceWorkspace,
+.constructionWorkspace {
+  background: var(--surface-1);
+}
+
+.recordLayout {
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr);
+}
+
+.recordCatalog {
+  background: var(--surface-1);
+}
+
+.recordDetail {
+  background: var(--surface-2);
+}
+
+.fileToolbar {
+  background: var(--surface-2);
+}
+
+.fileRow {
+  min-height: 66px;
+  background: var(--surface-1);
+}
+
+@media (max-width: 1180px) {
+  .contextMain {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .contextFacts {
+    max-width: 760px;
+  }
+
+  .workspaceShell {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .constructionLayout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+
+  .taskRow {
+    grid-template-columns: minmax(190px, 1.4fr) minmax(100px, .7fr) 80px minmax(100px, .65fr) auto 40px;
+  }
+}
+
+@media (max-width: 900px) {
+  .workspaceShell {
+    display: block;
+  }
+
+  .workspaceNav {
+    position: sticky;
+    top: var(--header-height);
+    z-index: 12;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-1);
+    padding: 0;
+  }
+
+  .workspaceNavItem {
+    min-height: 52px;
+    justify-content: center;
+    border-radius: 0;
+    padding: 4px 8px;
+  }
+
+  .workspaceNavItem[data-active] {
+    box-shadow: inset 0 -3px 0 var(--primary);
+  }
+
+  .workspaceBody {
+    border-left: 0;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .constructionLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .lookaheadPanel {
+    position: static;
+    max-height: none;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .taskToolbar {
+    position: static;
+  }
+
+  .operationStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .operationCounts {
+    min-width: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
+  }
+
+  .attendanceLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .sessionPanel,
+  .peoplePanel {
+    grid-column: 1;
+  }
+
+  .sessionPanel {
+    grid-row: 1;
+  }
+
+  .peoplePanel {
+    grid-row: 2;
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .packageWorkspace {
+    width: calc(100% + 28px);
+    margin-inline: -14px;
+    gap: 0;
+  }
+
+  .contextHeader {
+    gap: 10px;
+    padding: 8px 14px 12px;
+    background: var(--surface-1);
+  }
+
+  .contextTopline {
+    align-items: center;
+  }
+
+  .contextStatus :global(.button) {
+    min-width: 44px;
+  }
+
+  .contextStatus :global(.button) span {
+    display: none;
+  }
+
+  .contextIdentity h1 {
+    font-size: 22px;
+  }
+
+  .contextFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-bottom: 0;
+  }
+
+  .contextFacts > div {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .contextFacts > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .workspaceShell {
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .workspaceNav {
+    top: var(--header-height);
+  }
+
+  .workspaceNavItem {
+    min-height: 58px;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+  }
+
+  .workspaceNavItem svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .workspaceBody {
+    border-radius: 0;
+  }
+
+  .workspaceHeading {
+    min-height: 62px;
+    padding: 12px 14px;
+  }
+
+  .workspaceHeading h2 {
+    font-size: 18px;
+  }
+
+  .headingActions {
+    width: 100%;
+  }
+
+  .headingActions > :global(.button) {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+
+  .operationStrip {
+    background: var(--surface-1);
+  }
+
+  .progressSnapshot {
+    padding: 12px 14px;
+  }
+
+  .operationCounts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .operationCounts > div {
+    padding: 10px;
+  }
+
+  .operationCounts dt {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .operationCounts dd {
+    font-size: 20px;
+  }
+
+  .taskToolbar {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding: 10px 12px;
+  }
+
+  .taskFilters {
+    grid-template-columns: 1fr;
+  }
+
+  .taskList {
+    gap: 9px;
+    padding: 10px;
+  }
+
+  .taskBranch {
+    gap: 9px;
+  }
+
+  .taskRow {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    border-radius: 9px;
+    padding: 11px;
+  }
+
+  .taskName {
+    grid-column: 1;
+    min-height: 40px;
+    padding-left: 0;
+  }
+
+  .taskOwner {
+    grid-column: 1 / -1;
+  }
+
+  .taskDeadline {
+    grid-column: 1;
+  }
+
+  .taskProgress {
+    grid-column: 1 / -1;
+  }
+
+  .mobileQuickActions {
+    grid-column: 1 / -1;
+  }
+
+  .lookaheadPanel {
+    background: var(--surface-1);
+  }
+
+  .mobileActionBar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 18;
+    min-height: 68px;
+  }
+
+  .recordLayout {
+    grid-template-columns: 1fr;
+  }
+}

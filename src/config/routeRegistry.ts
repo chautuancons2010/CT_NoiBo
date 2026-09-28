@@ -279,8 +279,8 @@ const employeeSectionLabels: Record<string, string> = {
 };
 
 const projectSectionLabels: Record<string, string> = {
-  progress: "Thi công",
-  team: "Chấm công",
+  progress: "Điều hành",
+  team: "Nhân lực",
   profile: "Hồ sơ",
   documents: "Tài liệu"
 };

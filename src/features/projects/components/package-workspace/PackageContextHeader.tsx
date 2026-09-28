@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarDays, Info, MapPin, Plus, UserRound } from "lucide-react";
+import { Building2, CalendarDays, HardHat, Info, MapPin, Plus, UserRound, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -77,20 +77,39 @@ export function PackageContextHeader({
     <>
       <header className={styles.contextHeader}>
         <div className={styles.contextTopline}>
-          <BackLink href="/projects" label="Danh sách gói" />
-          <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+          <BackLink href="/projects" label="Gói công trường" />
+          <div className={styles.contextStatus}>
+            <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+            <Button leftIcon={<Info aria-hidden="true" size={16} />} onClick={() => setOpen(true)} size="sm" variant="secondary">
+              Thông tin gói
+            </Button>
+          </div>
         </div>
         <div className={styles.contextMain}>
           <div className={styles.contextIdentity}>
             <span className={styles.contextCode}>{project.code}</span>
             <h1>{project.name}</h1>
-            <p>
-              {worksiteContext} · {project.projectManagerName ?? "Chưa phân công"}{completionPercent === undefined ? "" : ` · ${completionPercent}%`} · {project.currentPeople} nhân sự
-            </p>
           </div>
-          <Button leftIcon={<Info aria-hidden="true" size={17} />} onClick={() => setOpen(true)} variant="secondary">
-            Thông tin gói
-          </Button>
+          <dl className={styles.contextFacts}>
+            <div>
+              <dt><MapPin aria-hidden="true" size={16} /> Công trường</dt>
+              <dd>{worksiteContext}</dd>
+            </div>
+            <div>
+              <dt><UserRound aria-hidden="true" size={16} /> Phụ trách</dt>
+              <dd>{project.projectManagerName ?? "Chưa phân công"}</dd>
+            </div>
+            {completionPercent === undefined ? null : (
+              <div>
+                <dt><HardHat aria-hidden="true" size={16} /> Tiến độ</dt>
+                <dd>{completionPercent}%</dd>
+              </div>
+            )}
+            <div>
+              <dt><UsersRound aria-hidden="true" size={16} /> Nhân lực</dt>
+              <dd>{project.currentPeople}</dd>
+            </div>
+          </dl>
         </div>
       </header>
 
