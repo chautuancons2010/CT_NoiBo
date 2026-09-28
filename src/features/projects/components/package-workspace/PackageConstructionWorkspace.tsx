@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, FilePlus2, MoreHorizontal, Pencil, Plus, RefreshCw, Users } from "lucide-react";
+import { CircleAlert, Clock3, FilePlus2, MoreHorizontal, Pencil, Plus, RefreshCw, TriangleAlert, Users } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
@@ -118,6 +118,9 @@ export function PackageConstructionWorkspace({
   }, [nodes, normalizedQuery, roots, statusFilter]);
   const overall = roots.length ? Math.round(roots.reduce((sum, node) => sum + node.completionPercent, 0) / roots.length) : 0;
   const blocked = nodes.filter((node) => node.status === "blocked");
+  const inProgress = nodes.filter((node) => node.status === "in_progress");
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const overdue = nodes.filter((node) => Boolean(node.deadline) && node.deadline! < todayKey && node.status !== "completed" && node.status !== "cancelled");
 
   function openCreate(nextParentId?: string) {
     setEditing(undefined);
@@ -252,36 +255,74 @@ export function PackageConstructionWorkspace({
   }
 
   const updateButton = canFieldUpdate ? (
-    <Button leftIcon={<FilePlus2 aria-hidden="true" size={17} />} onClick={() => setFieldUpdateMode()} variant="primary">Cập nhật hiện trường</Button>
+    <Button leftIcon={<FilePlus2 aria-hidden="true" size={17} />} onClick={() => setFieldUpdateMode()} variant="primary">Ghi nhận hiện trường</Button>
   ) : null;
 
   return (
     <section className={styles.constructionWorkspace}>
       <header className={styles.workspaceHeading}>
-        <div><h2>Thi công &amp; Tiến độ</h2><p>{overall}% hoàn thành · {nodes.filter((node) => node.status === "in_progress").length} đang thi công · {blocked.length} vướng</p></div>
+        <div>
+          <span className={styles.operationEyebrow}>Điều hành công trường</span>
+          <h2>Việc cần xử lý</h2>
+        </div>
         <div className={styles.headingActions}>
-          <Button aria-label="Tải lại tiến độ" disabled={reloading} leftIcon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void reload()}>{reloading ? "Đang tải" : "Tải lại"}</Button>
-          {canEdit ? <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => openCreate()}>Công việc</Button> : null}
+          <Button aria-label="Tải lại tiến độ" disabled={reloading} leftIcon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void reload()} size="sm">
+            {reloading ? "Đang tải" : "Tải lại"}
+          </Button>
+          {canEdit ? <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => openCreate()} size="sm">Thêm việc</Button> : null}
           <div className={styles.desktopOnly}>{updateButton}</div>
         </div>
       </header>
+
+      <div className={styles.operationStrip}>
+        <div className={styles.progressSnapshot}>
+          <div>
+            <span>Tiến độ chung</span>
+            <strong>{overall}%</strong>
+          </div>
+          <span className={styles.progressTrack} aria-label={`Tiến độ chung ${overall}%`}>
+            <i style={{ width: `${overall}%` }} />
+          </span>
+        </div>
+        <dl className={styles.operationCounts}>
+          <div>
+            <dt><Clock3 aria-hidden="true" size={16} /> Đang làm</dt>
+            <dd>{inProgress.length}</dd>
+          </div>
+          <div data-tone={blocked.length ? "danger" : undefined}>
+            <dt><TriangleAlert aria-hidden="true" size={16} /> Đang vướng</dt>
+            <dd>{blocked.length}</dd>
+          </div>
+          <div data-tone={overdue.length ? "warning" : undefined}>
+            <dt><CircleAlert aria-hidden="true" size={16} /> Quá hạn</dt>
+            <dd>{overdue.length}</dd>
+          </div>
+        </dl>
+      </div>
+
       <div className={styles.constructionLayout}>
         <div className={styles.taskPanel}>
           <div className={styles.taskToolbar}>
-            <div className={styles.panelTitle}><h3>Hạng mục &amp; Công việc</h3><span>{roots.length}</span></div>
+            <div className={styles.panelTitle}><h3>Hạng mục thi công</h3><span>{nodes.length}</span></div>
             <div className={styles.taskFilters}>
-              <SearchInput label="Tìm công việc" onChange={(event) => setQuery(event.target.value)} placeholder="Tìm công việc, phụ trách" value={query} />
+              <SearchInput label="Tìm công việc" onChange={(event) => setQuery(event.target.value)} placeholder="Tên việc, người phụ trách" value={query} />
               <Select label="Trạng thái" labelHidden onChange={(event) => setStatusFilter(event.target.value)} options={[{ value: "all", label: "Tất cả trạng thái" }, ...Object.entries(statusLabels).map(([value, label]) => ({ value, label }))]} value={statusFilter} />
             </div>
           </div>
           {error && !editorOpen ? <div className={styles.inlineError} role="alert"><CircleAlert aria-hidden="true" size={17} /> <span>{error}</span></div> : null}
-          <div className={styles.taskTableHeader} aria-hidden="true"><span>Công việc</span><span>Phụ trách</span><span>Hạn</span><span>Tiến độ</span><span>Trạng thái</span><span /></div>
           <div className={styles.taskList}>
             {roots.some((node) => visibleNodeIds.has(node.id)) ? roots.map((node) => branch(node)) : <EmptyState action={canEdit && !nodes.length ? <Button onClick={() => openCreate()} variant="primary">Thêm công việc</Button> : undefined} title={nodes.length ? "Không có công việc phù hợp" : "Chưa có công việc"} />}
           </div>
         </div>
+
         <aside className={styles.lookaheadPanel}>
-          <div className={styles.panelTitle}><h3>Hôm nay &amp; 7 ngày</h3><span>{schedule.reduce((sum, day) => sum + day.workerCount, 0)} lượt công</span></div>
+          {blocked.length ? (
+            <section className={styles.blockedPanel}>
+              <h4><TriangleAlert aria-hidden="true" size={16} /> Cần xử lý vướng mắc</h4>
+              {blocked.slice(0, 5).map((node) => <button key={node.id} onClick={() => canFieldUpdate ? setFieldUpdateMode(node.id) : undefined} type="button"><span>{node.name}</span><strong>{node.completionPercent}%</strong></button>)}
+            </section>
+          ) : null}
+          <div className={styles.panelTitle}><h3>Kế hoạch 7 ngày</h3><span>{schedule.reduce((sum, day) => sum + day.workerCount, 0)} lượt công</span></div>
           {scheduleLoadError ? <p className={styles.inlineError} role="alert">{scheduleLoadError}</p> : null}
           <div className={styles.lookaheadList}>
             {schedule.map((day) => (
@@ -293,14 +334,15 @@ export function PackageConstructionWorkspace({
             ))}
             {!schedule.length ? <EmptyState title="Chưa có lịch thi công" /> : null}
           </div>
-          {blocked.length ? (
-            <section className={styles.blockedPanel}>
-              <h4><CircleAlert aria-hidden="true" size={16} /> Đang vướng</h4>
-              {blocked.slice(0, 5).map((node) => <button key={node.id} onClick={() => canFieldUpdate ? setFieldUpdateMode(node.id) : undefined} type="button"><span>{node.name}</span><strong>{node.completionPercent}%</strong></button>)}
+          {overdue.length ? (
+            <section className={styles.overduePanel}>
+              <h4><CircleAlert aria-hidden="true" size={16} /> Quá hạn</h4>
+              {overdue.slice(0, 5).map((node) => <button key={node.id} onClick={() => canFieldUpdate ? setFieldUpdateMode(node.id) : undefined} type="button"><span>{node.name}</span><time dateTime={node.deadline}>{formatDate(node.deadline)}</time></button>)}
             </section>
           ) : null}
         </aside>
       </div>
+
       {updateButton ? <MobileActionBar>{updateButton}</MobileActionBar> : null}
       <FieldUpdateDrawer initialNodeId={fieldUpdateNodeId} key={`${fieldUpdateOpen}-${fieldUpdateNodeId ?? "new"}`} nodes={nodes} onClose={closeFieldUpdate} onSaved={setNodes} open={canFieldUpdate && fieldUpdateOpen} projectId={projectId} />
       <Drawer onClose={closeEditor} open={editorOpen} title={editing ? "Cập nhật công việc" : parentId ? "Thêm công việc con" : "Thêm công việc"}>
@@ -392,7 +434,7 @@ function FieldUpdateDrawer({ projectId, nodes, initialNodeId, open, onClose, onS
   }
 
   return (
-    <Drawer onClose={() => { if (!saving) onClose(); }} open={open} title="Cập nhật hiện trường">
+    <Drawer onClose={() => { if (!saving) onClose(); }} open={open} title="Ghi nhận hiện trường">
       <form className={styles.fieldUpdateForm} onSubmit={save}>
         <Select label="Hạng mục" name="nodeId" onChange={(event) => chooseNode(event.target.value)} options={selectableNodes.map((node) => ({ value: node.id, label: node.name }))} placeholder="Chọn hạng mục" required value={nodeId} />
         <fieldset className={styles.segmentedControl}><legend>Trạng thái</legend>{(["in_progress", "blocked", "completed"] as const).map((value) => <button aria-pressed={status === value} key={value} onClick={() => { setStatus(value); if (value === "blocked") setHasIssue(true); if (value === "completed") setPercent(100); }} type="button">{statusLabels[value]}</button>)}</fieldset>
@@ -403,7 +445,7 @@ function FieldUpdateDrawer({ projectId, nodes, initialNodeId, open, onClose, onS
         {previews.length ? <div className={styles.photoPreviews}>{previews.map((url, index) => <Image alt={`Ảnh hiện trường ${index + 1}`} height={96} key={url} src={url} unoptimized width={128} />)}</div> : null}
         <Textarea label="Ghi chú" maxLength={500} onChange={(event) => setNote(event.target.value)} rows={3} value={note} />
         {error ? <p className={styles.inlineError} role="alert">{error}</p> : null}
-        <footer className={styles.drawerFooter}><span /><div><Button disabled={saving} onClick={onClose}>Hủy</Button><Button disabled={saving || !selectedNode} type="submit" variant="primary">{saving ? "Đang lưu" : "Lưu cập nhật"}</Button></div></footer>
+        <footer className={styles.drawerFooter}><span /><div><Button disabled={saving} onClick={onClose}>Hủy</Button><Button disabled={saving || !selectedNode} type="submit" variant="primary">{saving ? "Đang lưu" : "Lưu ghi nhận"}</Button></div></footer>
       </form>
     </Drawer>
   );
