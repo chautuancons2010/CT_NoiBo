@@ -59,6 +59,8 @@ export interface AttendanceEvent {
   receivedAtServer: string;
   locationId?: string;
   locationName?: string;
+  latitude?: number;
+  longitude?: number;
   accuracyMeters?: number;
   distanceMeters?: number;
   geofenceStatus: AttendanceGeofenceStatus;
@@ -94,6 +96,7 @@ export interface AttendanceAdminTodayRow {
   lateMinutes: number;
   earlyLeaveMinutes: number;
   totalMinutes: number;
+  events?: AttendanceEvent[];
   status: "present" | "late" | "leave" | "not_checked" | "missing_check";
 }
 
@@ -105,6 +108,7 @@ export interface AttendanceAdminToday {
   leave: number;
   notChecked: number;
   missingCheck: number;
+  canViewPhotos?: boolean;
   rows: AttendanceAdminTodayRow[];
 }
 

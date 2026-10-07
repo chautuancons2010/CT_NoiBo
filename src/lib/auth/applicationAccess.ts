@@ -1,8 +1,31 @@
 import type { Permission } from "@/lib/auth/permissions";
+import { can } from "@/lib/auth/permissions";
+
+const personalAttendancePermissions = ["attendance.self", "attendance.self.view", "attendance.self.create"] as const;
+
+export const humanResourcesPermissions = [
+  "employee.view", "contract.view", "insurance.view", "department.manage", "position.manage",
+  "attendance.view_all", "attendance.manage", "attendance.adjust", "attendance.period.manage",
+  "timesheet.view_team", "timesheet.view_all", "timesheet.adjust", "timesheet.lock",
+  "shift.view", "shift.manage", "shift.edit", "leave.view_all"
+] as const satisfies readonly Permission[];
+
+export const managedTimesheetPermissions = [
+  "timesheet.view_team", "timesheet.view_all", "timesheet.adjust", "timesheet.lock", "timesheet.unlock",
+  "attendance.view_all", "attendance.manage", "attendance.period.manage", "attendance.adjust"
+] as const satisfies readonly Permission[];
+
+export function canOpenPersonalAttendance(permissions: readonly Permission[]): boolean {
+  return personalAttendancePermissions.some((permission) => can(permissions, permission));
+}
+
+export function canSubmitPersonalAttendance(permissions: readonly Permission[]): boolean {
+  return can(permissions, "attendance.self.create") || can(permissions, "attendance.self");
+}
 
 export const applicationPermissionSets = {
   overview: ["dashboard.view"],
-  "human-resources": ["employee.view", "contract.view", "insurance.view", "department.manage", "position.manage", "attendance.view_all", "attendance.manage", "attendance.adjust", "attendance.period.manage", "timesheet.view", "timesheet.view_team", "timesheet.view_all", "timesheet.adjust", "shift.view", "leave.view_all"],
+  "human-resources": humanResourcesPermissions,
   attendance: ["attendance.self", "attendance.self.view", "attendance.self.create", "attendance.self_history", "attendance.self_request"],
   projects: ["project.view", "project_monitoring.view", "project_monitoring.view_all", "project_issue.view", "worker_attendance.view", "worker_attendance.create", "worker_attendance.self_scope", "worker_attendance.view_project", "worker_attendance.view_all"],
   warehouse: ["warehouse.view", "warehouse.view_all", "warehouse.item.view", "warehouse.receipt.view", "warehouse.issue.view", "warehouse.transfer.view", "warehouse.adjustment.view", "warehouse.stock_count.view", "warehouse.ledger.view", "warehouse.master.manage"],

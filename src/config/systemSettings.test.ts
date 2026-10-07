@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   appearanceSettingsSchema,
+  contrastRatio,
   dashboardSettingsSchema,
   defaultSystemSettings,
   deriveBrandColorTokens,
   isPathEnabled,
   moduleForPath,
+  normalizeStoredDashboardSettings,
   navigationSettingsSchema,
   normalizeStoredNavigationSettings,
   payslipSettingsSchema
@@ -52,6 +54,14 @@ describe("typed system settings", () => {
     expect(dark.focusRing).toMatch(/^#[0-9A-F]{8}$/);
   });
 
+  it.each(["#0F766E", "#19A94A", "#46A36D", "#2E9B67", "#268558", "#FDE68A", "#114F8B"])("keeps brand text readable in every action state for %s", (color) => {
+    const tokens = deriveBrandColorTokens(color);
+    for (const background of [tokens.primary, tokens.primaryHover, tokens.primaryActive]) {
+      expect(contrastRatio(background, tokens.primaryForeground)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(tokens.contrast).toBeCloseTo(contrastRatio(tokens.primary, tokens.primaryForeground));
+  });
+
   it("maps routes to module flags without changing permission state", () => {
     expect(moduleForPath("/warehouse/items/123")).toBe("warehouse");
     expect(isPathEnabled("/warehouse/items", defaultSystemSettings.modules)).toBe(true);
@@ -62,6 +72,25 @@ describe("typed system settings", () => {
   it("only accepts registered dashboard presets and widgets", () => {
     expect(dashboardSettingsSchema.parse(defaultSystemSettings.dashboard)).toEqual(defaultSystemSettings.dashboard);
     expect(() => dashboardSettingsSchema.parse({ ...defaultSystemSettings.dashboard, presets: defaultSystemSettings.dashboard.presets.map((preset, index) => index ? preset : { ...preset, enabledWidgets: ["unknown"] }) })).toThrow();
+  });
+
+  it("upgrades saved dashboard presets when a profile is added", () => {
+    const legacy = {
+      presetOrder: defaultSystemSettings.dashboard.presetOrder.filter((profile) => profile !== "accounting"),
+      presets: defaultSystemSettings.dashboard.presets
+        .filter((preset) => preset.profile !== "accounting")
+        .map((preset) => preset.profile === "employee"
+          ? { ...preset, landingPage: "/attendance/me", enabledWidgets: ["employee_today", "removed_widget"] }
+          : preset)
+    };
+    const upgraded = dashboardSettingsSchema.parse(normalizeStoredDashboardSettings(legacy));
+
+    expect(upgraded.presetOrder).toContain("accounting");
+    expect(upgraded.presets.find((preset) => preset.profile === "accounting")?.enabledWidgets).toContain("accounting_summary");
+    expect(upgraded.presets.find((preset) => preset.profile === "employee")).toMatchObject({
+      landingPage: "/attendance/me",
+      enabledWidgets: ["employee_today"]
+    });
   });
 
   it("validates the payslip template", () => {

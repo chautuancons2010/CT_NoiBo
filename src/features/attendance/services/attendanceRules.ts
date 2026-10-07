@@ -38,21 +38,18 @@ export function matchAttendanceLocation(
   locations: readonly AttendanceLocation[],
   policy: AttendancePolicy
 ): LocationMatch {
-  if (!policy.gpsRequired) return { status: "not_required" };
-  if (!coordinates) return { status: "unavailable" };
-  if (coordinates.accuracy > policy.allowedAccuracyThresholdMeters) {
-    return { status: "accuracy_low" };
-  }
+  if (!coordinates) return { status: policy.gpsRequired ? "unavailable" : "not_required" };
 
   const nearest = locations
     .filter((location) => location.active)
     .map((location) => ({ location, distanceMeters: distanceInMeters(coordinates, location) }))
     .sort((first, second) => first.distanceMeters - second.distanceMeters)[0];
 
-  if (!nearest) return { status: "outside" };
+  // Locations identify the nearest reference point. Attendance has no radius restriction.
+  // A low accuracy reading remains evidence for HR review and never blocks attendance.
   return {
     ...nearest,
-    status: nearest.distanceMeters <= nearest.location.radiusMeters ? "valid" : "outside"
+    status: coordinates.accuracy > policy.allowedAccuracyThresholdMeters ? "accuracy_low" : "valid"
   };
 }
 

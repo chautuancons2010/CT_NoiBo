@@ -1,15 +1,28 @@
 "use client";
 
-import { ArrowRight, BriefcaseBusiness, CalendarDays, CheckCircle2, Clock3, MapPin, Plus, Search, UsersRound } from "lucide-react";
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  MapPin,
+  Plus,
+  UserRound,
+  UsersRound
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/shared/Button";
-import { Select } from "@/components/shared/FormControls";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { SearchInput, Select } from "@/components/shared/FormControls";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { ProjectStatus, ProjectSummary } from "@/features/projects/types/projectTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+
+import styles from "./ProjectPortfolioWorkspace.module.css";
 
 type PortfolioGroup = "active" | "upcoming" | "completed";
 
@@ -22,9 +35,9 @@ const statusMeta: Record<ProjectStatus, { label: string; tone: "info" | "success
 };
 
 const groupMeta: Record<PortfolioGroup, { title: string; icon: typeof BriefcaseBusiness; tone: string }> = {
-  active: { title: "Đang thực hiện", icon: BriefcaseBusiness, tone: "mint" },
-  upcoming: { title: "Sắp tới", icon: Clock3, tone: "amber" },
-  completed: { title: "Đã hoàn thành", icon: CheckCircle2, tone: "lavender" }
+  active: { title: "Đang thực hiện", icon: BriefcaseBusiness, tone: "active" },
+  upcoming: { title: "Sắp tới", icon: Clock3, tone: "upcoming" },
+  completed: { title: "Đã hoàn thành", icon: CheckCircle2, tone: "completed" }
 };
 
 function groupFor(project: ProjectSummary): PortfolioGroup {
@@ -39,12 +52,12 @@ function shortDate(value?: string) {
   return day && month && year ? `${day}/${month}/${year}` : value;
 }
 
-export function ProjectPortfolioWorkspace() {
+export function ProjectPortfolioWorkspace({ canCreate = false }: { canCreate?: boolean }) {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [query, setQuery] = useState("");
-  const [group, setGroup] = useState<PortfolioGroup | "all">("all");
+  const [group, setGroup] = useState<PortfolioGroup | "">("");
 
   const load = useCallback(async () => {
     const controller = new AbortController();
@@ -70,8 +83,8 @@ export function ProjectPortfolioWorkspace() {
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("vi-VN");
     return projects.filter((project) => {
-      const matchesGroup = group === "all" || group === groupFor(project);
-      const matchesSearch = !term || [project.code, project.name, project.customerName, project.projectManagerName]
+      const matchesGroup = !group || group === groupFor(project);
+      const matchesSearch = !term || [project.name, project.customerName, project.projectManagerName]
         .some((value) => value?.toLocaleLowerCase("vi-VN").includes(term));
       return matchesGroup && matchesSearch;
     });
@@ -83,54 +96,77 @@ export function ProjectPortfolioWorkspace() {
     completed: filtered.filter((project) => groupFor(project) === "completed")
   }), [filtered]);
 
-  return <div className="project-portfolio">
-    <section className="project-portfolio__toolbar" aria-label="Công cụ danh sách gói">
-      <div className="project-portfolio__search">
-        <Search aria-hidden="true" size={18} />
-        <input aria-label="Tìm gói" onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã, tên gói, khách hàng" type="search" value={query} />
-      </div>
-      <Select
-        label="Nhóm gói"
-        labelHidden
-        onChange={(event) => setGroup(event.target.value as PortfolioGroup | "all")}
-        options={[
-          { value: "all", label: "Tất cả nhóm" },
-          { value: "active", label: "Đang thực hiện" },
-          { value: "upcoming", label: "Sắp tới" },
-          { value: "completed", label: "Đã hoàn thành" }
-        ]}
-        value={group}
-      />
-      <Link href="/projects/new"><Button leftIcon={<Plus aria-hidden="true" size={17} />} variant="primary">Tạo gói</Button></Link>
-    </section>
+  return (
+    <div className={styles.workspace}>
+      <section className={styles.surface}>
+        <FilterBar
+          actions={canCreate ? <Link aria-label="Tạo gói" href="/projects/new"><Button className={styles.createButton} leftIcon={<Plus aria-hidden="true" size={17} />} variant="primary">Tạo gói</Button></Link> : undefined}
+          label="Tìm và lọc gói"
+        >
+          <SearchInput label="Tìm gói" onChange={(event) => setQuery(event.target.value)} placeholder="Tên gói, khách hàng, phụ trách" value={query} />
+          <Select
+            label="Nhóm gói"
+            onChange={(event) => setGroup(event.target.value as PortfolioGroup | "")}
+            options={[
+              { value: "", label: "Tất cả nhóm" },
+              { value: "active", label: "Đang thực hiện" },
+              { value: "upcoming", label: "Sắp tới" },
+              { value: "completed", label: "Đã hoàn thành" }
+            ]}
+            value={group}
+          />
+        </FilterBar>
 
-    {loading ? <LoadingState /> : error ? <ErrorState action={<Button onClick={() => void load()} variant="secondary">Tải lại</Button>} description={error} /> : filtered.length === 0 ? <EmptyState title="Chưa có gói phù hợp" /> : (
-      <div className="project-portfolio__groups">
-        {(["active", "upcoming", "completed"] as const).map((key) => {
-          const items = grouped[key];
-          if (!items.length) return null;
-          const meta = groupMeta[key];
-          const Icon = meta.icon;
-          return <section className={`project-package-group project-package-group--${meta.tone}`} key={key}>
-            <header className="project-package-group__header">
-              <div><span className="project-package-group__icon"><Icon aria-hidden="true" size={18} /></span><h2>{meta.title}</h2></div>
-              <span>{items.length} gói</span>
-            </header>
-            <div className="project-package-list">{items.map((project) => <ProjectRow key={project.id} project={project} />)}</div>
-          </section>;
-        })}
-      </div>
-    )}
-  </div>;
+        {loading ? <LoadingState /> : error ? (
+          <ErrorState action={<Button onClick={() => void load()} variant="secondary">Tải lại</Button>} description={error} />
+        ) : filtered.length === 0 ? <EmptyState title="Chưa có gói phù hợp" /> : (
+          <div className={styles.groups}>
+            {(["active", "upcoming", "completed"] as const).map((key) => {
+              const items = grouped[key];
+              if (!items.length) return null;
+              const meta = groupMeta[key];
+              const Icon = meta.icon;
+              return (
+                <section className={styles.group} data-tone={meta.tone} key={key}>
+                  <header className={styles.groupHeader}>
+                    <div><span className={styles.groupIcon}><Icon aria-hidden="true" size={18} /></span><h2>{meta.title}</h2></div>
+                    <span>{items.length} gói</span>
+                  </header>
+                  <div className={styles.list}>{items.map((project) => <ProjectRow key={project.id} project={project} />)}</div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
 function ProjectRow({ project }: { project: ProjectSummary }) {
   const meta = statusMeta[project.status];
-  return <Link className="project-package-row" href={`/projects/${project.id}/progress`}>
-    <div className="project-package-row__identity"><span>{project.code}</span><strong>{project.name}</strong><small>{project.customerName ?? "Chưa có khách hàng"}</small></div>
-    <div className="project-package-row__meta"><span><MapPin aria-hidden="true" size={15} />{project.worksiteCount} công trường</span><span><UsersRound aria-hidden="true" size={15} />{project.currentPeople} nhân sự</span></div>
-    <div className="project-package-row__dates"><CalendarDays aria-hidden="true" size={15} /><span>{shortDate(project.startDate)}<small>{shortDate(project.expectedEndDate ?? project.actualEndDate)}</small></span></div>
-    <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>
-    <span className="project-package-row__open">Mở gói <ArrowRight aria-hidden="true" size={17} /></span>
-  </Link>;
+  return (
+    <Link className={styles.row} href={`/projects/${project.id}/today`}>
+      <div className={styles.identity}>
+        <strong>{project.name}</strong>
+        <small>{project.customerName ?? "Chưa có khách hàng"}</small>
+      </div>
+      <div className={styles.manager}>
+        <UserRound aria-hidden="true" size={16} />
+        <span><small>Phụ trách</small><strong>{project.projectManagerName ?? "Chưa phân công"}</strong></span>
+      </div>
+      <div className={styles.operationalMeta}>
+        <span><MapPin aria-hidden="true" size={15} />{project.worksiteCount} công trường</span>
+        <span><UsersRound aria-hidden="true" size={15} />{project.currentPeople} nhân sự</span>
+      </div>
+      <div className={styles.deadline}>
+        <CalendarDays aria-hidden="true" size={16} />
+        <span><small>Bắt đầu {shortDate(project.startDate)}</small><strong>Hạn {shortDate(project.expectedEndDate ?? project.actualEndDate)}</strong></span>
+      </div>
+      <div className={styles.rowEnd}>
+        <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>
+        <span className={styles.openAction}>Mở gói <ArrowRight aria-hidden="true" size={17} /></span>
+      </div>
+    </Link>
+  );
 }

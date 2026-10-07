@@ -70,7 +70,6 @@ export function PayslipTemplatePage() {
           <h2>{title}</h2>
           <dl>
             <div><dt>Nhân viên</dt><dd>Nguyễn Văn An</dd></div>
-            <div><dt>Mã nhân viên</dt><dd>NV001</dd></div>
             {template.showWorkDays ? <div><dt>Ngày công</dt><dd>22</dd></div> : null}
             {template.showBaseSalary ? <div><dt>Lương cơ bản</dt><dd>14.000.000 VND</dd></div> : null}
             {template.showAllowance ? <div><dt>Phụ cấp</dt><dd>1.000.000 VND</dd></div> : null}

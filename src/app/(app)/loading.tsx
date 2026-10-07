@@ -1,5 +1,5 @@
-import { ModuleTransition } from "@/components/shared/LoadingExperience";
+import { LoadingState } from "@/components/shared/States";
 
 export default function Loading() {
-  return <ModuleTransition />;
+  return <LoadingState title="Đang tải trang" />;
 }

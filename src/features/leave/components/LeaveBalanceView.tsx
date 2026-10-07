@@ -47,7 +47,7 @@ export function LeaveBalanceView({ all = false }: { all?: boolean }) {
         <div className="leave-balance-grid">
           {balances.map((item) => (
             <article className="leave-balance-card" key={`${item.employeeId}-${item.leaveTypeId}`}>
-              <strong>{all ? `${item.employeeCode} · ${item.employeeName}` : item.leaveTypeName}</strong>
+              <strong>{all ? item.employeeName : item.leaveTypeName}</strong>
               {all ? <span>{item.leaveTypeName}</span> : null}
               <b>{item.officialRemaining}</b>
               <dl>

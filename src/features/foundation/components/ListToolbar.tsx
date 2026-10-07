@@ -2,8 +2,8 @@
 
 import { CalendarRange, Download, Filter, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useRef } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { ColumnVisibilityMenu } from "@/components/shared/ColumnVisibilityMenu";
@@ -47,6 +47,8 @@ function ListToolbarContent<TData extends object>({
   dateRange = true
 }: ListToolbarProps<TData>) {
   const pathname = usePathname();
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const params = useSearchParams();
   const query = getSingleParam(params, "q");
   const status = getSingleParam(params, "status");
@@ -61,8 +63,10 @@ function ListToolbarContent<TData extends object>({
   ].filter(Boolean) as Array<{ label: string; value: string }>;
 
   return (
-    <form action={pathname} className="list-toolbar" method="get">
+    <form action={pathname} className="list-toolbar" method="get" ref={formRef}>
       <FilterBar
+        onApply={() => formRef.current?.requestSubmit()}
+        onReset={() => { formRef.current?.reset(); router.push(pathname); }}
         actions={
           <>
             <ColumnVisibilityMenu

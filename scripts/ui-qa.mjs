@@ -78,6 +78,8 @@ try {
         controlHeight: root.getPropertyValue("--control-height-md").trim(),
         metricCards: document.querySelectorAll(".dashboard-overview__metric").length,
         dataTables: document.querySelectorAll(".data-table").length,
+        mobileLists: document.querySelectorAll(".mobile-record-list").length,
+        mobileRecords: document.querySelectorAll(".mobile-record").length,
         formFields: document.querySelectorAll(".erp-form-preview .field").length,
         invalidFields: document.querySelectorAll('.erp-form-preview [aria-invalid="true"]').length,
         readOnlyFields: document.querySelectorAll(".erp-form-preview :read-only").length,
@@ -88,7 +90,10 @@ try {
     });
     if (visual.content > visual.viewport) throw new Error(`UI preview tràn ngang tại ${viewport.width}px: ${visual.content}px > ${visual.viewport}px`);
     if (visual.appBackground !== "#f0fdfa" || visual.cardRadius !== "12px" || visual.controlHeight !== "44px") throw new Error(`UI preview không nhận đúng token: ${JSON.stringify(visual)}`);
-    if (visual.metricCards < 4 || visual.dataTables !== 1) throw new Error(`UI preview thiếu primitive bắt buộc: ${JSON.stringify(visual)}`);
+    const validWorklist = viewport.width < 768
+      ? visual.dataTables === 0 && visual.mobileLists === 1 && visual.mobileRecords === 2
+      : visual.dataTables === 1 && visual.mobileLists === 0;
+    if (visual.metricCards < 4 || !validWorklist) throw new Error(`UI preview thiếu primitive bắt buộc: ${JSON.stringify(visual)}`);
     if (visual.formFields < 7 || visual.invalidFields !== 1 || visual.readOnlyFields < 1 || visual.disabledFields < 1) throw new Error(`UI preview thiếu trạng thái field ERP: ${JSON.stringify(visual)}`);
     if (visual.filterBars !== 1 || visual.stickyActionBars !== 1) throw new Error(`UI preview thiếu filter/action contract ERP: ${JSON.stringify(visual)}`);
     await page.screenshot({ path: path.join(output, `ui-preview-${viewport.width}x${viewport.height}-playwright.png`), fullPage: true });

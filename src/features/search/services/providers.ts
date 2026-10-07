@@ -35,7 +35,7 @@ export const employeeSearchProvider: SearchProvider = {
     const safe = safeQueryValue(query);
     const clauses = [`employee_code.ilike.%${safe}%`, `full_name.ilike.%${safe}%`, `company_email.ilike.%${safe}%`];
     if (can(user.permissions, "employee.view_sensitive")) clauses.push(`personal_phone.ilike.%${safe}%`);
-    const { data, error } = await client.from("employees").select("id,employee_code,full_name,company_email,employment_status,departments(name),positions(name)").or(clauses.join(",")).limit(limit);
+    const { data, error } = await client.from("employees").select("id,employee_code,full_name,company_email,employment_status,departments!employees_department_id_fkey(name),positions(name)").or(clauses.join(",")).limit(limit);
     if (error) throw new AppError("SERVER_ERROR", "Không thể tìm nhân viên.");
     return (data ?? []).map((row) => {
       const department = (Array.isArray(row.departments) ? row.departments[0] : row.departments) as { name?: string } | null;

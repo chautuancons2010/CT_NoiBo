@@ -37,12 +37,12 @@ export interface LauncherApplication extends ApplicationDefinition {
 export const applicationRegistry: readonly ApplicationDefinition[] = [
   { id: "overview", label: "Dashboard", ...moduleIconRegistry.overview, baseRoute: "/dashboard", defaultRoute: "/dashboard", routePrefixes: ["/dashboard", "/home"], navigationGroups: ["Tổng quan"], requiredAny: applicationPermissionSets.overview, launcher: true },
   { id: "human-resources", label: "Nhân sự", ...moduleIconRegistry["human-resources"], baseRoute: "/employees", defaultRoute: "/employees", routePrefixes: ["/dashboard/hr", "/employees", "/attendance/today", "/attendance/logs", "/timesheets", "/shifts", "/leave/manage"], navigationGroups: ["Nhân sự", "Quản trị công"], moduleFlag: "human_resources", requiredAny: applicationPermissionSets["human-resources"], launcher: true },
-  { id: "attendance", label: "Cá nhân", ...moduleIconRegistry.attendance, baseRoute: "/attendance/me", defaultRoute: "/attendance/me", routePrefixes: ["/attendance", "/leave"], navigationGroups: ["Cá nhân"], moduleFlag: "attendance", requiredAny: applicationPermissionSets.attendance, launcher: true },
+  { id: "attendance", label: "Cá nhân", ...moduleIconRegistry.attendance, baseRoute: "/attendance/me", defaultRoute: "/attendance/me", routePrefixes: ["/personal", "/attendance", "/leave"], navigationGroups: ["Cá nhân"], moduleFlag: "attendance", requiredAny: applicationPermissionSets.attendance, launcher: true },
   { id: "projects", label: "Gói / Công trường", ...moduleIconRegistry.projects, baseRoute: "/projects", defaultRoute: "/projects", routePrefixes: ["/projects", "/project-monitoring", "/worker-attendance"], navigationGroups: ["Gói / Công trường"], moduleFlag: "projects", requiredAny: applicationPermissionSets.projects, launcher: true },
   { id: "warehouse", label: "Kho", ...moduleIconRegistry.warehouse, baseRoute: "/warehouse", defaultRoute: "/warehouse/inventory", routePrefixes: ["/dashboard/warehouse", "/warehouse", "/settings/warehouse"], navigationGroups: ["Kho", "Hệ thống"], moduleFlag: "warehouse", requiredAny: applicationPermissionSets.warehouse, launcher: true },
   { id: "import-export", label: "Xuất nhập khẩu", ...moduleIconRegistry["import-export"], baseRoute: "/import-export", defaultRoute: "/import-export/shipments", routePrefixes: ["/dashboard/import-export", "/import-export", "/settings/import-export"], navigationGroups: ["Xuất nhập khẩu", "Hệ thống"], moduleFlag: "import_export", requiredAny: applicationPermissionSets["import-export"], launcher: true },
   { id: "accounting", label: "Kế toán", ...moduleIconRegistry.accounting, baseRoute: "/accounting", defaultRoute: "/accounting/salaries", routePrefixes: ["/accounting"], navigationGroups: ["Kế toán"], requiredAny: applicationPermissionSets.accounting, launcher: true },
-  { id: "messaging", label: "Tin nhắn", ...moduleIconRegistry.messaging, baseRoute: "/messages", defaultRoute: "/messages", routePrefixes: ["/messages"], navigationGroups: ["Tin nhắn"], requiredAny: applicationPermissionSets.messaging, launcher: true },
+  { id: "messaging", label: "Tin nhắn", ...moduleIconRegistry.messaging, baseRoute: "/messages", defaultRoute: "/messages", routePrefixes: ["/messages"], navigationGroups: [], requiredAny: applicationPermissionSets.messaging, launcher: false },
   { id: "operations", label: "Đơn từ & Điều hành", ...moduleIconRegistry.operations, baseRoute: "/approvals", defaultRoute: "/approvals", routePrefixes: ["/dashboard/management", "/approvals", "/documents", "/reports", "/notifications", "/profile"], navigationGroups: ["Quản lý"], requiredAny: applicationPermissionSets.operations, launcher: true },
   { id: "system", label: "Quản trị", ...moduleIconRegistry.system, baseRoute: "/system-admin", defaultRoute: "/system-admin", routePrefixes: ["/system-admin", "/settings"], navigationGroups: ["Hệ thống"], requiredAny: applicationPermissionSets.system, launcher: true }
 ] as const;
@@ -127,6 +127,7 @@ export function contextualNavigationGroups(
     .filter((group) => group.items.length > 0);
   const items = overviewFirst(groups.flatMap((group) => group.items));
   if (application.id === "overview") return dashboardGroup;
+  if (application.id === "messaging") return dashboardGroup;
   if (application.id === "warehouse") {
     const sections = [
       { label: "VẬN HÀNH KHO", paths: ["/warehouse/inventory", "/warehouse/receipts", "/warehouse/issues", "/warehouse/transfers", "/warehouse/adjustments", "/warehouse/stock-counts", "/warehouse/ledger"] },

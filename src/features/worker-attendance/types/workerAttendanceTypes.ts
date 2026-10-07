@@ -65,6 +65,8 @@ export interface WorkerAttendanceSession {
   dayClosedAt?: string;
   capturedAtClient: string;
   geofenceStatus: "valid" | "outside" | "accuracy_low" | "unavailable" | "not_required";
+  latitude?: number;
+  longitude?: number;
   distanceMeters?: number;
   accuracyMeters?: number;
   workNote?: string;
@@ -89,6 +91,8 @@ export interface WorkerAttendanceTask {
   shiftCode: string;
   shiftName: string;
   expectedWorkers: number;
+  gpsRequired?: boolean;
+  allowedAccuracyThresholdMeters?: number;
   existingSessionId?: string;
   existingStatus?: WorkerSessionStatus;
   checklist: WorkerAttendanceChecklistItem[];

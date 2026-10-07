@@ -11,7 +11,11 @@ import type { ApprovalCase } from "@/features/shared-platforms/types";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 
 const domainLabels: Record<string, string> = { LEAVE: "Nghỉ phép", TIMESHEET_ADJUSTMENT: "Điều chỉnh công", WAREHOUSE: "Kho", IMPORT_EXPORT: "Xuất nhập khẩu" };
-const statusLabels: Record<string, string> = { pending: "Chờ duyệt", approved: "Đã duyệt", rejected: "Đã từ chối", cancelled: "Đã hủy" };
+const statusLabels: Record<string, string> = { pending: "Chờ duyệt", approved: "Đã duyệt", rejected: "Đã từ chối", cancelled: "Đã hủy", withdrawn: "Đã rút" };
+
+function hasValue(value?: string) {
+  return Boolean(value?.trim() && value.trim() !== "—");
+}
 
 function waitLabel(hours: number) {
   if (hours < 1) return "Mới gửi";
@@ -55,21 +59,20 @@ export function ApprovalCenter({ view }: { view: "pending" | "completed" | "dele
   return (
     <WorkbenchLayout className={selected ? "approval-queue" : "approval-queue workbench-layout--solo"}>
       <WorkCanvas className="approval-queue__canvas">
-        <div className="approval-queue__status"><span>{items.length} yêu cầu</span>{refreshing ? <span role="status">Đang cập nhật…</span> : <span>Dữ liệu đã xác nhận</span>}</div>
-        <div className="platform-table platform-table--approvals" role="table" aria-label="Yêu cầu phê duyệt">
-          <div className="platform-table__head" role="row"><span>Loại yêu cầu</span><span>Mã tham chiếu</span><span>Người gửi</span><span>Đơn vị</span><span>Nội dung</span><span>Bước hiện tại</span><span>Thời gian chờ</span></div>
-          {items.map((item) => <button className={`platform-table__row${selected?.id === item.id ? " is-selected" : ""}`} key={item.id} onClick={() => setSelected(item)} role="row" type="button">
-            <span data-label="Loại yêu cầu">{domainLabels[item.domainType] ?? item.domainType}</span>
-            <strong className="operational-code" data-label="Mã tham chiếu">{item.referenceNumber}</strong>
-            <span data-label="Người gửi">{item.requesterName}</span><span data-label="Đơn vị">{item.organizationName ?? "—"}</span><span data-label="Nội dung">{item.summary}</span>
-            <span data-label="Bước hiện tại">{item.currentStep ? `Bước ${item.currentStep}` : <StatusBadge tone={item.status === "approved" ? "success" : item.status === "rejected" ? "error" : "neutral"}>{statusLabels[item.status] ?? item.status}</StatusBadge>}</span>
-            <time dateTime={item.submittedAt} data-label="Thời gian chờ">{item.status === "pending" ? waitLabel(item.waitingHours) : new Intl.DateTimeFormat("vi-VN").format(new Date(item.completedAt ?? item.submittedAt))}</time>
+        <div className="approval-queue__status"><span>{items.length} yêu cầu</span>{refreshing ? <span role="status">Đang cập nhật…</span> : null}</div>
+        <div className="platform-table platform-table--approvals" role="group" aria-label="Yêu cầu phê duyệt">
+          <div className="platform-table__head" aria-hidden="true"><span>Loại yêu cầu</span><span>Nội dung</span><span>Trạng thái</span><span>{view === "pending" ? "Thời gian chờ" : "Ngày xử lý"}</span></div>
+          {items.map((item) => <button aria-pressed={selected?.id === item.id} className={`platform-table__row${selected?.id === item.id ? " is-selected" : ""}`} key={item.id} onClick={() => setSelected((current) => current?.id === item.id ? undefined : item)} type="button">
+            <span className="approval-queue__type" data-label="Loại yêu cầu">{domainLabels[item.domainType] ?? item.domainType}</span>
+            <span className="approval-queue__summary" data-label="Nội dung"><strong>{item.summary}</strong>{hasValue(item.requesterName) ? <small>{item.requesterName}</small> : null}</span>
+            <span className="approval-queue__state" data-label="Trạng thái"><StatusBadge tone={item.status === "approved" ? "success" : item.status === "rejected" ? "error" : item.status === "pending" ? "warning" : "neutral"}>{statusLabels[item.status] ?? item.status}</StatusBadge>{item.currentStep ? <small>Bước {item.currentStep}</small> : null}</span>
+            <time className="approval-queue__when" dateTime={item.status === "pending" ? item.submittedAt : item.completedAt ?? item.submittedAt} data-label={view === "pending" ? "Thời gian chờ" : "Ngày xử lý"}>{item.status === "pending" ? waitLabel(item.waitingHours) : new Intl.DateTimeFormat("vi-VN").format(new Date(item.completedAt ?? item.submittedAt))}</time>
           </button>)}
         </div>
       </WorkCanvas>
-      {selected ? <Inspector className="approval-queue__inspector" title="Ngữ cảnh quyết định">
-        <div className="approval-inspector-heading"><span>{domainLabels[selected.domainType] ?? selected.domainType}</span><strong className="operational-code">{selected.referenceNumber}</strong><StatusBadge tone={selected.status === "approved" ? "success" : selected.status === "rejected" ? "error" : "warning"}>{statusLabels[selected.status] ?? selected.status}</StatusBadge></div>
-        <dl className="approval-inspector-fields"><div><dt>Người gửi</dt><dd>{selected.requesterName}</dd></div><div><dt>Đơn vị</dt><dd>{selected.organizationName ?? "—"}</dd></div><div><dt>Nội dung</dt><dd>{selected.summary}</dd></div><div><dt>Thời gian chờ</dt><dd>{waitLabel(selected.waitingHours)}</dd></div><div><dt>Bước hiện tại</dt><dd>{selected.currentStep ?? "Đã hoàn tất"}</dd></div></dl>
+      {selected ? <Inspector className="approval-queue__inspector" title="Chi tiết yêu cầu">
+        <div className="approval-inspector-heading"><span>{domainLabels[selected.domainType] ?? selected.domainType}</span><strong>{selected.summary}</strong><StatusBadge tone={selected.status === "approved" ? "success" : selected.status === "rejected" ? "error" : "warning"}>{statusLabels[selected.status] ?? selected.status}</StatusBadge></div>
+        <dl className="approval-inspector-fields">{hasValue(selected.requesterName) ? <div><dt>Người gửi</dt><dd>{selected.requesterName}</dd></div> : null}{hasValue(selected.organizationName) ? <div><dt>Đơn vị</dt><dd>{selected.organizationName}</dd></div> : null}<div><dt>{selected.status === "pending" ? "Thời gian chờ" : "Ngày xử lý"}</dt><dd>{selected.status === "pending" ? waitLabel(selected.waitingHours) : new Intl.DateTimeFormat("vi-VN").format(new Date(selected.completedAt ?? selected.submittedAt))}</dd></div>{selected.currentStep ? <div><dt>Bước hiện tại</dt><dd>{selected.currentStep}</dd></div> : null}</dl>
         <div className="approval-inspector-actions"><Link className="button button--primary button--md" href={`/approvals/${selected.id}`}>Mở yêu cầu</Link><Button onClick={() => setSelected(undefined)}>Đóng</Button></div>
       </Inspector> : null}
     </WorkbenchLayout>

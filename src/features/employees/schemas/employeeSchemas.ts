@@ -72,12 +72,12 @@ const createEmployeeBaseSchema = z.object({
     ),
     departmentId: z.string().uuid("Phòng ban không hợp lệ."),
     positionId: z.string().uuid("Chức vụ không hợp lệ."),
-    employmentTypeId: z.string().uuid("Loại nhân sự không hợp lệ."),
+    employmentTypeId: z.string().uuid("Nhóm làm việc không hợp lệ."),
     managerEmployeeId: z.preprocess(
       (value) => (value === "" || value === null ? undefined : value),
       z.string().uuid("Quản lý trực tiếp không hợp lệ.").optional()
     ),
-    joinDate: dateText,
+    joinDate: optionalDateText,
     probationStartDate: optionalDateText,
     probationEndDate: optionalDateText,
     officialDate: optionalDateText,
@@ -99,7 +99,8 @@ const createEmployeeBaseSchema = z.object({
 
 export const createEmployeeSchema = createEmployeeBaseSchema
   .superRefine((value, context) => {
-    if (value.officialDate && value.officialDate < value.joinDate) {
+    const employmentStartDate = value.joinDate ?? value.probationStartDate ?? value.officialDate;
+    if (value.officialDate && employmentStartDate && value.officialDate < employmentStartDate) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["officialDate"],
@@ -137,10 +138,13 @@ export const patchEmployeeSchema = createEmployeeBaseSchema
 
 export const provisionAccountSchema = z.object({
   username: z.string().trim().toLowerCase().regex(usernamePattern, "Tên tài khoản không hợp lệ."),
-  password: z.string().regex(ACCOUNT_PASSWORD_PATTERN, ACCOUNT_PASSWORD_MESSAGE),
+  password: z.preprocess(
+    (value) => (value === "" || value === null ? undefined : value),
+    z.string().regex(ACCOUNT_PASSWORD_PATTERN, ACCOUNT_PASSWORD_MESSAGE).optional()
+  ),
   loginEmail: optionalEmail,
   loginPhone: optionalText,
-  roleIds: z.array(z.string().min(1)).min(1, "Cần chọn ít nhất một vai trò.")
+  roleIds: z.array(z.string().uuid("Vai trò không hợp lệ.")).min(1, "Cần chọn ít nhất một vai trò.")
 }).strict();
 
 export const accountStatusPatchSchema = z
@@ -159,7 +163,7 @@ export const accountStatusPatchSchema = z
   });
 
 export const accountRolesPatchSchema = z.object({
-  roleIds: z.array(z.string().min(1)).min(1, "Cần chọn ít nhất một vai trò.")
+  roleIds: z.array(z.string().uuid("Vai trò không hợp lệ.")).min(1, "Cần chọn ít nhất một vai trò.")
 });
 
 export const archiveEmployeeSchema = z.object({

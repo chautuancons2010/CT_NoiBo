@@ -45,7 +45,9 @@ import type {
   ProvisionAccountInput,
   SensitiveProfilePatchInput
 } from "@/features/employees/schemas/employeeSchemas";
-import { assertNoAdminLockout, getEffectivePermissions, resolveRoleNames, roleCatalog } from "@/services/authorization/rbacService";
+import { assertNoAdminLockout, getEffectivePermissions, resolveRoleNames, roleCatalog, type RoleDefinition } from "@/services/authorization/rbacService";
+import { normalizeEmployeeRoleIds, withEmployeeBaseline } from "@/services/authorization/employeeAccessPolicy";
+import { getBusinessDateKey } from "@/lib/time/timezone";
 
 export interface EmployeeDataSet {
   employees: EmployeeRecord[];
@@ -247,7 +249,8 @@ export function findEmployeeForAccount(
   return findEmployee(account.employeeId, dataSet);
 }
 
-export function toEmployeeAccountView(account: AppAccountRecord): EmployeeAccountView {
+export function toEmployeeAccountView(account: AppAccountRecord, roles: readonly RoleDefinition[] = roleCatalog): EmployeeAccountView {
+  const roleIds = normalizeEmployeeRoleIds(account.roleIds, roles);
   return {
     id: account.id,
     employeeId: account.employeeId ?? "",
@@ -257,8 +260,8 @@ export function toEmployeeAccountView(account: AppAccountRecord): EmployeeAccoun
     loginPhone: account.loginPhone,
     employeeCodeIdentifier: account.employeeCodeIdentifier ?? "",
     status: account.status,
-    roleIds: account.roleIds,
-    roleNames: resolveRoleNames(account.roleIds),
+    roleIds,
+    roleNames: resolveRoleNames(roleIds, roles),
     activatedAt: account.activatedAt,
     disabledAt: account.disabledAt,
     lastLoginAt: account.lastLoginAt
@@ -276,6 +279,7 @@ export function buildEmployeeSummary(
 
   return {
     id: employee.id,
+    avatarAssetId: employee.avatarAssetId,
     employeeCode: employee.employeeCode,
     fullName: employee.fullName,
     displayName: employee.displayName ?? employee.fullName,
@@ -566,7 +570,7 @@ function assertEmployeeReferences(input: CreateEmployeeInput | PatchEmployeeInpu
   }
 
   if (input.employmentTypeId && !findEmploymentType(input.employmentTypeId, dataSet)) {
-    throw new AppError("VALIDATION_ERROR", "Loại nhân sự không tồn tại.");
+    throw new AppError("VALIDATION_ERROR", "Nhóm làm việc không tồn tại.");
   }
 
   if (input.managerEmployeeId && !findEmployee(input.managerEmployeeId, dataSet)) {
@@ -669,7 +673,7 @@ export function createEmployeeRecord(
     employmentTypeId: input.employmentTypeId,
     managerEmployeeId: optionalTrim(input.managerEmployeeId),
     contractorName: optionalTrim(input.contractorName),
-    joinDate: input.joinDate,
+    joinDate: input.joinDate ?? input.probationStartDate ?? input.officialDate ?? getBusinessDateKey(now),
     probationStartDate: input.probationStartDate,
     probationEndDate: input.probationEndDate,
     officialDate: input.officialDate,
@@ -1209,15 +1213,18 @@ export function updateAccountRoles(
 }
 
 export function listAccounts(
-  dataSet: EmployeeDataSet = defaultEmployeeDataSet
+  dataSet: EmployeeDataSet = defaultEmployeeDataSet,
+  roles: readonly RoleDefinition[] = roleCatalog
 ): Array<EmployeeAccountView & { employeeName?: string; effectivePermissions: Permission[] }> {
   return dataSet.accounts.map((account) => {
     const employee = account.employeeId ? findEmployee(account.employeeId, dataSet) : undefined;
 
     return {
-      ...toEmployeeAccountView(account),
+      ...toEmployeeAccountView(account, roles),
       employeeName: employee?.fullName,
-      effectivePermissions: getEffectivePermissions(account.roleIds)
+      effectivePermissions: account.employeeId
+        ? withEmployeeBaseline(getEffectivePermissions(account.roleIds, roles))
+        : getEffectivePermissions(account.roleIds, roles)
     };
   });
 }

@@ -10,6 +10,7 @@ import { commandsForUser, type AppCommand } from "@/features/search/commandRegis
 import { recordRecentResult, SearchResultList } from "@/features/search/components/SearchResultList";
 import type { GlobalSearchResponse, RecentEntity, SearchResult } from "@/features/search/types";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
+import { acquireBodyScrollLock } from "@/lib/ui/bodyScrollLock";
 
 interface SearchBody { ok: boolean; data?: GlobalSearchResponse; }
 interface RecentBody { ok: boolean; data?: { items: RecentEntity[] }; }
@@ -60,15 +61,14 @@ export function CommandPalette({ user }: { user: AuthenticatedUser }) {
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScrollLock = acquireBodyScrollLock();
     window.requestAnimationFrame(() => inputRef.current?.focus());
     void fetch("/api/v1/recent-items", { cache: "no-store" })
       .then((response) => response.json() as Promise<RecentBody>)
       .then((body) => setRecent(body.data?.items ?? []))
       .catch(() => setRecent([]));
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScrollLock();
       previousFocus?.focus();
     };
   }, [open]);

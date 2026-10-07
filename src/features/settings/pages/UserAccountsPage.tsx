@@ -13,7 +13,7 @@ export async function UserAccountsPage() {
   const user = await getRequestUser();
   if (!user || !can(user.permissions, "user.view")) return <PermissionDeniedState />;
   const [dataSet, roles] = await Promise.all([getEmployeeDataSetAsync(), listPersistedRoles()]);
-  const accounts = listAccounts(dataSet);
+  const accounts = listAccounts(dataSet, roles);
   const accountEmployeeIds = new Set(dataSet.accounts.map((account) => account.employeeId).filter(Boolean));
   const employeesWithoutAccount = dataSet.employees
     .filter((employee) => employee.profileStatus !== "archived" && !accountEmployeeIds.has(employee.id))

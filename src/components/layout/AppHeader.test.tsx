@@ -5,7 +5,8 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 
 vi.mock("@/components/providers/SystemSettingsProvider", () => ({
-  useBranding: () => ({ systemName: "Hệ thống nội bộ Châu Tuấn" })
+  useBranding: () => ({ systemName: "Hệ thống nội bộ Châu Tuấn" }),
+  useOrganizationSettings: () => ({ shortName: "Châu Tuấn" })
 }));
 vi.mock("@/components/layout/AppLogo", () => ({
   AppLogo: () => <span aria-label="Châu Tuấn" />
@@ -26,11 +27,22 @@ vi.mock("@/components/shared/UserMenu", () => ({
 const user: AuthenticatedUser = { id: "account-1", displayName: "Nguyễn Thị Thúy Hằng", username: "thuyhang", email: "hang@example.com", status: "active", permissions: [] };
 
 describe("AppHeader", () => {
-  it("does not render the module or current route title", () => {
+  it("renders the current route title in the shared mobile leading area", () => {
     render(<AppHeader connectionState="connected" pathname="/dashboard" user={user} />);
-    expect(screen.queryByText("Tổng quan")).not.toBeInTheDocument();
+    expect(screen.getByText("Tổng quan")).toBeInTheDocument();
     expect(screen.queryByText("Đồng bộ tức thời")).not.toBeInTheDocument();
     expect(screen.getByText("Tìm kiếm")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+  });
+
+  it("keeps the module launcher on non-dashboard screens", () => {
+    render(<AppHeader connectionState="connected" pathname="/employees" user={user} />);
+    expect(screen.getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+  });
+
+  it("uses a local return target when a screen provides one", () => {
+    render(<AppHeader backHrefOverride="/projects" connectionState="connected" pathname="/worker-attendance/today" user={user} />);
+    expect(screen.getByRole("link", { name: "Quay lại" })).toHaveAttribute("href", "/projects");
   });
 
   it("only shows realtime state when the connection needs attention", () => {

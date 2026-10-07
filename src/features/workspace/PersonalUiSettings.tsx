@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/shared/FormControls";
 import { Pin, Save, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
@@ -80,7 +81,7 @@ export function PersonalUiSettings({ initialHasAvatar }: { initialHasAvatar: boo
       <div className="personal-ui-settings__avatar-actions"><Button disabled={!file || uploading} leftIcon={<Upload size={15} />} onClick={() => void uploadAvatar()} size="sm" variant="soft">Tải ảnh</Button>{hasAvatar ? <Button leftIcon={<Trash2 size={15} />} onClick={() => void removeAvatar()} size="sm" variant="ghost">Xóa ảnh</Button> : null}</div>
     </div>
     <form className="personal-ui-settings__form" onSubmit={savePreferences}>
-      <label>Mật độ<select className="select" onChange={(event) => setPreferences({ ...preferences, density: event.target.value as Preferences["density"] })} value={preferences.density}><option value="compact">Gọn</option><option value="default">Tiêu chuẩn</option><option value="comfortable">Thoải mái</option></select></label>
+      <Select label={"Mật độ"} className="select" onChange={(event) => setPreferences({ ...preferences, density: event.target.value as Preferences["density"] })} value={preferences.density} options={[{ label: "Gọn", value: "compact" }, { label: "Tiêu chuẩn", value: "default" }, { label: "Thoải mái", value: "comfortable" }]} />
       <label className="choice-field"><input checked={preferences.sidebarCollapsed} onChange={(event) => setPreferences({ ...preferences, sidebarCollapsed: event.target.checked })} type="checkbox" />Thu gọn sidebar mặc định</label>
       <fieldset><legend><Pin size={15} /> Module ghim</legend><div className="personal-ui-settings__modules">{modules.map((module) => <label key={module.id}><input checked={preferences.pinnedModules.includes(module.id)} onChange={() => togglePinned(module.id)} type="checkbox" />{module.label}</label>)}</div></fieldset>
       <fieldset><legend>Widget Dashboard</legend><div className="personal-ui-settings__modules">{dashboardWidgetRegistry.filter((widget) => widget.key !== "quick_actions").map((widget) => <label key={widget.key}><input checked={preferences.dashboardWidgetVisibility[widget.key] !== false} onChange={() => toggleWidget(widget.key)} type="checkbox" />{widget.label}</label>)}</div></fieldset>

@@ -1,2 +1,5 @@
-import type { ReactNode } from "react"; import { ProtectedAreaLayout } from "@/components/auth/ProtectedAreaLayout";
-export default function Layout({children}:{children:ReactNode}){return <ProtectedAreaLayout area="dashboard">{children}</ProtectedAreaLayout>;}
+import type { ReactNode } from "react";
+
+export default function Layout({ children }: { children: ReactNode }) {
+  return children;
+}

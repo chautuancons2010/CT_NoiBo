@@ -31,12 +31,32 @@ describe("attendance rules", () => {
     expect(result.distanceMeters).toBeLessThan(1);
   });
 
-  it("does not accept an inaccurate reading", () => {
+  it("marks an inaccurate reading for review", () => {
     expect(matchAttendanceLocation(
       { latitude: 10, longitude: 106, accuracy: 150, capturedAt: new Date().toISOString() },
       [],
       policy
     ).status).toBe("accuracy_low");
+  });
+
+  it("accepts GPS anywhere without enforcing the location radius", () => {
+    const result = matchAttendanceLocation(
+      { latitude: 21.0278, longitude: 105.8342, accuracy: 20, capturedAt: new Date().toISOString() },
+      [{ id: "office", name: "Văn phòng", latitude: 10.7769, longitude: 106.7009, radiusMeters: 10, active: true }],
+      policy
+    );
+    expect(result.status).toBe("valid");
+    expect(result.distanceMeters).toBeGreaterThan(1_000_000);
+  });
+
+  it("accepts real coordinates with no configured attendance locations", () => {
+    expect(matchAttendanceLocation({ latitude: 0, longitude: 0, accuracy: 12, capturedAt: new Date().toISOString() }, [], policy)).toEqual({ status: "valid" });
+  });
+
+  it("requires coordinates only when the GPS policy requires them", () => {
+    expect(matchAttendanceLocation(undefined, [], policy).status).toBe("unavailable");
+    expect(matchAttendanceLocation(undefined, [], { ...policy, gpsRequired: false }).status).toBe("not_required");
+    expect(matchAttendanceLocation({ latitude: 10, longitude: 106, accuracy: 20, capturedAt: new Date().toISOString() }, [], { ...policy, gpsRequired: false }).status).toBe("valid");
   });
 
   it("follows check-in then check-out state", () => {

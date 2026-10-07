@@ -56,7 +56,9 @@ export type NavigationIcon =
   | "ChartSpline"
   | "Cable"
   | "PackageCheck"
-  | "ShieldAlert";
+  | "ShieldAlert"
+  | "Grid2X2"
+  | "Camera";
 
 export interface NavigationItem {
   label: string;
@@ -66,6 +68,8 @@ export interface NavigationItem {
   alternativePermission?: Permission;
   alternativePermissions?: readonly Permission[];
   exact?: boolean;
+  mobilePriority?: number;
+  mobileLabel?: string;
 }
 
 export interface NavigationGroup {
@@ -82,6 +86,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/dashboard",
         icon: "LayoutDashboard",
         requiredPermission: "dashboard.view",
+        alternativePermissions: ["salary.view", "payroll.view", "payslip.self.view"],
         exact: true
       }
     ]
@@ -94,6 +99,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/employees",
         icon: "Users",
         requiredPermission: "employee.view",
+        mobilePriority: 1,
         exact: true
       },
       {
@@ -132,6 +138,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/attendance/me",
         icon: "Clock3",
         requiredPermission: "attendance.self",
+        mobilePriority: 1,
         alternativePermissions: ["attendance.self.view", "attendance.self.create"]
       },
       {
@@ -139,6 +146,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/attendance/history",
         icon: "CalendarRange",
         requiredPermission: "attendance.self.view",
+        mobilePriority: 2,
         alternativePermission: "attendance.self_history"
       },
       {
@@ -146,6 +154,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/leave",
         icon: "CalendarOff",
         requiredPermission: "leave.self.view",
+        mobilePriority: 3,
         alternativePermission: "leave.self.create"
       },
       {
@@ -153,6 +162,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/attendance/requests",
         icon: "Send",
         requiredPermission: "attendance.self",
+        mobilePriority: 4,
         alternativePermission: "attendance.self_request"
       },
       {
@@ -168,24 +178,26 @@ export const desktopNavigation: NavigationGroup[] = [
     label: "Quản trị công",
     items: [
       {
-        label: "Chấm công hôm nay",
+        label: "Kiểm tra công",
         href: "/attendance/today",
         icon: "Timer",
         requiredPermission: "attendance.view_all",
+        mobilePriority: 2,
         alternativePermission: "attendance.manage"
       },
       {
         label: "Bảng công",
         href: "/timesheets/matrix",
         icon: "TableProperties",
-        requiredPermission: "timesheet.view",
+        requiredPermission: "timesheet.view_all",
+        mobilePriority: 5,
         alternativePermissions: ["timesheet.view_team", "timesheet.view_all", "attendance.view_all", "attendance.period.manage"]
       },
       {
         label: "Kỳ công",
         href: "/timesheets",
         icon: "CalendarRange",
-        requiredPermission: "timesheet.view",
+        requiredPermission: "timesheet.view_all",
         alternativePermissions: ["timesheet.view_team", "timesheet.view_all", "attendance.view_all", "attendance.period.manage"],
         exact: true
       },
@@ -193,13 +205,15 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Ca làm",
         href: "/shifts",
         icon: "CalendarClock",
-        requiredPermission: "shift.view"
+        requiredPermission: "shift.view",
+        mobilePriority: 3
       },
       {
         label: "Quản lý nghỉ phép",
         href: "/leave/manage",
         icon: "CalendarCheck",
         requiredPermission: "leave.view_all",
+        mobilePriority: 4,
         exact: true
       },
       {
@@ -219,7 +233,24 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/projects",
         icon: "BriefcaseBusiness",
         requiredPermission: "project.view",
+        mobilePriority: 1,
         exact: true
+      },
+      {
+        label: "Theo dõi dự án",
+        href: "/project-monitoring",
+        icon: "ChartNoAxesCombined",
+        requiredPermission: "project_monitoring.view",
+        alternativePermissions: ["project_monitoring.view_all", "project_issue.view"],
+        mobilePriority: 2
+      },
+      {
+        label: "Điểm danh",
+        href: "/worker-attendance/today",
+        icon: "ClipboardCheck",
+        requiredPermission: "worker_attendance.view",
+        alternativePermissions: ["worker_attendance.self_scope", "worker_attendance.view_project", "worker_attendance.view_all"],
+        mobilePriority: 3
       },
     ]
   },
@@ -230,7 +261,8 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Tồn kho",
         href: "/warehouse/inventory",
         icon: "Boxes",
-        requiredPermission: "warehouse.view"
+        requiredPermission: "warehouse.view",
+        mobilePriority: 1
       },
       {
         label: "Hàng hóa",
@@ -242,19 +274,22 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Nhập kho",
         href: "/warehouse/receipts",
         icon: "PackagePlus",
-        requiredPermission: "warehouse.receipt.view"
+        requiredPermission: "warehouse.receipt.view",
+        mobilePriority: 2
       },
       {
         label: "Xuất kho",
         href: "/warehouse/issues",
         icon: "PackageMinus",
-        requiredPermission: "warehouse.issue.view"
+        requiredPermission: "warehouse.issue.view",
+        mobilePriority: 3
       },
       {
         label: "Chuyển kho",
         href: "/warehouse/transfers",
         icon: "Repeat",
-        requiredPermission: "warehouse.transfer.view"
+        requiredPermission: "warehouse.transfer.view",
+        mobilePriority: 4
       },
       {
         label: "Kho hàng",
@@ -289,13 +324,15 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Lô hàng",
         href: "/import-export/shipments",
         icon: "Ship",
-        requiredPermission: "shipment.view"
+        requiredPermission: "shipment.view",
+        mobilePriority: 1
       },
       {
         label: "Vận chuyển",
         href: "/import-export/transport",
         icon: "Truck",
-        requiredPermission: "shipment.view"
+        requiredPermission: "shipment.view",
+        mobilePriority: 2
       },
       {
         label: "Hợp đồng mua hàng",
@@ -307,7 +344,8 @@ export const desktopNavigation: NavigationGroup[] = [
         label: "Chứng từ",
         href: "/import-export/documents",
         icon: "FolderArchive",
-        requiredPermission: "shipment_document.view"
+        requiredPermission: "shipment_document.view",
+        mobilePriority: 3
       },
       {
         label: "Thông quan",
@@ -326,14 +364,9 @@ export const desktopNavigation: NavigationGroup[] = [
   {
     label: "Kế toán",
     items: [
-      { label: "Kỳ lương", href: "/accounting/payroll", icon: "Calculator", requiredPermission: "payroll.view", alternativePermission: "payroll.create" },
-      { label: "Hồ sơ lương", href: "/accounting/salaries", icon: "WalletCards", requiredPermission: "salary.view" }
-    ]
-  },
-  {
-    label: "Tin nhắn",
-    items: [
-      { label: "Hội thoại", href: "/messages", icon: "MessageCircle", requiredPermission: "chat.access" }
+      { label: "Kỳ lương", href: "/accounting/payroll", icon: "Calculator", requiredPermission: "payroll.view", alternativePermission: "payroll.create", mobilePriority: 1 },
+      { label: "Hồ sơ lương", href: "/accounting/salaries", icon: "WalletCards", requiredPermission: "salary.view", mobilePriority: 2 },
+      { label: "Phiếu lương", href: "/accounting/payslips", icon: "ReceiptText", requiredPermission: "payslip.self.view", mobilePriority: 3 }
     ]
   },
   {
@@ -422,6 +455,7 @@ export const mobileNavigation: NavigationItem[] = [
     href: "/dashboard",
     icon: "LayoutDashboard",
     requiredPermission: "dashboard.view",
+    alternativePermissions: ["salary.view", "payroll.view", "payslip.self.view"],
     exact: true
   },
   {
@@ -440,7 +474,8 @@ export const mobileNavigation: NavigationItem[] = [
     label: "Thông báo",
     href: "/notifications",
     icon: "Bell",
-    requiredPermission: "notification.view"
+    requiredPermission: "notification.view",
+    alternativePermission: "notification.self.view"
   },
   {
     label: "Cá nhân",

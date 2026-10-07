@@ -158,20 +158,29 @@ export async function updatePosition(user: AuthenticatedUser, id: string, input:
 
 export async function listAllEmployeeContracts(user: AuthenticatedUser) {
   if (!can(user.permissions, "contract.view")) throw new AppError("PERMISSION_DENIED");
-  const { data, error } = await db().from("employee_contracts")
-    .select("*,employees(employee_code,full_name,departments(name),positions(name))")
+  const client=db();
+  const { data, error } = await client.from("employee_contracts")
+    .select("*,employees!employee_contracts_employee_id_fkey(employee_code,full_name,departments!employees_department_id_fkey(name),positions(name))")
     .order("effective_date", { ascending: false, nullsFirst: false });
   if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách hợp đồng.");
   const canViewFile = can(user.permissions, "contract.file.view");
+  const fileIds=(data??[]).map(row=>optional(row.attachment_file_id)).filter((value):value is string=>Boolean(value));
+  const{data:assets,error:assetError}=canViewFile&&fileIds.length?await client.from("file_assets").select("id,mime_type,metadata").in("id",fileIds):{data:[],error:null};
+  if(assetError)throw new AppError("SERVER_ERROR","Không thể đọc file hợp đồng.");
+  const assetById=new Map((assets??[]).map(asset=>[String(asset.id),asset]));
   return (data ?? []).map((row) => {
     const employee = nested(row.employees) ?? {};
     const department = nested(employee.departments);
     const position = nested(employee.positions);
+    const attachmentFileId=canViewFile?optional(row.attachment_file_id):undefined;
+    const asset=attachmentFileId?assetById.get(attachmentFileId):undefined;
     return {
       id: String(row.id), employeeId: String(row.employee_id), employeeCode: String(employee.employee_code ?? ""), employeeName: String(employee.full_name ?? ""),
       departmentName: optional(department?.name), positionName: optional(position?.name), contractNumber: String(row.contract_number), contractType: String(row.contract_type),
       signedDate: optional(row.signed_date), effectiveDate: optional(row.effective_date) ?? String(row.start_date), endDate: optional(row.end_date), status: String(row.status),
-      archivedAt: optional(row.archived_at), attachmentFileId: canViewFile ? optional(row.attachment_file_id) : undefined
+      archivedAt: optional(row.archived_at), attachmentFileId,
+      attachmentFileName:typeof asset?.metadata?.originalName==="string"?asset.metadata.originalName:undefined,
+      attachmentMimeType:asset?.mime_type?String(asset.mime_type):undefined
     };
   });
 }

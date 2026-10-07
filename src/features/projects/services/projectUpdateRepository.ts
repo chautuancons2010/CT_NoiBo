@@ -174,7 +174,22 @@ export async function createProjectUpdate(user: AuthenticatedUser, projectId: st
   if (error || !data) {
     if (error?.code === "23505" && input.clientUpdateId) {
       const { data: existing } = await client.from("project_updates").select("id").eq("client_update_id", input.clientUpdateId).maybeSingle();
-      if (existing) return getProjectUpdate(user, String(existing.id));
+      if (existing) {
+        const existingId = String(existing.id);
+        if (input.issueFlag && input.issueSeverity) {
+          const { data: existingIssue, error: issueReadError } = await client.from("project_issues").select("id").eq("source_update_id", existingId).maybeSingle();
+          if (issueReadError) throw new AppError("SERVER_ERROR", "Không thể kiểm tra vấn đề đã đồng bộ.");
+          if (!existingIssue) {
+            const { data: issue, error: issueError } = await client.from("project_issues").insert({ project_id: projectId, worksite_id: input.worksiteId ?? null, source_update_id: existingId, title, severity: input.issueSeverity, owner_employee_id: input.issueOwnerEmployeeId ?? null }).select("id").single();
+            if (issueError && issueError.code !== "23505") throw new AppError("SERVER_ERROR", "Cập nhật đã lưu nhưng không thể tạo vấn đề.");
+            if (issue) await client.from("project_domain_events").insert([
+              { event_type: "project.issue.created", project_id: projectId, aggregate_id: issue.id, payload: { severity: input.issueSeverity, recoveredFromRetry: true } },
+              ...((input.issueSeverity === "high" || input.issueSeverity === "critical") ? [{ event_type: "project.issue.high", project_id: projectId, aggregate_id: issue.id, payload: { severity: input.issueSeverity, recoveredFromRetry: true } }] : [])
+            ]);
+          }
+        }
+        return getProjectUpdate(user, existingId);
+      }
     }
     throw new AppError("SERVER_ERROR", "Không thể lưu cập nhật dự án.");
   }
@@ -227,9 +242,14 @@ const allowedAttachments: Record<string, ProjectUpdateAttachment["attachmentType
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document"
 };
 
-export async function uploadProjectUpdateAttachment(user: AuthenticatedUser, updateId: string, file: File, caption?: string) {
+export async function uploadProjectUpdateAttachment(user: AuthenticatedUser, updateId: string, file: File, caption?: string, clientAttachmentId?: string) {
   if (!can(user.permissions, "project_update.create") && !can(user.permissions, "project_update.edit_all")) throw new AppError("PERMISSION_DENIED");
   const current = await getProjectUpdate(user, updateId);
+  if (clientAttachmentId) {
+    const { data: existing, error: existingError } = await db().from("project_update_attachments").select(attachmentSelect).eq("update_id", updateId).eq("client_attachment_id", clientAttachmentId).maybeSingle();
+    if (existingError) throw new AppError("SERVER_ERROR", "Không thể kiểm tra tệp đã tải.");
+    if (existing) return mapAttachment(existing as Row);
+  }
   if (current.publishStatus === "archived") throw new AppError("CONFLICT", "Cập nhật đã lưu trữ.");
   const attachmentType = allowedAttachments[file.type];
   if (!attachmentType) throw new AppError("VALIDATION_ERROR", "Tệp không đúng định dạng.");
@@ -240,9 +260,17 @@ export async function uploadProjectUpdateAttachment(user: AuthenticatedUser, upd
   const { error: uploadError } = await client.storage.from("project-update-files").upload(objectPath, bytes, { contentType: file.type, upsert: false });
   if (uploadError) throw new AppError("PHOTO_UPLOAD", "Không thể tải tệp lên. Nội dung cập nhật vẫn được giữ.");
   const { error: assetError } = await client.from("file_assets").insert({ id: assetId, bucket: "project-update-files", object_path: objectPath, owner_entity_type: "project_update", owner_entity_id: updateId, mime_type: file.type, byte_size: file.size, visibility: "private", created_by: identity.accountId ?? null, metadata: { originalName: file.name } });
-  if (assetError) throw new AppError("SERVER_ERROR", "Không thể lưu thông tin tệp.");
-  const { data, error } = await client.from("project_update_attachments").insert({ update_id: updateId, file_id: assetId, attachment_type: attachmentType, caption: caption?.trim() || null, uploaded_by: identity.accountId ?? null }).select(attachmentSelect).single();
-  if (error || !data) throw new AppError("SERVER_ERROR", "Không thể gắn tệp vào cập nhật.");
+  if (assetError) { await client.storage.from("project-update-files").remove([objectPath]); throw new AppError("SERVER_ERROR", "Không thể lưu thông tin tệp."); }
+  const { data, error } = await client.from("project_update_attachments").insert({ update_id: updateId, file_id: assetId, attachment_type: attachmentType, caption: caption?.trim() || null, uploaded_by: identity.accountId ?? null, client_attachment_id: clientAttachmentId ?? null }).select(attachmentSelect).single();
+  if (error || !data) {
+    await client.from("file_assets").delete().eq("id", assetId);
+    await client.storage.from("project-update-files").remove([objectPath]);
+    if (error?.code === "23505" && clientAttachmentId) {
+      const { data: existing } = await client.from("project_update_attachments").select(attachmentSelect).eq("update_id", updateId).eq("client_attachment_id", clientAttachmentId).maybeSingle();
+      if (existing) return mapAttachment(existing as Row);
+    }
+    throw new AppError("SERVER_ERROR", "Không thể gắn tệp vào cập nhật.");
+  }
   await recordAuditLog({ actorId: identity.accountId ?? user.id, action: "project.update.attachment_added", entityType: "project_update", entityId: updateId, metadata: { fileId: assetId, mimeType: file.type } });
   return mapAttachment(data as Row);
 }
@@ -313,7 +341,9 @@ export async function listProjectHealthHistory(user: AuthenticatedUser, projectI
 
 export async function getProjectMonitoring(user: AuthenticatedUser): Promise<ProjectMonitoringSummary> {
   if (!can(user.permissions, "project_monitoring.view") && !can(user.permissions, "project_monitoring.view_all")) throw new AppError("PERMISSION_DENIED");
-  const client = db(); const scope = await scopedProjectIds(client, user); const projects = (await listProjects(user)).filter((project) => project.status !== "closed" && (!scope || scope.includes(project.id)));
+  const client = db();
+  // listProjects already applies the user's project scope.
+  const projects = (await listProjects(user)).filter((project) => project.status !== "closed");
   const projectIds = projects.map((project) => project.id);
   if (!projectIds.length) return { active: 0, averageCompletion: 0, onTrack: 0, atRisk: 0, delayed: 0, paused: 0, projects: [], attention: [], recentUpdates: [] };
   const [{ data: updateRows, error: updateError }, issues, { data: progressRows, error: progressError }] = await Promise.all([

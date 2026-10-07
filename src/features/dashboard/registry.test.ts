@@ -13,11 +13,21 @@ describe("permission-driven dashboard registry", () => {
     expect(resolveDashboardProfile(user(["warehouse.view", "dashboard.view"]), defaultDashboardSettings)).toBe("warehouse");
     expect(resolveDashboardProfile(user(["payroll.view", "dashboard.view"]), defaultDashboardSettings)).toBe("accounting");
     expect(resolveDashboardProfile(user(["worker_attendance.create", "dashboard.view"]), defaultDashboardSettings)).toBe("supervisor");
+    expect(resolveDashboardProfile(user(["worker_attendance.create", "employee.view", "dashboard.view"]), defaultDashboardSettings)).toBe("supervisor");
+    expect(resolveDashboardProfile(user(["worker_attendance.create", "employee.view", "dashboard.view"]), {
+      ...defaultDashboardSettings,
+      presetOrder: ["hr", ...defaultDashboardSettings.presetOrder.filter((profile) => profile !== "hr")]
+    })).toBe("supervisor");
   });
 
   it("does not render enabled widgets when their permission is missing", () => {
     const widgets = enabledWidgetsFor(user(["dashboard.view"]), "employee", defaultDashboardSettings);
     expect(widgets.map((widget) => widget.key)).toEqual([]);
+  });
+
+  it("combines permitted business areas in one management dashboard", () => {
+    const widgets = enabledWidgetsFor(user(["project_monitoring.view_all", "attendance.view_all", "approval.view", "employee.view"]), "management", defaultDashboardSettings);
+    expect(widgets.map((widget) => widget.key)).toEqual(["attendance_overview", "my_approvals", "project_attention", "hr_summary"]);
   });
 
   it("falls back to an accessible landing page", () => {

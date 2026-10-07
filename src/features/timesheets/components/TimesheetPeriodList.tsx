@@ -21,10 +21,10 @@ const periodColumns: DataTableColumn<TimesheetPeriod>[] = [
   { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge tone={item.status === "locked" ? "success" : item.status === "reviewing" ? "warning" : "neutral"}>{statusLabel[item.status]}</StatusBadge> }
 ];
 
-export function TimesheetPeriodList({ canCreate = false }: { canCreate?: boolean }) {
-  const [items, setItems] = useState<TimesheetPeriod[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export function TimesheetPeriodList({ canCreate = false, initialItems, initialError }: { canCreate?: boolean; initialItems?: TimesheetPeriod[]; initialError?: string }) {
+  const [items, setItems] = useState<TimesheetPeriod[]>(initialItems ?? []);
+  const [loading, setLoading] = useState(initialItems === undefined && !initialError);
+  const [error, setError] = useState(initialError ?? "");
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
@@ -42,9 +42,10 @@ export function TimesheetPeriodList({ canCreate = false }: { canCreate?: boolean
   }, []);
 
   useEffect(() => {
+    if (initialItems !== undefined || initialError) return;
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [initialError, initialItems, load]);
   useDomainReconciliation("timesheets", load);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {

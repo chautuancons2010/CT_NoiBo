@@ -62,7 +62,6 @@ export async function generatePayslipPdf(input: PayslipPdfInput): Promise<Uint8A
     y -= 24;
   };
   field("Nhân viên", input.employeeName);
-  field("Mã nhân viên", input.employeeCode);
   if (template.showWorkDays) field("Ngày công", String(input.snapshot.workDays ?? 0));
   if (template.showBaseSalary) field("Lương cơ bản", `${number(input.snapshot.baseSalary)} VND`);
   if (template.showAllowance) field("Phụ cấp", `${number(input.snapshot.allowance)} VND`);

@@ -73,4 +73,35 @@ export async function getSettings(user:AuthenticatedUser):Promise<ImportExportSe
 export async function updateSettings(user:AuthenticatedUser,input:z.infer<typeof settingsSchema>){requireXnk(user,"settings.view");requireXnk(user,"module.manage");const client=db(),accountId=await actor(client,user),{error}=await client.from("import_export_settings").update({shipment_prefix:input.shipmentPrefix,contract_prefix:input.contractPrefix,over_receipt_tolerance_percent:input.overReceiptTolerancePercent,eta_delay_days:input.etaDelayDays,customs_attention_days:input.customsAttentionDays,arrival_not_received_days:input.arrivalNotReceivedDays,stale_shipment_days:input.staleShipmentDays,updated_by:accountId??null}).eq("singleton",true);if(error)throw new AppError("SERVER_ERROR");await recordAuditLog({actorId:accountId??user.id,action:"import_export.settings.updated",entityType:"system_settings",entityId:"import_export"});return getSettings(user);}
 export async function updateDocumentType(user:AuthenticatedUser,id:string,input:z.infer<typeof documentTypePatchSchema>){requireXnk(user,"module.manage");const client=db(),accountId=await actor(client,user),{data,error}=await client.from("shipment_document_types").update({name:input.name,required_for_import:input.requiredForImport,required_before_customs:input.requiredBeforeCustoms,expiry_date_applicable:input.expiryDateApplicable,active:input.active,sort_order:input.sortOrder}).eq("id",id).select("*").maybeSingle();if(error||!data)throw new AppError("NOT_FOUND");await recordAuditLog({actorId:accountId??user.id,action:"import_export.document_type.updated",entityType:"shipment_document_type",entityId:id});return data;}
 export async function getReferenceData(user:AuthenticatedUser){requireXnk(user,"import_export.view");const client=db(),[partners,contracts,items,uom,warehouses,documentTypes]=await Promise.all([can(user.permissions,"partner.view")?listPartners(user):Promise.resolve([]),can(user.permissions,"import_contract.view")?listContracts(user):Promise.resolve([]),client.from("inventory_items").select("id,item_code,name,specification,base_uom_id").eq("status","active").order("name"),client.from("units_of_measure").select("id,code,name").eq("active",true).order("name"),client.from("warehouses").select("id,code,name").eq("status","active").order("name"),client.from("shipment_document_types").select("*").eq("active",true).order("sort_order")]);if(items.error||uom.error||warehouses.error||documentTypes.error)throw new AppError("SERVER_ERROR","Không thể đọc dữ liệu tham chiếu xuất nhập khẩu.");return{partners,contracts,items:items.data??[],uom:uom.data??[],warehouses:warehouses.data??[],documentTypes:documentTypes.data??[],transportModes:["sea","air","road","rail","courier","other"],containerTypes:["20GP","40GP","40HQ","20OT","40OT","FR","OTHER"]};}
-export async function getDashboard(user:AuthenticatedUser):Promise<ImportExportDashboard>{const shipments=await listShipments(user,{limit:100}),settings=await getSettings(user),now=new Date(),soon=new Date(now.getTime()+30*86400000);const active=shipments.filter((x)=>!["completed","cancelled"].includes(x.status)),upcoming=active.filter((x)=>x.currentEta&&new Date(x.currentEta)>=now&&new Date(x.currentEta)<=soon).sort((a,b)=>String(a.currentEta).localeCompare(String(b.currentEta))).slice(0,10),needs=[] as ImportExportDashboard["needsAttention"];for(const base of active.slice(0,50)){const full=await getShipment(user,base.id),[receiving,checklist]=await Promise.all([getReceiving(user,base.id),listDocumentChecklist(user,base.id)]);const flags=attentionFlags({originalEta:full.originalEta,currentEta:full.currentEta,actualArrival:full.actualArrival,updatedAt:full.updatedAt,customsStatus:full.customs.status,customsDeclarationDate:full.customs.declarationDate,missingDocuments:checklist.filter((x)=>x.required&&x.state==="missing").map((x)=>x.name),received:receiving.receivedQuantity,expected:receiving.expectedQuantity,shortResolved:receiving.status==="short_closed",...settings});if(flags.length)needs.push({shipment:full,flags});}return{inTransit:active.filter((x)=>x.status==="in_transit").length,upcoming:upcoming.length,customsProcessing:active.filter((x)=>["customs_processing","arrived_port"].includes(x.status)).length,awaitingReceipt:active.filter((x)=>["customs_cleared","delivering_to_warehouse","partially_received"].includes(x.status)).length,attentionCount:needs.length,upcomingArrivals:upcoming,needsAttention:needs};}
+export async function getDashboard(user:AuthenticatedUser):Promise<ImportExportDashboard>{
+  const [shipments, settings] = await Promise.all([listShipments(user, { limit: 100 }), getSettings(user)]);
+  const now = new Date(), soon = new Date(now.getTime() + 30 * 86400000);
+  const active = shipments.filter((shipment) => !["completed", "cancelled"].includes(shipment.status));
+  const upcoming = active.filter((shipment) => shipment.currentEta && new Date(shipment.currentEta) >= now && new Date(shipment.currentEta) <= soon)
+    .sort((first, second) => String(first.currentEta).localeCompare(String(second.currentEta))).slice(0, 10);
+  const needs: ImportExportDashboard["needsAttention"] = [];
+  const candidates = active.slice(0, 50);
+  // Bound database concurrency while retaining the same shipment ordering.
+  for (let offset = 0; offset < candidates.length; offset += 4) {
+    const batch = await Promise.all(candidates.slice(offset, offset + 4).map(async (base) => {
+      const [full, receiving, checklist] = await Promise.all([
+        getShipment(user, base.id), getReceiving(user, base.id), listDocumentChecklist(user, base.id)
+      ]);
+      const flags = attentionFlags({
+        originalEta: full.originalEta, currentEta: full.currentEta, actualArrival: full.actualArrival,
+        updatedAt: full.updatedAt, customsStatus: full.customs.status, customsDeclarationDate: full.customs.declarationDate,
+        missingDocuments: checklist.filter((item) => item.required && item.state === "missing").map((item) => item.name),
+        received: receiving.receivedQuantity, expected: receiving.expectedQuantity, shortResolved: receiving.status === "short_closed", ...settings
+      });
+      return flags.length ? { shipment: full, flags } : undefined;
+    }));
+    for (const item of batch) if (item) needs.push(item);
+  }
+  return {
+    inTransit: active.filter((shipment) => shipment.status === "in_transit").length,
+    upcoming: upcoming.length,
+    customsProcessing: active.filter((shipment) => ["customs_processing", "arrived_port"].includes(shipment.status)).length,
+    awaitingReceipt: active.filter((shipment) => ["customs_cleared", "delivering_to_warehouse", "partially_received"].includes(shipment.status)).length,
+    attentionCount: needs.length, upcomingArrivals: upcoming, needsAttention: needs
+  };
+}

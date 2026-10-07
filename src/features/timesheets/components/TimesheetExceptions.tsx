@@ -47,7 +47,7 @@ export function TimesheetExceptions({ periodId }: { periodId?: string }) {
 
   const columns = useMemo<DataTableColumn<TimesheetException>[]>(() => [
     { id: "date", header: "Ngày", accessor: "workDate" },
-    { id: "employee", header: "Nhân viên", cell: (item) => <><strong>{item.employeeName}</strong><br /><small>{item.employeeCode}</small></> },
+    { id: "employee", header: "Nhân viên", cell: (item) => <strong>{item.employeeName}</strong> },
     { id: "type", header: "Loại", cell: (item) => labels[item.type] ?? item.type },
     { id: "severity", header: "Mức độ", cell: (item) => <StatusBadge tone={item.severity === "high" ? "error" : "warning"}>{item.severity === "high" ? "Cao" : "Cảnh báo"}</StatusBadge> },
     { id: "status", header: "Trạng thái", cell: (item) => item.status === "open" ? "Chưa xử lý" : item.status === "resolved" ? "Đã xử lý" : "Đã bỏ qua" }

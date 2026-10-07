@@ -11,7 +11,8 @@ import { FilterBar } from "@/components/shared/FilterBar";
 import { Input, SearchInput, Select } from "@/components/shared/FormControls";
 import { Drawer } from "@/components/shared/Overlays";
 import { DataSurface, ListPageLayout } from "@/components/shared/PageLayouts";
-import { formatBusinessDate, formatBusinessDateTime } from "@/lib/time/timezone";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { formatBusinessDate, formatBusinessDateTime, getBusinessDateKey } from "@/lib/time/timezone";
 import type { SalaryRecord } from "../types";
 
 type Person = { id: string; code: string; name: string };
@@ -58,7 +59,7 @@ export function SalaryConsole({ canEdit, canViewHistory }: { canEdit: boolean; c
   }
 
   const columns = useMemo<DataTableColumn<SalaryRecord>[]>(() => [
-    { id: "employee", header: "Nhân viên", cell: (item) => <><strong>{item.employeeName}</strong><br /><small>{item.employeeCode}</small></> },
+    { id: "employee", header: "Nhân viên", cell: (item) => <strong>{item.employeeName}</strong> },
     { id: "effective", header: "Hiệu lực", cell: (item) => formatBusinessDate(item.effectiveDate) },
     { id: "salary", header: "Lương cơ bản", cell: (item) => money(item.baseSalary) },
     { id: "allowance", header: "Phụ cấp", cell: (item) => money(item.allowance), hiddenOnMobile: true },
@@ -68,13 +69,13 @@ export function SalaryConsole({ canEdit, canViewHistory }: { canEdit: boolean; c
 
   return (
     <ListPageLayout className="salary-console">
+      <PageHeader action={canEdit ? <Button leftIcon={<Plus aria-hidden="true" size={18} />} onClick={() => setDrawerOpen(true)} variant="primary">Ghi nhận mức lương</Button> : undefined} title="Hồ sơ lương" />
       <DataSurface className="salary-console__surface">
         <div className="data-surface__toolbar panel-header salary-console__toolbar">
           <div className="salary-console__heading">
             <span aria-hidden="true" className="salary-console__icon"><Banknote size={21} /></span>
             <div><h2>Hồ sơ lương hiện tại</h2><span>{latest.length} hồ sơ</span></div>
           </div>
-          {canEdit ? <Button leftIcon={<Plus aria-hidden="true" size={18} />} onClick={() => setDrawerOpen(true)} size="lg" variant="primary">Ghi nhận mức lương</Button> : null}
         </div>
         <DataTable
           actions={canViewHistory ? (item) => <DropdownMenu label={`Thao tác lương ${item.employeeName}`}><button onClick={() => setHistoryEmployeeId(item.employeeId)} type="button">Lịch sử</button></DropdownMenu> : undefined}
@@ -96,7 +97,7 @@ export function SalaryConsole({ canEdit, canViewHistory }: { canEdit: boolean; c
           <Input defaultValue="0" label="Phụ cấp" min="0" name="allowance" required type="number" />
           <Input defaultValue="0" label="Thưởng" min="0" name="bonus" required type="number" />
           <Input defaultValue="0" label="Khấu trừ" min="0" name="deduction" required type="number" />
-          <Input defaultValue={new Date().toISOString().slice(0, 10)} label="Hiệu lực từ" name="effectiveDate" required type="date" />
+          <Input defaultValue={getBusinessDateKey()} label="Hiệu lực từ" name="effectiveDate" required type="date" />
           <Input label="Lý do" name="reason" required />
           <Input label="Ghi chú" name="note" />
           <div className="form-actions"><Button onClick={() => setDrawerOpen(false)} type="button">Hủy</Button><Button type="submit" variant="primary">Lưu mức lương</Button></div>
@@ -132,7 +133,7 @@ export function SalaryHistoryConsole() {
   }, [records]);
   const filtered = useMemo(() => (records ?? []).filter((row) => `${row.employeeCode} ${row.employeeName} ${row.reason}`.toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi"))), [records, search]);
   const columns: DataTableColumn<SalaryRecord>[] = [
-    { id: "employee", header: "Nhân viên", cell: (row) => <><strong>{row.employeeName}</strong><br /><small>{row.employeeCode}</small></> },
+    { id: "employee", header: "Nhân viên", cell: (row) => <strong>{row.employeeName}</strong> },
     { id: "effective", header: "Hiệu lực từ", cell: (row) => formatBusinessDate(row.effectiveDate) },
     { id: "base", header: "Lương cơ bản", cell: (row) => <>{previous.has(row.id) ? `${money(previous.get(row.id)!.baseSalary)} → ` : ""}{money(row.baseSalary)}</> },
     { id: "extras", header: "Phụ cấp / Thưởng / Khấu trừ", cell: (row) => `${money(row.allowance)} · ${money(row.bonus)} · ${money(row.deduction)}`, hiddenOnMobile: true },

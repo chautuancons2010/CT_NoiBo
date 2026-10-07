@@ -3,6 +3,9 @@ import { globSync } from "node:fs";
 
 const required = [
   "src/styles/tokens.css",
+  "src/styles/enterprise.css",
+  "src/components/shared/FloatingPanel.tsx",
+  "src/components/shared/SelectControl.tsx",
   "src/components/shared/Button.tsx",
   "src/components/shared/FormControls.tsx",
   "src/components/shared/DataTable.tsx",
@@ -17,6 +20,38 @@ const required = [
 
 for (const file of required) {
   if (!existsSync(file)) throw new Error(`Missing centralized UI building block: ${file}`);
+}
+
+const uiCoreContracts = [
+  ["src/components/shared/PageHeader.tsx", ["ResponsivePageHeader", "EntityContextHeader"]],
+  ["src/components/shared/Tabs.tsx", ["ContextTabs", "aria-current"]],
+  ["src/components/shared/ActionBars.tsx", ["FunctionToolbar", "export function ActionBar"]],
+  ["src/components/shared/DataTable.tsx", ["export function Worklist"]],
+  ["src/components/shared/FormLayout.tsx", ["export function FieldGroup"]],
+  ["src/components/shared/FilterBar.tsx", ["export function FilterSheet"]],
+  ["src/components/shared/Uploads.tsx", ["export function UploadPreview"]],
+  ["src/components/shared/States.tsx", ["export const NoPermission"]]
+];
+for (const [file, markers] of uiCoreContracts) {
+  const source = readFileSync(file, "utf8");
+  for (const marker of markers) {
+    if (!source.includes(marker)) throw new Error(`UI Core contract ${marker} missing from ${file}`);
+  }
+}
+
+const realConsumers = [
+  ["src/features/employees/pages/EmployeeListPage.tsx", "ResponsivePageHeader"],
+  ["src/features/employees/components/EmployeeListTable.tsx", "Worklist"],
+  ["src/features/projects/components/package-workspace/PackageContextHeader.tsx", "EntityContextHeader"],
+  ["src/features/projects/components/package-workspace/WorkspaceNav.tsx", "ContextTabs"]
+];
+for (const [file, marker] of realConsumers) {
+  if (!readFileSync(file, "utf8").includes(marker)) throw new Error(`UI Core contract ${marker} has no verified business consumer in ${file}`);
+}
+
+const mobileBottomNav = readFileSync("src/components/layout/MobileBottomNav.tsx", "utf8");
+if (!mobileBottomNav.includes("resolveMobileNavigation(pathname, user)") || !mobileBottomNav.includes("activeMobileDestination(pathname, model)")) {
+  throw new Error("Mobile navigation must use the shared route and permission resolver.");
 }
 
 const tokens = readFileSync("src/styles/tokens.css", "utf8");
@@ -43,8 +78,12 @@ const inlineStyleAllowlist = new Set([
   "src/components/shared/LoadingExperience.tsx",
   "src/features/accounting/components/AccountingOverview.tsx",
   "src/features/dashboard/components/DashboardView.tsx",
+  "src/features/dashboard/components/ModuleChart.tsx",
   "src/features/employees/pages/EmployeeDetailPage.tsx",
   "src/features/projects/components/ProjectProgressTree.tsx",
+  "src/features/projects/components/ProjectPeopleAttendanceWorkspace.tsx",
+  "src/features/projects/components/package-workspace/PackageAttendanceWorkspace.tsx",
+  "src/features/projects/components/package-workspace/PackageConstructionWorkspace.tsx",
   "src/features/projects/pages/ProjectMonitoringPage.tsx",
   "src/features/system-admin/pages/AppearancePage.tsx",
   "src/features/system-admin/pages/PayslipTemplatePage.tsx"
@@ -59,6 +98,8 @@ const manualPageHeaders = uiFiles
 if (manualPageHeaders.length) throw new Error(`Manual PageHeader duplicates: ${manualPageHeaders.map(({ file }) => file).join(", ")}`);
 
 const nativeTableAllowlist = new Set([
+  "src/features/dashboard/components/ModuleChart.tsx",
+  "src/features/projects/components/package-workspace/PackageAttendanceWorkspace.tsx",
   "src/features/timesheets/components/CalendarSettings.tsx",
   "src/features/timesheets/components/TimesheetMatrix.tsx",
   "src/features/warehouse/components/StockCountEditor.tsx"
@@ -75,6 +116,15 @@ const rawColorFiles = uiFiles
   .map(normalize)
   .filter((file) => file !== "src/features/system-admin/pages/AppearancePage.tsx");
 if (rawColorFiles.length) throw new Error(`Raw colors in feature JSX: ${rawColorFiles.join(", ")}`);
+
+const nativeFeatureSelects = uiFiles.filter((file) => file.endsWith(".tsx") && normalize(file).startsWith("src/features/") && /<select\b|<datalist\b/.test(readFileSync(file, "utf8")));
+if (nativeFeatureSelects.length) throw new Error(`Feature choices must use the shared Select/Combobox: ${nativeFeatureSelects.join(", ")}`);
+const shell = readFileSync("src/components/layout/AppShell.tsx", "utf8");
+if (/app-content--mobile-blocked|isMobilePersonalRoute/.test(shell)) throw new Error("Business screens must remain available on mobile within the same RBAC.");
+const header = readFileSync("src/components/layout/AppHeader.tsx", "utf8");
+if (header.includes("QuickCreateMenu")) throw new Error("Creation belongs in the owning page header.");
+const pageHeader = readFileSync("src/components/shared/PageHeader.tsx", "utf8");
+if (/<h1 className="sr-only"/.test(pageHeader)) throw new Error("PageHeader must render the actual visible main title.");
 
 console.log(`PASS centralized UI architecture · ${pageCount} pages · ${uiFiles.length} UI files`);
 console.log(`PASS PageHeader has no manual duplicates · ${nativeFeatureTables.length} specialized native tables allowlisted`);

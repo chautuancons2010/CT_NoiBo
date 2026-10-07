@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 
-import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { Worklist, type DataTableColumn } from "@/components/shared/DataTable";
+import { Avatar } from "@/components/shared/Avatar";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
 import { PermissionGate } from "@/components/shared/PermissionGate";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -18,22 +19,16 @@ function selectedEmployeeHref(baseHref: string, employeeId: string): string {
 function columnsFor(selectionBaseHref?: string): DataTableColumn<EmployeeSummary>[] {
   return [
   {
-    id: "employeeCode",
-    header: "Mã NV",
-    cell: (employee) => (
-      <Link className="table-link" href={selectionBaseHref ? selectedEmployeeHref(selectionBaseHref, employee.id) : `/employees/${employee.id}/profile`} title={employee.employeeCode}>
-        {employee.employeeCode}
-      </Link>
-    ),
-    sortable: true
-  },
-  {
     id: "fullName",
     header: "Họ tên",
+    priority: "primary",
     cell: (employee) => (
-      <span className="employee-name-cell">
-        <strong>{employee.fullName}</strong>
-        <small>{employee.companyEmail ?? employee.displayName}</small>
+      <span className="employee-name-with-avatar">
+        <Avatar imageUrl={employee.avatarAssetId ? `/api/v1/employees/${employee.id}/avatar` : undefined} loading="lazy" name={employee.fullName} />
+        <span className="employee-name-cell">
+          <Link className="table-link" href={selectionBaseHref ? selectedEmployeeHref(selectionBaseHref, employee.id) : `/employees/${employee.id}/profile`}><strong>{employee.fullName}</strong></Link>
+          <small title={employee.companyEmail ?? employee.displayName}>{employee.companyEmail ?? employee.displayName}</small>
+        </span>
       </span>
     )
   },
@@ -51,18 +46,20 @@ function columnsFor(selectionBaseHref?: string): DataTableColumn<EmployeeSummary
   },
   {
     id: "employmentTypeName",
-    header: "Loại",
+    header: "Nhóm",
     accessor: "employmentTypeName"
   },
   {
     id: "phone",
     header: "Số điện thoại",
+    width: "compact",
     accessor: "phone",
     hiddenOnMobile: true
   },
   {
     id: "employmentStatus",
     header: "Trạng thái",
+    width: "standard",
     cell: (employee) => (
       <StatusBadge tone={employee.employmentStatusTone}>{employee.employmentStatusLabel}</StatusBadge>
     )
@@ -78,11 +75,11 @@ export interface EmployeeListTableProps {
 
 export function EmployeeListTable({ employees, permissions, selectionBaseHref }: EmployeeListTableProps) {
   return (
-    <DataTable
+    <Worklist
       ariaLabel="Danh sách nhân viên"
       className="employee-table"
       actions={(employee) => (
-        <DropdownMenu label={`Thao tác ${employee.employeeCode}`}>
+        <DropdownMenu label={`Thao tác ${employee.fullName}`}>
           <Link href={`/employees/${employee.id}/profile`}>Xem hồ sơ</Link>
           <PermissionGate permissions={permissions} require="employee.edit">
             <Link href={`/employees/${employee.id}/edit`}>Chỉnh sửa</Link>

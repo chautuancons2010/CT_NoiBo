@@ -153,7 +153,10 @@ export interface EmployeeContract {
   endDate?: string;
   status: ContractStatus;
   attachmentFileId?: string;
-  fileVersions?: Array<{ fileId: string; fileName: string; uploadedAt: string }>;
+  attachmentFileName?: string;
+  attachmentMimeType?: string;
+  templateId?: string;
+  fileVersions?: Array<{ fileId: string; fileName: string; mimeType?: string; uploadedAt: string }>;
   note?: string;
   archivedAt?: string;
   rowVersion?: number;
@@ -204,6 +207,7 @@ export interface EmployeeAccountView {
 
 export interface EmployeeSummary {
   id: string;
+  avatarAssetId?: string;
   employeeCode: string;
   fullName: string;
   displayName: string;

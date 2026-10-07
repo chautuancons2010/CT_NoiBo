@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { PageHeader } from "@/components/shared/PageHeader";
-import { LeaveRequestList } from "@/features/leave";
+import { LeaveRequestList } from "@/features/leave/components/LeaveRequestList";
 
 const managementLinks = [
   { href: "/leave/manage/balances", label: "Số dư nhân viên" },

@@ -1,118 +1,26 @@
-# Châu Tuấn ERP — Master Design System
+﻿# Châu Tuấn ERP — Master Design System
 
-Generated from verified `ui-ux-pro-max` local datasets on 2026-09-19 and adapted to the existing construction ERP brand and Next.js implementation.
+Revised 2026-10-03 using the supplied dashboard references and the existing ERP. Detailed component ownership lives in [UI design system](../../docs/ui-design-system.md).
 
-## Product direction
+## Direction
 
-- Product: internal construction operations ERP.
-- Platform: responsive web, desktop-first with complete mobile operation.
-- Style: Minimalism / Swiss, data-first, high contrast, low visual noise.
-- Design dials: variance 4/10, motion 3/10, density 8/10.
-- Primary goal: let staff scan status, records and next actions quickly.
-- Excluded pattern: marketing hero / feature / CTA layouts are not applicable to authenticated ERP screens.
+Pearl enterprise workspace matching the supplied reference: gray with pink/peach/lilac haze, translucent cards with white edges, paired light/dark soft shadows, colored ring KPIs and floating header controls. Keep the configured Châu Tuấn identity. Maintain visible control boundaries and readable contrast.
 
-## Color system
+## System rules
 
-The verified enterprise result recommends trust blue. The verified real-estate result recommends trust teal plus professional blue, which better matches construction and the existing Châu Tuấn identity.
+- Semantic tokens in `src/styles/tokens.css` are the single source for color, spacing, type, radius, depth and shell geometry. Final shared skins live in `src/styles/enterprise.css`.
+- Use Inter at 400/500/600 and tabular figures. Page headings use 22–28px; text metrics remain smaller than numeric metrics.
+- Use pearl cards, white edges, shared reference shadows and consistent radii. Semantic badges retain readable text; charts use the reference orange/cyan/yellow/green/violet palette.
+- Desktop navigation opens at 232px with names beside icons and a visible `Thu gọn` control. It collapses to an 84px icon rail with tooltips and can expand again; preserve subsequent explicit layout choices and permission filtering. The transparent top bar is 56px high. Creation actions belong to the owning page header.
+- Show one visible main title per working page at every viewport. No repeated greeting, eyebrow or descriptive subtitle beneath functions, actions, permissions or navigation.
+- Lists occupy available width with filters, reset, sorting, pagination, selection and row menus. Standard tables use horizontal separators; mobile records preserve their primary identity.
+- Custom selects support keyboard navigation, long-list search, disabled/empty/required states and native form data. Portal menus remain in the viewport above table clipping.
+- Forms preserve workflow and field order. Show labels, inline errors and clear primary/secondary actions; use sticky actions where appropriate.
+- Dialogs trap and restore focus. Escape dismisses a nested dropdown before its parent. Phone dialogs retain safe areas and internal scrolling.
+- Mobile exposes all authorized modules; viewport width is not a permission boundary. Preserve personal home, camera workflows and module-aware bottom navigation.
+- Dashboard metrics, work queues and charts use real scoped data. Never invent series or KPIs to imitate reference images.
+- Motion respects reduced motion. Icon-only controls need accessible names; status needs visible text.
 
-| Role | Value | Usage |
-| --- | --- | --- |
-| Brand primary | `#0F766E` | Primary actions, focus relationship, brand states |
-| Brand secondary | `#14B8A6` | Supporting progress and positive highlights |
-| Data accent | `#2563EB` | Charts, data series, informational emphasis |
-| Professional blue | `#0369A1` | Links, selected data context, secondary information |
-| Attention | `#EA580C` | Pending/attention states, never as the only signal |
-| Canvas | `#F0FDFA` | Main workspace background |
-| Neutral canvas | `#F8FAFC` | Header gradient and nested workspace background |
-| Surface | `#FFFFFF` | Cards, tables, forms, overlays |
-| Foreground | `#0F172A` | Primary text |
-| Muted foreground | `#475569` | Secondary text |
-| Border | `#E2E8F0` | Standard separators and component boundaries |
-| Destructive | `#DC2626` | Destructive actions and error states |
+## Verification
 
-All component code uses semantic CSS variables. Feature pages must not introduce raw color values.
-
-## Typography
-
-- Family: Inter for headings, body and UI labels. This is the verified Minimal Swiss pairing for dashboards and enterprise design systems.
-- Weights: 400 body, 500 labels, 600 headings and actions.
-- Scale: 12 / 14 / 15 / 17 / 26px through shared tokens.
-- Numeric data uses tabular figures.
-- Normal text contrast remains at least 4.5:1.
-
-## Geometry and density
-
-- 4/8px spacing rhythm.
-- Controls: 44px standard height; compact controls remain at least 36px on desktop.
-- Cards: 12px radius; dashboard/panels: 16px; controls: 9px.
-- Table header: 44px; standard row: 52px; compact row: 48px.
-- Page padding: 32px desktop, 16px mobile.
-- Section gap: 24px standard, 20px compact/mobile.
-- Touch interactions remain at least 44px where mobile users operate them.
-
-## Application shell
-
-- Desktop: dark trust-teal sidebar, bright sticky top bar, light data canvas.
-- Mobile/tablet: compact top bar with a permission-aware `Ứng dụng của tôi` drawer; no global bottom navigation.
-- Module destinations use horizontally scrollable context tabs below the top bar when more than one permitted destination exists.
-- Sticky bottom areas are reserved for the current workflow CTA, never for global module navigation.
-- Active navigation combines label, weight, surface and leading indicator; color is not the only cue.
-- Search remains in the top bar. Destructive/session actions stay spatially separate from navigation.
-- Detail screens preserve route-based back navigation and breadcrumbs.
-
-## Components
-
-- Cards use white surfaces, visible borders and restrained depth.
-- KPI cards use a semantic leading border and a very soft gradient, never a full saturated fill.
-- Tables use clear headers, row separators, a subtle alternate row and blue selected state.
-- Forms keep visible labels, inline errors and focus rings. Placeholder text never replaces a label.
-- Primary actions use the configured brand color. Secondary actions use a white surface and visible border.
-- Status badges always contain text and a boundary; status is never represented by color alone.
-- Modal/drawer layers use the shared floating shadow and trap focus.
-
-### ERP form contract
-
-- Preserve the business field order and workflow defined by each module; standardization applies to field chrome and interaction states only.
-- Every control has a persistent label. Required fields use the shared required marker and the native `required` attribute.
-- Standard controls are 44px high. Textareas start at 112px and resize vertically.
-- Read-only values use a quiet neutral surface and remain selectable; disabled controls use lower emphasis and a not-allowed cursor.
-- Validation uses an error border, an inline message linked with `aria-describedby`, and `role="alert"`. Forms with multiple errors also show a focusable linked summary.
-- Numeric values use tabular figures and right alignment. Dates and times use semantic native input types.
-- Related checkbox, radio and switch controls use 44px interaction rows with explicit labels and disabled semantics.
-- Filter bars use the same input geometry, keep search first, and visually separate data actions from filter fields.
-- Long create/edit forms use the shared sticky action bar with secondary actions before one primary save/submit action.
-- Never use placeholder text as a label or use color as the only error/status indicator.
-
-## Data visualization
-
-- Trends over time use a line chart for four or more points.
-- Performance against target uses compact bullet/progress presentation for multiple KPIs.
-- A single target may use a gauge only when the target and threshold are explicit.
-- Charts keep visible labels/legend and a table or textual summary fallback.
-- Series use line style/labels in addition to hue. Red/yellow/green alone is prohibited.
-- More than six time-series lines must be split or progressively disclosed.
-
-## Motion
-
-- Motion is subtle and functional: 150–250ms for interaction state, small 1–2px movement.
-- Animate transform/opacity only; do not animate layout dimensions.
-- No decorative scroll reveal is required for ERP working screens.
-- `prefers-reduced-motion` disables non-essential transitions and loading motion.
-
-## Responsive and accessibility
-
-- Verify 375 / 768 / 1024 / 1440px and wide desktop up to 2560px.
-- Standard tables switch to mobile records or use a controlled horizontal scroll.
-- Keyboard focus remains visible and is not obscured by sticky UI.
-- Icon-only controls have accessible names; decorative icons are hidden from assistive technology.
-- Empty, loading and error states preserve layout and provide an actionable recovery path.
-- Zoom from 80% through 150% must not create horizontal page overflow.
-
-## Anti-patterns
-
-- No marketing hero blocks inside authenticated working screens.
-- No pastel wall of cards, glassmorphism, oversized radii or decorative blur.
-- No emoji as structural icons; use the existing Lucide SVG family.
-- No per-page hex colors, arbitrary shadows or independent spacing scales.
-- No hover-only operation, hidden form labels or status conveyed only by color.
-- No permanent loading spinner where a skeleton can preserve layout.
+Reference widths: 390, 768, 1366, 1440 and 1920px, plus 320/360/430px personal and camera checks. Require no page overflow, normal touch targets at least 44px, visible focus and stable loading/empty/error states. Preview routes return 404 in production. See the production review for measured coverage and outstanding UAT/deployment conditions.

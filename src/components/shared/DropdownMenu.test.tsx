@@ -6,16 +6,16 @@ import { DropdownMenu } from "@/components/shared/DropdownMenu";
 describe("DropdownMenu", () => {
   it("closes after clicking outside or pressing Escape", () => {
     render(<DropdownMenu label="Tác vụ"><a href="/test">Chi tiết</a></DropdownMenu>);
-    const summary = screen.getByLabelText("Tác vụ");
-    const details = summary.closest("details") as HTMLDetailsElement;
+    const summary = screen.getByRole("button", { name: "Tác vụ" });
 
     fireEvent.click(summary);
-    expect(details.open).toBe(true);
+    expect(screen.getByRole("menu", { name: "Tác vụ" })).toBeInTheDocument();
     fireEvent.pointerDown(document.body);
-    expect(details.open).toBe(false);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     fireEvent.click(summary);
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(details.open).toBe(false);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(summary).toHaveFocus();
   });
 });

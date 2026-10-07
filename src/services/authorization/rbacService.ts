@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import type { AccountStatus, Permission } from "@/lib/auth/permissions";
 import { allFoundationPermissions } from "@/lib/auth/permissions";
+import { employeeBaselinePermissions } from "@/services/authorization/employeeAccessPolicy";
 
 export type PermissionGroup =
   | "Nhân sự"
@@ -512,18 +513,7 @@ export const roleCatalog: RoleDefinition[] = [
     name: "Nhân viên",
     description: "Self-service cá nhân và các module cơ bản.",
     isSystem: true,
-    permissionKeys: [
-      "dashboard.view",
-      "profile.view",
-      "notification.view",
-      "attendance.view",
-      "attendance.self",
-      "payslip.self.view",
-      "timesheet.view",
-      "leave.view",
-      "chat.access",
-      "file.read"
-    ],
+    permissionKeys: [...employeeBaselinePermissions],
     userCount: 0
   },
   {
@@ -534,7 +524,6 @@ export const roleCatalog: RoleDefinition[] = [
     isSystem: true,
     permissionKeys: [
       "dashboard.view",
-      "employee.view",
       "worker_attendance.view",
       "project.view",
       "notification.view",
@@ -609,8 +598,8 @@ export function getRoleById(roleId: string): RoleDefinition | undefined {
   return roleCatalog.find((role) => role.id === roleId);
 }
 
-export function resolveRoleNames(roleIds: readonly string[]): string[] {
-  return roleIds.map((roleId) => getRoleById(roleId)?.name ?? "Vai trò không xác định");
+export function resolveRoleNames(roleIds: readonly string[], roles: readonly RoleDefinition[] = roleCatalog): string[] {
+  return roleIds.map((roleId) => roles.find((role) => role.id === roleId)?.name ?? `Vai trò ${roleId.slice(0, 8)}`);
 }
 
 export function getEffectivePermissions(

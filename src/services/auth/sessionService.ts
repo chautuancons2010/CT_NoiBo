@@ -10,6 +10,7 @@ import { normalizeUsername } from "@/lib/auth/username";
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
+import { withEmployeeBaseline } from "@/services/authorization/employeeAccessPolicy";
 
 export const ACCESS_COOKIE = "ct_access_token";
 export const REFRESH_COOKIE = "ct_refresh_token";
@@ -20,6 +21,19 @@ type CookieWriter = { set: (name: string, value: string, options: Record<string,
 
 const validStatuses = new Set<AccountStatus>(["pending_activation", "active", "disabled", "locked", "invited"]);
 const validPermissions = new Set<string>(allFoundationPermissions);
+const accountFields = "id,employee_id,username,display_name,primary_email,status,account_roles!account_roles_account_id_fkey(roles(role_permissions(permission_key)))";
+const pendingSessionResolutions = new Map<string, Promise<AuthenticatedUser | null>>();
+
+interface StoredAccount {
+  id: string;
+  auth_user_id?: string;
+  employee_id?: string | null;
+  username: string;
+  display_name: string;
+  primary_email?: string | null;
+  status: string;
+  account_roles?: Array<{ roles?: { role_permissions?: Array<{ permission_key?: string }> } | null }>;
+}
 
 export function isSessionInactive(lastSeenAt: string, now = Date.now()): boolean {
   const lastSeen = Date.parse(lastSeenAt);
@@ -66,7 +80,7 @@ export async function assertLoginAllowed(identifier: string, ip?: string | null)
   const keyHash = tokenHash(`${normalizeUsername(identifier)}:${ip || "unknown"}`);
   const { data, error } = await client.rpc("check_auth_login_allowed", { p_key_hash: keyHash });
   if (error) {
-    logger.error("auth.login_limit_check_failed", { metadata: { code: error.code } });
+    logger.error("auth.login_limit_check_failed", { metadata: { code: error.code, message: error.message.slice(0, 200) } });
     throw new AppError("SERVER_ERROR", "Không thể kiểm tra giới hạn đăng nhập.");
   }
   if (data === false) throw new AppError("RATE_LIMITED", "Quá nhiều lần đăng nhập không thành công. Vui lòng thử lại sau.");
@@ -138,12 +152,17 @@ async function resolveAccount(authUserId: string, fallbackEmail: string): Promis
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR", "Cơ sở dữ liệu chưa được cấu hình.");
   const { data: account, error } = await client.from("app_accounts")
-    .select("id,username,display_name,primary_email,status,account_roles!account_roles_account_id_fkey(roles(role_permissions(permission_key)))")
+    .select(accountFields)
     .eq("auth_user_id", authUserId).maybeSingle();
   if (error || !account) throw new AppError("ACCOUNT_NOT_PROVISIONED", "Tài khoản chưa được cấp quyền sử dụng hệ thống.");
 
-  const rawRoles = (account as unknown as { account_roles?: Array<{ roles?: { role_permissions?: Array<{ permission_key?: string }> } | null }> }).account_roles || [];
-  const permissions = [...new Set(rawRoles.flatMap(item => item.roles?.role_permissions || []).map(item => item.permission_key).filter((key): key is Permission => Boolean(key && validPermissions.has(key))))];
+  return mapAccount(account as unknown as StoredAccount, fallbackEmail);
+}
+
+function mapAccount(account: StoredAccount, fallbackEmail: string): AuthenticatedUser {
+  const rawRoles = account.account_roles || [];
+  const assignedPermissions = [...new Set(rawRoles.flatMap(item => item.roles?.role_permissions || []).map(item => item.permission_key).filter((key): key is Permission => Boolean(key && validPermissions.has(key))))];
+  const permissions = account.employee_id ? withEmployeeBaseline(assignedPermissions) : assignedPermissions;
   const status = String(account.status);
   return {
     id: String(account.id),
@@ -160,21 +179,52 @@ export async function resolveRequestUser(): Promise<AuthenticatedUser | null> {
   const accessToken = store.get(ACCESS_COOKIE)?.value;
   const sessionId = store.get(SESSION_COOKIE)?.value;
   if (!accessToken || !sessionId) return null;
+
+  // Parallel shell API requests can share a pending validation. Remove it as
+  // soon as it completes so subsequent requests recheck revocation and roles.
+  const key = createHash("sha256").update(accessToken).update(":").update(sessionId).digest("hex");
+  let resolution = pendingSessionResolutions.get(key);
+  if (!resolution) {
+    resolution = resolveSessionUser(accessToken, sessionId);
+    pendingSessionResolutions.set(key, resolution);
+    const pending = resolution;
+    void pending.finally(() => {
+      if (pendingSessionResolutions.get(key) === pending) pendingSessionResolutions.delete(key);
+    }).catch(() => undefined);
+  }
+  const user = await resolution;
+  return user ? { ...user, permissions: [...user.permissions] } : null;
+}
+
+async function resolveSessionUser(accessToken: string, sessionId: string): Promise<AuthenticatedUser | null> {
   try {
-    const { data, error } = await publicAuthClient().auth.getUser(accessToken);
-    if (error || !data.user) return null;
     const client = getSupabaseServiceClient();
     if (!client) return null;
-    const [account, { data: session, error: sessionError }] = await Promise.all([
-      resolveAccount(data.user.id, data.user.email || ""),
-      client.from("app_sessions").select("id,account_id,last_seen_at").eq("id", sessionId).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle()
+    const [{ data, error }, { data: session, error: sessionError }] = await Promise.all([
+      publicAuthClient().auth.getUser(accessToken),
+      client.from("app_sessions")
+        .select(`id,account_id,last_seen_at,account:app_accounts!app_sessions_account_id_fkey(auth_user_id,${accountFields})`)
+        .eq("id", sessionId).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle()
     ]);
-    if (account.status !== "active" || sessionError || !session || session.account_id !== account.id) return null;
+    if (error || !data.user) return null;
+    if (sessionError || !session) return null;
+    // Read the session and its account together, but still verify the account
+    // belongs to the user authenticated by Supabase before accepting its roles.
+    const storedAccount = (Array.isArray(session.account) ? session.account[0] : session.account) as unknown as StoredAccount | null;
+    if (!storedAccount || storedAccount.auth_user_id !== data.user.id) return null;
+    const account = mapAccount(storedAccount, data.user.email || "");
+    if (account.status !== "active" || session.account_id !== account.id) return null;
     if (isSessionInactive(String(session.last_seen_at))) {
       await client.from("app_sessions").update({ revoked_at: new Date().toISOString() }).eq("id", sessionId).is("revoked_at", null);
       return null;
     }
-    void client.from("app_sessions").update({ last_seen_at: new Date().toISOString() }).eq("id", sessionId);
+    // PostgREST queries are lazy thenables: consuming the query starts the
+    // activity write without making the page wait for another round trip.
+    void Promise.resolve(client.from("app_sessions").update({ last_seen_at: new Date().toISOString() }).eq("id", sessionId))
+      .then(({ error: updateError }) => {
+        if (updateError) logger.warn("auth.session_activity_update_failed", { metadata: { code: updateError.code } });
+      })
+      .catch(() => logger.warn("auth.session_activity_update_failed"));
     return account;
   } catch (error) {
     logger.warn("auth.session_resolution_failed", { metadata: { error: error instanceof Error ? error.name : "unknown" } });

@@ -61,6 +61,11 @@ export async function GET(
       const { data: owner } = await client.from("employee_contracts").select("id").eq("id", asset.owner_entity_id).maybeSingle();
       if (!owner) throw new AppError("NOT_FOUND", "Hợp đồng chứa file không tồn tại.");
     }
+    if (asset.owner_entity_type === "employee_contract_template") {
+      if (!can(user.permissions, "contract.file.view")) throw new AppError("PERMISSION_DENIED");
+      const { data: owner } = await client.from("employee_contract_templates").select("id").eq("id", asset.owner_entity_id).eq("active", true).maybeSingle();
+      if (!owner) throw new AppError("NOT_FOUND", "Mẫu hợp đồng không tồn tại.");
+    }
     if (contract && !can(user.permissions, "contract.file.view")) throw new AppError("PERMISSION_DENIED");
     if (asset.owner_entity_type === "insurance_event" && !can(user.permissions, "insurance.document.view")) {
       throw new AppError("PERMISSION_DENIED");

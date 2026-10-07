@@ -5,19 +5,21 @@ import { errorResponse } from "@/lib/api/errors";
 import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
-import { getPermissionGroups, permissionCatalog } from "@/services/authorization/rbacService";
+import { getPermissionGroups } from "@/services/authorization/rbacService";
 import { createPersistedRole, listPersistedPermissionKeys, listPersistedRoles } from "@/services/authorization/rolePersistenceService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
-import { recordAuditLog } from "@/services/audit/auditLog";
 
-const permissionKeySchema = z.custom<Permission>(
-  (value) => typeof value === "string" && permissionCatalog.some((permission) => permission.key === value),
-  "Quyền không hợp lệ."
-);
+const permissionKeySchema = z.string().trim().min(1).max(160).transform((value) => value as Permission);
+
+function roleCodeFromName(name: string) {
+  const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replaceAll("đ", "d").replaceAll("Đ", "d")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
+  return normalized.length >= 2 ? normalized : `vai_tro_${crypto.randomUUID().slice(0, 8)}`;
+}
 
 const roleCreateSchema = z.object({
-  code: z.string().trim().min(2).max(60),
+  code: z.string().trim().min(2).max(60).optional(),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).optional(),
   permissionKeys: z.array(permissionKeySchema).min(1)
@@ -46,15 +48,7 @@ export async function POST(request: Request) {
     const user = await getRequestUser();
     const authorizedUser = requirePermission(user, "role.manage");
     const input = parseWithSchema(roleCreateSchema, await request.json());
-    const role = await createPersistedRole(input);
-
-    await recordAuditLog({
-      actorId: authorizedUser.id,
-      action: "role.created",
-      entityType: "role",
-      entityId: role.id,
-      after: { code: role.code, name: role.name, permissionKeys: role.permissionKeys }
-    });
+    const role = await createPersistedRole({ ...input, code: input.code ?? roleCodeFromName(input.name) }, authorizedUser.id);
 
     return successResponse({ role }, { status: 201 });
   } catch (error) {

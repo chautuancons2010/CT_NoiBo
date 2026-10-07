@@ -9,18 +9,22 @@ export interface FormSectionProps {
   columns?: 1 | 2;
 }
 
-export function FormSection({ title, description, children, columns = 2 }: FormSectionProps) {
+export function FormSection({ title, children, columns = 2 }: FormSectionProps) {
   return (
     <section className="form-section">
       <div className="form-section__header">
         <h2>{title}</h2>
-        {description ? <p>{description}</p> : null}
       </div>
       <div className={cn("form-section__grid", columns === 1 && "form-section__grid--one")}>
         {children}
       </div>
     </section>
   );
+}
+
+/** Canonical field grouping name for new and migrated feature forms. */
+export function FieldGroup(props: FormSectionProps) {
+  return <FormSection {...props} />;
 }
 
 export function StickyActionBar({ children }: { children: ReactNode }) {

@@ -31,22 +31,29 @@ const scenarios = [
     username: "test.employee",
     profileLabel: "Nhân viên",
     route: "/attendance/me",
-    forbiddenApps: ["Kho", "Xuất nhập khẩu", "Kế toán", "Quản trị"]
+    // Nhân viên có payslip.self.view nên ứng dụng Kế toán hợp lệ và mở ở phiếu lương cá nhân.
+    forbiddenApps: ["Kho", "Xuất nhập khẩu", "Quản trị"]
   },
   {
     key: "accounting",
     username: "test.payroll",
     profileLabel: "Kế toán",
+    dashboardAccessible: false,
     route: "/accounting/payroll",
     forbiddenApps: ["Kho", "Xuất nhập khẩu", "Quản trị"]
   }
 ];
+const requestedScenario = process.argv[2] || process.env.UI_QA_ROLE;
+const activeScenarios = requestedScenario
+  ? scenarios.filter((scenario) => scenario.key === requestedScenario)
+  : scenarios;
+if (!activeScenarios.length) throw new Error(`Vai trò QA không hợp lệ: ${requestedScenario}`);
 
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: browserPath, headless: true });
 
 try {
-  for (const scenario of scenarios) {
+  for (const scenario of activeScenarios) {
     for (const viewport of viewports) {
       const context = await browser.newContext({ viewport, locale: "vi-VN" });
       const page = await context.newPage();
@@ -54,23 +61,31 @@ try {
       await page.locator('[name="username"]').fill(scenario.username);
       await page.locator('[name="password"]').fill(password);
       await Promise.all([
-        page.waitForURL(/\/dashboard(?:$|\?)/, { timeout: 20_000 }),
+        page.waitForURL((url) => url.pathname !== "/login", { timeout: 20_000 }),
         page.getByRole("button", { name: /Đăng nhập/i }).click()
       ]);
-
-      await page.locator(".dashboard-heading").waitFor({ state: "visible", timeout: 20_000 });
+      if (scenario.dashboardAccessible !== false && new URL(page.url()).pathname !== "/dashboard") {
+        await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
+      }
+      const shellSelector = scenario.dashboardAccessible === false ? ".app-header" : ".dashboard-heading";
+      await page.locator(shellSelector).waitFor({ state: "visible", timeout: 20_000 });
       const dashboardAudit = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
         content: document.documentElement.scrollWidth,
         bottomNavigation: document.querySelectorAll(".mobile-bottom-nav").length,
         loadingSpinner: document.querySelectorAll(".state-box__spinner").length,
-        profileText: document.querySelector(".dashboard-date-card")?.textContent ?? ""
+        profileText: document.querySelector(".dashboard-heading")?.textContent ?? ""
       }));
       if (dashboardAudit.content > dashboardAudit.viewport) throw new Error(`${scenario.key} dashboard tràn ngang tại ${viewport.width}px`);
       if (dashboardAudit.bottomNavigation) throw new Error(`${scenario.key} còn global bottom navigation`);
       if (dashboardAudit.loadingSpinner) throw new Error(`${scenario.key} còn spinner loading toàn trang`);
-      if (!dashboardAudit.profileText.includes(scenario.profileLabel)) throw new Error(`${scenario.key} sai dashboard context: ${dashboardAudit.profileText}`);
+      if (scenario.dashboardAccessible !== false && !dashboardAudit.profileText.includes(scenario.profileLabel)) throw new Error(`${scenario.key} sai dashboard context: ${dashboardAudit.profileText}`);
+      if (scenario.dashboardAccessible !== false && await page.getByRole("button", { name: "Mở Ứng dụng của tôi" }).count()) {
+        throw new Error(`${scenario.key} dashboard còn nút mở module trùng chức năng`);
+      }
 
+      await page.goto(`${baseUrl}${scenario.route}`, { waitUntil: "domcontentloaded" });
+      await page.locator(".app-header").waitFor({ state: "visible", timeout: 20_000 });
       const launcher = page.getByRole("button", { name: "Mở Ứng dụng của tôi" }).first();
       const launcherBox = await launcher.boundingBox();
       if (!launcherBox || launcherBox.width < 44 || launcherBox.height < 44) throw new Error(`${scenario.key} launcher dưới 44px tại ${viewport.width}px`);
@@ -82,17 +97,24 @@ try {
         if (appLabels.includes(forbidden)) throw new Error(`${scenario.key} thấy ứng dụng không có quyền: ${forbidden}`);
       }
       await drawer.getByRole("button", { name: "Đóng" }).click();
-
-      await page.goto(`${baseUrl}${scenario.route}`, { waitUntil: "networkidle" });
       const routeAudit = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
         content: document.documentElement.scrollWidth,
-        bottomNavigation: document.querySelectorAll(".mobile-bottom-nav").length
+        bottomNavigation: document.querySelectorAll(".mobile-bottom-nav").length,
+        contextNavigationRows: [...document.querySelectorAll(".mobile-context-nav, [aria-label='Không gian làm việc gói'], [aria-label='Thao tác hiện trường']")]
+          .filter((element) => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+          }).length
       }));
       if (routeAudit.content > routeAudit.viewport) throw new Error(`${scenario.key} ${scenario.route} tràn ngang tại ${viewport.width}px`);
       if (routeAudit.bottomNavigation) throw new Error(`${scenario.key} ${scenario.route} còn global bottom navigation`);
+      if (scenario.route.startsWith(`/projects/${projectId}/`) && routeAudit.contextNavigationRows !== 1) {
+        throw new Error(`${scenario.key} ${scenario.route} có ${routeAudit.contextNavigationRows} hàng điều hướng ngữ cảnh`);
+      }
 
-      const contextLinks = page.locator(".mobile-context-nav__item:visible, [aria-label='Không gian làm việc gói'] a:visible");
+      const contextLinks = page.locator(".mobile-context-nav__item:visible, .mobile-context-nav__more:visible, [aria-label='Không gian làm việc gói'] a:visible, [aria-label='Thao tác hiện trường'] :is(a, button):visible");
       const touchHeights = await contextLinks.evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
       if (touchHeights.some((height) => height < 44)) throw new Error(`${scenario.key} context tab dưới 44px: ${touchHeights.join(",")}`);
 

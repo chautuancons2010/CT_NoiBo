@@ -70,12 +70,14 @@ for (const { route } of pageSources) {
 }
 
 await Promise.all([
-  assertContract("src/features/dashboard/components/DashboardView.tsx", ["dashboard-command-bar", "dashboard-overview__grid", "dashboard-operations-grid", "<ModuleLauncher"]),
+  assertContract("src/features/dashboard/components/DashboardView.tsx", ["model?.widgets", "model?.attention", "styles.metrics", "styles.chartGrid", "<ModuleChart", "<ModuleLauncher"]),
   assertContract("src/features/employees/pages/EmployeeDetailPage.tsx", ["EmployeeAttendanceTab", "EmployeeProjectsTab", "<Tabs", "PermissionDeniedState", "EmptyState"]),
   assertContract("src/features/attendance/components/AttendanceCameraExperience.tsx", ["capturedOffline", "LoadingState", "ErrorState", "attendance-success-card"]),
-  assertContract("src/features/timesheets/components/TimesheetPeriodDetail.tsx", ["StatusBadge", "timesheet-period-bar", "disabled={busy}"]),
-  assertContract("src/features/leave/components/LeaveRequestDetail.tsx", ["LoadingState", "ErrorState", "approval-timeline", "router.refresh"]),
-  assertContract("src/features/projects/components/ProjectDetailView.tsx", ["StatusBadge", "project-", "healthHistory", "EmptyState"]),
+  assertContract("src/features/timesheets/components/TimesheetPeriodDetail.tsx", ["StatusBadge", "EntityContextHeader", "ContextTabs", "LoadingState", "ErrorState", "disabled={busy}"]),
+  assertContract("src/features/leave/components/LeaveRequestDetail.tsx", ["LoadingState", "ErrorState", "styles.timeline", "item.approvalSteps.map", "router.refresh"]),
+  assertContract("src/features/projects/components/package-workspace/PackageWorkspace.tsx", ["PackageConstructionWorkspace", "PackageAttendanceWorkspace", "PackageDocumentWorkspace", "PackageRecordWorkspace", "PermissionDeniedState"]),
+  assertContract("src/features/projects/components/package-workspace/PackageContextHeader.tsx", ["StatusBadge", "EntityContextHeader", "Select"]),
+  assertContract("src/features/projects/components/package-workspace/PackageRecordWorkspace.tsx", ["ProjectHealthControl", "healthDisplay", "Thông tin gói"]),
   assertContract("src/features/warehouse/components/InventoryDocumentEditor.tsx", ["warehouse-document-heading", "StatusBadge", "disabled={busy}"]),
   assertContract("src/features/warehouse/components/StockCountEditor.tsx", ["LoadingState", "ErrorState", "data-table-scroll", "disabled={busy}"]),
   assertContract("src/features/import-export/components/ImportExportViews.tsx", ["DataTable", "StatusBadge", "emptyTitle", "Tabs"]),

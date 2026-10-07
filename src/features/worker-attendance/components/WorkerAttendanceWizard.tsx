@@ -12,11 +12,12 @@ import { Checkbox, Input, Select, Textarea } from "@/components/shared/FormContr
 import { ImageUploader } from "@/components/shared/ImageUploader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { processAttendanceImage } from "@/features/attendance/client/imageProcessing";
+import { captureAttendanceLocation } from "@/features/attendance/client/locationCapture";
 import { WorkerSelector } from "@/features/employees/components/EmployeePicker";
 import type { EmployeePickerOption } from "@/features/employees/types";
 import { deleteWorkerDraft, getWorkerDraft, saveWorkerDraft, type LocalWorkerPhoto, type WorkerLocalDraft } from "@/features/worker-attendance/client/workerDraftStore";
 import { fetchWorkerSession, readWorkerResponse, syncWorkerDraft } from "@/features/worker-attendance/client/workerAttendanceSync";
-import { countWorkerAttendance } from "@/features/worker-attendance/services/workerAttendanceRules";
+import { countWorkerAttendance, hasWorkerCoordinates, workerLocationLabel } from "@/features/worker-attendance/services/workerAttendanceRules";
 import type { WorkerAttendanceEntry, WorkerAttendanceSession, WorkerEntryStatus } from "@/features/worker-attendance/types/workerAttendanceTypes";
 
 type WizardStep = "roster" | "photos" | "review";
@@ -49,6 +50,8 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
   const [photoFile, setPhotoFile] = useState<File>();
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +86,17 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
   }, [draft, router]);
 
   async function update(next: WorkerLocalDraft) { setDraft(next); await saveWorkerDraft(next); }
+
+  async function retryLocation() {
+    if (!draft) return;
+    setLocationBusy(true); setLocationError("");
+    try {
+      const coordinates = await captureAttendanceLocation(navigator.geolocation, window.isSecureContext);
+      const location = { latitude: coordinates.latitude, longitude: coordinates.longitude, accuracy: coordinates.accuracy };
+      await update({ ...draft, location, session: { ...draft.session, latitude: location.latitude, longitude: location.longitude, accuracyMeters: location.accuracy, geofenceStatus: "valid" }, updatedAt: new Date().toISOString() });
+    } catch (caught) { setLocationError(caught instanceof Error ? caught.message : "Chưa xác định được GPS."); }
+    finally { setLocationBusy(false); }
+  }
 
   function updateEntry(entryId: string, patch: Partial<WorkerAttendanceEntry>) {
     if (!draft) return;
@@ -143,6 +157,10 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
 
   async function submit() {
     if (!draft) return;
+    if (draft.session.geofenceStatus !== "not_required" && !hasWorkerCoordinates(draft.session)) {
+      setLocationError("Chưa có tọa độ GPS. Hãy thử lại vị trí.");
+      return;
+    }
     const pending = { ...draft, pendingSubmit: true, updatedAt: new Date().toISOString() };
     await update(pending); setBusy(true); setMessage("");
     try {
@@ -154,7 +172,7 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
     finally { setBusy(false); }
   }
 
-  const visibleEntries = useMemo(() => draft?.session.entries.filter((entry) => (!onlyUnprocessed || entry.status === "unconfirmed") && `${entry.employeeCode} ${entry.workerName}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi"))) ?? [], [draft, onlyUnprocessed, query]);
+  const visibleEntries = useMemo(() => draft?.session.entries.filter((entry) => (!onlyUnprocessed || entry.status === "unconfirmed") && `${entry.employeeCode} ${entry.workerName}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi"))).sort((first, second) => Number(first.status !== "unconfirmed") - Number(second.status !== "unconfirmed")) ?? [], [draft, onlyUnprocessed, query]);
   const counts = useMemo(() => countWorkerAttendance(draft?.session.entries ?? []), [draft]);
   const checklistGroups = useMemo(() => {
     const groups = new Map<string, WorkerAttendanceSession["checklist"]>();
@@ -172,8 +190,8 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
 
       {step === "roster" ? <>
         <Card className="worker-roster-card">
-          <div className="worker-roster-actions"><div className="search-input"><Search size={17} /><input aria-label="Tìm công nhân" className="input" onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã hoặc tên" value={query} /></div><Button aria-pressed={onlyUnprocessed} onClick={() => setOnlyUnprocessed((value) => !value)} size="sm" variant={onlyUnprocessed ? "soft" : "secondary"}>Chưa xử lý</Button><Button onClick={() => { if (!draft) return; void update({ ...draft, session: { ...draft.session, entries: draft.session.entries.map((entry) => entry.status === "leave" && entry.exceptionReason === "approved_leave" ? entry : { ...entry, status: "present", exceptionReason: undefined }) }, updatedAt: new Date().toISOString() }); }} size="sm" variant="primary">Có mặt tất cả</Button></div>
-          <div className="worker-roster-list">{visibleEntries.map((entry) => <article className="worker-roster-row" key={entry.id}><div><strong>{entry.workerName}</strong><span>{entry.employeeCode}{entry.isUnplanned ? " · Ngoài kế hoạch" : ""}</span></div><div className="worker-status-chips"><span className={entry.status === "present" ? "is-active" : ""}>Có mặt</span>{(["leave", "absent", "late"] as WorkerEntryStatus[]).map((value) => <button aria-pressed={entry.status === value} className={entry.status === value ? "is-active" : ""} key={value} onClick={() => updateEntry(entry.id, { status: value, exceptionReason: value === "absent" ? "unknown" : value === "leave" ? "approved_leave" : undefined })} type="button">{statuses.find((item) => item.value === value)?.label}</button>)}</div>{entry.status === "absent" || entry.status === "leave" || entry.status === "transferred" ? <select aria-label={`Lý do ${entry.workerName}`} className="select worker-row-reason" onChange={(event) => updateEntry(entry.id, { exceptionReason: event.target.value as WorkerAttendanceEntry["exceptionReason"] })} value={entry.exceptionReason ?? "unknown"}><option value="approved_leave">Có phép</option><option value="unapproved">Không phép</option><option value="unknown">Chưa rõ</option><option value="other_worksite">Công trường khác</option><option value="other">Khác</option></select> : null}</article>)}</div>
+          <div className="worker-roster-actions"><div className="search-input"><Search size={17} /><input aria-label="Tìm công nhân" className="input" onChange={(event) => setQuery(event.target.value)} placeholder="Tìm tên công nhân" value={query} /></div><Button aria-pressed={onlyUnprocessed} onClick={() => setOnlyUnprocessed((value) => !value)} size="sm" variant={onlyUnprocessed ? "soft" : "secondary"}>Chưa xử lý</Button><Button onClick={() => { if (!draft) return; void update({ ...draft, session: { ...draft.session, entries: draft.session.entries.map((entry) => entry.status === "leave" && entry.exceptionReason === "approved_leave" ? entry : { ...entry, status: "present", exceptionReason: undefined }) }, updatedAt: new Date().toISOString() }); }} size="sm" variant="primary">Có mặt tất cả</Button></div>
+          <div className="worker-roster-list">{visibleEntries.map((entry) => <article className="worker-roster-row" key={entry.id}><div><strong>{entry.workerName}</strong>{entry.isUnplanned ? <span>Ngoài kế hoạch</span> : null}</div><div className="worker-status-chips"><span className={entry.status === "present" ? "is-active" : ""}>Có mặt</span>{(["leave", "absent", "late"] as WorkerEntryStatus[]).map((value) => <button aria-pressed={entry.status === value} className={entry.status === value ? "is-active" : ""} key={value} onClick={() => updateEntry(entry.id, { status: value, exceptionReason: value === "absent" ? "unknown" : value === "leave" ? "approved_leave" : undefined })} type="button">{statuses.find((item) => item.value === value)?.label}</button>)}</div>{entry.status === "absent" || entry.status === "leave" || entry.status === "transferred" ? <Select label={`Lý do ${entry.workerName}`} labelHidden className="select worker-row-reason" onChange={(event) => updateEntry(entry.id, { exceptionReason: event.target.value as WorkerAttendanceEntry["exceptionReason"] })} value={entry.exceptionReason ?? "unknown"} options={[{ label: "Có phép", value: "approved_leave" }, { label: "Không phép", value: "unapproved" }, { label: "Chưa rõ", value: "unknown" }, { label: "Công trường khác", value: "other_worksite" }, { label: "Khác", value: "other" }]} /> : null}</article>)}</div>
           <Button leftIcon={<UserPlus size={16} />} onClick={() => setShowTemporary((value) => !value)} variant="ghost">Thêm công nhân</Button>
           {showTemporary ? <div className="worker-add-person"><section><h4>Đã có hồ sơ</h4><WorkerSelector label="Tìm công nhân" onSelect={(option) => setSelectedExistingId(option.id)} options={employeeOptions} selectedId={selectedExistingId} /><Select label="Lý do" onChange={(event) => setExistingReason(event.target.value)} options={[{ value: "mobilized", label: "Điều động" }, { value: "support", label: "Hỗ trợ" }, { value: "replacement", label: "Thay thế" }, { value: "other", label: "Khác" }]} value={existingReason} /><Button disabled={busy || !selectedExistingId} onClick={() => void addExisting()} variant="primary">Thêm vào danh sách</Button></section><section><h4>Chưa có hồ sơ</h4><form action={addTemporary} className="worker-temporary-form"><Input label="Họ tên" name="fullName" required /><Input label="Số điện thoại" name="phone" /><Input label="Nhà thầu" name="contractorName" /><Select label="Lý do" name="unplannedReason" options={[{ value: "mobilized", label: "Điều động" }, { value: "support", label: "Hỗ trợ" }, { value: "replacement", label: "Thay thế" }, { value: "other", label: "Khác" }]} required /><Button disabled={busy} type="submit" variant="primary">Tạo và thêm</Button></form></section></div> : null}
         </Card>
@@ -187,8 +205,8 @@ export function WorkerAttendanceWizard({ sessionId, step, employeeOptions = [] }
       </> : null}
 
       {step === "review" ? <>
-        <Card><div className="worker-review-grid"><span>Tổng<strong>{counts.total}</strong></span><span>Có mặt<strong>{counts.present}</strong></span><span>Đi trễ<strong>{counts.late}</strong></span><span>Vắng / nghỉ<strong>{counts.absent + counts.leave}</strong></span><span>Ảnh<strong>{draft.session.photos.length + draft.photos.length}</strong></span><span>Vị trí<strong>{draft.session.geofenceStatus === "valid" ? "Hợp lệ" : draft.session.geofenceStatus === "not_required" ? "Không yêu cầu" : "Chưa hợp lệ"}</strong></span></div>{checklistGroups.length ? <div className="worker-checklist">{checklistGroups.map(([group, items]) => <fieldset key={group}><legend>{group}</legend>{items.map((item) => <Checkbox checked={draft.session.checklistResponses.some((response) => response.itemId === item.id && response.checked)} key={item.id} label={`${item.content}${item.required ? " *" : ""}`} onChange={(event) => updateChecklist(item.id, event.target.checked)} />)}</fieldset>)}</div> : null}<Textarea label="Nội dung công việc" onChange={(event) => void update({ ...draft, session: { ...draft.session, workNote: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.workNote ?? ""} /><Textarea label="Ghi chú" onChange={(event) => void update({ ...draft, session: { ...draft.session, note: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.note ?? ""} /></Card>
-        <div className="sticky-action-bar"><Button disabled={busy} onClick={() => void submit()} size="lg" variant="primary">{busy ? "Đang gửi" : "Hoàn tất điểm danh"}</Button></div>
+        <Card><div className="worker-review-grid"><span>Tổng<strong>{counts.total}</strong></span><span>Có mặt<strong>{counts.present}</strong></span><span>Đi trễ<strong>{counts.late}</strong></span><span>Vắng / nghỉ<strong>{counts.absent + counts.leave}</strong></span><span>Ảnh<strong>{draft.session.photos.length + draft.photos.length}</strong></span><span>Vị trí<strong>{workerLocationLabel(draft.session)}</strong></span></div><div className="action-row"><Button disabled={locationBusy || busy} leftIcon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void retryLocation()}>{locationBusy ? "Đang lấy GPS" : "Thử lại GPS"}</Button></div>{locationError ? <div className="form-message form-message--error" role="alert">{locationError}</div> : null}{checklistGroups.length ? <div className="worker-checklist">{checklistGroups.map(([group, items]) => <fieldset key={group}><legend>{group}</legend>{items.map((item) => <Checkbox checked={draft.session.checklistResponses.some((response) => response.itemId === item.id && response.checked)} key={item.id} label={`${item.content}${item.required ? " *" : ""}`} onChange={(event) => updateChecklist(item.id, event.target.checked)} />)}</fieldset>)}</div> : null}<Textarea label="Nội dung công việc" onChange={(event) => void update({ ...draft, session: { ...draft.session, workNote: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.workNote ?? ""} /><Textarea label="Ghi chú" onChange={(event) => void update({ ...draft, session: { ...draft.session, note: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.note ?? ""} /></Card>
+        <div className="sticky-action-bar"><Button disabled={busy || locationBusy} onClick={() => void submit()} size="lg" variant="primary">{busy ? "Đang gửi" : "Hoàn tất điểm danh"}</Button></div>
       </> : null}
     </div>
   );

@@ -2,17 +2,18 @@ import { notFound, redirect } from "next/navigation";
 
 import { projectDetailSections } from "@/config/routeRegistry";
 import { PackageWorkspace } from "@/features/projects/components/package-workspace/PackageWorkspace";
-import { getProject, getProjectRoster, getProjectSchedule, listProjectProgress } from "@/features/projects/services/projectRepository";
+import { getProject, getProjectRoster, listProjectProgress } from "@/features/projects/services/projectRepository";
 import { listProjectUpdates } from "@/features/projects/services/projectUpdateRepository";
-import type { DailySchedule, ProjectProgressNode } from "@/features/projects/types/projectTypes";
+import type { ProjectUpdate } from "@/features/projects/types/projectTypes";
 import { listWorkerSessions } from "@/features/worker-attendance/services/workerAttendanceRepository";
 import { can } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
+import { getBusinessDateKey } from "@/lib/time/timezone";
 
 export async function ProjectDetailPage({ projectId, section }: { projectId: string; section: string }) {
   const legacySections: Record<string, string> = {
-    overview: "profile",
+    overview: "today",
     updates: "progress",
     schedule: "progress",
     "worker-attendance": "team",
@@ -24,48 +25,39 @@ export async function ProjectDetailPage({ projectId, section }: { projectId: str
   const user = requireAuthenticatedUser(await getRequestUser());
   const project = await getProject(projectId, user);
   const today = new Date();
-  const end = new Date(today);
-  end.setDate(today.getDate() + 6);
-  const todayKey = today.toISOString().slice(0, 10);
+  const todayKey = getBusinessDateKey(today);
   const monthStart = `${todayKey.slice(0, 7)}-01`;
-
-  let schedule: DailySchedule[] = [];
-  let progressNodes: ProjectProgressNode[] = [];
-  let progressLoadError: string | undefined;
-  let scheduleLoadError: string | undefined;
-  if (section === "progress") {
-    const [progressResult, scheduleResult] = await Promise.allSettled([
-      listProjectProgress(user, projectId),
-      getProjectSchedule(projectId, todayKey, end.toISOString().slice(0, 10), user),
-    ]);
-    if (progressResult.status === "fulfilled") progressNodes = progressResult.value;
-    else progressLoadError = "Không thể tải tiến độ thi công.";
-    if (scheduleResult.status === "fulfilled") schedule = scheduleResult.value;
-    else scheduleLoadError = "Không thể tải kế hoạch 7 ngày.";
-  }
-
   const canViewUpdates = can(user.permissions, "project_update.view_project") || can(user.permissions, "project_update.view_all");
-  const documentUpdates = canViewUpdates && (section === "documents" || section === "profile")
-    ? (await listProjectUpdates(user, projectId, { limit: 100 })).items
-    : [];
   const canViewAttendance = can(user.permissions, "worker_attendance.view")
     || can(user.permissions, "worker_attendance.view_all")
     || can(user.permissions, "worker_attendance.view_project");
-  const [todayRoster, attendanceSessions] = section === "team"
-    ? await Promise.all([
-      getProjectRoster(projectId, todayKey, undefined, user),
-      canViewAttendance
-        ? listWorkerSessions(user, { from: monthStart, to: todayKey, projectId }).catch(() => [])
-        : Promise.resolve([])
-    ])
-    : [[], []];
+  const [progressResult, updateResult, rosterResult, sessionResult] = await Promise.allSettled([
+    listProjectProgress(user, projectId),
+    canViewUpdates ? listProjectUpdates(user, projectId, { limit: 100 }) : Promise.resolve({ items: [] as ProjectUpdate[], nextCursor: undefined }),
+    getProjectRoster(projectId, todayKey, undefined, user),
+    canViewAttendance ? listWorkerSessions(user, { from: monthStart, to: todayKey, projectId }) : Promise.resolve([])
+  ]);
+  const progressNodes = progressResult.status === "fulfilled" ? progressResult.value : [];
+  const documentUpdates = updateResult.status === "fulfilled" ? updateResult.value.items : [];
+  const todayRoster = rosterResult.status === "fulfilled" ? rosterResult.value : [];
+  const attendanceSessions = sessionResult.status === "fulfilled" ? sessionResult.value : [];
+  const progressLoadError = progressResult.status === "rejected" ? "Không thể tải tiến độ thi công." : undefined;
+  const attendanceLoadError = rosterResult.status === "rejected"
+    ? "Không thể tải danh sách nhân sự công trường."
+    : canViewAttendance && sessionResult.status === "rejected"
+      ? sessionResult.reason instanceof Error && sessionResult.reason.message.includes("chưa liên kết hồ sơ nhân viên")
+        ? "Tài khoản cần được liên kết hồ sơ nhân viên để xem dữ liệu chấm công theo phạm vi được phân công."
+        : "Không thể tải dữ liệu chấm công."
+      : undefined;
 
   const editProgress = can(user.permissions, "project.edit") || can(user.permissions, "project.manage_schedule");
   return <PackageWorkspace
+    accountId={user.id}
+    attendanceLoadError={attendanceLoadError}
     attendanceSessions={attendanceSessions}
     permissions={{
       editProgress,
-      fieldUpdate: editProgress && can(user.permissions, "project_update.create"),
+      fieldUpdate: can(user.permissions, "project_update.create"),
       manageTeam: can(user.permissions, "project.manage_team"),
       manageWorksites: can(user.permissions, "worksite.manage"),
       openAttendance: can(user.permissions, "worker_attendance.create"),
@@ -80,8 +72,6 @@ export async function ProjectDetailPage({ projectId, section }: { projectId: str
     progressLoadError={progressLoadError}
     progressNodes={progressNodes}
     project={project}
-    schedule={schedule}
-    scheduleLoadError={scheduleLoadError}
     section={section}
     today={todayKey}
     todayRoster={todayRoster}

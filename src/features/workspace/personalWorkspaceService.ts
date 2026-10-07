@@ -82,8 +82,8 @@ export async function deletePersonalTodo(user: AuthenticatedUser, todoId: string
 }
 
 export async function getUiPreferences(user: AuthenticatedUser) {
-  const client = clientOrThrow(), identity = await resolvePlatformIdentity(client, user);
-  const { data, error } = await client.from("user_ui_preferences").select("*").eq("account_id", identity.accountId).maybeSingle();
+  const client = clientOrThrow();
+  const { data, error } = await client.from("user_ui_preferences").select("*").eq("account_id", user.id).maybeSingle();
   if (error) throw new AppError("SERVER_ERROR", "Không thể tải tùy chọn giao diện.");
   return {
     density: (data?.density ?? "default") as "compact" | "default" | "comfortable",
@@ -96,8 +96,8 @@ export async function getUiPreferences(user: AuthenticatedUser) {
 }
 
 export async function saveUiPreferences(user: AuthenticatedUser, input: z.infer<typeof uiPreferencesSchema>) {
-  const client = clientOrThrow(), identity = await resolvePlatformIdentity(client, user);
-  const { error } = await client.from("user_ui_preferences").upsert({ account_id: identity.accountId, density: input.density, sidebar_collapsed: input.sidebarCollapsed, pinned_modules: input.pinnedModules, dashboard_widget_visibility: input.dashboardWidgetVisibility, dashboard_widget_order: input.dashboardWidgetOrder, theme_preference: input.themePreference }, { onConflict: "account_id" });
+  const client = clientOrThrow();
+  const { error } = await client.from("user_ui_preferences").upsert({ account_id: user.id, density: input.density, sidebar_collapsed: input.sidebarCollapsed, pinned_modules: input.pinnedModules, dashboard_widget_visibility: input.dashboardWidgetVisibility, dashboard_widget_order: input.dashboardWidgetOrder, theme_preference: input.themePreference }, { onConflict: "account_id" });
   if (error) throw new AppError("SERVER_ERROR", "Không thể lưu tùy chọn giao diện.");
   return input;
 }

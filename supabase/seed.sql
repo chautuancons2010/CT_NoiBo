@@ -17,6 +17,7 @@ insert into public.app_accounts(id,employee_id,display_name,primary_email,status
 ('91000000-0000-4000-8000-000000000002','90000000-0000-4000-8000-000000000002','Trần Thu Nhân Viên','employee.test@chautuan.local','active','{"testData":true}'::jsonb,'test.employee')
 on conflict(id) do update set display_name=excluded.display_name,metadata=excluded.metadata,username=excluded.username;
 insert into public.account_roles(account_id,role_id) select '91000000-0000-4000-8000-000000000001',id from public.roles where code='supervisor' on conflict do nothing;
+insert into public.account_roles(account_id,role_id) select '91000000-0000-4000-8000-000000000001',id from public.roles where code='employee' on conflict do nothing;
 insert into public.account_roles(account_id,role_id) select '91000000-0000-4000-8000-000000000002',id from public.roles where code='employee' on conflict do nothing;
 
 insert into public.employee_contracts(id,employee_id,contract_number,contract_type,start_date,end_date,status,note,created_by,signed_date,effective_date) values
@@ -27,11 +28,43 @@ insert into public.project_assignments(id,project_id,worksite_id,employee_id,ass
 values('93000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000001','b1000000-0000-4000-8000-000000000001','90000000-0000-4000-8000-000000000001','supervisor_main',current_date-10,current_date+30,'DAY','Ca ngày','active','91000000-0000-4000-8000-000000000001')
 on conflict(id) do update set status='active',end_date=excluded.end_date;
 
+insert into public.project_assignments(id,project_id,worksite_id,employee_id,assignment_role,start_date,end_date,shift_code,shift_name,status,assigned_by)
+select ('93010000-0000-4000-8000-'||lpad(row_number() over(order by employee_code)::text,12,'0'))::uuid,
+  'b0000000-0000-4000-8000-000000000001','b1000000-0000-4000-8000-000000000001',employee.id,
+  'worker',current_date-10,current_date+30,'DAY','Ca ngày','active','91000000-0000-4000-8000-000000000001'
+from public.employees employee
+where lower(employee.employee_code) in ('cn018','cn019','cn020')
+  and not exists (select 1 from public.project_assignments assignment
+    where assignment.project_id='b0000000-0000-4000-8000-000000000001'
+      and assignment.worksite_id='b1000000-0000-4000-8000-000000000001'
+      and assignment.employee_id=employee.id and assignment.assignment_role='worker'
+      and assignment.status='active' and assignment.start_date<=current_date
+      and (assignment.end_date is null or assignment.end_date>=current_date))
+on conflict(id) do nothing;
+
 insert into public.attendance_events(id,client_event_id,employee_id,account_id,event_type,attendance_date,effective_at,captured_at_client,location_id,latitude,longitude,accuracy_meters,distance_meters,geofence_status,attendance_status,photo_status,sync_status,captured_offline,device_metadata)
 select v.id::uuid,v.client_id::uuid,'90000000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000002',v.event_type::public.attendance_event_type,current_date,(current_date+v.event_time::time)::timestamptz,(current_date+v.event_time::time)::timestamptz,l.id,l.latitude,l.longitude,12,8,'valid','recorded','uploaded','synced',false,'{"testData":true,"device":"seed"}'::jsonb
 from(values('94000000-0000-4000-8000-000000000001','94100000-0000-4000-8000-000000000001','check_in','07:56'),('94000000-0000-4000-8000-000000000002','94100000-0000-4000-8000-000000000002','check_out','17:08'))v(id,client_id,event_type,event_time)
 cross join lateral(select * from public.attendance_locations where active order by created_at limit 1)l
 on conflict(id) do update set effective_at=excluded.effective_at,attendance_date=excluded.attendance_date;
+
+-- Personal mobile calendar: recent working days for both demo accounts.
+insert into public.attendance_events(id,client_event_id,employee_id,account_id,event_type,attendance_date,effective_at,captured_at_client,location_id,latitude,longitude,accuracy_meters,distance_meters,geofence_status,attendance_status,photo_status,sync_status,captured_offline,device_metadata)
+select
+  ('94200000-0000-4000-8000-' || left(md5(person.employee_id || ':' || (current_date-day_offset)::text || ':' || event_number::text), 12))::uuid,
+  ('94300000-0000-4000-8000-' || left(md5(person.employee_id || ':' || (current_date-day_offset)::text || ':' || event_number::text), 12))::uuid,
+  person.employee_id::uuid,person.account_id::uuid,
+  case when event_number=0 then 'check_in' else 'check_out' end::public.attendance_event_type,
+  current_date-day_offset,
+  ((current_date-day_offset)::timestamp + case when event_number=0 then time '07:54' else time '17:06' end) at time zone 'Asia/Ho_Chi_Minh',
+  ((current_date-day_offset)::timestamp + case when event_number=0 then time '07:54' else time '17:06' end) at time zone 'Asia/Ho_Chi_Minh',
+  location.id,location.latitude,location.longitude,12,8,'valid','recorded','not_required','synced',false,'{"testData":true,"device":"seed-calendar"}'::jsonb
+from (values (1,'90000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001'),(2,'90000000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000002')) person(number,employee_id,account_id)
+cross join generate_series(1,24) as offsets(day_offset)
+cross join generate_series(0,1) as events(event_number)
+cross join lateral (select * from public.attendance_locations where active order by created_at limit 1) location
+where extract(isodow from current_date-day_offset)<=5 and not (day_offset=3 and event_number=1)
+on conflict(employee_id,attendance_date,event_type) do nothing;
 
 insert into public.worker_attendance_sessions(id,client_session_id,project_id,project_name_snapshot,worksite_id,worksite_name_snapshot,attendance_date,shift_code,shift_name_snapshot,supervisor_employee_id,supervisor_name_snapshot,captured_at_client,geofence_status,work_note,status,sync_status,photo_status,created_by,submitted_at)
 values('95000000-0000-4000-8000-000000000001','95100000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000001','Bảo trì hệ thống ray Cảng ABC','b1000000-0000-4000-8000-000000000001','Khu QC03',current_date,'DAY','Ca ngày','90000000-0000-4000-8000-000000000001','Nguyễn Minh Giám Sát',now(),'valid','[TEST DATA] Kiểm tra an toàn đầu ca','submitted','synced','uploaded','91000000-0000-4000-8000-000000000001',now())
@@ -72,18 +105,97 @@ values('98310000-0000-4000-8000-000000000001','98300000-0000-4000-8000-000000000
 insert into public.timesheet_period_summaries(id,period_id,employee_id,employee_snapshot,scheduled_workdays,actual_workdays,worked_minutes)
 values('98320000-0000-4000-8000-000000000001','98300000-0000-4000-8000-000000000001','90000000-0000-4000-8000-000000000002','{"code":"TEST-NV01","name":"Trần Thu Nhân Viên"}'::jsonb,22,21,10080)on conflict(id)do update set actual_workdays=excluded.actual_workdays;
 insert into public.payroll_periods(id,period_month,timesheet_period_id,status,calculated_at,calculated_by,created_by,note)
-values('98400000-0000-4000-8000-000000000001',(date_trunc('month',current_date)-interval'1 month')::date,'98300000-0000-4000-8000-000000000001','calculated',now(),'91000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','[TEST DATA] Sẵn sàng review')on conflict(id)do update set status='calculated',calculated_at=now();
+values('98400000-0000-4000-8000-000000000001',(date_trunc('month',current_date)-interval'1 month')::date,'98300000-0000-4000-8000-000000000001','published',now(),'91000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','[TEST DATA] Phiếu lương cá nhân')on conflict(id)do update set status='published',calculated_at=now();
 insert into public.payroll_lines(id,payroll_period_id,employee_id,work_days,base_salary,allowance,bonus,deduction,calculation_snapshot)
 values('98410000-0000-4000-8000-000000000001','98400000-0000-4000-8000-000000000001','90000000-0000-4000-8000-000000000002',21,18000000,1200000,500000,300000,'{"testData":true}'::jsonb)on conflict(id)do update set work_days=excluded.work_days,base_salary=excluded.base_salary;
+insert into public.payslips(id,payroll_line_id,employee_id,version,status,snapshot,published_at,published_by)
+select '98420000-0000-4000-8000-000000000001',line.id,line.employee_id,1,'published',jsonb_build_object('periodMonth',period.period_month)||to_jsonb(line),now()-interval '5 days','91000000-0000-4000-8000-000000000001'
+from public.payroll_lines line join public.payroll_periods period on period.id=line.payroll_period_id
+where line.id='98410000-0000-4000-8000-000000000001'
+on conflict(payroll_line_id,version) do update set snapshot=excluded.snapshot,status='published',published_at=excluded.published_at;
+
+-- More real month-to-month variation for the employee's private payslip list.
+insert into public.timesheet_periods(id,code,name,start_date,end_date,status,version,row_version,locked_at,locked_by,created_by)
+select ('98300000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  'TEST-TS-HISTORY-'||month_offset,
+  '[TEST DATA] Kỳ công '||to_char((date_trunc('month',current_date)-make_interval(months=>month_offset))::date,'MM/YYYY'),
+  (date_trunc('month',current_date)-make_interval(months=>month_offset))::date,
+  (date_trunc('month',current_date)-make_interval(months=>month_offset-1)-interval '1 day')::date,
+  'locked',1,1,now(),'91000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001'
+from generate_series(2,4) as months(month_offset)
+on conflict(id) do update set start_date=excluded.start_date,end_date=excluded.end_date,status='locked';
+insert into public.timesheet_period_summaries(id,period_id,employee_id,employee_snapshot,scheduled_workdays,actual_workdays,worked_minutes)
+select ('98320000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  ('98300000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  '90000000-0000-4000-8000-000000000002','{"code":"TEST-NV01","name":"Trần Thu Nhân Viên"}'::jsonb,
+  22,22-(month_offset%3),(22-(month_offset%3))*480
+from generate_series(2,4) as months(month_offset)
+on conflict(id) do update set actual_workdays=excluded.actual_workdays,worked_minutes=excluded.worked_minutes;
+insert into public.payroll_periods(id,period_month,timesheet_period_id,status,calculated_at,calculated_by,created_by,note)
+select ('98400000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  (date_trunc('month',current_date)-make_interval(months=>month_offset))::date,
+  ('98300000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  'published',now(),'91000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','[TEST DATA] Phiếu lương cá nhân'
+from generate_series(2,4) as months(month_offset)
+on conflict(id) do update set status='published',period_month=excluded.period_month;
+insert into public.payroll_lines(id,payroll_period_id,employee_id,work_days,base_salary,allowance,bonus,deduction,calculation_snapshot)
+select ('98410000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  ('98400000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  '90000000-0000-4000-8000-000000000002',22-(month_offset%3),18000000-month_offset*150000,1200000,month_offset*100000,300000,'{"testData":true}'::jsonb
+from generate_series(2,4) as months(month_offset)
+on conflict(id) do update set work_days=excluded.work_days,base_salary=excluded.base_salary,bonus=excluded.bonus;
+insert into public.payslips(id,payroll_line_id,employee_id,version,status,snapshot,published_at,published_by)
+select ('98420000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  line.id,line.employee_id,1,'published',jsonb_build_object('periodMonth',period.period_month)||to_jsonb(line),
+  period.period_month+interval '1 month 5 days','91000000-0000-4000-8000-000000000001'
+from generate_series(2,4) as months(month_offset)
+join public.payroll_lines line on line.id=('98410000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid
+join public.payroll_periods period on period.id=line.payroll_period_id
+on conflict(payroll_line_id,version) do update set snapshot=excluded.snapshot,status='published',published_at=excluded.published_at;
+
+-- The supervisor also has an employee self-service payslip, separate from worker roster attendance.
+insert into public.timesheet_period_summaries(id,period_id,employee_id,employee_snapshot,scheduled_workdays,actual_workdays,worked_minutes)
+select ('98330000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  ('98300000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  '90000000-0000-4000-8000-000000000001','{"code":"TEST-GS01","name":"Nguyễn Minh Giám Sát"}'::jsonb,22,22,10560
+from generate_series(1,4) as months(month_offset)
+on conflict(id) do nothing;
+insert into public.payroll_lines(id,payroll_period_id,employee_id,work_days,base_salary,allowance,bonus,deduction,calculation_snapshot)
+select ('98430000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  ('98400000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  '90000000-0000-4000-8000-000000000001',22,22000000-(month_offset-1)*200000,2000000,750000,400000,'{"testData":true}'::jsonb
+from generate_series(1,4) as months(month_offset)
+on conflict(id) do nothing;
+insert into public.payslips(id,payroll_line_id,employee_id,version,status,snapshot,published_at,published_by)
+select ('98440000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid,
+  line.id,line.employee_id,1,'published',jsonb_build_object('periodMonth',period.period_month)||to_jsonb(line),
+  period.period_month+interval '1 month 5 days','91000000-0000-4000-8000-000000000001'
+from generate_series(1,4) as months(month_offset)
+join public.payroll_lines line on line.id=('98430000-0000-4000-8000-'||lpad(month_offset::text,12,'0'))::uuid
+join public.payroll_periods period on period.id=line.payroll_period_id
+on conflict(payroll_line_id,version) do nothing;
 
 insert into public.notifications(id,recipient_account_id,event_key,type,title,message,entity_type,entity_id,deep_link,priority,delivery_key)values
 ('98500000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','test.leave.pending','approval','Đơn nghỉ phép chờ duyệt','TEST-NV01 xin nghỉ một ngày.','leave_request','96000000-0000-4000-8000-000000000001','/leave/requests','important','test:leave:pending:1'),
 ('98500000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000001','test.customs.issue','warning','Lô hàng cần xử lý','TEST-SHP-2026-001 thiếu chứng từ.','shipment','98200000-0000-4000-8000-000000000001','/import-export/shipments/98200000-0000-4000-8000-000000000001','critical','test:customs:issue:1')on conflict(id)do update set read_at=null,message=excluded.message;
-insert into public.conversations(id,type,title,created_by)values('98600000-0000-4000-8000-000000000001','group','[TEST] Điều phối QC03','91000000-0000-4000-8000-000000000001')on conflict(id)do update set title=excluded.title;
-insert into public.conversation_members(conversation_id,account_id,role)values('98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','owner'),('98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000002','member')on conflict do nothing;
+insert into public.conversations(id,type,title,direct_key,created_by)values
+('98600000-0000-4000-8000-000000000001','group','[TEST] Điều phối QC03',null,'91000000-0000-4000-8000-000000000001'),
+('98600000-0000-4000-8000-000000000002','direct',null,'91000000-0000-4000-8000-000000000001:91000000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000002')
+on conflict(id)do update set title=excluded.title,direct_key=excluded.direct_key;
+insert into public.conversation_members(conversation_id,account_id,role)values
+('98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','owner'),
+('98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000002','member'),
+('98600000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000002','owner'),
+('98600000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000001','member')
+on conflict do nothing;
 insert into public.messages(id,conversation_id,sender_account_id,body,created_at,metadata)values
 ('98610000-0000-4000-8000-000000000001','98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','[TEST DATA] Đã cập nhật danh sách đầu ca.',now()-interval'10 minutes','{"deliveryState":"sent"}'::jsonb),
-('98610000-0000-4000-8000-000000000002','98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000002','[TEST DATA] Đã nhận thông tin.',now()-interval'5 minutes','{"deliveryState":"sent"}'::jsonb)on conflict(id)do update set body=excluded.body;
+('98610000-0000-4000-8000-000000000002','98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000002','[TEST DATA] Đã nhận thông tin.',now()-interval'5 minutes','{"deliveryState":"sent"}'::jsonb),
+('98610000-0000-4000-8000-000000000003','98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','[TEST DATA] Ca sáng đã xác nhận đủ người.',now()-interval'3 days','{"deliveryState":"sent"}'::jsonb),
+('98610000-0000-4000-8000-000000000004','98600000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000002','[TEST DATA] Em sẽ theo dõi lịch công.',now()-interval'2 days','{"deliveryState":"sent"}'::jsonb),
+('98610000-0000-4000-8000-000000000005','98600000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000002','[TEST DATA] Anh kiểm tra giúp em lượt chấm ra hôm trước nhé.',now()-interval'1 day','{"deliveryState":"sent"}'::jsonb),
+('98610000-0000-4000-8000-000000000006','98600000-0000-4000-8000-000000000002','91000000-0000-4000-8000-000000000001','[TEST DATA] Anh đã nhận, sẽ đối chiếu trong lịch công.',now()-interval'20 hours','{"deliveryState":"sent"}'::jsonb)
+on conflict(id)do update set body=excluded.body;
 
 insert into public.user_dashboard_notes(account_id,content)values('91000000-0000-4000-8000-000000000001','[TEST DATA] Kiểm tra chứng từ lô hàng và duyệt phép trước 15:00.')on conflict(account_id)do update set content=excluded.content;
 insert into public.user_todos(id,user_id,title,due_date,priority,completed)values

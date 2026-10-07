@@ -1,95 +1,63 @@
-# Bright Enterprise ERP UI
+# Châu Tuấn ERP — UI design system
 
-The product uses a trust-teal canvas, crisp white surfaces, professional blue data accents, restrained semantic color and compact data-first geometry. Color clarifies modules, metrics and status without turning operational screens into marketing pages. Standard cards use 12px radii, large dashboard surfaces use 16px, and borders remain visible in every data-heavy view. The hierarchical source of truth is `design-system/chau-tuan-erp/MASTER.md`, with page overrides under its `pages` directory.
+Updated 2026-10-03. The authenticated workspace follows the supplied pearl dashboard reference: a gray canvas with pink, peach and lilac haze, translucent white-edged surfaces, soft highlight/shadow pairs, collapsible navigation and colored KPI rings. Operational data and existing permissions determine the content.
 
-## Architecture
+## Ownership and cascade
 
-`design-system/chau-tuan-erp/MASTER.md` is the design contract and `src/app/theme.css` is its executable token mapping. Detailed create/edit/filter behavior is specified by `design-system/chau-tuan-erp/pages/forms.md`. The theme loads after `globals.css` from the root layout. Existing module class names continue to work through compatibility selectors in the theme. New presentation code should use shared components from `src/components/shared` and semantic tokens from the theme. `src/app/globals.css` still contains historical layout and module rules; the migration is in progress. Do not add new visual constants there.
+1. `src/styles/tokens.css` owns primitive and semantic values: color, type, spacing, density, radius, depth and shell geometry.
+2. `src/app/theme.css` maps compatibility classes and configured appearance settings to those tokens.
+3. `src/app/mobile.css` provides responsive compatibility for specialized workflows.
+4. `src/styles/enterprise.css`, imported last in the root layout, owns the final shared workspace appearance. Feature CSS owns specialized composition, not a second palette or control skin.
+5. Shared primitives and enterprise components compose dashboard/list/form/detail/report templates. Feature code owns data, business validation and permission checks.
 
-The authenticated application has one shell: `AppShell` → `AppRail`, `AppHeader`, `page-main`. The shell owns global search, quick create, notifications, account menu, route context and mobile navigation. Quick create uses the existing permission filtered action registry.
-
-The application has one personal Dashboard at `/dashboard`. Legacy `/home` and module dashboard routes redirect to the personal Dashboard or the module's primary working screen. The third reference image defines the required dashboard information architecture: personalized greeting, module launcher, KPI cards, trend and donut analytics, schedule/deadlines, notifications, warehouse/project/HR operations, recent data, tasks and personal notes. Each business widget is hidden when its permission is absent.
-
-Module presentation is centralized in `src/config/moduleIconRegistry.ts`. Change a module icon or accent there. `ModuleLauncher` filters `applicationRegistry` through the current user's permissions; `ModuleIconCard` owns the shared tinted surface, hover, focus and pressed behavior. Feature pages must not define module colors themselves.
+Keep existing CSS as a compatibility layer. Fix shared controls in their shared component or canonical stylesheet instead of adding a page-specific override.
 
 ## Tokens
 
-| Concern | Tokens | How to change |
-| --- | --- | --- |
-| Page and surface | `--app-bg`, `--app-bg-soft`, `--surface`, `--surface-elevated`, compatibility aliases `--surface-1`, `--surface-2`, `--surface-hover` | Edit the root declaration in `theme.css` |
-| Text | `--text-primary`, `--text-secondary`, `--text-muted`, `--text-disabled` | Edit root tokens; keep normal text contrast at or above 4.5:1 |
-| Accent | `--erp-primary`, `--erp-secondary`, `--erp-accent`, `--erp-data-blue`, `--erp-attention`; configurable brand aliases `--primary`, `--primary-hover`, `--primary-soft` | Change system accents in `theme.css`; change configured action color through appearance settings |
-| Soft accents | Legacy-compatible `--pastel-*` aliases and the `--blue-*`, `--mint-*`, `--lavender-*`, `--orange-*`, `--yellow-*`, `--cyan-*`, `--rose-*` scales | Use only for subtle module/KPI/status treatment; do not put literal hex in a page |
-| Chart accents | `--accent-violet`, `--accent-cyan`, `--accent-green`, `--accent-orange`, `--accent-blue`, `--accent-red` | Charts consume these semantic accents through `dataVisualizationPalette` |
-| Status | `--success`, `--warning`, `--danger`, `--info` and their `-soft` partners | Change semantic tokens; labels must still convey status |
-| Space | `--space-1` through `--space-12`, `--page-padding-x`, `--page-padding-y`, `--section-gap`, `--grid-gap`, `--card-padding` | Change a layout token for all matching pages |
-| Radius | `--radius-control`, `--radius-button`, `--radius-nav`, `--radius-card`, `--radius-card-large`, `--radius-panel`, `--radius-pill` | Change the semantic token; standard cards currently use 12px and large dashboard cards use 16px |
-| Shadow | `--shadow-sm`, `--shadow-card`, `--shadow-card-hover`, `--shadow-floating` | Adjust one token for each depth |
-| Control | `--control-height-sm`, `--control-height-md`, `--control-height-lg` | Change control heights centrally |
-| Table | `--table-header-height`, `--table-row-height`, `--table-cell-padding-x` | Change all standard `DataTable` instances |
-| Shell | `--sidebar-width`, `--sidebar-collapsed-width`, `--topbar-height` | Change navigation geometry |
-| Motion | `--motion-fast`, `--motion-normal`, `--motion-slow`, `--ease-standard`, `--ease-exit` | Change motion centrally; reduced motion is respected |
-| Layers | `--z-header`, `--z-dropdown`, `--z-overlay`, `--z-modal`, `--z-toast` | Keep stacking order centralized |
-| Type | `--font-page`, `--font-section`, `--font-card`, `--font-body`, `--font-meta` | Inter 400/500/600 is loaded in the root layout; headings default to 600 |
+| Concern | Canonical tokens / owner |
+| --- | --- |
+| Workspace | `--workspace-canvas`, `--surface`, `--surface-elevated`, `--surface-border` |
+| Reference material | `--reference-surface`, `--reference-border`, `--reference-shadow`, `--reference-control-shadow`, `--reference-panel-radius` |
+| Reference charts | `--reference-orange`, `--reference-cyan`, `--reference-yellow`, `--reference-green`, `--reference-violet`, `--reference-ring-track` |
+| Brand | Configurable `--primary`, `--primary-hover`, `--primary-soft`; appearance settings remain authoritative |
+| Status | `--success`, `--warning`, `--danger`, `--info` with soft partners; always show text |
+| Data | Semantic `dataVisualizationPalette`, preserving point tone |
+| Typography | Inter; `--font-page`, `--font-section`, `--font-card`, `--font-body`, `--font-meta`; tabular figures |
+| Spacing | `--space-*`, `--page-padding-*`, `--section-gap`, `--grid-gap`, `--card-padding` |
+| Geometry | `--radius-control`, `--radius-card`, `--radius-card-large`, `--radius-panel`; full-width working surfaces |
+| Depth | `--shadow-sm`, `--shadow-md`, `--shadow-card`, `--shadow-card-hover`, `--shadow-floating`, `--shadow-control` |
+| Shell | `--sidebar-width`, `--sidebar-collapsed-width`, `--topbar-height` (56px) |
+| Controls | `--control-height-*`; phone controls and primary touch targets at least 44px |
+| Tables | `--table-header-height`, `--table-row-height`, `--table-cell-padding-x` |
+| Motion | `--motion-*`, `--ease-*`; respect reduced motion |
 
-App appearance settings still own the primary brand color and compact/comfortable density. `theme.css` maps those settings to the same component tokens.
+## Shell and page hierarchy
+
+- Desktop opens with a 232px white sidebar displaying function names beside icons, the organization identity, current module navigation and permission-filtered applications. The footer's `Thu gọn` button collapses it to an 84px icon rail with tooltips; `Mở rộng điều hướng` restores labels.
+- The layout choice uses the account-scoped local key `ct:sidebar-layout:v2:<account-id>`. This version starts expanded after the user's request to show labels, then retains explicit compact/expanded choices across reloads. User changes still update the existing preference API. Density and other workspace preferences retain their existing behavior.
+- The 56px transparent header contains floating search, messaging, notifications and account controls. Creation actions belong to their owning page header. The desktop chat launcher sits above the expand action in the rail, preserving equal page gutters and reachable table actions.
+- `PageHeader` / `ResponsivePageHeader` renders one visible `h1` on desktop and phone. `EntityContextHeader` adds record context. Do not repeat the title as a greeting, eyebrow or second heading.
+- Phone users retain authorized module access through applications and shared bottom navigation. A small viewport must not impose business permissions or redirect every module to Personal.
+- UI shows labels, states and actionable data. No descriptions beneath actions, permissions, navigation or function headings. Detailed guidance belongs in documentation.
 
 ## Shared components
 
-- `Button` and `IconButton`: `primary`, `secondary`, `soft`, `ghost`, `danger`; sizes `sm`, `md`, `lg` for `Button`.
-- `Card`: semantic variants `neutral`, `blue`, `mint`, `lavender`, `orange`, `yellow`, `cyan`, `rose`; padding `none`, `sm`, `md`, `lg`. Use `interactive` only when the card itself has an action.
-- `DashboardPageTemplate`, `ListPageTemplate`, `FormPageTemplate`, `DetailPageTemplate`, `ReportPageTemplate` and their layout primitives: page composition.
-- `MetricCard`, `ChartCard`, `AnalyticsCard`, `ProgressCard`, `ActivityCard`, `TaskCard`: dashboard surfaces. KPI cards use a white-to-soft-accent gradient, semantic leading border and shared large radius.
-- `ModuleLauncher` and `ModuleIconCard`: permission aware direct links to the user's modules, backed by `moduleIconRegistry`.
-- `DataTable`, `FilterBar`, `Pagination`, `DropdownMenu`, `StatusBadge`: lists and actions. Put row actions in `DropdownMenu`. Use semantic badge tones.
-- `PageActionBar`, `TableActionBar`, `ActionButton`, `CompactActionMenu`: one responsive action policy for page headers and data tools.
-- `FormSection`, `Input`, `Select`, `Textarea`, `DatePicker`, `Checkbox`, `Radio`, `Switch`, `FormErrorSummary`, `StickyActionBar`: ERP forms. Shared fields own required, invalid, read-only and disabled states; feature code owns business order and validation rules.
-- `PasswordInput`: shared visibility toggle for login and password management without changing the field value or auth flow.
-- `ImageUploader`: local preview, validation, progress, retry, replace, remove and object URL cleanup. Avatar, messaging attachments and worker attendance evidence use this component.
-- `GlobalRouteLoader`, `ModuleTransition`, `PageSkeleton`, `TableSkeleton`, `CardSkeleton`, `ChartSkeleton`: loading feedback that keeps the authenticated shell stable.
-- `Modal`, `Drawer`, `EmptyState`, `ErrorState`, `LoadingState`, `Skeleton`: floating and state UI.
+- `Button`, `IconButton`, `Card`, `StatusBadge` own action, surface and status styles.
+- `DataTable` / `Worklist` own sorting, record navigation, selection and responsive records. Primary mobile identity follows column priority. Standard tables use horizontal separators and no vertical cell borders.
+- `FilterBar` keeps desktop filters inline; `FilterSheet` keeps phone controls mounted while closed. Portaled fields belong to the original form via the `form` attribute. Apply submits that form; Reset clears route parameters and field values.
+- `Select` uses `SelectControl` and `FloatingPanel`. Long lists support Vietnamese accent-insensitive search. Arrows/Home/End/Enter, outside dismissal, Escape, active option scrolling, disabled and empty states are shared. A hidden native select preserves `FormData`, existing change handlers, reset and required validation.
+- `ComboboxControl` supports a free value and keyboard option selection without browser datalist UI.
+- `DropdownMenu` portals row actions above scrolling tables, supports keyboard opening/navigation and restores focus. Floating panels stay inside the viewport and a parent dialog's focus boundary.
+- `Modal` and `Drawer` trap/restore focus, lock background scroll and dismiss the uppermost popup first. Nested menu/select Escape must not close the parent.
+- Shared fields, `FormSection` and `StickyActionBar` preserve business field order, explicit labels, native form semantics and validation. Inline errors remain visible.
+- Loading, empty, error, permission and retry states use shared state components.
 
-List pages should compose `PageHeader` → a single `DataSurface` with filter, table and pagination. Forms use a page header and `FormSection` with a two column grid on desktop. Detail pages use entity header, tabs and related sections. Module code owns data and actions; shared components own geometry and visual states. The repository UI rule forbids descriptive text under each action, permission or navigation item.
+## Dashboard
 
-## Interaction and accessibility
+The authorized “Ứng dụng của tôi” bar appears first, before the dashboard title and analytics, with permission filtering and pinned order. `DashboardView` consumes the existing scoped read model: up to five real role-specific metrics, at most two meaningful charts in a 2:1 desktop grid, followed by a deduplicated work queue and recent items/notifications. KPI cards are horizontal with decorative colored rings, values above labels and smaller text metrics. A single real percentage uses a semicircle gauge; comparisons use capsule bars and trends use smooth lines. When the only chart is a percentage, a companion comparison may count the complete deduplicated work collection by actual category; it is not a historical trend. Charts retain accessible tabular data and CSV export with spreadsheet formula protection. Do not synthesize trends, fake counts or tasks to fill a reference layout. Account-scoped personal tasks and notes retain their existing APIs through `PersonalWorkspaceCards`.
 
-Buttons rise 1px on hover, interactive cards rise 2px, rows tint without movement, navigation links move 2px horizontally and icon buttons scale to 1.02. Floating surfaces fade and move 3px using `--shadow-floating`. Focus uses the configured primary ring. Icon buttons require an accessible `label`. Form labels, helper text and inline errors are separate accessible relationships; multi-error forms use a linked focusable summary. Color never carries status alone; visible labels remain mandatory. `prefers-reduced-motion` disables these transitions and animations.
+## Validation
 
-## Do and don't
+Run `lint`, `typecheck`, `test`, `build`, `ui:audit`, `ui:architecture-audit` and `ui:screen-audit`. `ui:reference-qa` checks the reference material, real KPI/gauge values, labelled sidebar, compact/expanded persistence, header control spacing and responsive dashboard/list screens for three roles. Its sidebar scenario mocks the two preference PUTs locally and does not modify the server preference. `ui:release-qa` checks authenticated production views at phone/tablet/desktop widths. `ui:interaction-qa` checks filter persistence, empty/reset, keyboard menus, nested select dismissal and negative permissions without submitting business records. `ui:core-qa` uses development previews.
 
-```tsx
-<Card variant="mint" padding="lg" />
-<Button variant="soft">Xem</Button>
-<StatusBadge tone="warning">Chờ xử lý</StatusBadge>
-```
-
-Avoid literal `rounded-[17px]`, `bg-[#...]`, page-specific button classes, bordered page title boxes, vertical table cell borders and repeated edit buttons in rows. A new page should use a page template; a new visual state belongs in a shared variant or token.
-
-## Migration audit and plan
-
-Audit on 2026-09-17: 178 authenticated routes, 153 files referencing `page-stack`, and 226 JSX references to key shared components were found. Existing design primitives covered many modules, but `globals.css` had more than 8,000 lines and repeated late overrides for card radius, table density, page title borders, forms and dashboard. The current working tree already included many independent changes before this UI pass; they were left intact.
-
-Completed in this pass: bright ERP theme tokens and compatibility mapping, shell quick create, core button/card variant API, dashboard/list/form/detail/report templates, employee list/create/detail composition, shared dashboard card primitives, semantic KPI geometry, custom line/bar/circular analytics, dashboard recent activity table and dev-only `/__ui` preview. The personal Dashboard includes the current user's greeting, permission aware module launcher, contextual date, real KPI/chart data, schedule/deadline and notification rail, operational module widgets, recent data, tasks, and persisted personal notes and todos. Shared CSS applies to the existing module markup across the authenticated app.
-
-Explicit templates are now used by the employee pages and main surfaces in projects, warehouse, import/export, attendance, timesheets, accounting, insurance, leave, organization and roles. All standard feature tables use `DataTable`. Three native tables remain by design because their interaction model is tabular rather than a record list: work calendar, timesheet matrix and inline stock count editor. The audit script enforces this allowlist. Duplicate unused `ReportTemplateManager`, `ReportTemplateSettings`, `WarehouseDashboardView`, and `ImportExportDashboardView` implementations were removed. Module dashboard links were removed from navigation; their old routes remain as redirects for bookmarks. Historical selectors in `globals.css` remain as a compatibility layer for specialized module layouts; new visual decisions are enforced through shared components and the UI audit. The shared playground is available at `/ui-preview` and `/__ui` only in development; both return 404 in production.
-
-Validation on the current working tree: `npm run typecheck`, `npm run lint`, `npm test` (59 files, 200 tests), `npm run build`, `npm run ui:audit` (180 authenticated routes), and `npm run ui:qa` passed. Viewport QA verifies login at 320–2560px, zoom, font loading, protected route redirects, plus the shared playground at 390px and 1440px. It asserts the bright canvas, 12px card radius, 44px control height, KPI cards, DataTable, error/read-only/disabled field states, filter bar and action bar, then saves screenshots in `docs/ui-evidence`. `/ui-preview` intentionally returns 404 in production. Run the development seed against a disposable Supabase instance before manual authenticated workflow QA. Build logged `system_settings.read_failed` while generating pages because the local settings data source was unavailable, but the command finished successfully.
-
-## Personal data, attachments and retention
-
-Personal notes, todos and UI preferences use account scoped database tables through the workspace API. Avatar files and message attachments use private storage with permission checked download routes. Message creation accepts multipart content and finalizes the message only after attachment metadata is linked; a failed upload can be retried without selecting the file again.
-
-Attendance evidence stays private. The daily maintenance flow deletes storage objects older than 45 days, preserves attendance and audit records, clears file references and marks evidence as expired. The migration and maintenance service cover employee attendance and worker roll call photos.
-
-### Global change scenarios
-
-1. All standard card radius: edit `--radius-card`; large dashboard cards use `--radius-card-large`.
-2. More room across pages: edit `--page-padding-*`, `--section-gap`, `--grid-gap` and `--card-padding`.
-3. Softer standard row hover: edit `.data-table tbody tr:hover` in `theme.css`.
-4. Primary color: change the appearance setting, which feeds root layout brand tokens; buttons and focus ring follow.
-5. Button height: edit `--control-height-md` (or the size-specific token).
-6. Sidebar width and active treatment: edit `--sidebar-width` and `.app-rail__link.is-active`.
-7. Page title to content gap: edit `--section-gap` or the page template rule.
-8. Module icon or accent: edit the module entry in `moduleIconRegistry`.
-
-When a module-specific selector prevents one of these from propagating, remove that local styling and use the shared primitive before adding another override.
+Static route coverage is not business UAT. See [production review](UI_UX_PRODUCTION_REVIEW_2026-10-03.md) for measured coverage and [production readiness](operations/production-readiness.md) for deployment prerequisites. Preview routes stay inaccessible in production.

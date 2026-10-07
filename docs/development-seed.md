@@ -55,3 +55,14 @@ npm run smoke:authenticated
 ```
 
 Muốn seed storage hoặc coverage vào Supabase remote phải truyền rõ `--allow-remote`; script không tự mở khóa môi trường remote.
+
+## Bổ sung dữ liệu mobile trên staging
+
+Hai nguồn công được giữ riêng: `attendance_events` là lượt vào/ra cá nhân; `worker_attendance_sessions` và `worker_attendance_entries` là phiên điểm danh công nhân theo gói, công trường và ca. Script bên dưới chỉ thêm fixture TEST cho lịch công cá nhân, phiếu lương của nhân viên và giám sát, cùng hội thoại; không ghi vào phiên điểm danh công nhân.
+
+```bash
+node scripts/seed-mobile-personal-data.mjs --allow-remote --dry-run
+node scripts/seed-mobile-personal-data.mjs --allow-remote
+```
+
+Script yêu cầu hai tài khoản `test.supervisor` và `test.employee` có `metadata.testData = true`, bỏ qua kỳ lương đang thuộc dữ liệu khác, và khi chạy lại chỉ thêm bản ghi còn thiếu. Chỉ dùng `--allow-remote` sau khi xác nhận đích là staging/test; không chạy trên production.

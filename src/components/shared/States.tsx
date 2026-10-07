@@ -2,6 +2,7 @@ import { AlertTriangle, Ban, Inbox, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { RetryButton } from "@/components/shared/RetryButton";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils/cn";
 
 interface StateProps {
@@ -29,10 +30,7 @@ export function LoadingState({
   return (
     <div aria-label={title} aria-live="polite" className={cn("state-box state-box--loading-pattern", className)} role="status">
       <span className="sr-only">{title}</span>
-      <div aria-hidden="true" className="state-loading-skeleton">
-        <span className="skeleton" />
-        {Array.from({ length: 5 }, (_, index) => <i className="skeleton" key={index} />)}
-      </div>
+      <LoadingSpinner />
     </div>
   );
 }
@@ -70,6 +68,8 @@ export function PermissionDeniedState({
     </div>
   );
 }
+
+export const NoPermission = PermissionDeniedState;
 
 export function OfflineState({
   title = "Đang offline",

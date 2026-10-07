@@ -57,7 +57,7 @@ export function EmployeePicker({ label, options, workerCategory, selectedId, onS
             <span>
               <strong>{option.displayName}</strong>
               <small>
-                {option.employeeCode} · {option.departmentName} · {option.positionName}
+                {option.departmentName} · {option.positionName}
               </small>
             </span>
             <StatusBadge tone={employeeStatusMeta[option.employmentStatus].tone}>

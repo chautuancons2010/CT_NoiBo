@@ -7,13 +7,13 @@ import { Button, type ButtonProps } from "@/components/shared/Button";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
 import { cn } from "@/lib/utils/cn";
 
-interface ActionBarProps {
+export interface ActionBarProps {
   children: ReactNode;
   className?: string;
   label?: string;
 }
 
-function ActionBar({ children, className, label }: ActionBarProps) {
+export function ActionBar({ children, className, label = "Thao tác" }: ActionBarProps) {
   return (
     <div aria-label={label} className={cn("action-bar", className)} role="toolbar">
       {children}
@@ -27,6 +27,10 @@ export function PageActionBar({ children, className, label = "Thao tác trang" }
 
 export function PageToolbar({ children, className, label = "Công cụ trang" }: ActionBarProps) {
   return <ActionBar className={cn("page-toolbar", className)} label={label}>{children}</ActionBar>;
+}
+
+export function FunctionToolbar({ children, className, label = "Công cụ chức năng" }: ActionBarProps) {
+  return <ActionBar className={cn("function-toolbar", className)} label={label}>{children}</ActionBar>;
 }
 
 export function TableActionBar({ children, className, label = "Thao tác dữ liệu" }: ActionBarProps) {

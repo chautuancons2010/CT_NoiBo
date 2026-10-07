@@ -5,16 +5,11 @@ import { errorResponse } from "@/lib/api/errors";
 import { successResponse } from "@/lib/api/responses";
 import { parseWithSchema } from "@/lib/api/validation";
 import { logger } from "@/lib/logger";
-import { permissionCatalog } from "@/services/authorization/rbacService";
 import { updatePersistedRole } from "@/services/authorization/rolePersistenceService";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requirePermission } from "@/services/authorization/requirePermission";
-import { recordAuditLog } from "@/services/audit/auditLog";
 
-const permissionKeySchema = z.custom<Permission>(
-  (value) => typeof value === "string" && permissionCatalog.some((permission) => permission.key === value),
-  "Quyền không hợp lệ."
-);
+const permissionKeySchema = z.string().trim().min(1).max(160).transform((value) => value as Permission);
 
 const rolePatchSchema = z.object({
   code: z.string().trim().min(2).max(60).optional(),
@@ -37,14 +32,6 @@ export async function PATCH(
     const { id } = await params;
     const input = parseWithSchema(rolePatchSchema, await request.json());
     const role = await updatePersistedRole(id, input, authorizedUser.id);
-
-    await recordAuditLog({
-      actorId: authorizedUser.id,
-      action: "role.updated",
-      entityType: "role",
-      entityId: id,
-      after: { code: role.code, name: role.name, permissionKeys: role.permissionKeys }
-    });
 
     return successResponse({ role });
   } catch (error) {

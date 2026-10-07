@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/shared/PageHeader";
-import { AttendanceSettings } from "@/features/attendance";
+import { AttendanceSettings } from "@/features/attendance/components/AttendanceSettings";
 import { BackLink } from "@/components/shared/BackLink";
 
 export default function Page() {

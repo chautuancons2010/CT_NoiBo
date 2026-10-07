@@ -16,5 +16,11 @@ describe("generatePayrollExcel", () => {
     expect(sheet?.getCell("A4").value).toBe("'=NV001");
     expect(sheet?.getCell("B4").value).toBe("Nguyễn Văn A");
     expect(sheet?.getCell("H4").value).toBe(14_500_000);
+    expect(sheet?.getCell("I4").value).toBe("Đã khóa");
+    expect(sheet?.getCell("C5").value).toMatchObject({ formula: "SUM(C4:C4)", result: 22 });
+    expect(sheet?.getCell("G5").value).toMatchObject({ formula: "SUM(G4:G4)", result: 500_000 });
+    expect(sheet?.getCell("H5").value).toMatchObject({ formula: "SUM(H4:H4)", result: 14_500_000 });
+    expect(bytes.subarray(0, 2).toString()).toBe("PK");
+    expect(sheet?.getColumn(8).numFmt).toBe('#,##0 "₫"');
   });
 });

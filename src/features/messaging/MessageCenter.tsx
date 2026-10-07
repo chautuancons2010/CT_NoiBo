@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable react-hooks/set-state-in-effect -- conversation state is reconciled asynchronously. */
-import { Paperclip, Search, Send, Users } from "lucide-react";
+import { MessageCircle, Paperclip, Plus, Search, Send, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/shared/Button";
@@ -12,7 +12,15 @@ import { getAuthenticatedSupabaseRealtimeClient } from "@/lib/supabase/client";
 import type { ChatMessage, ConversationSummary } from "./types";
 
 type Account = { id: string; name: string; employeeCode?: string; department?: string; roleLabel?: string };
-const when = (value: string) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }).format(new Date(value));
+const when = (value: string) => new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", hour12: false }).format(new Date(value));
+const previewTime = (value: string) => {
+  const date = new Date(value);
+  const day = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" });
+  return day.format(date) === day.format(new Date())
+    ? new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hour12: false }).format(date)
+    : new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit" }).format(date);
+};
+const initials = (value: string) => value.trim().split(/\s+/).slice(-2).map((word) => word[0] ?? "").join("").toLocaleUpperCase("vi-VN");
 const fileSize = (bytes: number) => bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 export function MessageCenter({ activeId, canCreateGroup }: { activeId?: string; canCreateGroup: boolean }) {
@@ -66,8 +74,8 @@ export function MessageCenter({ activeId, canCreateGroup }: { activeId?: string;
   }
 
   useEffect(() => {
-    if (!activeId) void loadConversations().catch((reason) => setError(reason.message));
-  }, [activeId, loadConversations]);
+    void loadConversations().catch((reason) => setError(reason.message));
+  }, [loadConversations]);
 
   useEffect(() => {
     if (!showCreate) return;
@@ -150,10 +158,11 @@ export function MessageCenter({ activeId, canCreateGroup }: { activeId?: string;
       setSending(false);
     }
   }
+  const activeConversation = conversations.find((item) => item.id === activeId);
   return (
-    <div className="message-center">
+    <div className="message-center" data-view={activeId ? "thread" : "list"}>
       <Card className="message-sidebar">
-        <div className="panel-header"><h2>Tin nhắn</h2><Button onClick={() => setShowCreate((value) => !value)} size="sm" variant="primary">Mới</Button></div>
+        <div className="panel-header message-sidebar__header"><h2>Tin nhắn</h2><Button aria-label="Tạo hội thoại" onClick={() => setShowCreate((value) => !value)} size="sm" variant="primary"><Plus aria-hidden="true" size={18} /><span>Mới</span></Button></div>
         {showCreate ? (
           <form className="message-create" onSubmit={create}>
             {canCreateGroup ? <label className="choice-field"><input checked={group} className="checkbox" onChange={(event) => { setGroup(event.target.checked); setGroupMembers([]); }} type="checkbox" />Nhóm</label> : null}
@@ -163,21 +172,20 @@ export function MessageCenter({ activeId, canCreateGroup }: { activeId?: string;
                 <legend>Thành viên</legend>
                 {accounts.map((item) => <label key={item.id}><input checked={groupMembers.includes(item.id)} onChange={() => toggleGroupMember(item.id)} type="checkbox" />{item.name}</label>)}
               </fieldset>
-            ) : <Select label="Thành viên" name="accountId" options={accounts.map((item) => ({ value: item.id, label: `${item.name}${item.department || item.employeeCode ? ` · ${[item.department,item.employeeCode].filter(Boolean).join(" · ")}` : item.roleLabel ? ` · ${item.roleLabel}` : ""}` }))} placeholder="Chọn người dùng" required />}
+            ) : <Select label="Thành viên" name="accountId" options={accounts.map((item) => ({ value: item.id, label: item.name }))} placeholder="Chọn người dùng" required />}
             <Button disabled={group && !groupMembers.length} type="submit">Tạo hội thoại</Button>
           </form>
         ) : null}
         <label className="message-search"><Search size={16} /><input aria-label="Tìm hội thoại" onChange={(event) => setConversationSearch(event.target.value)} placeholder="Tìm hội thoại" value={conversationSearch} /></label>
         <div className="conversation-list">
-          {conversations.filter((item) => item.title.toLocaleLowerCase("vi").includes(conversationSearch.trim().toLocaleLowerCase("vi"))).map((item) => <button className={item.id === activeId ? "is-active" : ""} key={item.id} onClick={() => router.push(`/messages/${item.id}`)}><span><strong>{item.title}</strong><small>{item.lastMessage ? `${item.lastMessage.senderName}: ${item.lastMessage.body}` : "Chưa có tin nhắn"}</small></span>{item.unreadCount ? <b>{item.unreadCount}</b> : null}</button>)}
+          {conversations.filter((item) => item.title.toLocaleLowerCase("vi").includes(conversationSearch.trim().toLocaleLowerCase("vi"))).map((item) => <button aria-label={`Mở hội thoại ${item.title}`} className={item.id === activeId ? "is-active" : ""} key={item.id} onClick={() => router.push(`/messages/${item.id}`)} type="button"><span aria-hidden="true" className="message-avatar">{item.type === "group" ? <Users size={19} /> : initials(item.title)}</span><span className="conversation-list__body"><strong>{item.title}</strong><small>{item.lastMessage ? `${item.lastMessage.senderName}: ${item.lastMessage.body}` : "Chưa có tin nhắn"}</small></span><span className="conversation-list__meta"><time dateTime={item.lastMessage?.createdAt ?? item.updatedAt}>{previewTime(item.lastMessage?.createdAt ?? item.updatedAt)}</time>{item.unreadCount ? <b>{item.unreadCount}</b> : null}</span></button>)}
+          {!conversations.length && !showCreate ? <div className="message-sidebar__empty"><MessageCircle aria-hidden="true" size={28} /><strong>Chưa có cuộc trò chuyện</strong><Button onClick={() => setShowCreate(true)} size="sm" variant="soft">Bắt đầu hội thoại</Button></div> : null}
         </div>
       </Card>
       <Card className="message-thread">
-        {activeId ? <><div className="message-thread__header"><Users size={18} /><strong>{conversations.find((item) => item.id === activeId)?.title ?? "Hội thoại"}</strong></div><div className="message-list">{nextCursor ? <Button className="message-load-older" onClick={() => void loadOlderMessages()} size="sm" variant="ghost">Tải tin cũ hơn</Button> : null}{messages.map((item) => <article className={item.senderAccountId === selfId ? "is-own" : ""} key={item.id}><span>{item.senderName}</span><p>{item.body}</p>{item.metadata?.payslipId?<a className="message-payslip" href={`/accounting/payslips/${item.metadata.payslipId}`}><span>Phiếu lương {item.metadata.payslipPeriod??""}</span><strong>Xem · Tải PDF</strong></a>:null}{item.attachments.map((attachment) => <a className="message-attachment" href={`/api/v1/chat/conversations/${activeId}/attachments/${attachment.id}`} key={attachment.id} rel="noreferrer" target="_blank"><Paperclip size={14} /><span>{attachment.fileName}</span><small>{fileSize(attachment.sizeBytes)}</small></a>)}<time dateTime={item.createdAt}>{when(item.createdAt)}</time></article>)}<div ref={bottom} /></div><form className="message-composer" onSubmit={send} ref={composer}><input aria-label="Tin nhắn" autoComplete="off" className="input" name="body" placeholder="Nhập tin nhắn" required /><ImageUploader accept="image/jpeg,image/png,image/webp,application/pdf" compact error={attachmentError} file={attachmentFile} label="Tệp" onFileChange={(file) => { setAttachmentFile(file); setAttachmentError(""); }} onRetry={() => composer.current?.requestSubmit()} uploading={sending && Boolean(attachmentFile)} /><Button disabled={sending} leftIcon={<Send size={16} />} type="submit" variant="primary">Gửi</Button></form></> : <div className="message-empty"><MessageCircleIcon /><strong>Chọn một hội thoại</strong></div>}
+        {activeId ? <><div className="message-thread__header"><span aria-hidden="true" className="message-avatar">{activeConversation?.type === "group" ? <Users size={18} /> : initials(activeConversation?.title ?? "HT")}</span><strong>{activeConversation?.title ?? "Hội thoại"}</strong></div><div className="message-list">{nextCursor ? <Button className="message-load-older" onClick={() => void loadOlderMessages()} size="sm" variant="ghost">Tải tin cũ hơn</Button> : null}{messages.map((item) => <article className={item.senderAccountId === selfId ? "is-own" : ""} key={item.id}><span>{item.senderName}</span><p>{item.body}</p>{item.metadata?.payslipId?<a className="message-payslip" href={`/accounting/payslips/${item.metadata.payslipId}`}><span>Phiếu lương {item.metadata.payslipPeriod??""}</span><strong>Xem · Tải PDF</strong></a>:null}{item.attachments.map((attachment) => <a className="message-attachment" href={`/api/v1/chat/conversations/${activeId}/attachments/${attachment.id}`} key={attachment.id} rel="noreferrer" target="_blank"><Paperclip size={14} /><span>{attachment.fileName}</span><small>{fileSize(attachment.sizeBytes)}</small></a>)}<time dateTime={item.createdAt}>{when(item.createdAt)}</time></article>)}<div ref={bottom} /></div><form className="message-composer" onSubmit={send} ref={composer}><ImageUploader accept="image/jpeg,image/png,image/webp,application/pdf" compact error={attachmentError} file={attachmentFile} label="Tệp" onFileChange={(file) => { setAttachmentFile(file); setAttachmentError(""); }} onRetry={() => composer.current?.requestSubmit()} uploading={sending && Boolean(attachmentFile)} /><input aria-label="Tin nhắn" autoComplete="off" className="input" name="body" placeholder="Nhập tin nhắn" required /><Button aria-label="Gửi tin nhắn" disabled={sending} type="submit" variant="primary"><Send aria-hidden="true" size={18} /><span className="message-composer__send-label">Gửi</span></Button></form></> : <div className="message-empty"><MessageCircle aria-hidden="true" size={32} /><strong>Chọn một hội thoại</strong></div>}
         {error ? <p className="form-error">{error}</p> : null}
       </Card>
     </div>
   );
 }
-
-function MessageCircleIcon() { return <span aria-hidden="true" className="message-empty__icon">●</span>; }

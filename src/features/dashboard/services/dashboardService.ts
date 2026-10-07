@@ -2,12 +2,12 @@ import "server-only";
 
 import { getAttendanceAdminToday, getAttendanceDashboard } from "@/features/attendance/services/attendanceRepository";
 import { normalizeAttention } from "@/features/dashboard/attention";
+import { analyticsDefinitionsFor } from "@/features/dashboard/moduleAnalytics";
+import { getDashboardProjectSummary, listDashboardActivity } from "@/features/dashboard/services/dashboardRepository";
 import {
   canUseDashboardProfile,
   dashboardProfiles,
-  dashboardWidgetRegistry,
   enabledWidgetsFor,
-  matchesAnyPermission,
   resolveDashboardProfile,
   visibleQuickActions
 } from "@/features/dashboard/registry";
@@ -21,9 +21,7 @@ import type {
   DashboardWidgetResult
 } from "@/features/dashboard/types";
 import { getDashboard as getImportExportDashboard } from "@/features/import-export/services/importExportRepository";
-import { getProjectMonitoring } from "@/features/projects/services/projectUpdateRepository";
 import { listApprovalCases } from "@/features/shared-platforms/services/approvalRepository";
-import { listAuditLogs } from "@/features/shared-platforms/services/auditRepository";
 import { listNotifications } from "@/features/shared-platforms/services/notificationRepository";
 import { resolvePlatformIdentity } from "@/features/shared-platforms/services/platformIdentity";
 import { listExceptions } from "@/features/timesheets/services/timesheetRepository";
@@ -33,6 +31,8 @@ import { AppError } from "@/lib/api/errors";
 import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { readSettingsGroup } from "@/services/system-settings/systemSettingsService";
+import { getBusinessDateKey } from "@/lib/time/timezone";
+import { errorFingerprint, logger } from "@/lib/logger";
 
 function formatAge(iso: string): string {
   const hours = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 3_600_000));
@@ -50,11 +50,16 @@ async function loadApprovals(user: AuthenticatedUser): Promise<DashboardWidgetDa
   const cases = await listApprovalCases(user, "pending");
   return {
     metrics: [{ label: "Chờ duyệt", value: cases.length, href: "/approvals/pending", tone: cases.length ? "warning" : "success" }],
+    charts: [{ key: "approval-waiting", title: "Thời gian chờ phê duyệt", kind: "bar", unit: "hồ sơ", series: [
+      { label: "Dưới 24 giờ", value: cases.filter((item) => item.waitingHours < 24).length },
+      { label: "24–72 giờ", value: cases.filter((item) => item.waitingHours >= 24 && item.waitingHours < 72).length },
+      { label: "Từ 72 giờ", value: cases.filter((item) => item.waitingHours >= 72).length }
+    ] }],
     items: cases.slice(0, 8).map((item) => ({
       id: item.id,
       type: "approval",
-      title: item.referenceNumber,
-      context: `${item.requesterName} · ${item.summary}`,
+      title: item.summary || item.referenceNumber,
+      context: item.requesterName,
       priority: approvalPriority(item.waitingHours),
       dueOrAge: formatAge(item.submittedAt),
       href: `/approvals/${item.id}`,
@@ -81,14 +86,12 @@ async function loadEmployeeToday(user: AuthenticatedUser): Promise<DashboardWidg
       { label: "Trạng thái", value: nextLabel, tone: dashboard.nextAction === "completed" ? "success" : "info" }
     ],
     items,
+    charts: [{ key: "personal-attendance", title: "Lượt chấm công hôm nay", kind: "bar", unit: "lượt", series: [
+      { label: "Chấm vào", value: dashboard.todayEvents.filter((event) => event.eventType === "check_in").length },
+      { label: "Chấm ra", value: dashboard.todayEvents.filter((event) => event.eventType === "check_out").length }
+    ] }],
     state: { primaryAction: nextLabel, primaryHref: "/attendance", employeeName: dashboard.employeeName }
   };
-}
-
-function localDate(): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${map.year}-${map.month}-${map.day}`;
 }
 
 async function loadAttendanceOverview(user: AuthenticatedUser): Promise<DashboardWidgetData> {
@@ -123,7 +126,7 @@ async function loadSupervisorToday(user: AuthenticatedUser): Promise<DashboardWi
   const projectIds = [...new Set((assignments ?? []).map((item) => String(item.project_id)))];
   const [{ count: expected }, { data: sessions }] = await Promise.all([
     projectIds.length ? client.from("project_assignments").select("employee_id", { count: "exact", head: true }).in("project_id", projectIds).eq("status", "active") : Promise.resolve({ count: 0 }),
-    client.from("worker_attendance_sessions").select("id,status,project_name_snapshot,worksite_name_snapshot").eq("supervisor_employee_id", identity.employeeId).eq("attendance_date", localDate()).order("created_at", { ascending: false })
+    client.from("worker_attendance_sessions").select("id,status,project_name_snapshot,worksite_name_snapshot").eq("supervisor_employee_id", identity.employeeId).eq("attendance_date", getBusinessDateKey()).order("created_at", { ascending: false })
   ]);
   const assignment = assignments?.[0] as Record<string, unknown> | undefined;
   const project = (Array.isArray(assignment?.projects) ? assignment?.projects[0] : assignment?.projects) as Record<string, unknown> | undefined;
@@ -135,20 +138,34 @@ async function loadSupervisorToday(user: AuthenticatedUser): Promise<DashboardWi
       { label: "Phiên hôm nay", value: sessions?.length ?? 0, tone: sessions?.length ? "success" : "warning" }
     ],
     items: (sessions ?? []).slice(0, 6).map((session) => ({ id: String(session.id), type: "worker_attendance", title: String(session.worksite_name_snapshot), context: String(session.project_name_snapshot), href: `/worker-attendance/sessions/${session.id}`, status: String(session.status), priority: session.status === "needs_review" ? "HIGH" : "INFO" })),
+    charts: [{ key: "supervisor-sessions", title: "Phiên điểm danh hôm nay", kind: "bar", unit: "phiên", series: [
+      { label: "Cần xem lại", value: (sessions ?? []).filter((session) => session.status === "needs_review").length },
+      { label: "Các phiên khác", value: (sessions ?? []).filter((session) => session.status !== "needs_review").length }
+    ] }],
     state: { primaryAction: "Điểm danh hôm nay", primaryHref: "/worker-attendance/today" }
   };
 }
 
 async function loadTimesheetExceptions(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const exceptions = (await listExceptions(user)).filter((item) => item.status === "open");
+  const exceptionLabels: Record<string, string> = {
+    missing_check_in: "Thiếu chấm vào", missing_check_out: "Thiếu chấm ra",
+    attendance_leave_conflict: "Trùng ngày nghỉ", gps_issue: "Vị trí cần kiểm tra",
+    photo_pending: "Ảnh chưa đồng bộ", offline_sync_pending: "Chưa đồng bộ",
+    worker_roster_conflict: "Lệch danh sách công nhân", duplicate_source_conflict: "Dữ liệu chấm công trùng"
+  };
   return {
     metrics: [{ label: "Ngoại lệ đang mở", value: exceptions.length, href: "/timesheets/exceptions", tone: exceptions.length ? "warning" : "success" }],
-    items: exceptions.slice(0, 8).map((item) => ({ id: item.id, type: "timesheet", title: `${item.employeeCode} · ${item.employeeName}`, context: `${item.workDate} · ${item.type}`, priority: item.severity === "high" ? "HIGH" : "MEDIUM", href: "/timesheets/exceptions", status: "Cần xử lý" }))
+    charts: [{ key: "timesheet-exceptions", title: "Ngoại lệ bảng công", kind: "bar", unit: "mục", series: [
+      { label: "Mức độ cao", value: exceptions.filter((item) => item.severity === "high").length },
+      { label: "Các mức còn lại", value: exceptions.filter((item) => item.severity !== "high").length }
+    ] }],
+    items: exceptions.slice(0, 8).map((item) => ({ id: item.id, type: "timesheet", title: item.employeeName, context: `${item.workDate} · ${exceptionLabels[item.type] ?? "Ngoại lệ bảng công"}`, priority: item.severity === "high" ? "HIGH" : "MEDIUM", href: "/timesheets/exceptions", status: "Cần xử lý" }))
   };
 }
 
 async function loadProjectAttention(user: AuthenticatedUser): Promise<DashboardWidgetData> {
-  const summary = await getProjectMonitoring(user);
+  const summary = await getDashboardProjectSummary(user);
   return {
     metrics: [
       { label: "Đang hoạt động", value: summary.active, href: "/project-monitoring" },
@@ -157,11 +174,12 @@ async function loadProjectAttention(user: AuthenticatedUser): Promise<DashboardW
       { label: "Vấn đề mức cao", value: summary.attention.filter((item) => item.severity === "critical" || item.severity === "high").length, href: "/project-monitoring/issues", tone: "error" }
     ],
     items: summary.attention.slice(0, 8).map((item) => ({ id: item.id, type: "project_issue", title: item.title, context: item.projectName, priority: item.severity === "critical" ? "CRITICAL" : item.severity === "high" ? "HIGH" : item.severity === "medium" ? "MEDIUM" : "LOW", dueOrAge: formatAge(item.createdAt), href: `/projects/${item.projectId}/updates/${item.sourceUpdateId}`, status: item.status })),
-    charts: [{ key: "project-health", title: "Tình trạng dự án", series: [
-      { label: "Đúng tiến độ", value: summary.onTrack, tone: "success" },
-      { label: "Có rủi ro", value: summary.atRisk, tone: "warning" },
-      { label: "Chậm", value: summary.delayed, tone: "error" },
-      { label: "Tạm dừng", value: summary.paused }
+    charts: [{ key: "project-progress", title: "Tiến độ công trường", kind: "bar", unit: "%", maxValue: 100, series: [...summary.projects].sort((first, second) => second.completionPercent - first.completionPercent).slice(0, 6).map((project) => ({ label: project.name, value: project.completionPercent })) }, { key: "project-health", title: "Tình trạng dự án", kind: "donut", unit: "dự án", series: [
+      { label: "Đúng tiến độ", value: summary.projects.filter((project) => project.status !== "paused" && project.health === "on_track").length },
+      { label: "Có rủi ro", value: summary.projects.filter((project) => project.status !== "paused" && project.health === "at_risk").length },
+      { label: "Chậm tiến độ", value: summary.projects.filter((project) => project.status !== "paused" && project.health === "delayed").length },
+      { label: "Tạm dừng", value: summary.projects.filter((project) => project.status === "paused" || project.health === "paused").length },
+      { label: "Hoàn thành", value: summary.projects.filter((project) => project.status !== "paused" && project.health === "completed").length }
     ] }]
   };
 }
@@ -174,10 +192,15 @@ async function loadWarehouse(user: AuthenticatedUser): Promise<DashboardWidgetDa
       { label: "Sắp hết", value: summary.lowStock, href: "/warehouse/inventory?status=low_stock", tone: summary.lowStock ? "warning" : "success" },
       { label: "Hết hàng", value: summary.outOfStock, href: "/warehouse/inventory?status=out_of_stock", tone: summary.outOfStock ? "error" : "success" }
     ],
-    items: summary.lowStockItems.slice(0, 8).map((item) => ({ id: `${item.warehouseId}:${item.itemId}`, type: "warehouse_item", title: `${item.itemCode} · ${item.itemName}`, context: item.warehouseName, priority: item.status === "out_of_stock" ? "HIGH" : "MEDIUM", href: `/warehouse/items/${item.itemId}`, status: item.status === "out_of_stock" ? "Hết hàng" : "Sắp hết" })),
-    charts: [{
+    items: summary.lowStockItems.slice(0, 8).map((item) => ({ id: `${item.warehouseId}:${item.itemId}`, type: "warehouse_item", title: item.itemName, context: item.warehouseName, priority: item.status === "out_of_stock" ? "HIGH" : "MEDIUM", href: `/warehouse/items/${item.itemId}`, status: item.status === "out_of_stock" ? "Hết hàng" : "Sắp hết" })),
+    charts: [{ key: "warehouse-pending", title: "Chứng từ chờ xử lý", kind: "bar", unit: "phiếu", series: [
+      { label: "Phiếu nhập", value: summary.pendingReceipts },
+      { label: "Phiếu xuất", value: summary.pendingIssues },
+      { label: "Chứng từ khác", value: Math.max(0, summary.pendingDocuments - summary.pendingReceipts - summary.pendingIssues) }
+    ] }, {
       key: "warehouse-stock-alerts",
       title: "Trạng thái cảnh báo tồn",
+      kind: "donut", unit: "cảnh báo",
       series: [
         { label: "Sắp hết", value: summary.lowStock, tone: "warning" },
         { label: "Hết hàng", value: summary.outOfStock, tone: "error" }
@@ -196,17 +219,22 @@ async function loadShipments(user: AuthenticatedUser): Promise<DashboardWidgetDa
       { label: "Chờ nhập kho", value: summary.awaitingReceipt, href: "/import-export/shipments" },
       { label: "Cần chú ý", value: summary.attentionCount, href: "/import-export/shipments", tone: summary.attentionCount ? "warning" : "success" }
     ],
-    items: summary.needsAttention.slice(0, 8).flatMap(({ shipment, flags }) => flags.map((flag) => ({ id: `${shipment.id}:${flag.code}`, type: "shipment", title: shipment.shipmentNumber, context: flag.label, priority: flag.code === "customs_issue" ? "HIGH" as const : flag.code === "eta_delayed" || flag.code === "document_missing" ? "MEDIUM" as const : "LOW" as const, href: `/import-export/shipments/${shipment.id}/overview`, status: "Cần chú ý" }))),
+    items: summary.needsAttention.slice(0, 8).map(({ shipment, flags }) => ({ id: shipment.id, type: "shipment", title: shipment.shipmentNumber, context: flags.length === 1 ? flags[0].label : `${flags.length} vấn đề cần xử lý`, priority: flags.some((flag) => flag.code === "customs_issue") ? "HIGH" as const : "MEDIUM" as const, href: `/import-export/shipments/${shipment.id}/overview`, status: "Cần chú ý" })),
     charts: [{
       key: "shipment-status",
       title: "Tiến độ lô hàng",
+      kind: "bar", unit: "lô hàng",
       series: [
         { label: "Sắp về", value: summary.upcoming },
         { label: "Đang vận chuyển", value: summary.inTransit },
         { label: "Đang thông quan", value: summary.customsProcessing },
         { label: "Chờ nhập kho", value: summary.awaitingReceipt, tone: "warning" }
       ]
-    }]
+    }, { key: "shipment-flags", title: "Cảnh báo lô hàng", kind: "bar", unit: "cảnh báo", series: [
+      { label: "Trễ ETA", value: summary.needsAttention.reduce((sum, item) => sum + item.flags.filter((flag) => flag.code === "eta_delayed").length, 0) },
+      { label: "Thiếu chứng từ", value: summary.needsAttention.reduce((sum, item) => sum + item.flags.filter((flag) => flag.code === "document_missing").length, 0) },
+      { label: "Vướng thông quan", value: summary.needsAttention.reduce((sum, item) => sum + item.flags.filter((flag) => flag.code === "customs_issue").length, 0) }
+    ] }]
   };
 }
 
@@ -214,15 +242,15 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
   if (!can(user.permissions, "employee.view")) throw new AppError("PERMISSION_DENIED");
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình.");
-  const contractCutoff = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  const contractCutoff = getBusinessDateKey(new Date(Date.now() + 30 * 86_400_000));
   const [total, active, probation, incomplete, departmentRows, pendingHr, expiringContracts] = await Promise.all([
     client.from("employees").select("id", { count: "exact", head: true }).in("employment_status", ["active", "probation", "pending_onboarding"]),
     client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "active"),
     client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "probation"),
     client.from("employees").select("id", { count: "exact", head: true }).lt("profile_completeness", 100).in("employment_status", ["active", "probation", "pending_onboarding"]),
-    client.from("employees").select("department_id,departments(name)").in("employment_status", ["active", "probation"]),
+    client.from("employees").select("department_id,departments!employees_department_id_fkey(name)").in("employment_status", ["active", "probation"]),
     client.from("employees").select("id", { count: "exact", head: true }).eq("profile_status", "pending_hr_completion"),
-    can(user.permissions, "contract.view") ? client.from("employee_contracts").select("id", { count: "exact", head: true }).eq("status", "active").is("archived_at", null).gte("end_date", localDate()).lte("end_date", contractCutoff) : Promise.resolve({ count: 0, error: null })
+    can(user.permissions, "contract.view") ? client.from("employee_contracts").select("id", { count: "exact", head: true }).eq("status", "active").is("archived_at", null).gte("end_date", getBusinessDateKey()).lte("end_date", contractCutoff) : Promise.resolve({ count: 0, error: null })
   ]);
   if ([total, active, probation, incomplete, pendingHr, departmentRows, expiringContracts].some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
   const byDepartment = new Map<string, number>();
@@ -249,9 +277,10 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
           .sort((first, second) => second.value - first.value)
           .slice(0, 8)
       }] : []),
-      { key: "hr-employment", title: "Cơ cấu nhân sự", series: [
+      { key: "hr-employment", title: "Cơ cấu nhân sự", kind: "donut", unit: "nhân viên", series: [
         { label: "Đang làm", value: active.count ?? 0 },
-        { label: "Thử việc", value: probation.count ?? 0 }
+        { label: "Thử việc", value: probation.count ?? 0 },
+        { label: "Chờ nhận việc", value: Math.max(0, (total.count ?? 0) - (active.count ?? 0) - (probation.count ?? 0)) }
       ] }
     ]
   };
@@ -259,13 +288,34 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
 
 async function loadAccountingSummary(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const summary = await accountingSummary(user);
-  const pendingPayrolls = summary.recentPayrolls.filter((period) => !["locked", "published"].includes(period.status));
+  const payrollAccess = can(user.permissions, "payroll.view");
+  const pendingPayrolls = payrollAccess ? summary.recentPayrolls.filter((period) => !["locked", "published"].includes(period.status)) : [];
+  const salaryAccess = can(user.permissions, "salary.view");
+  const payslipAccess = payrollAccess || can(user.permissions, "payslip.self.view");
   return {
     metrics: [
-      { label: "Hồ sơ lương", value: summary.salaryProfiles, href: "/accounting/salaries" },
-      { label: "Kỳ đang xử lý", value: summary.openPayrolls, href: "/accounting/payroll", tone: summary.openPayrolls ? "warning" : "success" },
-      { label: "Kỳ đã khóa", value: summary.lockedPayrolls, href: "/accounting/payroll" },
-      { label: "Phiếu lương chưa xem", value: summary.unseenPayslips, href: "/accounting/payslips", tone: summary.unseenPayslips ? "info" : "success" }
+      ...(salaryAccess ? [{ label: "Hồ sơ lương", value: summary.salaryProfiles, href: "/accounting/salaries" }] : []),
+      ...(payrollAccess ? [
+        { label: "Kỳ đang xử lý", value: summary.openPayrolls, href: "/accounting/payroll" },
+        { label: "Kỳ đã khóa", value: summary.lockedPayrolls, href: "/accounting/payroll" }
+      ] : []),
+      ...(payslipAccess ? [{ label: "Phiếu lương chưa xem", value: summary.unseenPayslips, href: "/accounting/payslips" }] : [])
+    ],
+    charts: [
+      ...(payrollAccess ? [
+        { key: "payroll-fund", title: "Quỹ lương theo kỳ", kind: "line" as const, unit: "VNĐ", series: [...summary.recentPayrolls].reverse().map((period) => ({ label: `${period.periodMonth.slice(5, 7)}/${period.periodMonth.slice(0, 4)}`, value: period.netTotal })) },
+        { key: "payroll-status", title: "Tình trạng kỳ lương", kind: "donut" as const, unit: "kỳ lương", series: [
+          { label: "Đang xử lý", value: summary.openPayrolls, tone: "warning" as const },
+          { label: "Đã khóa / phát hành", value: summary.lockedPayrolls, tone: "success" as const }
+        ] }
+      ] : payslipAccess ? [
+        { key: "payslip-status", title: "Phiếu lương của tôi", kind: "donut" as const, unit: "phiếu", series: [
+          { label: "Đã xem", value: summary.viewedPayslips },
+          { label: "Chưa xem", value: summary.unseenPayslips, tone: "warning" as const }
+        ] }
+      ] : salaryAccess ? [
+        { key: "salary-profiles", title: "Hồ sơ lương hiện có", kind: "bar" as const, unit: "nhân viên", series: [{ label: "Đã thiết lập lương", value: summary.salaryProfiles }] }
+      ] : [])
     ],
     items: pendingPayrolls.map((period) => ({
       id: period.id,
@@ -280,8 +330,8 @@ async function loadAccountingSummary(user: AuthenticatedUser): Promise<Dashboard
 }
 
 async function loadRecentActivity(user: AuthenticatedUser): Promise<DashboardWidgetData> {
-  const { entries } = await listAuditLogs(user, { page: 1 });
-  return { items: entries.slice(0, 8).map((entry) => ({ id: entry.id, type: entry.entityType, title: entry.actorName, context: entry.entityReference ? `${entry.actionLabel} · ${String(entry.entityReference)}` : entry.actionLabel, dueOrAge: formatAge(entry.happenedAt), href: `/settings/audit-log?q=${encodeURIComponent(entry.entityId)}`, status: entry.severity === "critical" ? "Quan trọng" : undefined })) };
+  const entries = await listDashboardActivity(user);
+  return { items: entries.map((entry) => ({ id: entry.id, type: entry.entityType, title: entry.actorName, context: entry.entityReference ? `${entry.actionLabel} · ${String(entry.entityReference)}` : entry.actionLabel, dueOrAge: formatAge(entry.happenedAt), href: `/settings/audit-log?q=${encodeURIComponent(entry.entityId)}`, status: entry.severity === "critical" ? "Quan trọng" : undefined })) };
 }
 
 async function loadNotifications(user: AuthenticatedUser): Promise<DashboardWidgetData> {
@@ -313,15 +363,20 @@ export async function getDashboardReadModel(user: AuthenticatedUser, requestedPr
   const contextual = resolveDashboardProfile(user, settings);
   const profile = requestedProfile && canUseDashboardProfile(user, requestedProfile) ? requestedProfile : contextual;
   const enabled = scope === "global"
-    ? dashboardWidgetRegistry.filter((widget) => matchesAnyPermission(user.permissions, widget.requiredAny))
+    ? analyticsDefinitionsFor(user, await readSettingsGroup("modules"))
     : enabledWidgetsFor(user, profile, settings);
   const definitions = requestedWidget ? enabled.filter((definition) => definition.key === requestedWidget) : enabled;
   const settled = await Promise.allSettled(definitions.map((definition) => loaders[definition.key](user)));
+  settled.forEach((result, index) => {
+    if (result.status === "rejected") logger.warn("dashboard.widget_failed", {
+      metadata: { widget: definitions[index].key, fingerprint: errorFingerprint(result.reason) }
+    });
+  });
   const widgets: DashboardWidgetResult[] = settled.map((result, index) => ({
     key: definitions[index].key,
     label: definitions[index].label,
     status: result.status === "fulfilled" ? "ready" : "error",
-    data: result.status === "fulfilled" ? result.value : undefined,
+    data: result.status === "fulfilled" ? scope === "global" ? { metrics: result.value.metrics, charts: result.value.charts } : result.value : undefined,
     error: result.status === "rejected" ? `Không thể tải ${definitions[index].label.toLocaleLowerCase("vi")}.` : undefined
   }));
   const attention = normalizeAttention(widgets.flatMap((widget) => widget.status === "ready" ? widget.data?.items?.filter((item) => item.priority && item.priority !== "INFO") ?? [] : []));

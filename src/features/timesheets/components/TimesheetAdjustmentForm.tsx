@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/shared/FormControls";
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -85,9 +86,9 @@ export function TimesheetAdjustmentForm({ defaults }: {
         <label>Phiên bản dòng<input className="input" name="rowVersion" type="number" defaultValue={defaults.rowVersion} required /></label>
         <label>ID nhân viên<input className="input" name="employeeId" defaultValue={defaults.employeeId} required /></label>
         <label>Ngày<input className="input" name="workDate" type="date" defaultValue={defaults.date} required /></label>
-        <label>Loại<select className="select" name="adjustmentType">{Object.entries(adjustmentLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <Select label={"Loại"} className="select" name="adjustmentType" options={[...(Object.entries(adjustmentLabels).map(([value, label]) => ({ label: label, value: value })))]} />
         <label>Thời gian hiệu lực<input className="input" name="effectiveTime" type="datetime-local" /></label>
-        <label>Trạng thái<select className="select" name="correctedStatus"><option value="">Không đổi</option><option value="full_work">Đủ công</option><option value="annual_leave">Phép năm</option><option value="unpaid_leave">Nghỉ không lương</option><option value="business_trip">Công tác</option><option value="absent">Vắng</option></select></label>
+        <Select label={"Trạng thái"} className="select" name="correctedStatus" options={[{ label: "Không đổi", value: "" }, { label: "Đủ công", value: "full_work" }, { label: "Phép năm", value: "annual_leave" }, { label: "Nghỉ không lương", value: "unpaid_leave" }, { label: "Công tác", value: "business_trip" }, { label: "Vắng", value: "absent" }]} />
         <label>Ngày công<input className="input" name="correctedWorkFraction" type="number" min="0" max="1" step="0.5" /></label>
       </div>
       <label>Ghi chú HR<textarea className="textarea" name="hrNote" /></label>

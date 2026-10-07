@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 
@@ -13,6 +13,8 @@ const columns: DataTableColumn<Row>[] = [
   { id: "name", header: "Tên", accessor: "name" }
 ];
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("DataTable", () => {
   it("keeps table headers visible with an empty state", () => {
     render(<DataTable ariaLabel="Danh sách nhân viên" columns={columns} data={[]} emptyTitle="Chưa có nhân viên" />);
@@ -20,7 +22,7 @@ describe("DataTable", () => {
     expect(screen.getByRole("table", { name: "Danh sách nhân viên" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Mã" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Tên" })).toBeInTheDocument();
-    expect(screen.getAllByText("Chưa có nhân viên")).toHaveLength(2);
+    expect(screen.getAllByText("Chưa có nhân viên")).toHaveLength(1);
   });
 
   it("renders desktop table content for records", () => {
@@ -29,6 +31,24 @@ describe("DataTable", () => {
     expect(screen.getByRole("table", { name: "Danh sách nhân viên" })).toBeInTheDocument();
     expect(screen.getAllByText("NV001").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nguyễn Văn A").length).toBeGreaterThan(0);
+  });
+
+  it("builds a phone record with a clear identity and a full-width open action", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 767px)", media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const { container } = render(
+      <DataTable
+        columns={columns}
+        data={[{ code: "NV001", name: "Nguyễn Văn A" }]}
+        getRowId={(row) => row.code}
+        rowHrefPrefix="/employees/"
+        rowHrefSuffix="/profile"
+      />
+    );
+
+    expect(container.querySelector(".mobile-record__eyebrow")).toHaveTextContent("MãNV001");
+    expect(container.querySelector(".mobile-record__title")).toHaveTextContent("Nguyễn Văn A");
+    expect(container.querySelector(".mobile-record__open")).toHaveAttribute("href", "/employees/NV001/profile");
+    expect(container.querySelector("table")).toBeNull();
   });
 
   it("marks a selected business row for visual treatment", () => {
@@ -80,5 +100,18 @@ describe("DataTable", () => {
     fireEvent.click(sortButton);
     expect(screen.getByRole("columnheader", { name: /Mã/ })).toHaveAttribute("aria-sort", "descending");
     expect(within(screen.getAllByRole("row")[1]).getByText("NV010")).toBeInTheDocument();
+  });
+
+  it("opens a focused row with Enter without hijacking controls inside it", () => {
+    const { container } = render(<DataTable actions={() => <button type="button">Modifier</button>} columns={columns} data={[{ code: "NV001", name: "A" }]} getRowId={(row) => row.code} rowHrefPrefix="/employees/" />);
+    const row = container.querySelector<HTMLTableRowElement>("tbody tr")!;
+    const link = container.querySelector<HTMLAnchorElement>(".data-table__row-link")!;
+    const open = vi.spyOn(link, "click").mockImplementation(() => undefined);
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Modifier" }), { key: "Enter" });
+    fireEvent.keyDown(link, { key: "Enter" });
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(open).toHaveBeenCalledOnce();
   });
 });

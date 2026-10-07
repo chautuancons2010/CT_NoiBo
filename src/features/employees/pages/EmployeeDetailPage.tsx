@@ -13,7 +13,6 @@ import { StatusBadge, type StatusBadgeTone } from "@/components/shared/StatusBad
 import { Tabs } from "@/components/shared/Tabs";
 import { can, type AccountStatus, type Permission } from "@/lib/auth/permissions";
 import { buildInternalFileUrl } from "@/services/storage/storageService";
-import { EmployeePicker } from "@/features/employees/components/EmployeePicker";
 import { EmployeeAccountActions } from "@/features/employees/components/EmployeeAccountActions";
 import { EmployeeSensitiveEdit } from "@/features/employees/components/EmployeeSensitiveEdit";
 import { IdentityDocumentPanel } from "@/features/employees/components/IdentityDocumentPanel";
@@ -24,15 +23,16 @@ import {
   getEmployeeContracts,
   getEmployeeDetail,
   getEmployeeDocuments,
-  getEmployeePickerOptions,
   maskSensitiveValue
 } from "@/features/employees/services/employeeService";
 import type { EmployeeDataSet } from "@/features/employees/services/employeeService";
 import { getEmployeeDataSetAsync } from "@/features/employees/services/employeeRepository";
 import type { EmployeeDetail, EmployeeHistoryEvent } from "@/features/employees/types";
 import { getRequestUser } from "@/services/auth/getRequestUser";
-import { roleCatalog } from "@/services/authorization/rbacService";
+import { listPersistedRoles } from "@/services/authorization/rolePersistenceService";
+import type { RoleDefinition } from "@/services/authorization/rbacService";
 import { EmployeeLeavePanel } from "@/features/leave/components/EmployeeLeavePanel";
+import { attendanceRecordHref } from "@/features/attendance/attendanceNavigation";
 import { listEmployeeSalaries } from "@/features/accounting/service";
 import { listAttendanceRecords } from "@/features/attendance/services/attendanceRepository";
 import { listEmployeeProjects } from "@/features/projects/services/projectRepository";
@@ -103,7 +103,6 @@ function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: Em
         <h2 className="section-title">Thông tin cơ bản</h2>
         <FieldList
           items={[
-            { label: "Mã nhân viên", value: detail.profile.employeeCode },
             { label: "Họ và tên", value: detail.profile.fullName },
             { label: "Tên hiển thị", value: detail.profile.displayName },
             { label: "Ngày sinh", value: formatDate(detail.profile.dateOfBirth) }
@@ -200,7 +199,7 @@ function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: Em
   );
 }
 
-function EmployeeEmploymentTab({ detail, dataSet }: { detail: EmployeeDetail; dataSet: EmployeeDataSet }) {
+function EmployeeEmploymentTab({ detail }: { detail: EmployeeDetail }) {
   return (
     <div className="content-grid content-grid--two">
       <Card>
@@ -209,7 +208,7 @@ function EmployeeEmploymentTab({ detail, dataSet }: { detail: EmployeeDetail; da
           items={[
             { label: "Phòng ban", value: detail.department.name },
             { label: "Chức vụ", value: detail.position.name },
-            { label: "Loại nhân sự", value: detail.employmentType.name },
+            { label: "Nhóm làm việc", value: detail.employmentType.name },
             { label: "Trạng thái", value: detail.summary.employmentStatusLabel },
             { label: "Ngày vào làm", value: formatDate(detail.profile.joinDate) },
             { label: "Ngày thử việc", value: formatDate(detail.profile.probationStartDate) },
@@ -227,21 +226,13 @@ function EmployeeEmploymentTab({ detail, dataSet }: { detail: EmployeeDetail; da
             <span>
               <strong>{detail.manager.fullName}</strong>
               <small>
-                {detail.manager.employeeCode} - {detail.manager.positionName}
+                {detail.manager.positionName}
               </small>
             </span>
           </article>
         ) : (
           <EmptyState title="Chưa có quản lý" />
         )}
-      </Card>
-      <Card className="employee-picker-card">
-        <header className="panel-header">
-          <div>
-            <h2>Bộ chọn nhân sự</h2>
-          </div>
-        </header>
-        <EmployeePicker label="Tìm nhân sự" options={getEmployeePickerOptions(dataSet, { activeOnly: true })} />
       </Card>
     </div>
   );
@@ -340,7 +331,7 @@ async function EmployeeAttendanceTab({ employeeId, user }: { employeeId: string;
               <small>{event.locationName ?? "Không ghi nhận địa điểm"} · {event.geofenceStatus}</small>
             </span>
             <StatusBadge tone={event.syncStatus === "synced" ? "success" : event.syncStatus === "sync_failed" ? "error" : "warning"}>{syncLabels[event.syncStatus]}</StatusBadge>
-            <Link href={`/attendance/records/${event.id}`}>Xem</Link>
+            <Link href={attendanceRecordHref(event.id, `/employees/${employeeId}/attendance`)}>Xem</Link>
           </li>
         ))}
       </ul>
@@ -407,10 +398,12 @@ async function EmployeeHistoryTab({ detail, user, canViewProjects }: { detail: E
 
 function EmployeeAccountTab({
   detail,
-  permissions
+  permissions,
+  roles
 }: {
   detail: EmployeeDetail;
   permissions: readonly Permission[];
+  roles: RoleDefinition[];
 }) {
   if (!can(permissions, "account.view")) {
     return <PermissionDeniedState />;
@@ -423,8 +416,9 @@ function EmployeeAccountTab({
           action={
             <EmployeeAccountActions
               employeeId={detail.profile.id}
+              employeeLabel={detail.profile.fullName}
               permissions={permissions}
-              roles={roleCatalog}
+              roles={roles}
               usernameSuggestion={detail.profile.employeeCode}
             />
           }
@@ -433,6 +427,11 @@ function EmployeeAccountTab({
       </Card>
     );
   }
+
+  const roleNames = detail.account.roleIds.map((roleId) => (
+    roles.find((role) => role.id === roleId)?.name
+    ?? `Vai trò ${roleId.slice(0, 8)}`
+  ));
 
   return (
     <div className="content-grid content-grid--two">
@@ -447,9 +446,8 @@ function EmployeeAccountTab({
         </header>
         <FieldList
           items={[
-            { label: "Tên tài khoản", value: detail.account.username ?? detail.account.employeeCodeIdentifier.toLowerCase() },
+            { label: "Tên tài khoản", value: detail.account.username ?? "—" },
             { label: "Số điện thoại", value: detail.account.loginPhone },
-            { label: "Mã nhân viên", value: detail.account.employeeCodeIdentifier },
             { label: "Ngày kích hoạt", value: detail.account.activatedAt },
             { label: "Đăng nhập gần nhất", value: detail.account.lastLoginAt }
           ]}
@@ -458,8 +456,8 @@ function EmployeeAccountTab({
       <Card>
         <h2 className="section-title">Vai trò</h2>
         <div className="role-chip-list">
-          {detail.account.roleNames.map((roleName) => (
-            <StatusBadge key={roleName} tone="info">
+          {roleNames.map((roleName, index) => (
+            <StatusBadge key={`${detail.account?.roleIds[index]}-${roleName}`} tone="info">
               {roleName}
             </StatusBadge>
           ))}
@@ -467,8 +465,9 @@ function EmployeeAccountTab({
         <EmployeeAccountActions
           account={detail.account}
           employeeId={detail.profile.id}
+          employeeLabel={detail.profile.fullName}
           permissions={permissions}
-          roles={roleCatalog}
+          roles={roles}
           usernameSuggestion={detail.profile.employeeCode}
         />
       </Card>
@@ -509,6 +508,9 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
     : undefined;
   const canViewEmployeeAttendance = can(user.permissions, "attendance.view_all") || can(user.permissions, "attendance.view_team") || can(user.permissions, "attendance.manage") || can(user.permissions, "attendance.log.view");
   const canViewEmployeeProjects = can(user.permissions, "project.view");
+  const roles = section === "account" && can(user.permissions, "account.view")
+    ? await listPersistedRoles()
+    : [];
 
   return (
     <DetailPageLayout>
@@ -530,7 +532,7 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
         <div>
           <h2>{detail.summary.displayName}</h2>
           <p>
-            {detail.summary.employeeCode} - {detail.summary.employmentTypeName}
+            {detail.summary.employmentTypeName}
           </p>
         </div>
         <StatusBadge tone={detail.summary.employmentStatusTone}>{detail.summary.employmentStatusLabel}</StatusBadge>
@@ -546,13 +548,13 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
       />
 
       {section === "profile" ? <EmployeeProfileTab detail={detail} identityFiles={{ front: identityProfile?.nationalIdFrontFileId, back: identityProfile?.nationalIdBackFileId }} permissions={user.permissions} /> : null}
-      {section === "employment" ? <EmployeeEmploymentTab dataSet={dataSet} detail={detail} /> : null}
+      {section === "employment" ? <EmployeeEmploymentTab detail={detail} /> : null}
       {section === "contracts" ? <EmployeeContractsTab dataSet={dataSet} employeeId={employeeId} permissions={user.permissions} /> : null}
       {section === "salary" ? <EmployeeSalaryTab employeeId={employeeId} user={user} /> : null}
       {section === "attendance" ? canViewEmployeeAttendance ? <EmployeeAttendanceTab employeeId={employeeId} user={user} /> : <PermissionDeniedState /> : null}
       {section === "history" ? <EmployeeHistoryTab detail={detail} user={user} canViewProjects={canViewEmployeeProjects} /> : null}
       {section === "leave" ? <EmployeeLeavePanel employeeId={employeeId} /> : null}
-      {section === "account" ? <EmployeeAccountTab detail={detail} permissions={user.permissions} /> : null}
+      {section === "account" ? <EmployeeAccountTab detail={detail} permissions={user.permissions} roles={roles} /> : null}
     </DetailPageLayout>
   );
 }

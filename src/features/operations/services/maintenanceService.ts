@@ -3,20 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError } from "@/lib/api/errors";
-import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
+import { getBusinessDateKey } from "@/lib/time/timezone";
 
 type Row = Record<string, unknown>;
-
-function businessDate() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: getServerEnv().APP_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
-}
 
 async function removeExpiredEvidence(
   client: SupabaseClient,
@@ -67,7 +58,7 @@ async function removeExpiredEvidence(
 }
 
 export async function purgeExpiredAttendanceEvidence(client: SupabaseClient) {
-  const cutoffDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+  const cutoffDate = getBusinessDateKey(new Date(Date.now() - 45 * 86_400_000));
   const personal = await removeExpiredEvidence(client, "attendance_photos", "attendance_events", cutoffDate);
   const worker = await removeExpiredEvidence(client, "worker_attendance_photos", "worker_attendance_sessions", cutoffDate);
   return { attendancePhotosExpired: personal, workerAttendancePhotosExpired: worker, retentionDays: 45 };
@@ -76,7 +67,7 @@ export async function purgeExpiredAttendanceEvidence(client: SupabaseClient) {
 export async function runDailyMaintenance() {
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR", "Database chưa được cấu hình.");
-  const jobKey = "daily-maintenance", idempotencyKey = businessDate();
+  const jobKey = "daily-maintenance", idempotencyKey = getBusinessDateKey();
   const { data, error } = await client.from("operational_job_runs").insert({ job_key: jobKey, idempotency_key: idempotencyKey, status: "running" }).select("id").single();
   if (error?.code === "23505") return { status: "skipped", reason: "already_run", idempotencyKey };
   if (error || !data) throw new AppError("SERVER_ERROR", "Không thể claim maintenance job.");

@@ -26,6 +26,8 @@ Smoke trên deployment: đặt `SMOKE_BASE_URL` rồi chạy `npm run smoke`.
 
 ## Documentation
 
+- [UI/UX và kiểm tra bản production 03/10/2026](docs/UI_UX_PRODUCTION_REVIEW_2026-10-03.md)
+- [UI design system và quy tắc component dùng chung](docs/ui-design-system.md)
 - [Production readiness](docs/operations/production-readiness.md), [deployment](docs/operations/deployment.md), [backup/restore](docs/operations/backup-restore.md), [security runbook](docs/operations/security-runbook.md)
 - [Architecture](docs/architecture/README.md), [data dictionary](docs/architecture/data-dictionary.md), [business rules](docs/architecture/business-rules.md)
 - [Permission catalog](docs/security/permissions.md), [settings catalog](docs/configuration/settings-catalog.md)

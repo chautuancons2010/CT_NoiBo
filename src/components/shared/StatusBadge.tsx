@@ -9,6 +9,7 @@ export interface StatusPresentation {
 }
 
 export const statusPresentation: Readonly<Record<string, StatusPresentation>> = {
+  calculated: { label: "Đã tính", tone: "info" },
   active: { label: "Đang hoạt động", tone: "success" },
   arrived_port: { label: "Đã cập cảng", tone: "info" },
   approved: { label: "Đã duyệt", tone: "success" },

@@ -14,8 +14,16 @@ import { ProjectHealthControl } from "@/features/projects/components/ProjectHeal
 import { ProjectPeopleAttendanceWorkspace } from "@/features/projects/components/ProjectPeopleAttendanceWorkspace";
 import { ProjectProgressTree } from "@/features/projects/components/ProjectProgressTree";
 import { ProjectRecordWorkspace } from "@/features/projects/components/ProjectRecordWorkspace";
-import type { DailySchedule, ProjectAssignment, ProjectDetail, ProjectProgressNode, ProjectUpdate } from "@/features/projects/types/projectTypes";
+import type { DailySchedule, ProjectAssignment, ProjectDetail, ProjectHealth, ProjectProgressNode, ProjectUpdate } from "@/features/projects/types/projectTypes";
 import type { WorkerAttendanceSession } from "@/features/worker-attendance/types/workerAttendanceTypes";
+
+const healthLabels: Record<ProjectHealth, string> = {
+  on_track: "Đúng tiến độ",
+  at_risk: "Có rủi ro",
+  delayed: "Chậm tiến độ",
+  paused: "Tạm dừng",
+  completed: "Hoàn thành"
+};
 
 async function postJson(url: string, payload: unknown) {
   const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -53,7 +61,7 @@ export function ProjectDetailView({ project, section, schedule, progressNodes = 
   if (section === "profile") return <div className="project-profile-workspace">
     <div className="project-profile-workspace__top">
       <ProjectRecordWorkspace project={project} />
-      <Card className="project-profile-health"><header><span>Vận hành</span><h2>Tình trạng</h2></header>{canUpdateHealth ? <ProjectHealthControl health={project.health} projectId={project.id} /> : <StatusBadge>{project.health}</StatusBadge>}</Card>
+      <Card className="project-profile-health"><header><span>Vận hành</span><h2>Tình trạng</h2></header>{canUpdateHealth ? <ProjectHealthControl health={project.health} projectId={project.id} /> : <StatusBadge>{healthLabels[project.health]}</StatusBadge>}</Card>
     </div>
     <WorksitePanel canManage={canManageWorksites} project={project} onError={setError} onSaved={() => router.refresh()} />
     {error ? <div className="attendance-notice" role="alert">{error}</div> : null}

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const locationSchema = z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180), accuracy: z.number().nonnegative().max(10000) });
+const locationSchema = z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180), accuracy: z.number().finite().nonnegative() });
 
 export const createWorkerSessionSchema = z.object({
   clientSessionId: z.string().uuid(), projectId: z.string().uuid(), worksiteId: z.string().uuid(), date: z.string().date(),

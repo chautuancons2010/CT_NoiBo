@@ -184,6 +184,55 @@ export const dashboardSettingsSchema = z
     });
   });
 
+/**
+ * Keeps role dashboard customizations usable when a release adds a profile or
+ * widget. Persisted values are filtered against the registry, while newly
+ * registered profiles receive their defaults.
+ */
+export function normalizeStoredDashboardSettings(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const stored = value as Record<string, unknown>;
+  if (!Array.isArray(stored.presetOrder) || !Array.isArray(stored.presets)) return value;
+
+  const knownProfiles = new Set<string>(dashboardProfileKeys);
+  const knownWidgets = new Set<string>(dashboardWidgetKeys);
+  const knownLandingPages = new Set<string>(dashboardLandingPages);
+  const presetOrder = [...new Set(stored.presetOrder.filter(
+    (profile): profile is (typeof dashboardProfileKeys)[number] =>
+      typeof profile === "string" && knownProfiles.has(profile)
+  ))];
+  for (const profile of dashboardProfileKeys) {
+    if (!presetOrder.includes(profile)) presetOrder.push(profile);
+  }
+
+  const storedPresets = new Map<string, Record<string, unknown>>();
+  for (const candidate of stored.presets) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const preset = candidate as Record<string, unknown>;
+    if (typeof preset.profile === "string" && knownProfiles.has(preset.profile) && !storedPresets.has(preset.profile)) {
+      storedPresets.set(preset.profile, preset);
+    }
+  }
+
+  const defaults = new Map(defaultDashboardSettings.presets.map((preset) => [preset.profile, preset]));
+  const presets = dashboardProfileKeys.map((profile) => {
+    const fallback = defaults.get(profile)!;
+    const saved = storedPresets.get(profile);
+    const enabledWidgets = saved && Array.isArray(saved.enabledWidgets)
+      ? [...new Set(saved.enabledWidgets.filter(
+          (widget): widget is (typeof dashboardWidgetKeys)[number] =>
+            typeof widget === "string" && knownWidgets.has(widget)
+        ))]
+      : [...fallback.enabledWidgets];
+    const landingPage = saved && typeof saved.landingPage === "string" && knownLandingPages.has(saved.landingPage)
+      ? saved.landingPage
+      : fallback.landingPage;
+    return { profile, landingPage, enabledWidgets };
+  });
+
+  return { presetOrder, presets };
+}
+
 export const moduleSettingsSchema = z
   .object({
     human_resources: z.boolean(),
@@ -363,30 +412,30 @@ export interface BrandColorTokens {
 
 export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
   const configuredPrimary = hexColorSchema.parse(primaryColor).toUpperCase();
-  const primary = configuredPrimary === "#0F766E" || configuredPrimary === "#19A94A" || configuredPrimary === "#46A36D"
-    ? "#2E9B67"
+  const primary = ["#0F766E", "#19A94A", "#46A36D", "#2E9B67"].includes(configuredPrimary)
+    ? "#268558"
     : configuredPrimary;
   const whiteContrast = contrastRatio(primary, "#FFFFFF");
   const blackContrast = contrastRatio(primary, "#111827");
   const primaryForeground = whiteContrast >= blackContrast ? "#FFFFFF" : "#111827";
 
-  if (primary === "#2E9B67") {
+  if (primary === "#268558") {
     return {
       primary,
-      primaryHover: "#27875A",
-      primaryActive: "#21734D",
+      primaryHover: "#21734D",
+      primaryActive: "#1C6241",
       primarySubtle: "#EAF7F0",
       primaryBorder: "#B8DDCA",
       primaryForeground: "#FFFFFF",
-      focusRing: "#2E9B6738",
-      contrast: Math.max(whiteContrast, blackContrast)
+      focusRing: "#26855838",
+      contrast: whiteContrast
     };
   }
 
   return {
     primary,
-    primaryHover: mix(primary, "#000000", 0.16),
-    primaryActive: mix(primary, "#000000", 0.26),
+    primaryHover: mix(primary, primaryForeground === "#FFFFFF" ? "#000000" : "#FFFFFF", 0.16),
+    primaryActive: mix(primary, primaryForeground === "#FFFFFF" ? "#000000" : "#FFFFFF", 0.26),
     primarySubtle: mix(primary, "#FFFFFF", 0.9),
     primaryBorder: mix(primary, "#FFFFFF", 0.62),
     primaryForeground,

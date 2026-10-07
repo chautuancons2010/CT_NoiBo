@@ -23,7 +23,7 @@ function accountColumns(canDelete: boolean, currentAccountId: string): DataTable
     cell: (account) => (
       <span className="employee-name-cell">
         <strong>{account.displayName}</strong>
-        <small>{account.username ?? account.employeeCodeIdentifier.toLowerCase()}</small>
+        {account.username ? <small>{account.username}</small> : null}
       </span>
     )
   },

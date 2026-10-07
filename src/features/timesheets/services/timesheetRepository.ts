@@ -5,6 +5,7 @@ import { AppError } from "@/lib/api/errors";
 import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { recordAuditLog } from "@/services/audit/auditLog";
+import { getBusinessDateKey } from "@/lib/time/timezone";
 import { computeDailyTimesheet, resolveCalendarDay, resolveShift } from "./timesheetRules";
 import type { CalendarDay, DailyTimesheet, Shift, TimesheetAdjustment, TimesheetException, TimesheetPeriod, TimesheetSummary } from "../types/timesheetTypes";
 
@@ -40,7 +41,7 @@ export async function saveShift(user:AuthenticatedUser,input:ShiftInput){
   }
   const{data,error}=await client.from("shifts").insert({...values,created_by:actor}).select("*").single();
   if(error||!data)throw new AppError(error?.code==="23505"?"DUPLICATE":"SERVER_ERROR","Không thể lưu ca làm.");
-  const{error:versionError}=await client.from("shift_versions").insert({shift_id:data.id,version:1,code:input.code,name:input.name,start_time:input.startTime,end_time:input.endTime,break_minutes:input.breakMinutes,late_grace_minutes:input.lateGraceMinutes,early_leave_grace_minutes:input.earlyLeaveGraceMinutes,cross_midnight:input.crossMidnight,effective_from:input.effectiveFrom??new Date().toISOString().slice(0,10),changed_by:actor,reason:input.reason??"Tạo ca làm"});
+  const{error:versionError}=await client.from("shift_versions").insert({shift_id:data.id,version:1,code:input.code,name:input.name,start_time:input.startTime,end_time:input.endTime,break_minutes:input.breakMinutes,late_grace_minutes:input.lateGraceMinutes,early_leave_grace_minutes:input.earlyLeaveGraceMinutes,cross_midnight:input.crossMidnight,effective_from:input.effectiveFrom??getBusinessDateKey(),changed_by:actor,reason:input.reason??"Tạo ca làm"});
   if(versionError){await client.from("shifts").delete().eq("id",data.id);throw new AppError("SERVER_ERROR","Không thể tạo phiên bản ca làm.");}
   await recordAuditLog({actorId:actor,action:"shift.created",entityType:"shift",entityId:String(data.id),after:values});return mapShift(data as Row);
 }
@@ -48,33 +49,34 @@ export async function saveShiftAssignment(user:AuthenticatedUser,input:{shiftId:
 export async function listCalendar(user:AuthenticatedUser,from?:string,to?:string){requireAny(user,["shift.view","shift.manage"]);let query=db().from("work_calendar_days").select("*").order("calendar_date");if(from)query=query.gte("calendar_date",from);if(to)query=query.lte("calendar_date",to);const {data,error}=await query;if(error)throw new AppError("SERVER_ERROR","Không thể đọc lịch làm việc.");return(data??[]).map(row=>({id:String(row.id),date:String(row.calendar_date),name:String(row.name),dayType:row.day_type,scopeType:row.scope_type,scopeId:row.scope_id??undefined,isWorkingDay:Boolean(row.is_working_day),active:Boolean(row.active)}));}
 export async function saveCalendarDay(user:AuthenticatedUser,input:CalendarInput){if(!can(user.permissions,"shift.manage"))throw new AppError("PERMISSION_DENIED");const client=db();const actor=await actorId(client,user);const values={calendar_date:input.date,name:input.name,day_type:input.dayType,scope_type:input.scopeType,scope_id:input.scopeId??null,is_working_day:input.isWorkingDay,active:input.active};const operation=input.id?client.from("work_calendar_days").update(values).eq("id",input.id):client.from("work_calendar_days").insert({...values,created_by:actor});const {data,error}=await operation.select("*").single();if(error||!data)throw new AppError(error?.code==="23505"?"DUPLICATE":"SERVER_ERROR","Không thể lưu ngày lịch.");return data;}
 
-export async function listPeriods(user:AuthenticatedUser){requireAny(user,["timesheet.view","timesheet.self.view","timesheet.view_all","timesheet.view_team","attendance.view_all","attendance.period.manage"]);const {data,error}=await db().from("timesheet_periods").select("*").order("start_date",{ascending:false});if(error)throw new AppError("SERVER_ERROR","Không thể đọc kỳ công.");return(data??[]).map(row=>mapPeriod(row as Row));}
+export async function listPeriods(user:AuthenticatedUser){requireAny(user,["timesheet.view","timesheet.self.view","timesheet.view_all","timesheet.view_team","attendance.view_all","attendance.period.manage"]);const {data,error}=await db().from("timesheet_periods").select("id,code,name,start_date,end_date,status,version,row_version,locked_at,reopened_at,reopen_reason").order("start_date",{ascending:false});if(error)throw new AppError("SERVER_ERROR","Không thể đọc kỳ công.");return(data??[]).map(row=>mapPeriod(row as Row));}
 export async function createPeriod(user:AuthenticatedUser,input:{code:string;name:string;startDate:string;endDate:string}){if(!can(user.permissions,"timesheet.adjust")&&!can(user.permissions,"timesheet.lock")&&!can(user.permissions,"attendance.period.manage"))throw new AppError("PERMISSION_DENIED");const client=db();const actor=await actorId(client,user);const {data,error}=await client.from("timesheet_periods").insert({code:input.code,name:input.name,start_date:input.startDate,end_date:input.endDate,created_by:actor}).select("*").single();if(error||!data)throw new AppError(error?.code==="23505"?"DUPLICATE":"SERVER_ERROR","Không thể tạo kỳ công.");await recordAuditLog({actorId:actor,action:"timesheet.period_created",entityType:"timesheet_period",entityId:String(data.id)});return mapPeriod(data as Row);}
 export async function getPeriod(user:AuthenticatedUser,id:string){
   requireAny(user,["timesheet.view","timesheet.self.view","timesheet.view_all","timesheet.view_team","attendance.view_all","attendance.period.manage"]);
   const client=db();
-  const scope=await visibleEmployeeIds(client,user);
-  const {data:period,error:periodError}=await client.from("timesheet_periods").select("*").eq("id",id).maybeSingle();
+  const [scope,{data:period,error:periodError}]=await Promise.all([
+    visibleEmployeeIds(client,user),
+    client.from("timesheet_periods").select("*").eq("id",id).maybeSingle()
+  ]);
   if(periodError||!period)throw new AppError("NOT_FOUND","Không tìm thấy kỳ công.");
   if(scope?.length===0)return{period:mapPeriod(period as Row),summaries:[],daily:[]};
-  const summaries:Row[]=[];
-  const daily:Row[]=[];
-  for(let offset=0;;offset+=1000){
-    let query=client.from("timesheet_period_summaries").select("*").eq("period_id",id).order("employee_id").range(offset,offset+999);
-    if(scope)query=query.in("employee_id",scope);
-    const {data,error}=await query;
-    if(error)throw new AppError("SERVER_ERROR","Không thể đọc tổng hợp kỳ công.");
-    summaries.push(...(data??[]));
-    if((data??[]).length<1000)break;
+  async function loadRows(table:"timesheet_period_summaries"|"daily_timesheets",errorMessage:string):Promise<Row[]>{
+    const rows:Row[]=[];
+    for(let offset=0;;offset+=1000){
+      let query=client.from(table).select("*").eq("period_id",id).order(table==="daily_timesheets"?"work_date":"employee_id").range(offset,offset+999);
+      if(table==="daily_timesheets")query=query.order("employee_id");
+      if(scope)query=query.in("employee_id",scope);
+      const {data,error}=await query;
+      if(error)throw new AppError("SERVER_ERROR",errorMessage);
+      rows.push(...(data??[]));
+      if((data??[]).length<1000)break;
+    }
+    return rows;
   }
-  for(let offset=0;;offset+=1000){
-    let query=client.from("daily_timesheets").select("*").eq("period_id",id).order("work_date").order("employee_id").range(offset,offset+999);
-    if(scope)query=query.in("employee_id",scope);
-    const {data,error}=await query;
-    if(error)throw new AppError("SERVER_ERROR","Không thể đọc ngày công.");
-    daily.push(...(data??[]));
-    if((data??[]).length<1000)break;
-  }
+  const [summaries,daily]=await Promise.all([
+    loadRows("timesheet_period_summaries","Không thể đọc tổng hợp kỳ công."),
+    loadRows("daily_timesheets","Không thể đọc ngày công.")
+  ]);
   return{period:mapPeriod(period as Row),summaries:summaries.map(mapSummary),daily:daily.map(mapDaily)};
 }
 

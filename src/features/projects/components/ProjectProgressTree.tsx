@@ -110,7 +110,7 @@ export function ProjectProgressTree({
         if (!response.ok) throw new Error(body.error?.message ?? "Không thể tải danh sách nhân sự.");
         setAssignees((body.data?.employees?.items ?? []).map((employee) => ({
           id: employee.id,
-          label: `${employee.employeeCode} · ${employee.displayName}`
+          label: employee.displayName
         })));
       } catch (reason) {
         if (!(reason instanceof DOMException && reason.name === "AbortError")) {

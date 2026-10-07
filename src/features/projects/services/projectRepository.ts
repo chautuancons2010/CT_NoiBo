@@ -81,12 +81,20 @@ function hasCompanyProjectScope(user: AuthenticatedUser): boolean {
 
 async function scopedProjectIds(client: SupabaseClient, user: AuthenticatedUser): Promise<Set<string> | undefined> {
   if (hasCompanyProjectScope(user)) return undefined;
-  const accountId = await actorAccountId(client, user);
-  let accountQuery = client.from("app_accounts").select("employee_id").limit(1);
-  accountQuery = accountId ? accountQuery.eq("id", accountId) : accountQuery.eq("primary_email", user.email);
+  let accountQuery = client.from("app_accounts").select("id,employee_id").limit(1);
+  accountQuery = /^[0-9a-f-]{36}$/i.test(user.id) ? accountQuery.eq("id", user.id) : accountQuery.eq("primary_email", user.email);
   const { data: account, error: accountError } = await accountQuery.maybeSingle();
-  if (accountError) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi dự án.");
-  const employeeId = account?.employee_id ? String(account.employee_id) : undefined;
+  if (accountError) throw new AppError("SERVER_ERROR", "Không thể xác định tài khoản dự án.");
+  const accountId = account?.id ? String(account.id) : undefined;
+  let employeeId = account?.employee_id ? String(account.employee_id) : undefined;
+  // Preserve the existing email fallback for an unresolved account identifier.
+  // The normal authenticated path reads account and employee IDs together.
+  if (!accountId) {
+    const { data: fallback, error: fallbackError } = await client.from("app_accounts")
+      .select("employee_id").eq("primary_email", user.email).limit(1).maybeSingle();
+    if (fallbackError) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi dự án.");
+    employeeId = fallback?.employee_id ? String(fallback.employee_id) : undefined;
+  }
   const [assignedResult, managedResult, createdResult] = await Promise.all([
     employeeId
       ? client.from("project_assignments").select("project_id").eq("employee_id", employeeId).eq("status", "active")
@@ -113,16 +121,16 @@ async function assertProjectScope(client: SupabaseClient, user: AuthenticatedUse
 
 export async function listProjects(user?: AuthenticatedUser): Promise<ProjectSummary[]> {
   const client = db();
-  let projectResult = await client.from("projects").select(projectSelect).order("updated_at", { ascending: false });
-  if (projectResult.error) {
-    projectResult = await client.from("projects").select("*").order("updated_at", { ascending: false });
-  }
-  if (projectResult.error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách dự án.");
-  const [worksiteResult, assignmentResult, scope] = await Promise.all([
+  const [projectResult, worksiteResult, assignmentResult, scope] = await Promise.all([
+    (async () => {
+      const selected = await client.from("projects").select(projectSelect).order("updated_at", { ascending: false });
+      return selected.error ? client.from("projects").select("*").order("updated_at", { ascending: false }) : selected;
+    })(),
     client.from("worksites").select("project_id,id"),
     client.from("project_assignments").select("project_id,employee_id").eq("status", "active"),
     user ? scopedProjectIds(client, user) : Promise.resolve(undefined)
   ]);
+  if (projectResult.error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách dự án.");
   const data = projectResult.data;
   const worksites = worksiteResult.error ? [] : worksiteResult.data;
   const assignments = assignmentResult.error ? [] : assignmentResult.data;

@@ -33,5 +33,5 @@ export function MessageBell() {
     return () => { disposed = true; cleanup(); };
   }, [load]);
 
-  return <Link aria-label={count ? `${count} tin nhắn chưa đọc` : "Tin nhắn"} className="icon-link notification-bell" href="/messages" title="Tin nhắn"><MessageCircle aria-hidden="true" size={18}/>{count ? <span>{count > 99 ? "99+" : count}</span> : null}</Link>;
+  return <Link aria-label={count ? `${count} tin nhắn chưa đọc` : "Tin nhắn"} className="icon-link notification-bell message-bell" href="/messages" title="Tin nhắn"><MessageCircle aria-hidden="true" size={18}/>{count ? <span>{count > 99 ? "99+" : count}</span> : null}</Link>;
 }

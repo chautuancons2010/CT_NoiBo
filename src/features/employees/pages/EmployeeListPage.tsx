@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
-import { PageHeader } from "@/components/shared/PageHeader";
+import { ResponsivePageHeader } from "@/components/shared/PageHeader";
 import { ListPageLayout } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Avatar } from "@/components/shared/Avatar";
 import { Inspector, WorkbenchLayout, WorkCanvas } from "@/components/shared/Workbench";
 import { PermissionGate } from "@/components/shared/PermissionGate";
 import { PermissionDeniedState } from "@/components/shared/States";
@@ -93,13 +94,10 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
   const selectedEmployee = result.items.find((employee) => employee.id === selectedId);
   const firstRecord = result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1;
   const lastRecord = Math.min(result.page * result.pageSize, result.total);
-  const activeEmployees = result.items.filter((employee) => employee.employmentStatus === "active").length;
-  const probationEmployees = result.items.filter((employee) => employee.employmentStatus === "probation").length;
-  const unlinkedEmployees = result.items.filter((employee) => !employee.hasAccount).length;
 
   return (
     <ListPageLayout>
-      <PageHeader
+      <ResponsivePageHeader
         action={
           <PermissionGate permissions={user.permissions} require="employee.create">
             <Link className="button button--primary button--md" href="/employees/new">
@@ -113,18 +111,9 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
         title="Nhân viên"
       />
 
-      <section aria-label="Tổng quan nhân sự" className="employee-overview">
-        <div className="employee-overview__primary"><span>Hồ sơ nhân sự</span><strong>{result.total}</strong><b>nhân viên</b></div>
-        <div className="employee-overview__metrics">
-          <div><span>Đang làm việc</span><strong>{activeEmployees}</strong></div>
-          <div><span>Thử việc</span><strong>{probationEmployees}</strong></div>
-          <div><span>Chưa liên kết tài khoản</span><strong>{unlinkedEmployees}</strong></div>
-        </div>
-      </section>
-
       <WorkbenchLayout className={selectedEmployee ? "employee-roster" : "employee-roster workbench-layout--solo"}>
         <WorkCanvas className="employee-roster__canvas">
-          <header className="employee-roster__heading"><div><span>Danh sách</span><strong>Nhân viên đang quản lý</strong></div><span>{firstRecord}–{lastRecord} / {result.total} bản ghi</span></header>
+          <header className="employee-roster__heading"><h2>Danh sách nhân viên</h2><span>{firstRecord}–{lastRecord} / {result.total} bản ghi</span></header>
           <EmployeeListFilters
             defaults={filters}
             departments={filterOptions.departments.map((item) => ({ label: item.name, value: item.id }))}
@@ -145,11 +134,11 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
         </WorkCanvas>
         {selectedEmployee ? (
           <Inspector className="employee-roster__inspector" title="Hồ sơ đang chọn">
-            <div className="employee-inspector-heading"><strong>{selectedEmployee.fullName}</strong><span className="operational-code">{selectedEmployee.employeeCode}</span><StatusBadge tone={selectedEmployee.employmentStatusTone}>{selectedEmployee.employmentStatusLabel}</StatusBadge></div>
+            <div className="employee-inspector-heading"><Avatar imageUrl={selectedEmployee.avatarAssetId ? `/api/v1/employees/${selectedEmployee.id}/avatar` : undefined} name={selectedEmployee.fullName} /><strong>{selectedEmployee.fullName}</strong><StatusBadge tone={selectedEmployee.employmentStatusTone}>{selectedEmployee.employmentStatusLabel}</StatusBadge></div>
             <dl className="employee-inspector-fields">
               <div><dt>Phòng ban</dt><dd>{selectedEmployee.departmentName}</dd></div>
               <div><dt>Chức vụ</dt><dd>{selectedEmployee.positionName}</dd></div>
-              <div><dt>Loại nhân sự</dt><dd>{selectedEmployee.employmentTypeName}</dd></div>
+              <div><dt>Nhóm làm việc</dt><dd>{selectedEmployee.employmentTypeName}</dd></div>
               <div><dt>Ngày vào làm</dt><dd>{selectedEmployee.joinDate}</dd></div>
               <div><dt>Hồ sơ</dt><dd>{selectedEmployee.profileCompleteness}% hoàn thiện</dd></div>
               <div><dt>Tài khoản</dt><dd>{selectedEmployee.hasAccount ? "Đã liên kết" : "Chưa liên kết"}</dd></div>

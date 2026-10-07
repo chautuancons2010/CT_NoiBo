@@ -15,15 +15,19 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button, IconButton } from "@/components/shared/Button";
+import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { captureAttendancePhoto, type ProcessedAttendancePhoto } from "@/features/attendance/client/imageProcessing";
 import { countPendingAttendance, listPendingAttendance, savePendingAttendance } from "@/features/attendance/client/attendanceQueue";
 import { AttendanceSyncError, syncAttendanceItem } from "@/features/attendance/client/attendanceSync";
+import { AttendanceLocationError, captureAttendanceLocation } from "@/features/attendance/client/locationCapture";
 import { matchAttendanceLocation } from "@/features/attendance/services/attendanceRules";
+import { canSubmitPersonalAttendance } from "@/lib/auth/applicationAccess";
 import type { AttendanceCoordinates, AttendanceDashboard, PendingAttendanceItem } from "@/features/attendance/types/attendanceTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 
@@ -51,14 +55,20 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Không thể hoàn tất thao tác. Vui lòng thử lại.";
 }
 
-export function AttendanceCameraExperience() {
+export function AttendanceCameraExperience({ initialCapture = false, returnHref }: { initialCapture?: boolean; returnHref?: string } = {}) {
+  const router = useRouter();
+  const user = useCurrentUser();
+  const canSubmit = canSubmitPersonalAttendance(user.permissions);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const autoCaptureStartedRef = useRef(false);
+  const locationRequestRef = useRef(0);
   const [dashboard, setDashboard] = useState<AttendanceDashboard>();
   const [loadError, setLoadError] = useState<string>();
   const [step, setStep] = useState<CaptureStep>("home");
   const [cameraState, setCameraState] = useState<PermissionState>("idle");
   const [locationState, setLocationState] = useState<PermissionState>("idle");
+  const [locationError, setLocationError] = useState<string>();
   const [coordinates, setCoordinates] = useState<AttendanceCoordinates>();
   const [photo, setPhoto] = useState<ProcessedAttendancePhoto>();
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
@@ -116,23 +126,24 @@ export function AttendanceCameraExperience() {
     if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl);
   }, [photo?.previewUrl, stopCamera]);
 
-  const requestLocation = useCallback(() => {
+  const requestLocation = useCallback(async () => {
+    const requestId = ++locationRequestRef.current;
+    setCoordinates(undefined);
+    setLocationError(undefined);
     setLocationState("requesting");
-    if (!navigator.geolocation) { setLocationState("unavailable"); return; }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCoordinates({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          capturedAt: new Date(position.timestamp).toISOString()
-        });
-        setLocationState("ready");
-      },
-      (error) => setLocationState(error.code === error.PERMISSION_DENIED ? "denied" : "unavailable"),
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 }
-    );
+    try {
+      const location = await captureAttendanceLocation(navigator.geolocation, window.isSecureContext);
+      if (locationRequestRef.current !== requestId) return;
+      setCoordinates(location);
+      setLocationState("ready");
+    } catch (error) {
+      if (locationRequestRef.current !== requestId) return;
+      setLocationState(error instanceof AttendanceLocationError && error.code === "denied" ? "denied" : "unavailable");
+      setLocationError(errorMessage(error));
+    }
   }, []);
+
+  useEffect(() => () => { locationRequestRef.current++; }, []);
 
   const startCamera = useCallback(async (nextFacingMode = facingMode) => {
     setCameraState("requesting");
@@ -151,19 +162,33 @@ export function AttendanceCameraExperience() {
     }
   }, [facingMode, stopCamera]);
 
-  const openCapture = () => {
+  const openCapture = useCallback(() => {
     setNotice(undefined);
     setStep("camera");
     setCoordinates(undefined);
-    requestLocation();
+    void requestLocation();
     void startCamera();
-  };
+  }, [requestLocation, startCamera]);
+
+  useEffect(() => {
+    if (!initialCapture || !dashboard || autoCaptureStartedRef.current || !canSubmit || !dashboard.policy.attendanceEnabled || dashboard.nextAction === "completed") return;
+    autoCaptureStartedRef.current = true;
+    queueMicrotask(openCapture);
+  }, [initialCapture, dashboard, canSubmit, openCapture]);
+
+  useEffect(() => {
+    if (step !== "camera" || cameraState !== "ready" || !videoRef.current || !streamRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    void videoRef.current.play().catch(() => undefined);
+  }, [step, cameraState]);
 
   const closeCapture = () => {
+    locationRequestRef.current++;
     stopCamera();
     if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl);
     setPhoto(undefined);
     setStep("home");
+    if (returnHref) router.replace(returnHref);
   };
 
   const takePhoto = async () => {
@@ -182,14 +207,14 @@ export function AttendanceCameraExperience() {
     if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl);
     setPhoto(undefined);
     setStep("camera");
+    void requestLocation();
     void startCamera();
   };
 
   const submitPhoto = async () => {
     if (!dashboard || !photo || dashboard.nextAction === "completed") return;
-    const locationMatch = matchAttendanceLocation(coordinates, dashboard.locations, dashboard.policy);
-    if (dashboard.policy.gpsRequired && locationMatch.status !== "valid") {
-      setNotice(locationMatch.status === "accuracy_low" ? "Vị trí chưa đủ chính xác. Hãy đứng ở khu vực thoáng và thử lại." : "Bạn đang ở ngoài phạm vi chấm công cho phép.");
+    if (dashboard.policy.gpsRequired && !coordinates) {
+      setNotice(locationError ?? "Chưa có tọa độ GPS. Hãy thử lại vị trí.");
       return;
     }
     setStep("saving");
@@ -231,13 +256,21 @@ export function AttendanceCameraExperience() {
     }
   };
 
-  if (!dashboard && !loadError) return <LoadingState title="Đang tải chấm công" description="Đang kiểm tra ca làm và trạng thái hôm nay." />;
+  if (!dashboard && !loadError) return <LoadingState title="Đang tải chấm công" />;
   if (!dashboard) return loadError?.includes("chưa liên kết")
     ? <ErrorState title="Tài khoản này chưa được liên kết với hồ sơ nhân viên" description="Chức năng chấm công cá nhân chưa khả dụng." />
     : <ErrorState title="Không thể mở chấm công" description={loadError} action={<Button onClick={() => void loadDashboard()}>Thử lại</Button>} />;
 
   const match = matchAttendanceLocation(coordinates, dashboard.locations, dashboard.policy);
+  const locationLabel = coordinates
+    ? `${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)} · ±${Math.round(coordinates.accuracy)} m`
+    : locationState === "requesting" ? "Đang xác định vị trí..." : locationError ?? "Chưa có GPS";
   const nextLabel = dashboard.nextAction === "check_in" ? "Chấm vào" : dashboard.nextAction === "check_out" ? "Chấm ra" : "Đã hoàn tất";
+
+  if (initialCapture && step === "home" && (!dashboard.policy.attendanceEnabled || dashboard.nextAction === "completed")) {
+    return <section className="attendance-quick-empty"><CheckCircle2 aria-hidden="true" size={36} /><strong>{dashboard.policy.attendanceEnabled ? "Hôm nay đã hoàn tất chấm công" : "Chấm công đang tạm ngừng"}</strong><Link href={returnHref ?? "/personal"}>Về Cá nhân</Link></section>;
+  }
+  if (initialCapture && step === "home") return <LoadingState title="Đang mở camera" />;
 
   return (
     <div className="attendance-page">
@@ -266,7 +299,7 @@ export function AttendanceCameraExperience() {
                 <div key={event.id}><span>{event.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</span><strong>{formatTime(event.effectiveAt)}</strong><StatusBadge tone={event.syncStatus === "synced" ? "success" : "warning"}>{event.syncStatus === "synced" ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge></div>
               )) : <span>Chưa có lượt chấm hôm nay</span>}
             </div>
-            <Button className="attendance-primary-action" disabled={dashboard.nextAction === "completed" || !dashboard.policy.attendanceEnabled} leftIcon={<Camera size={20} />} onClick={openCapture} size="lg" variant="primary">{nextLabel}</Button>
+            {canSubmit ? <Button className="attendance-primary-action" disabled={dashboard.nextAction === "completed" || !dashboard.policy.attendanceEnabled} leftIcon={<Camera size={20} />} onClick={openCapture} size="lg" variant="primary">{nextLabel}</Button> : null}
             {dashboard.lastEvent ? <Link className="attendance-last-link" href={`/attendance/history/${dashboard.lastEvent.attendanceDate}`}><History size={16} />Lần gần nhất: {formatTime(dashboard.lastEvent.effectiveAt)} · {dashboard.lastEvent.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</Link> : null}
           </section>
         </div>
@@ -280,13 +313,13 @@ export function AttendanceCameraExperience() {
             {cameraState !== "ready" ? <div className="attendance-camera-state">{cameraState === "requesting" ? <RefreshCcw className="spin" size={28} /> : <CameraOff size={30} />}<span>{cameraState === "denied" ? "Không thể truy cập camera. Hãy cấp quyền camera và thử lại." : cameraState === "unavailable" ? "Camera không khả dụng trên thiết bị này." : "Đang mở camera..."}</span></div> : null}
           </div>
           <div className="attendance-capture-status">
-            <span><MapPin size={16} />{locationState === "requesting" ? "Đang xác định vị trí..." : locationState === "denied" ? "Chưa có quyền vị trí" : match.status === "valid" ? `${match.location?.name} · Vị trí hợp lệ` : match.status === "accuracy_low" ? "GPS chưa đủ chính xác" : locationState === "ready" ? "Ngoài phạm vi cho phép" : "Không thể xác định vị trí"}</span>
+            <span role="status"><MapPin aria-hidden="true" size={16} />{locationLabel}</span>
             <span>{online ? <Wifi size={16} /> : <WifiOff size={16} />}{online ? "Đã kết nối" : "Không có mạng"}</span>
           </div>
           <div className="attendance-capture-actions">
             <IconButton label="Đổi camera" onClick={() => { const next = facingMode === "user" ? "environment" : "user"; setFacingMode(next); void startCamera(next); }}><SwitchCamera size={22} /></IconButton>
             <button aria-label="Chụp ảnh" className="capture-button" disabled={cameraState !== "ready"} onClick={() => void takePhoto()} type="button"><span /></button>
-            <IconButton label="Thử lại GPS" onClick={requestLocation}><RefreshCcw size={20} /></IconButton>
+            <IconButton disabled={locationState === "requesting"} label="Thử lại GPS" onClick={() => void requestLocation()}><RefreshCcw size={20} /></IconButton>
           </div>
         </section>
       ) : null}
@@ -295,14 +328,14 @@ export function AttendanceCameraExperience() {
         <section className="attendance-photo-review" aria-label="Kiểm tra ảnh chấm công">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img alt="Ảnh chấm công vừa chụp" src={photo.previewUrl} />
-          <div className="attendance-capture-status"><span><MapPin size={16} />{match.status === "valid" ? `${match.location?.name} · Vị trí hợp lệ` : "Vị trí chưa hợp lệ"}</span><span>{online ? <Wifi size={16} /> : <WifiOff size={16} />}{online ? "Đã kết nối" : "Sẽ lưu trên thiết bị"}</span></div>
-          <div className="action-row"><Button leftIcon={<RotateCcw size={16} />} onClick={retake}>Chụp lại</Button><Button disabled={dashboard.policy.gpsRequired && match.status !== "valid"} leftIcon={<CheckCircle2 size={16} />} onClick={() => void submitPhoto()} variant="primary">Sử dụng ảnh</Button></div>
+          <div className="attendance-capture-status"><span role="status"><MapPin aria-hidden="true" size={16} />{locationLabel}</span><span>{online ? <Wifi size={16} /> : <WifiOff size={16} />}{online ? "Đã kết nối" : "Sẽ lưu trên thiết bị"}</span></div>
+          <div className="action-row"><Button leftIcon={<RotateCcw size={16} />} onClick={retake}>Chụp lại</Button><Button disabled={locationState === "requesting"} leftIcon={<RefreshCcw size={16} />} onClick={() => void requestLocation()}>Thử lại GPS</Button><Button disabled={dashboard.policy.gpsRequired && !coordinates} leftIcon={<CheckCircle2 size={16} />} onClick={() => void submitPhoto()} variant="primary">Sử dụng ảnh</Button></div>
         </section>
       ) : null}
 
-      {step === "saving" ? <LoadingState title="Đang ghi nhận..." description="Đang lưu dữ liệu an toàn trên thiết bị." /> : null}
+      {step === "saving" ? <LoadingState title="Đang ghi nhận..." /> : null}
       {step === "success" ? (
-        <section className="attendance-success-card"><CheckCircle2 size={52} /><h2>{successSynced ? "Máy chủ đã xác nhận" : "Đã lưu trên thiết bị"}</h2><strong>{formatTime(now)}</strong><span>{match.location?.name}</span><StatusBadge tone={successSynced ? "success" : "warning"}>{successSynced ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge><Button onClick={closeCapture}>Về màn hình hôm nay</Button></section>
+        <section className="attendance-success-card"><CheckCircle2 size={52} /><h2>{successSynced ? "Máy chủ đã xác nhận" : "Đã lưu trên thiết bị"}</h2><strong>{formatTime(now)}</strong><span>{match.location?.name}</span><StatusBadge tone={successSynced ? "success" : "warning"}>{successSynced ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge><Button onClick={closeCapture}>{returnHref ? "Xong" : "Về màn hình hôm nay"}</Button></section>
       ) : null}
     </div>
   );

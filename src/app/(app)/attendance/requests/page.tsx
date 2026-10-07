@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/shared/PageHeader";
 import { AttendanceAdjustmentRequests } from "@/features/attendance/components/AttendanceAdjustmentRequests";
-import { LeaveRequestList } from "@/features/leave";
+import { LeaveRequestList } from "@/features/leave/components/LeaveRequestList";
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const { date } = await searchParams;

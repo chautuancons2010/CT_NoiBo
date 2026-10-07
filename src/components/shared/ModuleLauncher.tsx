@@ -8,6 +8,8 @@ import { navigationIconMap, navigationIconSizes } from "@/components/layout/icon
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { visibleApplications, type ApplicationDefinition } from "@/config/moduleRegistry";
+import { readWorkspacePreferences } from "@/lib/ui/workspacePreferencesRequest";
+import { LinkLoadingIndicator } from "@/components/shared/LinkLoadingIndicator";
 
 export function ModuleIconCard({ application }: { application: ApplicationDefinition }) {
   const Icon = navigationIconMap[application.icon];
@@ -21,23 +23,28 @@ export function ModuleIconCard({ application }: { application: ApplicationDefini
       <span className="module-icon-card__icon"><Icon aria-hidden="true" size={navigationIconSizes.module} strokeWidth={1.9} /></span>
       <strong>{application.label}</strong>
       <ArrowRight aria-hidden="true" className="module-icon-card__arrow" size={navigationIconSizes.launcherArrow} />
+      <LinkLoadingIndicator />
     </Link>
   );
 }
 
-export function ModuleLauncher() {
+export function ModuleLauncher({ showHeading = true, excludePersonal = false }: { showHeading?: boolean; excludePersonal?: boolean } = {}) {
   const user = useCurrentUser();
   const { settings } = useSystemSettings();
   const [pinned, setPinned] = useState<string[]>([]);
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/v1/workspace/preferences", { cache: "no-store", signal: controller.signal }).then(async (response) => {
-      if (!response.ok) return;
-      const body = await response.json(); setPinned(body.data?.pinnedModules ?? []);
+    let active = true;
+    void readWorkspacePreferences().then((preferences) => {
+      if (active && preferences) setPinned(preferences.pinnedModules);
     }).catch(() => undefined);
-    return () => controller.abort();
+    const update = (event: Event) => {
+      const preferences = (event as CustomEvent<{ pinnedModules?: string[] }>).detail;
+      if (Array.isArray(preferences?.pinnedModules)) setPinned(preferences.pinnedModules);
+    };
+    window.addEventListener("ui-preferences-updated", update);
+    return () => { active = false; window.removeEventListener("ui-preferences-updated", update); };
   }, []);
-  const applications = visibleApplications(user, settings.modules).filter((application) => application.id !== "overview").sort((first, second) => {
+  const applications = visibleApplications(user, settings.modules).filter((application) => application.id !== "overview" && (!excludePersonal || application.id !== "attendance")).sort((first, second) => {
     const firstIndex = pinned.indexOf(first.id), secondIndex = pinned.indexOf(second.id);
     if (firstIndex >= 0 && secondIndex >= 0) return firstIndex - secondIndex;
     if (firstIndex >= 0) return -1;
@@ -47,10 +54,8 @@ export function ModuleLauncher() {
   if (!applications.length) return null;
 
   return (
-    <section aria-labelledby="my-modules-title" className="module-launcher">
-      <header className="dashboard-section-heading">
-        <h2 id="my-modules-title">Ứng dụng của tôi</h2>
-      </header>
+    <section aria-label={showHeading ? undefined : "Ứng dụng được phép sử dụng"} aria-labelledby={showHeading ? "my-modules-title" : undefined} className="module-launcher">
+      {showHeading ? <header className="dashboard-section-heading"><h2 id="my-modules-title">Ứng dụng của tôi</h2></header> : null}
       <div className="module-launcher__grid">
         {applications.map((application) => <ModuleIconCard application={application} key={application.id} />)}
       </div>

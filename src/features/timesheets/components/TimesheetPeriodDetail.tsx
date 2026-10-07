@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Card } from "@/components/shared/Card";
+import { Button } from "@/components/shared/Button";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
 import { Select } from "@/components/shared/FormControls";
 import { DataSurface, DetailPageLayout } from "@/components/shared/PageLayouts";
+import { EntityContextHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ContextTabs } from "@/components/shared/Tabs";
+import { LoadingState, ErrorState } from "@/components/shared/States";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 import type { DailyTimesheet, ReportTemplate, TimesheetPeriod, TimesheetSummary } from "../types/timesheetTypes";
 
@@ -93,13 +96,12 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
     } finally { setBusy(false); }
   }
 
-  if (!detail) return <Card>{error ? <p className="form-error" role="alert">{error}</p> : "Đang tải…"}</Card>;
+  if (!detail) return error ? <ErrorState description={error} /> : <LoadingState title="Đang tải kỳ công" />;
   const period = detail.period;
   const summaryColumns: DataTableColumn<TimesheetSummary>[] = [
-    { id: "employee", header: "Nhân viên", cell: (item) => <><strong>{item.employeeName}</strong><br /><small>{item.employeeCode}</small></> },
+    { id: "employee", header: "Nhân viên", priority: "primary", cell: (item) => <strong>{item.employeeName}</strong> },
     { id: "scheduled", header: "Ngày chuẩn", cell: (item) => String(item.scheduledWorkdays) },
     { id: "actual", header: "Ngày công", cell: (item) => String(item.actualWorkdays) },
-    { id: "minutes", header: "Phút làm", cell: (item) => String(item.workedMinutes), hiddenOnMobile: true },
     { id: "late", header: "Trễ", cell: (item) => `${item.lateDays} / ${item.lateMinutes}'`, hiddenOnMobile: true },
     { id: "leave", header: "Phép năm", cell: (item) => String(item.annualLeaveDays), hiddenOnMobile: true },
     { id: "absent", header: "Vắng", cell: (item) => String(item.absentDays) },
@@ -107,7 +109,7 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
   ];
   const dailyColumns: DataTableColumn<DailyTimesheet>[] = [
     { id: "date", header: "Ngày", accessor: "workDate" },
-    ...(!employeeId ? [{ id: "employee", header: "Nhân viên", cell: (item: DailyTimesheet) => <>{item.employeeName}<br /><small>{item.employeeCode}</small></> }] : []),
+    ...(!employeeId ? [{ id: "employee", header: "Nhân viên", priority: "primary" as const, cell: (item: DailyTimesheet) => <>{item.employeeName}</> }] : []),
     { id: "shift", header: "Ca", cell: (item) => item.shiftName || "—" },
     { id: "in", header: "Vào", cell: (item) => displayTime(item.effectiveCheckIn) },
     { id: "out", header: "Ra", cell: (item) => displayTime(item.effectiveCheckOut) },
@@ -115,18 +117,35 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
     { id: "late", header: "Trễ", cell: (item) => `${item.lateMinutes}'`, hiddenOnMobile: true },
     { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge tone={item.exceptionCount ? "warning" : "neutral"}>{labels[item.status] ?? item.status}</StatusBadge> }
   ];
-  return <DetailPageLayout>
-    <div className="timesheet-period-bar"><div><strong>{period.name}</strong><span>{period.startDate} – {period.endDate}</span><StatusBadge tone={period.status === "locked" ? "success" : "warning"}>{labels[period.status]}</StatusBadge><span>v{period.version}</span></div>
-      <div>
-        {period.status !== "locked" && canRecompute ? <button className="button button--secondary" disabled={busy} onClick={() => void action("recompute")} type="button">Tính lại</button> : null}
-        {period.status !== "locked" && canLock ? <button className="button button--primary" disabled={busy} onClick={() => void action("lock")} type="button">Chốt kỳ công</button> : null}
-        {period.status === "locked" && canUnlock ? <button className="button button--secondary" disabled={busy} onClick={() => void action("unlock")} type="button">Mở khóa</button> : null}
-        {canExport ? <><select aria-label="Mẫu xuất" className="select" onChange={(event) => setTemplateId(event.target.value)} value={templateId}>{templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="button button--secondary" disabled={busy || !templateId} onClick={() => void exportExcel()} type="button">Xuất Excel</button></> : null}
-      </div>
-    </div>
+  return <DetailPageLayout className="timesheet-period-page">
+    <EntityContextHeader
+      action={<>
+        {period.status !== "locked" && canRecompute ? <Button disabled={busy} onClick={() => void action("recompute")} variant="secondary">Tính lại</Button> : null}
+        {period.status !== "locked" && canLock ? <Button disabled={busy} onClick={() => void action("lock")} variant="primary">Chốt kỳ công</Button> : null}
+        {period.status === "locked" && canUnlock ? <Button disabled={busy} onClick={() => void action("unlock")} variant="secondary">Mở khóa</Button> : null}
+        {canExport ? <>
+          <Select label="Mẫu xuất" labelHidden onChange={(event) => setTemplateId(event.target.value)} options={templates.map((item) => ({ label: item.name, value: item.id }))} value={templateId} />
+          <Button disabled={busy || !templateId} onClick={() => void exportExcel()} variant="secondary">{busy ? "Đang xử lý…" : "Xuất Excel"}</Button>
+        </> : null}
+      </>}
+      code="Kỳ công"
+      meta={<><span>{period.startDate} – {period.endDate}</span><StatusBadge tone={period.status === "locked" ? "success" : "warning"}>{labels[period.status]}</StatusBadge><span>Phiên bản {period.version}</span></>}
+      title={period.name}
+    />
     {error ? <p className="form-error" role="alert">{error}</p> : null}
-    <div className="timesheet-tabs"><button className={tab === "summary" ? "is-active" : ""} onClick={() => setTab("summary")} type="button">Tổng hợp ({summaries.length})</button><button className={tab === "daily" ? "is-active" : ""} onClick={() => setTab("daily")} type="button">Chi tiết ({daily.length})</button>{canViewExceptions ? <Link href={`/timesheets/exceptions?periodId=${periodId}`}>Ngoại lệ</Link> : null}</div>
-    {!employeeId ? <div className="timesheet-period-filter"><Select label="Nhóm nhân viên" name="employeeGroup" onChange={(event) => setEmployeeGroup(event.target.value as "all" | "office" | "worker")} options={[{ value: "all", label: "Tất cả nhân viên" }, { value: "office", label: "Nhân viên văn phòng" }, { value: "worker", label: "Công nhân" }]} value={employeeGroup} /></div> : null}
-    <DataSurface>{tab === "summary" ? <DataTable columns={summaryColumns} data={summaries} emptyDescription="" emptyTitle="Chưa có tổng hợp" getRowId={(item) => item.employeeId} rowHrefPrefix={`/timesheets/periods/${periodId}/employees/`} /> : <DataTable actions={period.status !== "locked" && canAdjust ? (item) => <DropdownMenu label={`Thao tác công ${item.employeeName}`}><Link href={`/timesheets/adjustments?periodId=${periodId}&employeeId=${item.employeeId}&date=${item.workDate}&rowVersion=${period.rowVersion}`}>Điều chỉnh</Link></DropdownMenu> : undefined} columns={dailyColumns} data={daily} emptyDescription="" emptyTitle="Chưa có dữ liệu ngày công" getRowId={(item) => item.id} />}</DataSurface>
+    <DataSurface className="operational-workspace">
+      <div className="operational-workspace__toolbar">
+        <ContextTabs
+          items={[
+            { label: `Tổng hợp (${summaries.length})`, active: tab === "summary", onSelect: () => setTab("summary") },
+            { label: `Chi tiết (${daily.length})`, active: tab === "daily", onSelect: () => setTab("daily") },
+            ...(canViewExceptions ? [{ label: "Ngoại lệ", href: `/timesheets/exceptions?periodId=${periodId}` }] : [])
+          ]}
+          label="Dữ liệu kỳ công"
+        />
+        {!employeeId ? <Select label="Nhóm nhân viên" labelHidden name="employeeGroup" onChange={(event) => setEmployeeGroup(event.target.value as "all" | "office" | "worker")} options={[{ value: "all", label: "Tất cả nhân viên" }, { value: "office", label: "Nhân viên văn phòng" }, { value: "worker", label: "Công nhân" }]} value={employeeGroup} /> : null}
+      </div>
+      {tab === "summary" ? <DataTable columns={summaryColumns} data={summaries} emptyDescription="" emptyTitle="Chưa có tổng hợp" getRowId={(item) => item.employeeId} rowHrefPrefix={`/timesheets/periods/${periodId}/employees/`} /> : <DataTable actions={period.status !== "locked" && canAdjust ? (item) => <DropdownMenu label={`Thao tác công ${item.employeeName}`}><Link href={`/timesheets/adjustments?periodId=${periodId}&employeeId=${item.employeeId}&date=${item.workDate}&rowVersion=${period.rowVersion}`}>Điều chỉnh</Link></DropdownMenu> : undefined} columns={dailyColumns} data={daily} emptyDescription="" emptyTitle="Chưa có dữ liệu ngày công" getRowId={(item) => item.id} />}
+    </DataSurface>
   </DetailPageLayout>;
 }

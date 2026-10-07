@@ -1,18 +1,11 @@
 import ExcelJS from "exceljs";
 import type { Permission } from "@/lib/auth/permissions";
-import { allowedFields, type ReportField } from "./reportFieldRegistry";
+import { allowedFields, reportSheetPermission, type ReportField } from "./reportFieldRegistry";
+import { addTimesheetMatrix } from "./timesheetMatrixExcel";
 import type { ReportTemplate } from "../types/timesheetTypes";
 import { sanitizeSpreadsheetCell } from "@/lib/security/filePolicy";
 
 type RecordRow = Record<string, unknown>;
-
-const sheetPermission: Record<string, Permission> = {
-  daily: "timesheet.export_detail",
-  events: "attendance.raw.view",
-  leave: "leave.export",
-  balance: "leave.export",
-  ledger: "leave.export"
-};
 
 const localizedValues: Record<string, string> = {
   full_work: "Đủ công",
@@ -39,21 +32,34 @@ const localizedValues: Record<string, string> = {
   terminated: "Đã nghỉ việc",
   probation: "Thử việc",
   pending_onboarding: "Chờ nhận việc",
+  valid: "Đã ghi nhận GPS",
   inside: "Trong vùng",
   outside: "Ngoài vùng",
-  unknown: "Chưa xác định",
+  accuracy_low: "Độ chính xác thấp",
+  unavailable: "Chưa có GPS",
+  not_required: "Không yêu cầu",
   verified: "Đã xác minh",
-  missing: "Thiếu",
+  uploaded: "Đã tải ảnh",
+  pending_upload: "Chờ tải ảnh",
+  uploading: "Đang tải ảnh",
+  upload_failed: "Tải ảnh thất bại",
   SELF_ATTENDANCE: "Tự chấm công",
-  SUPERVISOR_ROSTER: "Điểm danh đội",
-  APPROVED_LEAVE: "Nghỉ đã duyệt",
-  MANUAL_ADJUSTMENT: "HR điều chỉnh",
+  SUPERVISOR_ROSTER: "Điểm danh giám sát",
+  APPROVED_LEAVE: "Đơn nghỉ đã duyệt",
+  MANUAL_ADJUSTMENT: "Điều chỉnh HR",
   SYSTEM_CALENDAR: "Lịch làm việc",
   grant: "Cấp phép",
+  carryover: "Chuyển phép",
+  adjustment_add: "Điều chỉnh tăng",
+  adjustment_subtract: "Điều chỉnh giảm",
+  leave_usage: "Sử dụng phép",
+  leave_reversal: "Hoàn phép",
+  expiry: "Hết hạn phép",
+  unknown: "Chưa xác định",
+  missing: "Thiếu",
   deduction: "Khấu trừ",
   adjustment: "Điều chỉnh",
   carry_over: "Chuyển phép",
-  expiry: "Hết hạn",
   hired: "Tiếp nhận",
   profile_updated: "Cập nhật hồ sơ",
   department_changed: "Chuyển phòng ban",
@@ -72,6 +78,8 @@ function cellValue(field: ReportField, value: unknown): ExcelJS.CellValue {
   if (Array.isArray(value)) return sanitizeSpreadsheetCell(value.join(", ")) as ExcelJS.CellValue;
   if ((field.format === "date" || field.format === "datetime") && typeof value === "string" && value) {
     const parsed = new Date(field.format === "date" ? `${value}T00:00:00Z` : value);
+    // Excel stores dates without a timezone. Write Vietnam wall-clock time.
+    if (field.format === "datetime") parsed.setTime(parsed.getTime() + 7 * 60 * 60 * 1000);
     return Number.isNaN(parsed.getTime()) ? sanitizeSpreadsheetCell(value) as ExcelJS.CellValue : parsed;
   }
   if (field.format === "link" && typeof value === "string" && value) {
@@ -86,31 +94,44 @@ export async function generateReportWorkbook(input: {
   data: Record<string, RecordRow[]>;
   title: string;
   generatedAt?: Date;
+  period?: { startDate: string; endDate: string };
 }) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Châu Tuấn";
   workbook.created = input.generatedAt ?? new Date();
   workbook.modified = input.generatedAt ?? new Date();
 
-  for (const sheetDefinition of input.template.definition.sheets.filter((sheet) => sheet.enabled)) {
-    const required = sheetPermission[sheetDefinition.key];
+  const definitions = [...input.template.definition.sheets];
+  const legacyDaily = definitions.find((sheet) => sheet.key === "daily" && sheet.enabled);
+  // Existing HR templates gain the calendar view without changing their detail sheets.
+  if (input.template.reportType === "timesheet" && legacyDaily && !definitions.some((sheet) => sheet.key === "matrix") &&
+      (!legacyDaily.columns?.length || ["employeeCode", "employeeName", "workFraction", "status"].every((key) => legacyDaily.columns?.some((column) => column.key === key && column.enabled)))) {
+    definitions.unshift({ key: "matrix", name: "Bảng chấm công", enabled: true });
+  }
+
+  for (const sheetDefinition of definitions.filter((sheet) => sheet.enabled)) {
+    const required = reportSheetPermission[sheetDefinition.key];
     if (required && !input.permissions.includes(required)) continue;
     const fields = allowedFields(sheetDefinition.key, input.permissions, sheetDefinition.columns);
     if (!fields.length) continue;
+    if (sheetDefinition.key === "matrix") {
+      addTimesheetMatrix(workbook, { name: sheetDefinition.name, title: input.title, daily: input.data.daily ?? [], summaries: input.data.summary ?? [], fields, period: input.period, freezeHeader: input.template.definition.freezeHeader, autoFilter: input.template.definition.autoFilter });
+      continue;
+    }
 
     const sheet = workbook.addWorksheet(sheetDefinition.name.slice(0, 31), {
       views: input.template.definition.freezeHeader ? [{ state: "frozen", ySplit: 2 }] : undefined
     });
     sheet.mergeCells(1, 1, 1, fields.length);
     const title = sheet.getCell(1, 1);
-    title.value = input.title;
+    title.value = sanitizeSpreadsheetCell(input.title) as string;
     title.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
     title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F766E" } };
     title.alignment = { vertical: "middle" };
     sheet.getRow(1).height = 26;
 
     const header = sheet.getRow(2);
-    header.values = fields.map((field) => field.label);
+    header.values = fields.map((field) => sanitizeSpreadsheetCell(field.label) as string);
     header.font = { bold: true, color: { argb: "FF17202E" } };
     header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7F5F3" } };
     header.alignment = { vertical: "middle" };

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
 import { MetricCard } from "@/components/shared/DashboardCards";
-import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { Worklist, type DataTableColumn } from "@/components/shared/DataTable";
 import { FilterBar } from "@/components/shared/FilterBar";
 import {
   Checkbox,
@@ -17,11 +17,14 @@ import {
   Switch,
   Textarea
 } from "@/components/shared/FormControls";
-import { FormErrorSummary, FormSection, StickyActionBar } from "@/components/shared/FormLayout";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { FormErrorSummary, FieldGroup, StickyActionBar } from "@/components/shared/FormLayout";
+import { EntityContextHeader, ResponsivePageHeader } from "@/components/shared/PageHeader";
 import { DataSurface, PageContainer, Section, SectionHeader } from "@/components/shared/PageLayouts";
 import { Skeleton } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ContextTabs } from "@/components/shared/Tabs";
+import { FunctionToolbar } from "@/components/shared/ActionBars";
+import { UploadPreview } from "@/components/shared/Uploads";
 
 const tones = ["blue", "mint", "lavender", "orange", "yellow", "cyan", "rose"] as const;
 const rows = [
@@ -39,7 +42,27 @@ export function UiPlayground() {
 
   return (
     <PageContainer>
-      <PageHeader title="Hệ thống giao diện" />
+      <ResponsivePageHeader title="Hệ thống giao diện" />
+      <EntityContextHeader
+        action={<Button variant="secondary">Thông tin gói</Button>}
+        code="CT-ERP-01"
+        meta="Cảng ABC · Nguyễn Văn Cường · 12 nhân sự"
+        status={<StatusBadge tone="success">Đang thi công</StatusBadge>}
+        title="Bảo trì hệ thống ray"
+      />
+      <ContextTabs
+        items={[
+          { active: true, href: "#construction", label: "Thi công" },
+          { href: "#attendance", label: "Chấm công" },
+          { href: "#records", label: "Hồ sơ" },
+          { href: "#documents", label: "Tài liệu" }
+        ]}
+        label="Không gian làm việc mẫu"
+      />
+      <FunctionToolbar>
+        <Button variant="secondary">Xuất dữ liệu</Button>
+        <Button variant="primary">Tạo mới</Button>
+      </FunctionToolbar>
       <Section>
         <SectionHeader title="Màu và card" />
         <div className="ui-playground-grid">
@@ -68,7 +91,7 @@ export function UiPlayground() {
         <FormErrorSummary
           errors={[{ fieldId: "erp-counterparty", message: "Chọn đối tượng giao dịch" }]}
         />
-        <FormSection title="Thông tin chứng từ">
+        <FieldGroup title="Thông tin chứng từ">
           <Input defaultValue="CT-2026-00128" label="Mã chứng từ" readOnly />
           <DatePicker defaultValue="2026-09-19" label="Ngày chứng từ" required />
           <Input
@@ -100,7 +123,7 @@ export function UiPlayground() {
             <Checkbox defaultChecked label="Gửi thông báo" />
             <Switch checked={autoApprove} label="Tự động duyệt" onCheckedChange={setAutoApprove} />
           </div>
-        </FormSection>
+        </FieldGroup>
         <StickyActionBar>
           <Button variant="secondary">Hủy</Button>
           <Button variant="soft">Lưu nháp</Button>
@@ -120,8 +143,12 @@ export function UiPlayground() {
             placeholder="Tất cả trạng thái"
           />
         </FilterBar>
-        <DataTable columns={columns} data={rows} getRowId={(row) => row.id} />
+        <Worklist columns={columns} data={rows} getRowId={(row) => row.id} />
       </DataSurface>
+      <Section>
+        <SectionHeader title="Tệp tải lên" />
+        <UploadPreview meta="248 KB" name="bien-ban-nghiem-thu.pdf" />
+      </Section>
       <Section><SectionHeader title="Loading" /><Card><Skeleton /></Card></Section>
     </PageContainer>
   );

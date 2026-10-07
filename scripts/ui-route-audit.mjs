@@ -86,7 +86,8 @@ const [actionBars, pageHeader, filterBar, imageUploader, workerAttendanceWizard,
 ]);
 
 assert(!/applicationForPath/.test(header), "Topbar đang sở hữu lại tên ứng dụng/route.");
-assert(!/app-header__(?:identity|title|application)/.test(header), "Topbar đang render lại khối định danh route.");
+assert(!/app-header__(?:identity|application)/.test(header), "Topbar đang render lại khối định danh ứng dụng.");
+assert(/app-header__mobile-leading/.test(header) && /app-header__mobile-title/.test(header) && /<AppLogo compact href="\/personal"/.test(header), "Topbar mobile phải có một tên route gọn trong header và điều hướng về Cá nhân.");
 assert(!/\bBreadcrumb\b|\bgetBreadcrumbs\b|page-breadcrumb/.test(shell), "AppShell vẫn render đường dẫn breadcrumb.");
 assert(/getBackHref/.test(shell) && /<BackLink\s+href=\{backHref\}/.test(shell), "AppShell chưa bảo đảm nút Trở lại cho mọi route nghiệp vụ.");
 assert(/href\s*=\s*\{href\}/.test(backLink), "BackLink chưa dùng route cha an toàn được truyền vào.");
@@ -98,7 +99,7 @@ assert(/@fontsource\/inter\/500\.css/.test(layout), "Thiếu Inter đầy đủ 
 assert(/@fontsource\/inter\/600\.css/.test(layout), "Thiếu Inter đầy đủ Latin + Vietnamese 600.");
 assert(!/@fontsource\/inter\/700\.css/.test(layout), "Visual direction mới không tải Inter 700 mặc định.");
 assert(!/@fontsource\/inter\/vietnamese-(?:400|500|600)\.css/.test(layout), "Không được dùng riêng subset Vietnamese vì sẽ thiếu glyph Latin.");
-assert(/--topbar-height:\s*60px/.test(tokenCss), "Thiếu token chiều cao topbar mới.");
+assert(/--topbar-height:\s*56px/.test(tokenCss), "Topbar ERP phải dùng token 56px.");
 assert(!/top:\s*(?:58|66)px/.test(css), "Vẫn còn sticky offset hardcode 58/66px.");
 assert(/<EmployeeListFilters/.test(employeePage) && /className=["']employee-filter-bar["']/.test(employeeFilters), "Màn Nhân viên chưa dùng compact filter toolbar trên đầu bảng.");
 assert((employeeFilters.match(/\blabelHidden\b/g) ?? []).length === 4, "Bốn select lọc Nhân viên chưa giữ label accessible dạng compact.");
@@ -106,15 +107,12 @@ assert(/className=["']employee-table["']/.test(employeeTable), "Bảng Nhân vi�
 assert(!/\bid:\s*["']joinDate["']/.test(employeeTable), "Bảng Nhân viên vẫn còn cột Ngày vào làm.");
 assert(/\.page-main \.data-table-scroll[^{}]*\{[^}]*overflow-x:\s*auto/.test(themeCss), "Bảng dữ liệu chưa có chiến lược cuộn ngang khi cần.");
 assert(/\.employee-table \.data-table,[\s\S]{0,180}?min-width:\s*0/.test(css), "Bảng Nhân viên chưa co vừa vùng nội dung.");
-assert(/dashboard-command-bar/.test(dashboardView), "Dashboard chưa khôi phục thanh tác vụ theo dữ liệu phân quyền.");
-assert(/dashboard-overview__grid/.test(dashboardView) && /dashboard-analytics__plot/.test(dashboardView), "Dashboard chưa có KPI strip và analytics từ dữ liệu thật.");
-assert(/featuredActions\s*=\s*quickActions\.slice\(0,\s*4\)/.test(dashboardView) && !/additionalActions/.test(dashboardView), "Dashboard vẫn còn CTA tác vụ trùng với Tạo mới.");
-assert(/dashboard-chart-grid/.test(dashboardView) && /trendChart/.test(dashboardView) && /donutChart/.test(dashboardView), "Dashboard chưa chọn trend và donut từ dữ liệu thật.");
-assert(/function CircularDataChart/.test(dashboardView) && /conic-gradient/.test(dashboardView), "Dashboard chưa có circular analytics từ dữ liệu thật.");
-assert(/dashboard-personal-grid/.test(dashboardView) && /dashboard-visuals/.test(dashboardView) && /dashboard-operations-grid/.test(dashboardView) && /dashboard-bottom-grid/.test(dashboardView), "Dashboard chưa có composition control center nhiều nhịp.");
-assert(/<ModuleLauncher/.test(dashboardView) && /PersonalTodoWidget/.test(dashboardView) && /PersonalNoteWidget/.test(dashboardView), "Dashboard cá nhân thiếu launcher, việc cá nhân hoặc ghi chú.");
-assert(!/recentActivityColumns|ScheduleWidget|dashboard-recent-table/.test(dashboardView), "Dashboard vẫn hiển thị bảng dữ liệu hoặc lịch tóm tắt không có giá trị thao tác.");
-assert(/currentUser\.displayName/.test(dashboardView), "Greeting Dashboard chưa dùng người đang đăng nhập.");
+assert(/const widgets = model\?\.widgets \?\? \[\]/.test(dashboardView) && !/dashboardModuleFor/.test(dashboardView), "Dashboard chưa dùng dữ liệu tổng hợp theo vai trò.");
+assert(/styles\.metrics/.test(dashboardView) && /slice\(0, 5\)/.test(dashboardView), "Dashboard chưa giới hạn năm chỉ số thực theo mẫu tham chiếu.");
+assert(/<ModuleChart/.test(dashboardView) && /styles\.chartGrid/.test(dashboardView) && /overviewChart/.test(dashboardView) && /secondaryChart/.test(dashboardView), "Dashboard chưa giới hạn hai biểu đồ từ dữ liệu theo vai trò.");
+assert(!/QuickActions|PersonalTodoWidget|PersonalNoteWidget|InboxTable|ScheduleWidget/.test(dashboardView), "Dashboard vẫn còn danh sách hoặc biểu mẫu không thuộc tổng quan phân hệ.");
+assert(/<ModuleLauncher/.test(dashboardView), "Dashboard thiếu ô ứng dụng.");
+assert(/model\?\.attention/.test(dashboardView), "Dashboard chưa hiển thị việc cần xử lý theo vai trò.");
 assert(/visibleApplications/.test(moduleLauncher) && /application\.id\s*!==\s*["']overview["']/.test(moduleLauncher), "Ứng dụng của tôi chưa lọc theo quyền hoặc vẫn tự liên kết Dashboard.");
 assert(/moduleIconRegistry/.test(moduleIconRegistry) && /ModuleIconDefinition/.test(moduleIconRegistry), "Thiếu ModuleIconRegistry tập trung.");
 assert(/\.module-icon-card:hover/.test(themeCss) && /translateY\(-2px\)/.test(themeCss), "Module card thiếu phản hồi hover ổn định.");
@@ -123,12 +121,13 @@ assert(/operational-section__body/.test(workbench), "Panel nghiệp vụ chưa t
 assert(/--app-bg:\s*#f0fdfa/.test(tokenCss), "App background chưa dùng trust-teal enterprise token.");
 assert(/--radius-card:\s*12px/.test(tokenCss) && /--radius-card-large:\s*16px/.test(tokenCss), "Card radius chưa được khóa ở token enterprise 12/16px.");
 assert(/--radius-control:\s*9px/.test(tokenCss) && /--control-height-md:\s*44px/.test(tokenCss), "Control geometry chưa đi qua token chung.");
-assert(/--sidebar-width:\s*232px/.test(tokenCss) && /--sidebar-collapsed-width:\s*64px/.test(tokenCss), "Sidebar expanded/collapsed chưa đi qua token chung.");
+assert(/--sidebar-width:\s*232px/.test(tokenCss) && /--sidebar-collapsed-width:\s*84px/.test(tokenCss), "Sidebar mở rộng và rail icon mẫu chưa đi qua token chung.");
+assert(/--reference-surface:/.test(tokenCss) && /--reference-shadow:/.test(tokenCss) && /--reference-orange:/.test(tokenCss), "Thiếu hệ vật liệu mềm và màu điểm nhấn theo mẫu.");
 assert(/--erp-primary:\s*#0f766e/.test(tokenCss) && /--erp-data-blue:\s*#2563eb/.test(tokenCss) && /--erp-attention:\s*#ea580c/.test(tokenCss), "Thiếu trust teal/blue/orange palette theo design system.");
 assert(/\.page-main \.page-header/.test(themeCss) && /font-weight:\s*600/.test(themeCss), "Thiếu theme chung nhẹ cho tiêu đề trang.");
 assert(/onDoubleClick/.test(dataTable) && /event\.key\s*===\s*["']Enter["']/.test(dataTable), "Bảng dữ liệu chưa hỗ trợ mở bản ghi bằng double-click và Enter.");
 assert(/actionLabel\s*=\s*["']Thao tác["']/.test(dataTable), "Cột thao tác chưa có nhãn nhất quán.");
-assert(/keepFocusInside/.test(overlays) && /document\.body\.style\.overflow\s*=\s*["']hidden["']/.test(overlays), "Popup chưa khóa cuộn nền hoặc giữ focus trong hộp thoại.");
+assert(/keepFocusInside/.test(overlays) && /acquireBodyScrollLock/.test(overlays), "Popup chưa khóa cuộn nền an toàn hoặc giữ focus trong hộp thoại.");
 assert(/applicationsForLauncher/.test(moduleRegistry) && /accessible/.test(moduleRegistry), "Registry chưa giữ ứng dụng bị khóa trong launcher.");
 assert(!/href=["']\/workspace["']/.test(rail) && !/href=["']\/workspace["']/.test(moduleLauncher), "Màn component vẫn còn liên kết trong shell hoặc Dashboard.");
 
@@ -147,6 +146,9 @@ assert(/<FormErrorSummary/.test(uiPlayground) && /<StickyActionBar/.test(uiPlayg
 
 const featureFiles = await collectTsxFiles(path.join(root, "src", "features"));
 const nativeTableAllowlist = new Set([
+  // Accessible chart data fallback; not an interactive business listing.
+  "src/features/dashboard/components/ModuleChart.tsx",
+  "src/features/projects/components/package-workspace/PackageAttendanceWorkspace.tsx",
   "src/features/timesheets/components/CalendarSettings.tsx",
   "src/features/timesheets/components/TimesheetMatrix.tsx",
   "src/features/warehouse/components/StockCountEditor.tsx"
@@ -165,4 +167,4 @@ console.log(`  title trực tiếp: ${classifications.direct.length}`);
 console.log(`  title trong component được ủy quyền: ${classifications.delegated.length}`);
 console.log(`  redirect: ${classifications.redirect.length}`);
 console.log("PASS UI/UX Pro Max enterprise ERP theme, data-rich dashboard, responsive tables và Inter contract");
-console.log("PASS standard tables use DataTable; 3 specialized calendar/matrix/editor tables remain native");
+console.log(`PASS standard tables use DataTable; ${nativeTableAllowlist.size} specialized attendance/calendar/matrix/editor/chart tables remain native`);

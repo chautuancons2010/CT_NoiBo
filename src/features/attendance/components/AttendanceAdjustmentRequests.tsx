@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/shared/FormControls";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/shared/Button";
@@ -67,7 +68,7 @@ export function AttendanceAdjustmentRequests({ scope = "self", canReview = false
     <div className="panel-header"><h2>{scope === "self" ? "Điều chỉnh công" : "Yêu cầu điều chỉnh công"}</h2>{scope === "self" ? <Button onClick={() => setShowForm((value) => !value)} size="sm" variant="primary">Tạo yêu cầu</Button> : null}</div>
     {showForm && scope === "self" ? <form className="attendance-request-form" onSubmit={(event) => void submit(event)}>
       <label>Ngày công<input className="input" defaultValue={initialDate} name="attendanceDate" required type="date" /></label>
-      <label>Loại<select className="select" name="requestType"><option value="missing_check_out">Quên chấm ra</option><option value="missing_check_in">Quên chấm vào</option></select></label>
+      <Select label={"Loại"} className="select" name="requestType" options={[{ label: "Quên chấm ra", value: "missing_check_out" }, { label: "Quên chấm vào", value: "missing_check_in" }]} />
       <label>Giờ đề nghị<input className="input" name="requestedTime" required type="time" /></label>
       <label className="attendance-request-form__reason">Lý do<textarea className="textarea" minLength={5} name="reason" required rows={2} /></label>
       <Button disabled={busy} type="submit" variant="primary">Gửi yêu cầu</Button>

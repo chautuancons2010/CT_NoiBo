@@ -1,17 +1,19 @@
 import type { Permission } from "@/lib/auth/permissions";
 import { can } from "@/lib/auth/permissions";
+import { managedTimesheetPermissions } from "@/lib/auth/applicationAccess";
 
 export type ProtectedArea =
-  | "dashboard" | "employees" | "attendance" | "timesheets" | "shifts"
+  | "dashboard" | "employees" | "attendance" | "attendance-admin" | "timesheets" | "shifts"
   | "leave" | "projects" | "project-monitoring" | "worker-attendance"
   | "warehouse" | "import-export" | "approvals" | "documents" | "reports"
   | "notifications" | "profile" | "search" | "settings" | "accounting" | "messages";
 
 export const areaPermissionCatalog: Readonly<Record<ProtectedArea, readonly Permission[]>> = {
-  dashboard: ["dashboard.view", "attendance.self.view", "worker_attendance.view", "project_monitoring.view", "warehouse.view", "import_export.view"],
+  dashboard: ["dashboard.view", "attendance.self.view", "worker_attendance.view", "project_monitoring.view", "warehouse.view", "import_export.view", "salary.view", "payroll.view", "payslip.self.view"],
   employees: ["employee.view", "contract.view", "insurance.view", "department.manage", "position.manage"],
   attendance: ["attendance.view", "attendance.self", "attendance.self.view", "attendance.self.create", "attendance.self_history", "attendance.self_request", "attendance.view_team", "attendance.view_all", "attendance.manage", "attendance.adjust", "attendance.log.view"],
-  timesheets: ["timesheet.view", "timesheet.self.view", "timesheet.view_team", "timesheet.view_all", "timesheet.adjust", "attendance.view_all", "attendance.period.manage", "attendance.adjust"],
+  "attendance-admin": ["attendance.view_all", "attendance.manage", "attendance.log.view"],
+  timesheets: managedTimesheetPermissions,
   shifts: ["shift.view", "shift.manage", "shift.edit", "settings.view"],
   leave: ["leave.view", "leave.self.view", "leave.self.create", "leave.view_team", "leave.view_all"],
   projects: ["project.view", "project_update.view_project", "project_update.view_all", "project_update.create"],

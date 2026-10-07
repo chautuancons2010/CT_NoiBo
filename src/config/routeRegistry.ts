@@ -12,6 +12,8 @@ export interface BreadcrumbItem {
 }
 
 export const routeMetaByPath: Record<string, RouteMeta> = {
+  "/personal": { title: "Cá nhân", description: "", module: "Cá nhân" },
+  "/applications": { title: "Ứng dụng", description: "", module: "Cá nhân" },
   "/workspace": { title: "Không gian làm việc", description: "", module: "Tổng quan" },
   "/settings": { title: "Cấu hình nghiệp vụ", description: "", module: "Hệ thống" },
   "/approvals/pending": { title: "Cần tôi duyệt", description: "", module: "Phê duyệt" },
@@ -54,7 +56,8 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     module: "Cá nhân"
   },
   "/attendance/me": { title: "Chấm công của tôi", description: "", module: "Cá nhân" },
-  "/attendance/today": { title: "Chấm công hôm nay", description: "", module: "Quản trị công" },
+  "/attendance/quick": { title: "Chấm công", description: "", module: "Cá nhân" },
+  "/attendance/today": { title: "Kiểm tra công thông minh", description: "", module: "Quản trị công" },
   "/attendance/logs": { title: "Nhật ký công", description: "", module: "Quản trị công" },
   "/attendance/requests": { title: "Đơn của tôi", description: "", module: "Cá nhân" },
   "/attendance/notifications": { title: "Thông báo", description: "", module: "Cá nhân" },
@@ -93,6 +96,11 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "Quản lý project, worksite, phân công và roster theo cấu trúc mở rộng.",
     module: "Gói / Công trường"
   },
+  "/projects/new": {
+    title: "Tạo gói",
+    description: "",
+    module: "Gói / Công trường"
+  },
   "/projects/updates": {
     title: "Cập nhật dự án",
     description: "Kênh cập nhật tình hình dự án, hình ảnh và lịch sử theo công trường.",
@@ -118,6 +126,7 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     description: "",
     module: "Dự án"
   },
+  "/worker-attendance/today": { title: "Điểm danh hôm nay", description: "", module: "Dự án" },
   "/warehouse/items": {
     title: "Hàng hóa",
     description: "Danh mục hàng hóa dùng chung cho nhập, xuất, chuyển và kiểm kê.",
@@ -279,9 +288,10 @@ const employeeSectionLabels: Record<string, string> = {
 };
 
 const projectSectionLabels: Record<string, string> = {
+  today: "Hôm nay",
   progress: "Thi công",
-  team: "Chấm công",
-  profile: "Hồ sơ",
+  team: "Nhân lực",
+  profile: "Thông tin",
   documents: "Tài liệu"
 };
 
@@ -329,7 +339,7 @@ export function getRouteMeta(pathname: string): RouteMeta {
   if (employeeMatch) {
     const section = getEmployeeSectionLabel(employeeMatch[2]);
     return {
-      title: `Nhân viên ${employeeMatch[1]} · ${section}`,
+      title: `Hồ sơ nhân viên · ${section}`,
       description: "Route-backed tab cho hồ sơ nhân viên, giữ đúng URL khi refresh.",
       module: "Nhân sự"
     };
@@ -385,7 +395,7 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (projectMatch) {
     return [
       { label: "Gói / Công trường", href: "/projects" },
-      { label: projectMatch[1], href: `/projects/${projectMatch[1]}/progress` },
+      { label: projectMatch[1], href: `/projects/${projectMatch[1]}/today` },
       { label: projectSectionLabels[projectMatch[2]] ?? "Chi tiết" }
     ];
   }
@@ -399,6 +409,7 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
 }
 
 export function getBackHref(pathname: string): string | null {
+  if (pathname === "/attendance/quick") return "/personal";
   const functionRoutes = new Set([
     ...desktopNavigation.flatMap((group) => group.items.map((item) => item.href)),
     ...mobileNavigation.map((item) => item.href),
@@ -416,12 +427,12 @@ export function getBackHref(pathname: string): string | null {
     "/workspace",
     "/dashboard"
   ]);
-  // Dashboard is the only true root of the application. A screen that is
-  // reachable from the rail is still a working context, not a dead end: it
-  // must offer a predictable way back when the user arrives from search,
-  // notifications, or a direct URL.
+  // Primary destinations already have a persistent navigation entry. Reserve
+  // the return control for a child record or a task within that destination.
   if (pathname === "/dashboard") return null;
-  if (functionRoutes.has(pathname)) return "/dashboard";
+  if (pathname === "/attendance/logs") return "/attendance/today";
+  if (/^\/attendance\/records\/[^/]+$/.test(pathname)) return "/attendance/logs";
+  if (functionRoutes.has(pathname)) return null;
 
   const breadcrumbParent = [...getBreadcrumbs(pathname)]
     .reverse()

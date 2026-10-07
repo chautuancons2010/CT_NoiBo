@@ -57,7 +57,6 @@ export function EmployeeEditForm({
       positionId: value(formData, "positionId"),
       employmentTypeId: value(formData, "employmentTypeId"),
       managerEmployeeId: value(formData, "managerEmployeeId"),
-      joinDate: value(formData, "joinDate"),
       probationStartDate: value(formData, "probationStartDate"),
       probationEndDate: value(formData, "probationEndDate"),
       officialDate: value(formData, "officialDate"),
@@ -104,9 +103,8 @@ export function EmployeeEditForm({
       <FormSection title="Thông tin công việc">
         <Select defaultValue={employee.departmentId} label="Phòng ban" name="departmentId" options={departments.map((item) => ({ label: item.name, value: item.id }))} required />
         <Select defaultValue={employee.positionId} label="Chức vụ" name="positionId" options={positions.map((item) => ({ label: item.name, value: item.id }))} required />
-        <Select defaultValue={employee.employmentTypeId} label="Loại nhân sự" name="employmentTypeId" options={employmentTypes.map((item) => ({ label: item.name, value: item.id }))} required />
-        <Select defaultValue={employee.managerEmployeeId ?? ""} label="Quản lý trực tiếp" name="managerEmployeeId" options={managers.map((item) => ({ label: `${item.displayName} · ${item.employeeCode}`, value: item.id }))} placeholder="Chưa gán" />
-        <DatePicker defaultValue={employee.joinDate} label="Ngày vào làm" name="joinDate" required />
+        <Select defaultValue={employee.employmentTypeId} label="Nhóm làm việc" name="employmentTypeId" options={employmentTypes.map((item) => ({ label: item.name, value: item.id }))} required />
+        <Select defaultValue={employee.managerEmployeeId ?? ""} label="Quản lý trực tiếp" name="managerEmployeeId" options={managers.map((item) => ({ label: item.displayName, value: item.id }))} placeholder="Chưa gán" />
         <DatePicker defaultValue={employee.probationStartDate} label="Ngày thử việc" name="probationStartDate" />
         <DatePicker defaultValue={employee.probationEndDate} label="Ngày kết thúc thử việc" name="probationEndDate" />
         <DatePicker defaultValue={employee.officialDate} label="Ngày chính thức" name="officialDate" />

@@ -20,7 +20,8 @@ describe("EmployeeListFilters", () => {
     />);
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Tìm nhân viên" }), { target: { value: "An" } });
-    fireEvent.change(screen.getByRole("combobox", { name: "Trạng thái" }), { target: { value: "on_leave" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Trạng thái" }));
+    fireEvent.click(screen.getByRole("option", { name: "Tạm nghỉ" }));
     fireEvent.click(screen.getByRole("button", { name: "Lọc" }));
 
     expect(push).toHaveBeenCalledWith("/employees?q=An&status=on_leave&page=1&pageSize=20");

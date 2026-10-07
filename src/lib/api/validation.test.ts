@@ -18,4 +18,10 @@ describe("api validation", () => {
 
     expect(() => parseWithSchema(schema, { key: "" })).toThrow(AppError);
   });
+
+  it("shows a specific Vietnamese validation message when provided by the schema", () => {
+    const schema = z.object({ reason: z.string().min(3, "Lý do cần ít nhất 3 ký tự.") });
+
+    expect(() => parseWithSchema(schema, { reason: "a" })).toThrow("Lý do cần ít nhất 3 ký tự.");
+  });
 });

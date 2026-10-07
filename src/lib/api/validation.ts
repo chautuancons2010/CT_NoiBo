@@ -8,7 +8,9 @@ export function parseWithSchema<TSchema extends z.ZodTypeAny>(
 ): z.infer<TSchema> {
   const result = schema.safeParse(value);
   if (!result.success) {
-    throw new AppError("VALIDATION_ERROR", undefined, result.error.flatten());
+    const firstMessage = result.error.issues[0]?.message;
+    const actionableMessage = firstMessage && /[À-ỹ]/u.test(firstMessage) ? firstMessage : undefined;
+    throw new AppError("VALIDATION_ERROR", actionableMessage, result.error.flatten());
   }
 
   return result.data;

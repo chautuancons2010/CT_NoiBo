@@ -6,6 +6,7 @@ import {
   isNavigationItemActive
 } from "@/config/navigation";
 import type { Permission } from "@/lib/auth/permissions";
+import { employeeBaselinePermissions } from "@/services/authorization/employeeAccessPolicy";
 
 describe("permission-aware navigation", () => {
   it("uses a distinct semantic icon for every sibling navigation item", () => {
@@ -50,6 +51,17 @@ describe("permission-aware navigation", () => {
     expect(paths).toContain("/timesheets");
     expect(paths).toContain("/timesheets/matrix");
     expect(paths).not.toContain("/attendance/me");
+  });
+
+  it("hides HR and attendance administration from ordinary employees", () => {
+    const paths = filterGroupsByPermissions(desktopNavigation, employeeBaselinePermissions)
+      .flatMap((group) => group.items.map((item) => item.href));
+    expect(paths).toContain("/attendance/me");
+    expect(paths).toContain("/attendance/history");
+    expect(paths).not.toContain("/employees");
+    expect(paths).not.toContain("/attendance/today");
+    expect(paths).not.toContain("/timesheets");
+    expect(paths).not.toContain("/timesheets/matrix");
   });
 
   it("detects active nested routes without local navigation state", () => {

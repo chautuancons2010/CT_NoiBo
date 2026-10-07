@@ -16,11 +16,11 @@
   --line-height-tight: 1.2;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.65;
-  --font-meta: 12px;
-  --font-body: 14px;
-  --font-card: 15px;
-  --font-section: 20px;
-  --font-page: clamp(32px, 2.35vw, 40px);
+  --font-meta: 13px;
+  --font-body: 16px;
+  --font-card: 17px;
+  --font-section: 21px;
+  --font-page: clamp(24px, 1.85vw, 30px);
 
   /* Spacing and sizing */
   --space-1: 4px;
@@ -37,28 +37,42 @@
   --page-padding-y: 24px;
   --page-padding-inline: clamp(20px, 2.2vw, 40px);
   --page-padding-block: 24px;
-  --section-gap: 24px;
+  --section-gap: 20px;
   --grid-gap: 16px;
   --card-padding: 20px;
-  --container-max-width: 1600px;
+  --container-max-width: 100%;
   --inspector-width: clamp(270px, 22vw, 340px);
   --control-height-sm: 36px;
   --control-height-md: 44px;
   --control-height-lg: 50px;
   --table-header-height: 44px;
   --table-row-height: 52px;
-  --table-cell-padding-x: 16px;
+  --table-cell-padding-x: var(--card-padding);
+  --table-primary-column-width: 30%;
+  --table-compact-column-width: 144px;
+  --table-standard-column-width: 160px;
+  --table-action-column-width: 76px;
+  --table-selection-column-width: 48px;
+  --table-readable-min-width: 1000px;
+  --workspace-gap: 12px;
+  --workspace-section-padding-x: 16px;
+  --workspace-section-padding-y: 12px;
+  --workspace-toolbar-min-height: 60px;
   --sidebar-width: 232px;
-  --sidebar-collapsed-width: 64px;
+  --sidebar-collapsed-width: 84px;
   --app-navigation-width: var(--sidebar-width);
   --app-rail-width: var(--sidebar-collapsed-width);
-  --topbar-height: 60px;
+  --topbar-height: 56px;
   --header-height: var(--topbar-height);
   --breakpoint-mobile: 768px;
   --breakpoint-desktop: 1024px;
   --mobile-page-padding: 16px;
   --mobile-section-gap: 20px;
   --mobile-control-height: 44px;
+  --context-rail-width: clamp(300px, 28vw, 390px);
+  --worklist-detail-width: clamp(320px, 30vw, 410px);
+  --form-workspace-max-width: 920px;
+  --golden-canvas-max-width: 1720px;
 
   /* Shape and elevation */
   --radius-sm: 7px;
@@ -74,16 +88,16 @@
   --radius-panel: 16px;
   --radius-modal: var(--radius-panel);
   --radius-pill: 999px;
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 5%);
-  --shadow-md: 0 1px 2px rgb(36 49 61 / 6%);
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 6%), 0 6px 18px rgb(15 118 110 / 4%);
-  --shadow-card-hover: 0 4px 10px rgb(15 23 42 / 8%), 0 14px 28px rgb(15 118 110 / 8%);
+  --shadow-sm: var(--reference-control-shadow);
+  --shadow-md: 5px 6px 12px rgb(103 94 129 / 12%), -4px -4px 10px rgb(255 255 255 / 90%);
+  --shadow-card: var(--reference-shadow);
+  --shadow-card-hover: 10px 16px 30px rgb(94 83 119 / 14%), -6px -6px 16px rgb(255 255 255 / 90%);
   --shadow-floating: 0 20px 50px rgb(15 23 42 / 18%), 0 6px 16px rgb(15 23 42 / 9%);
 
   /* Semantic color */
-  --color-primary: #2e9b67;
-  --color-primary-hover: #27875a;
-  --color-primary-active: #21734d;
+  --color-primary: #268558;
+  --color-primary-hover: #21734d;
+  --color-primary-active: #1c6241;
   --color-primary-soft: #eaf7f0;
   --color-primary-border: #b8ddca;
   --color-primary-foreground: #ffffff;
@@ -95,14 +109,14 @@
   --color-sky-100: #ddeef4;
   --color-sky-700: #1f5e73;
   --color-sky-600: #2e8aa6;
-  --sidebar-bg: var(--color-sky-50);
-  --sidebar-hover: var(--color-sky-100);
-  --sidebar-active: #ffffff;
+  --sidebar-bg: #fdfdfd;
+  --sidebar-hover: var(--color-primary-soft);
+  --sidebar-active: var(--color-primary-soft);
   --sidebar-text: var(--color-slate-700);
   --sidebar-muted: var(--color-slate-500);
-  --sidebar-text-active: var(--color-sky-700);
-  --sidebar-icon: #527c8e;
-  --sidebar-icon-active: var(--color-sky-600);
+  --sidebar-text-active: var(--color-primary-active);
+  --sidebar-icon: #64748b;
+  --sidebar-icon-active: var(--color-primary);
   --page-bg: #f4f7f8;
   --border-soft: #dde6ea;
   --erp-primary: #0f766e;
@@ -114,23 +128,43 @@
   --shell-dark-soft: #0b5a54;
   --surface-navigation: #0f766e;
   --surface-navigation-strong: #0b5a54;
-  --shell-canvas: #eef2f5;
-  --app-bg: #f0fdfa;
-  --app-bg-soft: #f8fafc;
+  --shell-canvas: #f3f0f6;
+  --app-bg: #f8f6fa;
+  --app-bg-soft: #f5f2f8;
+  --workspace-canvas: radial-gradient(ellipse at 14% 8%, rgb(249 205 222 / 78%), transparent 44%), radial-gradient(ellipse at 90% 27%, rgb(255 218 193 / 74%), transparent 46%), radial-gradient(ellipse at 42% 100%, rgb(220 207 245 / 76%), transparent 51%), var(--shell-canvas);
+  --surface-border: var(--reference-border);
+  --shadow-control: var(--reference-control-shadow);
+  /* Reference dashboard material: pearl surfaces and two-direction soft depth. */
+  --reference-surface: rgb(250 250 252 / 72%);
+  --reference-border: rgb(255 255 255 / 90%);
+  --reference-shadow: 8px 14px 24px rgb(94 83 119 / 11%), -5px -5px 14px rgb(255 255 255 / 85%), inset 0 1px 0 rgb(255 255 255 / 90%);
+  --reference-control-shadow: 5px 6px 13px rgb(94 83 119 / 9%), -3px -3px 8px rgb(255 255 255 / 90%);
+  --reference-panel-radius: 14px;
+  --reference-orange: #e88c58;
+  --reference-cyan: #69bccb;
+  --reference-yellow: #e6b33f;
+  --reference-green: #91c96d;
+  --reference-violet: #a475ce;
+  --reference-text: #394158;
+  --reference-muted: #60677b;
+  --reference-ring-track: #e5e6ec;
+  --metric-icon-size: 44px;
+  --metric-value-size: clamp(24px, 2.2vw, 32px);
+  --floating-layer: 1200;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
   --surface-1: var(--surface);
   --surface-2: var(--app-bg-soft);
   --surface-toolbar: #ffffff;
   --surface-toolbar-hover: #fbfdff;
-  --surface-hover: #e9f7f4;
+  --surface-hover: #ededf4;
   --surface-selected: #e0f2fe;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
+  --text-primary: var(--reference-text);
+  --text-secondary: #535d72;
+  --text-muted: var(--reference-muted);
   --text-disabled: #94a3b8;
-  --border-subtle: #e2e8f0;
-  --border-default: #cbd5e1;
+  --border-subtle: #e0e0e9;
+  --border-default: #d3d4df;
   --border-focus: var(--color-primary);
   --primary: var(--color-primary);
   --primary-hover: var(--color-primary-hover);
@@ -268,21 +302,25 @@
   --motion-fast: 150ms;
   --motion-normal: 190ms;
   --motion-slow: 250ms;
+  --motion-control: 140ms;
+  --motion-panel: 210ms;
   --ease-standard: cubic-bezier(.2, .8, .2, 1);
   --ease-exit: cubic-bezier(.4, 0, 1, 1);
 }
 
 html[data-table-density="compact"] { --table-row-height: 48px; }
-html[data-density="compact"] { --section-gap: 20px; --grid-gap: 16px; --card-padding: 20px; }
-html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card-padding: 28px; }
+html[data-density="compact"] { --section-gap: 20px; --grid-gap: 16px; --card-padding: 20px; --workspace-gap: 8px; --workspace-section-padding-y: 10px; }
+html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card-padding: 28px; --workspace-gap: 16px; --workspace-section-padding-y: 16px; }
 
 @media (max-width: 700px) {
   :root {
     --page-padding-x: 16px;
     --page-padding-y: 20px;
+    --page-padding-block: 24px;
     --section-gap: 20px;
     --grid-gap: 16px;
     --card-padding: 18px;
+    --workspace-section-padding-x: 12px;
     --font-body: 16px;
     --font-meta: 13px;
     --font-page: clamp(30px, 9vw, 36px);

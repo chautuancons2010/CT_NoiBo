@@ -1,25 +1,27 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
+import Link from "next/link";
 
 import { getBackHref, getRouteMeta } from "@/config/routeRegistry";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { UserMenu } from "@/components/shared/UserMenu";
-import { QuickCreateMenu } from "@/components/layout/QuickCreateMenu";
 import { MobileAppLauncher } from "@/components/layout/MobileAppLauncher";
-import { useBranding } from "@/components/providers/SystemSettingsProvider";
+import { useBranding, useOrganizationSettings } from "@/components/providers/SystemSettingsProvider";
 import { NotificationBell } from "@/features/shared-platforms/components/NotificationBell";
 import { MessageBell } from "@/features/messaging/MessageBell";
 import { CommandPalette } from "@/features/search/components/CommandPalette";
 import type { RealtimeConnectionState } from "@/lib/realtime/coordinator";
 import { can } from "@/lib/auth/permissions";
+import { BackLink } from "@/components/shared/BackLink";
+import { AppLogo } from "@/components/layout/AppLogo";
+import { Avatar } from "@/components/shared/Avatar";
 
 export interface AppHeaderProps {
   pathname: string;
   user: AuthenticatedUser;
   connectionState: RealtimeConnectionState;
+  backHrefOverride?: string | null;
 }
 
 const connectionLabels: Record<RealtimeConnectionState, string> = {
@@ -30,32 +32,35 @@ const connectionLabels: Record<RealtimeConnectionState, string> = {
   offline: "Mất kết nối"
 };
 
-export function AppHeader({ pathname, user, connectionState }: AppHeaderProps) {
+export function AppHeader({ pathname, user, connectionState, backHrefOverride }: AppHeaderProps) {
   const branding = useBranding();
-  const meta = getRouteMeta(pathname);
-  const backHref = getBackHref(pathname);
-  const isDetail = Boolean(backHref && backHref !== "/dashboard");
+  const organization = useOrganizationSettings();
+  const routeMeta = getRouteMeta(pathname);
+  const meta = /^\/projects\/[^/]+\/(?:today|progress|team|profile|documents)$/.test(pathname)
+    ? { ...routeMeta, title: routeMeta.title.split(" · ").at(-1) ?? routeMeta.title }
+    : routeMeta;
+  const isRootScreen = ["/dashboard", "/home", "/personal", "/applications", "/messages", "/notifications", "/profile"].includes(pathname);
+  const backHref = isRootScreen ? null : backHrefOverride ?? getBackHref(pathname) ?? "/applications";
 
   useEffect(() => {
     document.title = `${meta.title} | ${branding.systemName}`;
   }, [branding.systemName, meta.title]);
 
   return (
-    <header className={`app-header${isDetail ? " app-header--detail" : ""}`}>
+    <header className={`app-header ${isRootScreen ? "app-header--root" : "app-header--detail"}`}>
       <div className="app-header__mobile-leading">
-        {isDetail && backHref ? (
-          <>
-            <Link aria-label="Quay lại" className="app-header__mobile-back" href={backHref}>
-              <ArrowLeft aria-hidden="true" size={21} />
-            </Link>
-            <strong>{meta.title}</strong>
-          </>
-        ) : <MobileAppLauncher user={user} variant="brand" />}
+        {backHref ? (
+          <BackLink
+            className="app-header__mobile-back"
+            href={backHref}
+            iconOnly
+            label="Quay lại"
+          />
+        ) : <><span className="app-header__mobile-logo"><AppLogo compact href="/personal" label="Về Cá nhân" /></span>{isRootScreen ? <span className="app-header__mobile-brand">{organization.shortName}</span> : null}</>}
+        <strong className={isRootScreen ? "sr-only" : "app-header__mobile-title"}>{meta.title}</strong>
       </div>
-      <div aria-hidden="true" className="app-header__title" />
-      <div className="app-header__search"><CommandPalette user={user} /></div>
+      <div className="app-header__search"><CommandPalette key={pathname} user={user} /></div>
       <div className="app-header__actions">
-        <QuickCreateMenu user={user} />
         {connectionLabels[connectionState] ? (
           <span aria-label={connectionLabels[connectionState]} className={`connection-status is-${connectionState}`} title={connectionLabels[connectionState]}>
             <i aria-hidden="true" /><span>{connectionLabels[connectionState]}</span>
@@ -63,8 +68,9 @@ export function AppHeader({ pathname, user, connectionState }: AppHeaderProps) {
         ) : null}
         {can(user.permissions, "chat.access") ? <MessageBell /> : null}
         <NotificationBell accountId={user.id} />
+        <Link aria-label="Tài khoản" className="app-header__mobile-profile" href="/profile"><Avatar imageUrl="/api/v1/workspace/avatar" name={user.displayName} /></Link>
         <UserMenu user={user} />
-        {isDetail ? <MobileAppLauncher user={user} variant="more" /> : null}
+        <MobileAppLauncher user={user} variant="more" />
       </div>
     </header>
   );

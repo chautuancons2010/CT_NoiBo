@@ -2,11 +2,11 @@ import type { Permission } from "@/lib/auth/permissions";
 
 export const dashboardProfileKeys = [
   "management",
+  "supervisor",
   "import_export",
   "warehouse",
   "accounting",
   "hr",
-  "supervisor",
   "employee"
 ] as const;
 
@@ -99,7 +99,9 @@ export interface DashboardChart {
   key: string;
   title: string;
   series: DashboardChartSeries[];
-  kind?: "bar" | "line";
+  kind?: "bar" | "line" | "donut";
+  unit?: string;
+  maxValue?: number;
 }
 
 export interface DashboardWidgetData {

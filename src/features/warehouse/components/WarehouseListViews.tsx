@@ -1,9 +1,7 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/shared/Button";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { SearchInput, Select } from "@/components/shared/FormControls";
@@ -21,7 +19,7 @@ const statusLabels:Record<string,string>={draft:"Nháp",submitted:"Đã gửi",p
 function badge(value:string){const tone:StatusBadgeTone=value==="posted"||value==="active"||value==="in_stock"?"success":value==="low_stock"||value==="submitted"||value==="reviewed"?"warning":value==="out_of_stock"||value==="cancelled"?"error":"neutral";return <StatusBadge tone={tone}>{statusLabels[value]??value}</StatusBadge>;}
 const typeConfig:Record<Exclude<InventoryDocumentType,"reversal">,{label:string;path:string}>={receipt:{label:"Nhập kho",path:"receipts"},issue:{label:"Xuất kho",path:"issues"},transfer:{label:"Chuyển kho",path:"transfers"},adjustment:{label:"Điều chỉnh",path:"adjustments"}};
 
-export function ItemListView({ canManage = false }: { canManage?: boolean }) {
+export function ItemListView() {
   const [search, setSearch] = useState("");
   const { data = [], error, loading } = useWarehouseData<InventoryItem[]>("/api/v1/items");
   const filtered = useMemo(
@@ -40,7 +38,7 @@ export function ItemListView({ canManage = false }: { canManage?: boolean }) {
   return (
     <ListPageLayout>
       <DataSurface>
-        <div className="data-surface__toolbar"><FilterBar actions={canManage ? <Link href="/warehouse/items/new"><Button leftIcon={<Plus size={16} />} variant="primary">Thêm hàng hóa</Button></Link> : undefined}>
+        <div className="data-surface__toolbar"><FilterBar>
           <SearchInput onChange={(event) => setSearch(event.target.value)} placeholder="Mã hoặc tên hàng" value={search} />
         </FilterBar></div>
         <DataTable ariaLabel="Danh sách hàng hóa" columns={columns} data={filtered} emptyDescription="" emptyTitle="Chưa có hàng hóa" error={error} getRowId={(row) => row.id} loading={loading} rowHrefPrefix="/warehouse/items/" />
@@ -51,7 +49,7 @@ export function ItemListView({ canManage = false }: { canManage?: boolean }) {
 
 export function WarehouseListView(){const{data=[],error,loading}=useWarehouseData<Warehouse[]>("/api/v1/warehouses");const columns:DataTableColumn<Warehouse>[]=[{id:"code",header:"Mã kho",cell:(row)=><Link className="text-link" href={`/warehouse/warehouses/${row.id}`}>{row.code}</Link>},{id:"name",header:"Tên kho",accessor:"name"},{id:"type",header:"Loại",accessor:"type"},{id:"project",header:"Dự án / công trường",cell:(row)=>[row.projectName,row.worksiteName].filter(Boolean).join(" · ")||"—",hiddenOnMobile:true},{id:"manager",header:"Quản lý",cell:(row)=>row.managerName??"—",hiddenOnMobile:true},{id:"status",header:"Trạng thái",cell:(row)=>badge(row.status)}];return <DataTable columns={columns} data={data} emptyDescription="" emptyTitle="Chưa có kho" error={error} getRowId={(row)=>row.id} loading={loading}/>;}
 
-export function DocumentListView({ type, canCreate = false }: { type: Exclude<InventoryDocumentType, "reversal">; canCreate?: boolean }) {
+export function DocumentListView({ type }: { type: Exclude<InventoryDocumentType, "reversal"> }) {
   const config = typeConfig[type];
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -84,7 +82,7 @@ export function DocumentListView({ type, canCreate = false }: { type: Exclude<In
   return (
     <ListPageLayout>
       <DataSurface>
-        <div className="data-surface__toolbar"><FilterBar actions={canCreate ? <Link href={`/warehouse/${config.path}/new`}><Button leftIcon={<Plus size={16} />} variant="primary">Tạo {config.label.toLowerCase()}</Button></Link> : undefined}>
+        <div className="data-surface__toolbar"><FilterBar>
           <SearchInput onChange={(event) => setSearch(event.target.value)} placeholder="Số chứng từ" value={search} />
           <Select label="Trạng thái" onChange={(event) => setStatus(event.target.value)} options={Object.entries(statusLabels).filter(([key]) => ["draft", "submitted", "posted", "cancelled", "reversed"].includes(key)).map(([value, label]) => ({ value, label }))} placeholder="Tất cả" value={status} />
         </FilterBar></div>
@@ -94,8 +92,18 @@ export function DocumentListView({ type, canCreate = false }: { type: Exclude<In
   );
 }
 
-export function InventoryView(){const[warehouseId,setWarehouseId]=useState(""),[search,setSearch]=useState("");const warehouses=useWarehouseData<Warehouse[]>("/api/v1/warehouses"),inventory=useWarehouseData<InventoryBalance[]>(`/api/v1/warehouse/inventory${warehouseId?`?warehouseId=${warehouseId}`:""}`);const balances=inventory.data??[];const filtered=balances.filter((row)=>`${row.itemCode} ${row.itemName}`.toLowerCase().includes(search.toLowerCase()));const metrics=[{label:"Mặt hàng có tồn",value:balances.length},{label:"Còn hàng",value:balances.filter((row)=>row.status==="in_stock").length},{label:"Sắp hết",value:balances.filter((row)=>row.status==="low_stock").length},{label:"Hết hàng",value:balances.filter((row)=>row.status==="out_of_stock").length}];const columns:DataTableColumn<InventoryBalance>[]=[{id:"warehouse",header:"Kho",cell:(row)=>`${row.warehouseCode} · ${row.warehouseName}`},{id:"item",header:"Hàng hóa",cell:(row)=><Link className="text-link" href={`/warehouse/items/${row.itemId}`}>{row.itemCode} · {row.itemName}</Link>},{id:"category",header:"Nhóm",cell:(row)=>row.categoryName??"—",hiddenOnMobile:true},{id:"stock",header:"Tồn",cell:(row)=>`${number.format(row.onHand)} ${row.uomCode}`,align:"right"},{id:"minimum",header:"Tồn tối thiểu",cell:(row)=>row.minimumStock===undefined?"—":number.format(row.minimumStock),align:"right",hiddenOnMobile:true},{id:"status",header:"Trạng thái",cell:(row)=>badge(row.status)}];return <ListPageLayout><DataManagementWorkspace metrics={metrics}><DataSurface><div className="data-surface__toolbar"><FilterBar><SearchInput onChange={(event)=>setSearch(event.target.value)} placeholder="Mã hoặc tên hàng" value={search}/><Select label="Kho" onChange={(event)=>setWarehouseId(event.target.value)} options={(warehouses.data??[]).map((row)=>({value:row.id,label:`${row.code} · ${row.name}`}))} placeholder="Tất cả" value={warehouseId}/></FilterBar></div><DataTable columns={columns} data={filtered} emptyDescription="" emptyTitle="Chưa có số dư tồn kho" error={inventory.error||warehouses.error} getRowId={(row)=>`${row.warehouseId}-${row.itemId}`} loading={inventory.loading}/></DataSurface></DataManagementWorkspace></ListPageLayout>;}
+export function InventoryView(){const[warehouseId,setWarehouseId]=useState(""),[search,setSearch]=useState("");const warehouses=useWarehouseData<Warehouse[]>("/api/v1/warehouses"),inventory=useWarehouseData<InventoryBalance[]>(`/api/v1/warehouse/inventory${warehouseId?`?warehouseId=${warehouseId}`:""}`);const balances=inventory.data??[];const filtered=balances.filter((row)=>`${row.itemCode} ${row.itemName}`.toLowerCase().includes(search.toLowerCase()));const columns:DataTableColumn<InventoryBalance>[]=[{id:"warehouse",header:"Kho",cell:(row)=>`${row.warehouseCode} · ${row.warehouseName}`},{id:"item",header:"Hàng hóa",cell:(row)=><Link className="text-link" href={`/warehouse/items/${row.itemId}`}>{row.itemCode} · {row.itemName}</Link>},{id:"category",header:"Nhóm",cell:(row)=>row.categoryName??"—",hiddenOnMobile:true},{id:"stock",header:"Tồn",cell:(row)=>`${number.format(row.onHand)} ${row.uomCode}`,align:"right"},{id:"minimum",header:"Tồn tối thiểu",cell:(row)=>row.minimumStock===undefined?"—":number.format(row.minimumStock),align:"right",hiddenOnMobile:true},{id:"status",header:"Trạng thái",cell:(row)=>badge(row.status)}];return <ListPageLayout><DataManagementWorkspace><DataSurface><div className="data-surface__toolbar"><FilterBar><SearchInput onChange={(event)=>setSearch(event.target.value)} placeholder="Mã hoặc tên hàng" value={search}/><Select label="Kho" onChange={(event)=>setWarehouseId(event.target.value)} options={(warehouses.data??[]).map((row)=>({value:row.id,label:`${row.code} · ${row.name}`}))} placeholder="Tất cả" value={warehouseId}/></FilterBar></div><DataTable columns={columns} data={filtered} emptyDescription="" emptyTitle="Chưa có số dư tồn kho" error={inventory.error||warehouses.error} getRowId={(row)=>`${row.warehouseId}-${row.itemId}`} loading={inventory.loading}/></DataSurface></DataManagementWorkspace></ListPageLayout>;}
 
 export function LedgerView(){const[warehouseId,setWarehouseId]=useState("");const warehouses=useWarehouseData<Warehouse[]>("/api/v1/warehouses"),ledger=useWarehouseData<StockLedgerEntry[]>(`/api/v1/warehouse/ledger?limit=200${warehouseId?`&warehouseId=${warehouseId}`:""}`);const columns:DataTableColumn<StockLedgerEntry>[]=[{id:"date",header:"Ngày",accessor:"postingDate"},{id:"document",header:"Chứng từ",cell:(row)=>row.documentNumber},{id:"warehouse",header:"Kho",accessor:"warehouseName"},{id:"item",header:"Hàng hóa",cell:(row)=>`${row.itemCode} · ${row.itemName}`},{id:"in",header:"Nhập",cell:(row)=>row.quantityIn?number.format(row.quantityIn):"—",align:"right"},{id:"out",header:"Xuất",cell:(row)=>row.quantityOut?number.format(row.quantityOut):"—",align:"right"},{id:"balance",header:"Tồn sau",cell:(row)=>`${number.format(row.runningBalance)} ${row.uomCode}`,align:"right"}];return <ListPageLayout><DataSurface><div className="data-surface__toolbar"><FilterBar><Select label="Kho" onChange={(event)=>setWarehouseId(event.target.value)} options={(warehouses.data??[]).map((row)=>({value:row.id,label:`${row.code} · ${row.name}`}))} placeholder="Tất cả" value={warehouseId}/></FilterBar></div><DataTable columns={columns} data={ledger.data??[]} emptyDescription="" emptyTitle="Chưa có bút toán kho" error={ledger.error||warehouses.error} getRowId={(row)=>row.id} loading={ledger.loading}/></DataSurface></ListPageLayout>;}
 
-export function StockCountListView({canCreate=false}:{canCreate?:boolean}){const{data=[],error,loading}=useWarehouseData<StockCount[]>("/api/v1/warehouse/stock-counts");const columns:DataTableColumn<StockCount>[]=[{id:"number",header:"Số kiểm kê",cell:(row)=><Link className="text-link" href={`/warehouse/stock-counts/${row.id}`}>{row.countNumber}</Link>},{id:"date",header:"Ngày",accessor:"countDate"},{id:"warehouse",header:"Kho",accessor:"warehouseName"},{id:"policy",header:"Chính sách",cell:(row)=>row.transactionPolicy==="freeze"?"Khóa giao dịch":"Đối chiếu phát sinh"},{id:"status",header:"Trạng thái",cell:(row)=>badge(row.status)}];return <ListPageLayout><DataSurface><div className="data-surface__toolbar"><FilterBar actions={canCreate?<Link href="/warehouse/stock-counts/new"><Button leftIcon={<Plus size={16}/>} variant="primary">Tạo kiểm kê</Button></Link>:undefined}/></div><DataTable ariaLabel="Danh sách kiểm kê" columns={columns} data={data} emptyDescription="" emptyTitle="Chưa có phiên kiểm kê" error={error} getRowId={(row)=>row.id} loading={loading} rowHrefPrefix="/warehouse/stock-counts/"/></DataSurface></ListPageLayout>;}
+export function StockCountListView() {
+  const { data = [], error, loading } = useWarehouseData<StockCount[]>("/api/v1/warehouse/stock-counts");
+  const columns: DataTableColumn<StockCount>[] = [
+    { id: "number", header: "Số kiểm kê", cell: (row) => <Link className="text-link" href={`/warehouse/stock-counts/${row.id}`}>{row.countNumber}</Link> },
+    { id: "date", header: "Ngày", accessor: "countDate" },
+    { id: "warehouse", header: "Kho", accessor: "warehouseName" },
+    { id: "policy", header: "Chính sách", cell: (row) => row.transactionPolicy === "freeze" ? "Khóa giao dịch" : "Đối chiếu phát sinh" },
+    { id: "status", header: "Trạng thái", cell: (row) => badge(row.status) }
+  ];
+  return <ListPageLayout><DataSurface><DataTable ariaLabel="Danh sách kiểm kê" columns={columns} data={data} emptyDescription="" emptyTitle="Chưa có phiên kiểm kê" error={error} getRowId={(row) => row.id} loading={loading} rowHrefPrefix="/warehouse/stock-counts/" /></DataSurface></ListPageLayout>;
+}

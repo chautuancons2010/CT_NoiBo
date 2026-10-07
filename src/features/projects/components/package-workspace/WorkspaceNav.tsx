@@ -1,30 +1,64 @@
-import Link from "next/link";
+"use client";
+
+import { ClipboardList, Files, HardHat, Home, UsersRound } from "lucide-react";
+import { useEffect, useMemo } from "react";
+
+import { useMobileNavigation } from "@/components/layout/MobileNavigationContext";
+import { ContextTabs } from "@/components/shared/Tabs";
+import type { MobileNavDestination } from "@/config/mobileNavigationResolver";
 
 import styles from "./PackageWorkspace.module.css";
 
 const workspaceSections = [
-  { value: "progress", label: "Thi công" },
-  { value: "team", label: "Chấm công" },
-  { value: "profile", label: "Hồ sơ" },
-  { value: "documents", label: "Tài liệu" }
+  { value: "today", label: "Hôm nay", Icon: Home, navIcon: "LayoutDashboard" },
+  { value: "progress", label: "Công việc", Icon: HardHat, navIcon: "HardHat" },
+  { value: "team", label: "Nhân lực", Icon: UsersRound, navIcon: "UsersRound" },
+  { value: "profile", label: "Thông tin", Icon: ClipboardList, navIcon: "ClipboardCheck" },
+  { value: "documents", label: "Tài liệu", Icon: Files, navIcon: "FolderArchive" }
 ] as const;
 
 export type PackageWorkspaceSection = (typeof workspaceSections)[number]["value"];
 
-export function WorkspaceNav({ projectId, section, visibleSections }: { projectId: string; section: string; visibleSections: readonly PackageWorkspaceSection[] }) {
+export function WorkspaceNav({ projectId, section, visibleSections, selectedWorksiteId, canOpenAttendance, onSelect }: {
+  projectId: string;
+  section: string;
+  visibleSections: readonly PackageWorkspaceSection[];
+  selectedWorksiteId?: string;
+  canOpenAttendance: boolean;
+  onSelect: (section: PackageWorkspaceSection) => void;
+}) {
+  const { register } = useMobileNavigation();
+  const desktopItems = workspaceSections.filter((item) => visibleSections.includes(item.value));
+  const attendanceHref = `/worker-attendance/today?projectId=${projectId}${selectedWorksiteId ? `&worksiteId=${encodeURIComponent(selectedWorksiteId)}` : ""}`;
+  const mobileItems = useMemo<MobileNavDestination[]>(() => {
+    const orderedSections = ["today", "progress", "team"] as const;
+    const first: MobileNavDestination[] = orderedSections.flatMap((value) => {
+      const item = workspaceSections.find((sectionItem) => sectionItem.value === value);
+      return item && visibleSections.includes(value) ? [{ href: `/projects/${projectId}/${value}`, label: item.label, icon: item.navIcon }] : [];
+    });
+    if (canOpenAttendance) first.push({ href: attendanceHref, label: "Điểm danh", icon: "Camera" });
+    for (const value of ["documents", "profile"] as const) {
+      const item = workspaceSections.find((sectionItem) => sectionItem.value === value);
+      if (item && visibleSections.includes(value)) first.push({ href: `/projects/${projectId}/${value}`, label: item.label, icon: item.navIcon });
+    }
+    return first;
+  }, [attendanceHref, canOpenAttendance, projectId, visibleSections]);
+
+  useEffect(() => register(mobileItems), [mobileItems, register]);
+
   return (
-    <nav aria-label="Không gian làm việc gói" className={styles.workspaceNav}>
-      {workspaceSections.filter((item) => visibleSections.includes(item.value)).map((item) => (
-        <Link
-          aria-current={item.value === section ? "page" : undefined}
-          className={styles.workspaceNavItem}
-          data-active={item.value === section || undefined}
-          href={`/projects/${projectId}/${item.value}`}
-          key={item.value}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </nav>
+    <>
+      <ContextTabs
+        className={styles.workspaceNav}
+        items={desktopItems.map((item) => ({
+          active: item.value === section,
+          href: `/projects/${projectId}/${item.value}`,
+          icon: <item.Icon aria-hidden="true" size={18} strokeWidth={1.8} />,
+          label: item.label,
+          onSelect: () => onSelect(item.value)
+        }))}
+        label="Không gian làm việc gói"
+      />
+    </>
   );
 }

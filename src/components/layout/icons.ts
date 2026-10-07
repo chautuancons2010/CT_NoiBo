@@ -1,8 +1,8 @@
 import {
   Bell, BookOpenCheck, Boxes, BriefcaseBusiness, Building2, Cable, Calculator, CalendarCheck, CalendarClock,
-  CalendarDays, CalendarOff, CalendarRange, ChartNoAxesCombined, ChartSpline, CheckSquare, ClipboardCheck,
+  CalendarDays, CalendarOff, CalendarRange, Camera, ChartNoAxesCombined, ChartSpline, CheckSquare, ClipboardCheck,
   ClipboardPenLine, Clock3, FileClock, FileSignature, FolderArchive, Handshake, HardHat, HeartPulse, History, IdCard,
-  Landmark, LayoutDashboard, Library, MessageCircle, Newspaper, Package, PackageCheck, PackageMinus, PackagePlus,
+  Grid2X2, Landmark, LayoutDashboard, Library, MessageCircle, Newspaper, Package, PackageCheck, PackageMinus, PackagePlus,
   ReceiptText, Repeat, Scale, ScanLine, Send, Settings, ShieldAlert, ShieldCheck, Ship, SlidersHorizontal,
   TableProperties, Timer, Truck, UserCog, UserRound, Users, UsersRound, WalletCards, Warehouse,
   type LucideIcon
@@ -64,7 +64,9 @@ export const navigationIconMap: Record<NavigationIcon, LucideIcon> = {
   ChartSpline,
   Cable,
   PackageCheck,
-  ShieldAlert
+  ShieldAlert,
+  Grid2X2,
+  Camera
 };
 
 /** Shared sizing keeps navigation and launcher icons on one visual rhythm. */

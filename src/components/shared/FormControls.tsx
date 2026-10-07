@@ -15,6 +15,8 @@ import type {
 import { useId, useState } from "react";
 
 import { cn } from "@/lib/utils/cn";
+import { SelectControl } from "@/components/shared/SelectControl";
+import { ComboboxControl } from "@/components/shared/ComboboxControl";
 
 export interface FormFieldProps {
   id?: string;
@@ -44,7 +46,7 @@ export function FieldLabel({
   required?: boolean;
 }) {
   return (
-    <label className={hidden ? "sr-only" : "field__label"} htmlFor={htmlFor}>
+    <label className={hidden ? "sr-only" : "field__label"} htmlFor={htmlFor} id={`${htmlFor}-label`}>
       {children}
       {required ? <RequiredIndicator /> : null}
     </label>
@@ -220,22 +222,17 @@ export function Select({
   return (
     <FormField disabled={disabled} error={error} helperText={helperText} id={id} label={label} labelHidden={labelHidden} required={required}>
       {(fieldId, describedBy) => (
-        <select
+        <SelectControl
           aria-describedby={describedBy}
           aria-invalid={error ? true : undefined}
           className={cn("select", className)}
           disabled={disabled}
           id={fieldId}
           required={required}
+          options={options}
+          placeholder={placeholder}
           {...props}
-        >
-          {placeholder ? <option value="">{placeholder}</option> : null}
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        />
       )}
     </FormField>
   );
@@ -246,32 +243,20 @@ export interface ComboboxProps extends InputProps {
 }
 
 export function Combobox({ options, label, labelHidden, helperText, error, required, className, id, disabled, readOnly, ...props }: ComboboxProps) {
-  const listId = useId();
-
   return (
     <FormField disabled={disabled} error={error} helperText={helperText} id={id} label={label} labelHidden={labelHidden} readOnly={readOnly} required={required}>
       {(fieldId, describedBy) => (
-        <>
-          <input
-            aria-controls={listId}
+          <ComboboxControl
             aria-describedby={describedBy}
-            aria-expanded="false"
             aria-invalid={error ? true : undefined}
             className={cn("input", className)}
             disabled={disabled}
             id={fieldId}
-            list={listId}
-            role="combobox"
+            options={options}
             readOnly={readOnly}
             required={required}
             {...props}
           />
-          <datalist id={listId}>
-            {options.map((option) => (
-              <option key={option.value} value={option.label} />
-            ))}
-          </datalist>
-        </>
       )}
     </FormField>
   );

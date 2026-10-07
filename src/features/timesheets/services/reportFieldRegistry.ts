@@ -8,10 +8,31 @@ export interface ReportField {
   format?: "date" | "datetime" | "number" | "decimal" | "link" | "status" | "boolean";
 }
 
+export const reportSheetPermission: Record<string, Permission> = {
+  matrix: "timesheet.export_detail",
+  daily: "timesheet.export_detail",
+  events: "attendance.raw.view",
+  leave: "leave.export",
+  balance: "leave.export",
+  ledger: "leave.export"
+};
+
 const warehouseFields = (fields: ReportField[]): ReportField[] => fields.map((field) => ({ ...field, permission: "warehouse.report.export" }));
 const importExportFields = (fields: ReportField[]): ReportField[] => fields.map((field) => ({ ...field, permission: "import_export.report.export" }));
 
 export const reportFieldRegistry: Record<string, readonly ReportField[]> = {
+  matrix: [
+    { key: "employeeCode", label: "Mã nhân viên", width: 16 },
+    { key: "employeeName", label: "Họ và tên", width: 28 },
+    { key: "departmentName", label: "Phòng ban", width: 22 },
+    { key: "actualWorkdays", label: "Tổng công", format: "decimal" },
+    { key: "annualLeaveDays", label: "Phép năm", format: "decimal" },
+    { key: "unpaidLeaveDays", label: "Nghỉ không lương", format: "decimal" },
+    { key: "absentDays", label: "Vắng", format: "decimal" },
+    { key: "lateMinutes", label: "Phút đi trễ", format: "number" },
+    { key: "earlyLeaveMinutes", label: "Phút về sớm", format: "number" },
+    { key: "exceptionCount", label: "Cần kiểm tra", format: "number" }
+  ],
   summary: [
     { key: "employeeCode", label: "Mã NV", width: 14 },
     { key: "employeeName", label: "Họ tên", width: 28 },
@@ -164,7 +185,9 @@ export function allowedFields(
   requested?: Array<{ key: string; label: string; enabled: boolean; order: number }>
 ) {
   const registry = reportFieldRegistry[sheet] ?? [];
-  const allowed = registry.filter((field) => !field.permission || permissions.includes(field.permission));
+  const allowed = registry.filter((field) => !field.permission || permissions.includes(field.permission) ||
+    (field.permission === "employee.export_sensitive" && permissions.includes("report.employee_sensitive")) ||
+    (field.permission === "attendance.photo.view" && permissions.includes("attendance.view_photo")));
   if (!requested?.length) return allowed;
   const selected = new Map(requested.filter((item) => item.enabled).map((item) => [item.key, item]));
   return allowed

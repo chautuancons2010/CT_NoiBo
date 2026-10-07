@@ -1,9 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import type { CSSProperties } from "react";
-
-import { navigationIconMap } from "@/components/layout/icons";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { applicationForPath } from "@/config/moduleRegistry";
 import { cn } from "@/lib/utils/cn";
 
@@ -20,18 +18,16 @@ export function TableSkeleton({ rows = 5, className }: { rows?: number; classNam
 }
 
 export function PageSkeleton() {
-  return <div aria-label="Đang tải trang" className="page-skeleton" role="status"><div className="page-skeleton__heading"><span /><span /></div><div className="page-skeleton__cards"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div><TableSkeleton /></div>;
+  return <div aria-label="Đang tải trang" className="page-skeleton" role="status"><LoadingSpinner /><div className="page-skeleton__heading"><span /><span /></div><div className="page-skeleton__cards"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div><TableSkeleton /></div>;
 }
 
 export function ModuleTransition() {
   const pathname = usePathname();
   const application = applicationForPath(pathname);
-  const Icon = navigationIconMap[application.icon];
   return (
-    <div className="module-transition" role="status" style={{ "--module-accent": application.accentColor, "--module-surface": application.accentSoft } as CSSProperties}>
-      <span><Icon aria-hidden="true" size={26} strokeWidth={1.8} /></span>
-      <strong>Đang mở {application.label}…</strong>
-      <div aria-hidden="true"><i /><i /><i /></div>
+    <div aria-label={`Đang mở ${application.label}`} className="module-transition" role="status">
+      <LoadingSpinner />
+      <span className="sr-only">Đang mở {application.label}</span>
     </div>
   );
 }

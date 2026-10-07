@@ -1,3 +1,4 @@
+import { Select } from "@/components/shared/FormControls";
 import Link from "next/link";
 import { connection } from "next/server";
 
@@ -21,8 +22,8 @@ export async function ProjectIssueCenterPage({ searchParams }: { searchParams: R
     <ListPageLayout>
       <PageHeader action={<Link href="/project-monitoring"><Button variant="secondary">Theo dõi dự án</Button></Link>} title="Trung tâm vấn đề" />
       <form className="project-update-filters">
-        <select aria-label="Trạng thái" className="select" defaultValue={value("status") ?? ""} name="status"><option value="">Tất cả trạng thái</option><option value="open">Chưa xử lý</option><option value="in_progress">Đang xử lý</option><option value="resolved">Đã xử lý</option><option value="closed">Đã đóng</option></select>
-        <select aria-label="Mức độ" className="select" defaultValue={value("severity") ?? ""} name="severity"><option value="">Tất cả mức độ</option><option value="critical">Nghiêm trọng</option><option value="high">Cao</option><option value="medium">Trung bình</option><option value="low">Thấp</option></select>
+        <Select label={"Trạng thái"} labelHidden className="select" defaultValue={value("status") ?? ""} name="status" options={[{ label: "Tất cả trạng thái", value: "" }, { label: "Chưa xử lý", value: "open" }, { label: "Đang xử lý", value: "in_progress" }, { label: "Đã xử lý", value: "resolved" }, { label: "Đã đóng", value: "closed" }]} />
+        <Select label={"Mức độ"} labelHidden className="select" defaultValue={value("severity") ?? ""} name="severity" options={[{ label: "Tất cả mức độ", value: "" }, { label: "Nghiêm trọng", value: "critical" }, { label: "Cao", value: "high" }, { label: "Trung bình", value: "medium" }, { label: "Thấp", value: "low" }]} />
         <Button type="submit" variant="secondary">Lọc</Button>
       </form>
       <ProjectIssueTable issues={issues} />

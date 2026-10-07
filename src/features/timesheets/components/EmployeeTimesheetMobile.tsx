@@ -28,8 +28,8 @@ export function EmployeeTimesheetMobile({ periodId, employeeId, selectedDate }: 
       const body = await response.json() as { data?: { period: TimesheetPeriod; daily: DailyTimesheet[]; summaries: TimesheetSummary[] }; error?: { message: string } };
       if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể tải công nhân viên.");
       setPeriod(body.data.period);
-      setDaily(body.data.daily.filter((item) => item.employeeId === employeeId));
-      setSummary(body.data.summaries.find((item) => item.employeeId === employeeId));
+      setDaily(body.data.daily.filter((item) => item.employeeId === employeeId || item.employeeCode === employeeId));
+      setSummary(body.data.summaries.find((item) => item.employeeId === employeeId || item.employeeCode === employeeId));
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không thể tải công nhân viên.");
@@ -46,7 +46,7 @@ export function EmployeeTimesheetMobile({ periodId, employeeId, selectedDate }: 
         <div className="employee-timesheet__identity">
           <span className="employee-timesheet__eyebrow"><UserRound aria-hidden="true" size={15} /> Nhân viên</span>
           <strong>{summary?.employeeName ?? daily[0]?.employeeName ?? "Nhân viên"}</strong>
-          <span>{summary?.employeeCode ?? daily[0]?.employeeCode ?? "—"} · {summary?.departmentName ?? daily[0]?.departmentName ?? "—"}</span>
+          <span>{summary?.departmentName ?? daily[0]?.departmentName ?? "—"}</span>
         </div>
         <div className="employee-timesheet__period"><CalendarDays aria-hidden="true" size={18} /><div><span>{period.name}</span><strong>{period.startDate} – {period.endDate}</strong></div></div>
       </div>

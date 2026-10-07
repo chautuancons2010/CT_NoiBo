@@ -26,11 +26,11 @@ interface DashboardWidgetDefinition {
 
 export const dashboardProfiles: DashboardProfileDefinition[] = [
   { key: "management", label: "Quản lý", requiredAny: ["project_monitoring.view_all"], defaultLandingPage: "/dashboard" },
+  { key: "supervisor", label: "Giám sát", requiredAny: ["worker_attendance.create", "worker_attendance.self_scope"], defaultLandingPage: "/dashboard" },
   { key: "import_export", label: "Xuất nhập khẩu", requiredAny: ["import_export.view", "shipment.view"], defaultLandingPage: "/dashboard" },
   { key: "warehouse", label: "Kho", requiredAny: ["warehouse.view"], defaultLandingPage: "/dashboard" },
   { key: "accounting", label: "Kế toán", requiredAny: ["accounting.access", "salary.view", "payroll.view"], defaultLandingPage: "/dashboard" },
   { key: "hr", label: "Nhân sự", requiredAny: ["employee.view", "timesheet.view_all", "leave.view_all"], defaultLandingPage: "/dashboard" },
-  { key: "supervisor", label: "Giám sát", requiredAny: ["worker_attendance.create", "worker_attendance.self_scope"], defaultLandingPage: "/dashboard" },
   { key: "employee", label: "Nhân viên", requiredAny: ["attendance.self.view", "leave.self.view", "profile.view", "dashboard.view"], defaultLandingPage: "/dashboard" }
 ];
 
@@ -43,7 +43,7 @@ export const dashboardWidgetRegistry: DashboardWidgetDefinition[] = [
   { key: "project_attention", label: "Dự án cần chú ý", requiredAny: ["project_monitoring.view", "project_monitoring.view_all"], allowedProfiles: ["supervisor", "management"] },
   { key: "warehouse_low_stock", label: "Cảnh báo kho", requiredAny: ["warehouse.view"], allowedProfiles: ["warehouse", "management"] },
   { key: "shipment_attention", label: "Lô hàng cần chú ý", requiredAny: ["import_export.view", "shipment.view"], allowedProfiles: ["import_export", "management"] },
-  { key: "accounting_summary", label: "Kỳ lương cần xử lý", requiredAny: ["accounting.access", "salary.view", "payroll.view"], allowedProfiles: ["accounting", "management"] },
+  { key: "accounting_summary", label: "Tổng quan kế toán", requiredAny: ["salary.view", "payroll.view", "payslip.self.view"], allowedProfiles: ["accounting", "management", "employee"] },
   { key: "hr_summary", label: "Tổng quan nhân sự", requiredAny: ["employee.view"], allowedProfiles: ["hr", "management"] },
   { key: "recent_activity", label: "Hoạt động gần đây", requiredAny: ["audit.view"], allowedProfiles: ["hr", "warehouse", "import_export", "management"] },
   { key: "recent_notifications", label: "Thông báo", requiredAny: ["notification.self.view", "notification.view"], allowedProfiles: [...dashboardProfileKeys] },
@@ -74,7 +74,12 @@ export function matchesAnyPermission(permissions: readonly Permission[], require
 }
 
 export function resolveDashboardProfile(user: AuthenticatedUser, settings: DashboardSettings): DashboardProfileKey {
-  for (const key of settings.presetOrder) {
+  // Profile precedence is a business rule, not a display preference. Persisted
+  // preset ordering may come from an older release and must not reclassify a
+  // supervisor as HR merely because both roles can view employees.
+  const configuredProfiles = new Set(settings.presetOrder);
+  for (const key of dashboardProfileKeys) {
+    if (!configuredProfiles.has(key)) continue;
     const profile = dashboardProfiles.find((item) => item.key === key);
     if (profile && matchesAnyPermission(user.permissions, profile.requiredAny)) return profile.key;
   }
@@ -101,7 +106,7 @@ export function resolveRoleLandingPage(user: AuthenticatedUser, settings: Dashbo
 }
 
 const landingRoutes: ReadonlyArray<{ route: string; requiredAny: Permission[] }> = [
-  { route: "/dashboard", requiredAny: ["dashboard.view"] },
+  { route: "/dashboard", requiredAny: ["dashboard.view", "salary.view", "payroll.view", "payslip.self.view"] },
   { route: "/attendance/me", requiredAny: ["attendance.self", "attendance.self.view", "attendance.self.create"] },
   { route: "/attendance/history", requiredAny: ["attendance.self.view", "attendance.self_history"] },
   { route: "/attendance/requests", requiredAny: ["attendance.self", "attendance.self_request"] },
@@ -112,7 +117,7 @@ const landingRoutes: ReadonlyArray<{ route: string; requiredAny: Permission[] }>
   { route: "/employees/positions", requiredAny: ["position.manage"] },
   { route: "/attendance/today", requiredAny: ["attendance.view_all", "attendance.manage"] },
   { route: "/timesheets", requiredAny: ["attendance.period.manage"] },
-  { route: "/timesheets/matrix", requiredAny: ["timesheet.view", "timesheet.view_team", "timesheet.view_all"] },
+  { route: "/timesheets/matrix", requiredAny: ["timesheet.view_team", "timesheet.view_all"] },
   { route: "/timesheets/adjustments", requiredAny: ["timesheet.adjust", "attendance.adjust"] },
   { route: "/shifts", requiredAny: ["shift.view"] },
   { route: "/leave/manage", requiredAny: ["leave.view_all"] },

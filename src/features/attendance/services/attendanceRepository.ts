@@ -24,6 +24,10 @@ import type { attendanceAdjustmentSchema } from "@/features/attendance/schemas/a
 
 type Row = Record<string, unknown>;
 
+function canViewAttendancePhotos(user: AuthenticatedUser): boolean {
+  return can(user.permissions, "attendance.view_photo") || can(user.permissions, "attendance.photo.view");
+}
+
 function deterministicUuid(operationId: string, derivative: "full" | "thumbnail"): string {
   const value = createHash("sha256").update(`${operationId}:${derivative}`).digest("hex").slice(0, 32).split("");
   value[12] = "4";
@@ -121,6 +125,8 @@ function mapEvent(row: Row): AttendanceEvent {
     receivedAtServer: requiredString(row, "received_at_server"),
     locationId: optionalString(row, "location_id"),
     locationName: location ? optionalString(location, "name") : undefined,
+    latitude: numberValue(row, "latitude"),
+    longitude: numberValue(row, "longitude"),
     accuracyMeters: numberValue(row, "accuracy_meters"),
     distanceMeters: numberValue(row, "distance_meters"),
     geofenceStatus: requiredString(row, "geofence_status") as AttendanceEvent["geofenceStatus"],
@@ -234,8 +240,10 @@ async function readEvents(
 
 export async function getAttendanceDashboard(user: AuthenticatedUser): Promise<AttendanceDashboard> {
   const client = clientOrThrow();
-  const identity = await resolveIdentity(client, user);
-  const policy = await readPolicy(client);
+  const [identity, policy] = await Promise.all([
+    resolveIdentity(client, user),
+    readPolicy(client)
+  ]);
   const today = localDate(new Date(), policy.timezone);
   const [locations, todayEvents, recentEvents] = await Promise.all([
     readLocations(client, identity.employeeId),
@@ -296,15 +304,16 @@ export async function getAttendanceAdminToday(user: AuthenticatedUser, selectedD
     const shiftStartMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5));
     const shiftEndMinutes = Number(end.slice(0, 2)) * 60 + Number(end.slice(3, 5));
     const daily = (byEmployee.get(String(employee.id)) ?? []).sort((a,b)=>a.effectiveAt.localeCompare(b.effectiveAt));
-    const checkIn = daily.find((event)=>event.eventType==="check_in"), checkOut = [...daily].reverse().find((event)=>event.eventType==="check_out");
+    const accepted = daily.filter((event) => event.attendanceStatus !== "rejected");
+    const checkIn = accepted.find((event)=>event.eventType==="check_in"), checkOut = [...accepted].reverse().find((event)=>event.eventType==="check_out");
     const lateMinutes = checkIn ? Math.max(0, minute(checkIn.effectiveAt)-shiftStartMinutes-Number(shift?.late_grace_minutes ?? policy.lateThresholdMinutes)) : 0;
     const earlyLeaveMinutes = checkOut ? Math.max(0, shiftEndMinutes-minute(checkOut.effectiveAt)-Number(shift?.early_leave_grace_minutes ?? 0)) : 0;
     const totalMinutes = checkIn&&checkOut ? Math.max(0,Math.round((new Date(checkOut.effectiveAt).getTime()-new Date(checkIn.effectiveAt).getTime())/60000)) : 0;
     const shiftHasEnded = today < localDate(new Date(), policy.timezone) || today === localDate(new Date(), policy.timezone) && minute(new Date().toISOString()) > shiftEndMinutes;
     const status = leaveIds.has(String(employee.id)) ? "leave" : checkIn&&!checkOut&&shiftHasEnded ? "missing_check" : lateMinutes>0 ? "late" : checkIn ? "present" : "not_checked";
-    return { employeeId:String(employee.id),employeeCode:String(employee.employee_code),employeeName:String(employee.full_name),departmentId:employee.department_id ? String(employee.department_id) : undefined,departmentName:departmentNames.get(String(employee.department_id)) ?? "Chưa phân phòng",shiftId:shift ? String(shift.id) : undefined,shiftName:String(shift?.name ?? policy.shiftName),checkIn:checkIn?.effectiveAt,checkOut:checkOut?.effectiveAt,lateMinutes,earlyLeaveMinutes,totalMinutes,status } as const;
+    return { employeeId:String(employee.id),employeeCode:String(employee.employee_code),employeeName:String(employee.full_name),departmentId:employee.department_id ? String(employee.department_id) : undefined,departmentName:departmentNames.get(String(employee.department_id)) ?? "Chưa phân phòng",shiftId:shift ? String(shift.id) : undefined,shiftName:String(shift?.name ?? policy.shiftName),checkIn:checkIn?.effectiveAt,checkOut:checkOut?.effectiveAt,lateMinutes,earlyLeaveMinutes,totalMinutes,status,events:daily } as const;
   });
-  return { date:today,totalEmployees:rows.length,present:rows.filter((row)=>row.status==="present"||row.status==="late"||row.status==="missing_check").length,late:rows.filter((row)=>row.status==="late").length,leave:rows.filter((row)=>row.status==="leave").length,notChecked:rows.filter((row)=>row.status==="not_checked").length,missingCheck:rows.filter((row)=>row.status==="missing_check").length,rows };
+  return { date:today,canViewPhotos:canViewAttendancePhotos(user),totalEmployees:rows.length,present:rows.filter((row)=>row.status==="present"||row.status==="late"||row.status==="missing_check").length,late:rows.filter((row)=>row.status==="late").length,leave:rows.filter((row)=>row.status==="leave").length,notChecked:rows.filter((row)=>row.status==="not_checked").length,missingCheck:rows.filter((row)=>row.status==="missing_check").length,rows };
 }
 
 export async function recordAttendance(
@@ -335,8 +344,6 @@ export async function recordAttendance(
 
   const match = matchAttendanceLocation(input.location, locations, policy);
   if (match.status === "unavailable") throw new AppError("LOCATION_UNAVAILABLE");
-  if (match.status === "accuracy_low") throw new AppError("LOCATION_ACCURACY_LOW");
-  if (match.status === "outside") throw new AppError("LOCATION_OUTSIDE_GEOFENCE");
 
   const effectiveAt = input.capturedOffline ? capturedAt : serverNow;
   const attendanceDate = localDate(effectiveAt, policy.timezone);
@@ -347,6 +354,7 @@ export async function recordAttendance(
   }
 
   const anomalyFlags: string[] = [];
+  if (match.status === "accuracy_low") anomalyFlags.push("gps_accuracy_low");
   if (!input.capturedOffline && Math.abs(ageMilliseconds) > 15 * 60 * 1000) anomalyFlags.push("device_clock_skew");
   if (input.capturedOffline && ageMilliseconds > 24 * 60 * 60 * 1000) anomalyFlags.push("delayed_sync_over_24h");
   const attendanceStatus = anomalyFlags.length ? "needs_review" : "recorded";
@@ -574,7 +582,7 @@ export async function adjustAttendanceEvent(user: AuthenticatedUser, eventId: st
 }
 
 export async function getAttendancePhotoAsset(user: AuthenticatedUser, photoId: string, thumbnail: boolean): Promise<{ bucket: string; path: string }> {
-  if (!can(user.permissions, "attendance.view_photo") && !can(user.permissions, "attendance.self.view") && !can(user.permissions, "attendance.self")) throw new AppError("PERMISSION_DENIED");
+  if (!canViewAttendancePhotos(user) && !can(user.permissions, "attendance.self.view") && !can(user.permissions, "attendance.self")) throw new AppError("PERMISSION_DENIED");
   const client = clientOrThrow();
   const { data, error } = await client
     .from("attendance_photos")
@@ -583,8 +591,8 @@ export async function getAttendancePhotoAsset(user: AuthenticatedUser, photoId: 
   if (error || !data) throw new AppError("NOT_FOUND", "Không tìm thấy ảnh chấm công.");
   if (data.evidence_status === "expired") throw new AppError("NOT_FOUND", "Ảnh chấm công đã hết thời hạn lưu 45 ngày.");
   const event = data.attendance_events as unknown as Row;
-  if (!can(user.permissions, "attendance.view_photo")) { const identity = await resolveIdentity(client,user); if (String(event.employee_id) !== identity.employeeId) throw new AppError("PERMISSION_DENIED"); }
-  const asset = (thumbnail ? data.thumbnail : data.file_assets) as unknown as Row | null;
+  if (!canViewAttendancePhotos(user)) { const identity = await resolveIdentity(client,user); if (String(event.employee_id) !== identity.employeeId) throw new AppError("PERMISSION_DENIED"); }
+  const asset = (thumbnail ? data.thumbnail ?? data.file_assets : data.file_assets) as unknown as Row | null;
   if (!asset) throw new AppError("NOT_FOUND", "Ảnh chưa đồng bộ.");
   return { bucket: requiredString(asset, "bucket"), path: requiredString(asset, "object_path") };
 }

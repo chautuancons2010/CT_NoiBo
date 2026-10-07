@@ -11,11 +11,11 @@ import type { ChatMessage, ConversationSummary } from "./types";
 
 const when = (value: string) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value));
 
-export function ChatDock() {
+export function ChatDock({ initiallyOpen = false }: { initiallyOpen?: boolean } = {}) {
   const bottom = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLElement>(null);
   const composer = useRef<HTMLFormElement>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [minimized, setMinimized] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string>();

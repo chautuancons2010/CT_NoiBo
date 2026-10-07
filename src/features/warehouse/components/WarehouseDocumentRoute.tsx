@@ -1,4 +1,6 @@
 import "server-only";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 
 import { BackLink } from "@/components/shared/BackLink";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -10,6 +12,7 @@ import { can, type Permission } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 
 type DocumentType = Exclude<InventoryDocumentType, "reversal">;
+const documentPaths: Record<DocumentType, string> = { receipt: "receipts", issue: "issues", transfer: "transfers", adjustment: "adjustments" };
 
 const permissionMap: Record<DocumentType, { view: Permission; create: Permission; post: Permission; reverse?: Permission }> = {
   receipt: { view: "warehouse.receipt.view", create: "warehouse.receipt.create", post: "warehouse.receipt.post", reverse: "warehouse.receipt.reverse" },
@@ -45,8 +48,8 @@ export async function WarehouseDocumentListRoute({ type, title }: { type: Docume
   if (!user || !can(user.permissions, permissions.view)) return <PermissionDeniedState />;
   return (
     <div className="page-stack">
-      <PageHeader title={title} />
-      <DocumentListView canCreate={can(user.permissions, permissions.create)} type={type} />
+      <PageHeader action={can(user.permissions, permissions.create) ? <Link className="button button--primary button--md" href={`/warehouse/${documentPaths[type]}/new`}><Plus aria-hidden="true" size={16} /><span>Tạo {title.toLocaleLowerCase("vi")}</span></Link> : undefined} title={title} />
+      <DocumentListView type={type} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { EmployeeListPage } from "@/features/employees";
+import { EmployeeListPage } from "@/features/employees/pages/EmployeeListPage";
 
 export default async function Page({
   searchParams

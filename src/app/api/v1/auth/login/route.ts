@@ -16,8 +16,11 @@ const schema = z.object({
 export async function POST(request: Request) {
   try {
     const input = parseWithSchema(schema, await request.json());
-    const result = await signInWithPassword({ ...input, ...await requestNetworkContext() });
-    const response = NextResponse.json({ ok: true, data: { redirectTo: resolveLandingPage(result.user, await readSettingsGroup("dashboard")) } }, { headers: { "cache-control": "no-store" } });
+    const [result, dashboardSettings] = await Promise.all([
+      requestNetworkContext().then((context) => signInWithPassword({ ...input, ...context })),
+      readSettingsGroup("dashboard")
+    ]);
+    const response = NextResponse.json({ ok: true, data: { redirectTo: resolveLandingPage(result.user, dashboardSettings), mobileRedirectTo: "/personal" } }, { headers: { "cache-control": "no-store" } });
     writeSessionCookies(response.cookies, result.session, result.sessionId);
     logger.info("auth.login_succeeded", { actorId: result.user.id });
     return response;

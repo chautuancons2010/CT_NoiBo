@@ -7,8 +7,8 @@ import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
 
 type Context = { params: Promise<{ id: string }> };
-export async function GET(_request: Request, { params }: Context) {
-  try { const user=requireAuthenticatedUser(await getRequestUser()); return successResponse(await getLeaveRequest(user,(await params).id)); }
+export async function GET(request: Request, { params }: Context) {
+  try { const user=requireAuthenticatedUser(await getRequestUser()); return successResponse(await getLeaveRequest(user,(await params).id,new URL(request.url).searchParams.get("scope")==="self"?"self":"all")); }
   catch (error) { return errorResponse(error); }
 }
 export async function PATCH(request: Request, { params }: Context) {

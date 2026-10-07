@@ -4,11 +4,6 @@ import { cn } from "@/lib/utils/cn";
 
 type LayoutProps = { children: ReactNode; className?: string };
 
-export interface DataManagementMetric {
-  label: string;
-  value: ReactNode;
-}
-
 export function PageContainer({ children, className }: LayoutProps) {
   return <div className={cn("page-container", className)}>{children}</div>;
 }
@@ -42,14 +37,9 @@ export function DataSurface({ children, className }: LayoutProps) {
   return <section className={cn("data-surface", "data-surface--workspace", className)}>{children}</section>;
 }
 
-export function DataManagementWorkspace({ children, className, metrics }: LayoutProps & { metrics?: readonly DataManagementMetric[] }) {
+export function DataManagementWorkspace({ children, className }: LayoutProps) {
   return (
     <section className={cn("data-management-workspace", className)}>
-      {metrics?.length ? (
-        <dl aria-label="Tóm tắt" className="data-management-summary">
-          {metrics.map((metric) => <div key={metric.label}><dt>{metric.label}</dt><dd>{metric.value}</dd></div>)}
-        </dl>
-      ) : null}
       {children}
     </section>
   );

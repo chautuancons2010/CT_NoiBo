@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { applicationForPath, applicationRegistry, applicationsForLauncher, contextualNavigationGroups, visibleApplications, visibleApplicationShortcuts } from "@/config/moduleRegistry";
 import { defaultSystemSettings } from "@/config/systemSettings";
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
+import { employeeBaselinePermissions } from "@/services/authorization/employeeAccessPolicy";
 
 function user(permissions: Permission[]): AuthenticatedUser {
   return { id: "test", displayName: "Test", username: "test", email: "test@example.com", status: "active", permissions };
@@ -20,6 +21,7 @@ describe("application registry", () => {
     expect(applicationForPath("/attendance/logs").id).toBe("human-resources");
     expect(applicationForPath("/timesheets").id).toBe("human-resources");
     expect(applicationForPath("/attendance/me").id).toBe("attendance");
+    expect(applicationForPath("/personal").id).toBe("attendance");
     expect(applicationForPath("/attendance/requests").id).toBe("attendance");
     expect(applicationForPath("/dashboard/warehouse").id).toBe("warehouse");
     expect(applicationForPath("/projects/abc/updates").id).toBe("projects");
@@ -28,6 +30,11 @@ describe("application registry", () => {
   it("shows launcher applications by permission", () => {
     const applications = visibleApplications(user(["warehouse.view", "profile.view"]), defaultSystemSettings.modules);
     expect(applications.map((item) => item.id)).toEqual(["warehouse"]);
+  });
+
+  it("keeps chat global instead of presenting it as a business module", () => {
+    expect(visibleApplications(user(["chat.access"]), defaultSystemSettings.modules).some((item) => item.id === "messaging")).toBe(false);
+    expect(contextualNavigationGroups("/messages", user(["chat.access"]), defaultSystemSettings.modules, defaultSystemSettings.navigation).flatMap((group) => group.items)).toEqual([]);
   });
 
   it("keeps only the global dashboard in the application switcher and sidebar", () => {
@@ -51,6 +58,15 @@ describe("application registry", () => {
 
     expect(applications.find((item) => item.id === "warehouse")?.accessible).toBe(true);
     expect(applications.find((item) => item.id === "human-resources")?.accessible).toBe(false);
+  });
+
+  it("keeps employee self-service from granting access to HR", () => {
+    const employee = user([...employeeBaselinePermissions]);
+    expect(visibleApplications(employee, defaultSystemSettings.modules).map((item) => item.id)).not.toContain("human-resources");
+    expect(applicationsForLauncher(employee, defaultSystemSettings.modules).find((item) => item.id === "human-resources")?.accessible).toBe(false);
+    expect(contextualNavigationGroups("/attendance/today", employee, defaultSystemSettings.modules, defaultSystemSettings.navigation)
+      .flatMap((group) => group.items.map((item) => item.href))).toEqual(["/dashboard"]);
+    expect(visibleApplications(employee, defaultSystemSettings.modules).map((item) => item.id)).toContain("attendance");
   });
 
   it("keeps the sidebar contextual", () => {

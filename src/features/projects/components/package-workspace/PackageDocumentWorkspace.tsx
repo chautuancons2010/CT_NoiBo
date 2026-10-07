@@ -9,7 +9,6 @@ import { Select } from "@/components/shared/FormControls";
 import { EmptyState } from "@/components/shared/States";
 import type { ProjectUpdate, ProjectUpdateAttachment } from "@/features/projects/types/projectTypes";
 
-import { MobileActionBar } from "./MobileActionBar";
 import styles from "./PackageWorkspace.module.css";
 
 type DocumentItem = ProjectUpdateAttachment & { authorName: string; updateId: string; version: number; versionCount: number };
@@ -40,7 +39,7 @@ function makeDocuments(updates: ProjectUpdate[]): DocumentItem[] {
   });
 }
 
-export function PackageDocumentWorkspace({ projectId, updates, canUpload }: { projectId: string; updates: ProjectUpdate[]; canUpload: boolean }) {
+export function PackageDocumentWorkspace({ projectId, updates, canUpload, selectedWorksiteId }: { projectId: string; updates: ProjectUpdate[]; canUpload: boolean; selectedWorksiteId?: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -67,6 +66,7 @@ export function PackageDocumentWorkspace({ projectId, updates, canUpload }: { pr
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           clientUpdateId: crypto.randomUUID(),
+          worksiteId: selectedWorksiteId,
           updateType: "general",
           title: "Tài liệu gói",
           content: `Tải lên ${files.map((file) => file.name).join(", ")}`,
@@ -105,7 +105,7 @@ export function PackageDocumentWorkspace({ projectId, updates, canUpload }: { pr
     <section className={styles.documentsWorkspace}>
       <header className={styles.workspaceHeading}>
         <div><h2>Tài liệu</h2><p>{documents.length} tệp</p></div>
-        {canUpload ? <div className={styles.desktopOnly}>{uploadButton}</div> : null}
+        {canUpload ? <div className={styles.headingActions}>{uploadButton}</div> : null}
       </header>
       {canUpload ? <input accept="application/pdf,.doc,.docx,.xls,.xlsx" aria-label="Chọn tài liệu" hidden multiple onChange={(event) => void upload(Array.from(event.target.files ?? []))} ref={inputRef} type="file" /> : null}
       <div className={styles.fileToolbar}>
@@ -149,7 +149,6 @@ export function PackageDocumentWorkspace({ projectId, updates, canUpload }: { pr
         })}
         {!visible.length ? <EmptyState title={documents.length ? "Không có tài liệu phù hợp" : "Chưa có tài liệu"} /> : null}
       </div>
-      {canUpload ? <MobileActionBar>{uploadButton}</MobileActionBar> : null}
     </section>
   );
 }

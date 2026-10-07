@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
 import { DataSurface, ListPageLayout } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { Payslip } from "../types";
+import { useMobileViewport } from "@/lib/ui/useMobileViewport";
 
 const money = (value: unknown) =>
   new Intl.NumberFormat("vi-VN", {
@@ -15,17 +16,25 @@ const money = (value: unknown) =>
     maximumFractionDigits: 0
   }).format(Number(value ?? 0));
 
-export function PayslipConsole({ canRevoke }: { canRevoke: boolean }) {
+export function PayslipConsole({ canRevoke, selfOnly = false }: { canRevoke: boolean; selfOnly?: boolean }) {
+  const mobile = useMobileViewport();
+  const selfScope = selfOnly || mobile;
   const [items, setItems] = useState<Payslip[]>([]);
+  const [loadedScope, setLoadedScope] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string>();
+  const requestId = useRef(0);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/v1/accounting/payslips", { cache: "no-store" });
+    if (selfScope === null) return;
+    const request = ++requestId.current;
+    const response = await fetch(`/api/v1/accounting/payslips${selfScope ? "?scope=self" : ""}`, { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error?.message);
+    if (request !== requestId.current) return;
     setItems(body.data);
-  }, []);
+    setLoadedScope(selfScope);
+  }, [selfScope]);
 
   useEffect(() => {
     queueMicrotask(() => void load().catch((reason) => setError(reason.message)));
@@ -53,8 +62,8 @@ export function PayslipConsole({ canRevoke }: { canRevoke: boolean }) {
   }
 
   const columns: DataTableColumn<Payslip>[] = [
-    { id: "employee", header: "Nhân viên", cell: (item) => <><strong>{item.employeeName}</strong><br /><small>{item.employeeCode}</small></> },
-    { id: "period", header: "Kỳ lương", cell: (item) => <Link className="text-link" href={`/accounting/payslips/${item.id}`}>{item.periodMonth.slice(0, 7)}</Link> },
+    ...(!selfScope ? [{ id: "employee", header: "Nhân viên", cell: (item: Payslip) => <strong>{item.employeeName}</strong> }] : []),
+    { id: "period", header: "Kỳ lương", cell: (item) => <Link className="text-link" href={`/accounting/payslips/${item.id}${selfScope ? "?scope=self" : ""}`}>{item.periodMonth.slice(0, 7)}</Link> },
     { id: "version", header: "Phiên bản", cell: (item) => `v${item.version}` },
     { id: "net", header: "Thực nhận", cell: (item) => <strong>{money(item.snapshot.netSalary)}</strong>, align: "right" },
     { id: "published", header: "Phát hành", cell: (item) => item.publishedAt ? new Intl.DateTimeFormat("vi-VN").format(new Date(item.publishedAt)) : "—", hiddenOnMobile: true },
@@ -64,14 +73,15 @@ export function PayslipConsole({ canRevoke }: { canRevoke: boolean }) {
 
   return (
     <ListPageLayout><DataSurface><DataTable
-      actions={(item) => <DropdownMenu label={`Thao tác phiếu lương ${item.employeeName}`}><a href={`/api/v1/accounting/payslips/${item.id}/download`}>Tải PDF</a>{canRevoke && item.status === "published" ? <button disabled={busyId === item.id} onClick={() => void revoke(item)} type="button">Thu hồi</button> : null}</DropdownMenu>}
+      actions={(item) => <DropdownMenu label={`Thao tác phiếu lương ${item.employeeName}`}><a href={`/api/v1/accounting/payslips/${item.id}/download`}>Tải PDF</a>{canRevoke && !selfScope && item.status === "published" ? <button disabled={busyId === item.id} onClick={() => void revoke(item)} type="button">Thu hồi</button> : null}</DropdownMenu>}
       columns={columns}
-      data={items}
+      data={loadedScope === selfScope ? items : []}
       emptyDescription=""
       emptyTitle="Chưa có phiếu lương"
       error={error}
       getRowId={(item) => item.id}
       rowHrefPrefix="/accounting/payslips/"
+      rowHrefSuffix={selfScope ? "?scope=self" : ""}
     /></DataSurface></ListPageLayout>
   );
 }

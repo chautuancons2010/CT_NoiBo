@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import Link from "next/link";
 import { BackLink } from "@/components/shared/BackLink";
 import { routeMetaByPath } from "@/config/routeRegistry";
-import { WorkerAttendanceSessionList } from "@/features/worker-attendance";
+import { WorkerAttendanceSessionList } from "@/features/worker-attendance/components/WorkerAttendanceHome";
 
 const meta = routeMetaByPath["/worker-attendance"];
 

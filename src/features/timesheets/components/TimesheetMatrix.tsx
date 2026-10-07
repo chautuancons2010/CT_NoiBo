@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/shared/FormControls";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -20,6 +21,11 @@ function dates(from: string, to: string) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return result;
+}
+
+function employeePath(periodId: string, summary: TimesheetSummary, date?: string) {
+  const path = `/timesheets/periods/${periodId}/employees/${encodeURIComponent(summary.employeeCode || summary.employeeId)}`;
+  return date ? `${path}?date=${date}` : path;
 }
 
 export function TimesheetMatrix() {
@@ -60,10 +66,22 @@ export function TimesheetMatrix() {
   const days = useMemo(() => period ? dates(period.startDate, period.endDate) : [], [period]);
   const byEmployeeDate = useMemo(() => new Map(daily.map((item) => [`${item.employeeId}:${item.workDate}`, item])), [daily]);
   return <Card className="timesheet-matrix-card">
-    <div className="panel-header"><h2>Ngày công theo nhân viên</h2><label className="timesheet-matrix-period">Kỳ công <select className="select" onChange={(event) => setPeriodId(event.target.value)} value={periodId}>{periods.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div>
+    <div className="panel-header"><h2>Ngày công theo nhân viên</h2><div className="timesheet-matrix-period"><Select label={"Kỳ công"} className="select" onChange={(event) => setPeriodId(event.target.value)} value={periodId} options={[...(periods.map((item) => ({ label: item.name, value: item.id })))]} /></div></div>
     {period ? <p className="timesheet-matrix-range">{period.startDate} – {period.endDate} · {period.status === "locked" ? "Đã chốt" : "Đang tổng hợp"}</p> : null}
     {error ? <p className="form-error">{error}</p> : null}
-    {loading ? <p>Đang tải bảng công…</p> : !period ? <p>Chưa có kỳ công.</p> : <div className="timesheet-matrix-scroll"><table className="timesheet-matrix"><thead><tr><th scope="col">Nhân viên</th>{days.map((date) => <th key={date} scope="col" title={date}>{date.slice(-2)}</th>)}<th scope="col">Tổng</th></tr></thead><tbody>{summaries.map((summary) => <tr key={summary.employeeId}><th scope="row"><Link href={`/timesheets/periods/${period.id}/employees/${summary.employeeId}`}>{summary.employeeName}<small>{summary.employeeCode}</small></Link></th>{days.map((date) => { const record = byEmployeeDate.get(`${summary.employeeId}:${date}`); return <td key={date}>{record ? <Link aria-label={`${summary.employeeName}, ${date}: ${record.status}`} className={`timesheet-matrix__day is-${record.status}`} href={`/timesheets/periods/${period.id}/employees/${summary.employeeId}?date=${date}`} title={`${date} · ${record.status}`}>{statusSymbol[record.status] ?? "?"}</Link> : <span className="timesheet-matrix__blank">—</span>}</td>; })}<td><strong>{summary.actualWorkdays}</strong></td></tr>)}{!summaries.length ? <tr><td colSpan={days.length + 2}>Kỳ này chưa được tổng hợp.</td></tr> : null}</tbody></table></div>}
+    {loading ? <p>Đang tải bảng công…</p> : !period ? <p>Chưa có kỳ công.</p> : <>
+      <div className="timesheet-matrix-scroll"><table className="timesheet-matrix"><thead><tr><th scope="col">Nhân viên</th>{days.map((date) => <th key={date} scope="col" title={date}>{date.slice(-2)}</th>)}<th scope="col">Tổng</th></tr></thead><tbody>{summaries.map((summary) => <tr key={summary.employeeId}><th scope="row"><Link href={employeePath(period.id, summary)}>{summary.employeeName}</Link></th>{days.map((date) => { const record = byEmployeeDate.get(`${summary.employeeId}:${date}`); return <td key={date}>{record ? <Link aria-label={`${summary.employeeName}, ${date}: ${record.status}`} className={`timesheet-matrix__day is-${record.status}`} href={employeePath(period.id, summary, date)} title={`${date} · ${record.status}`}>{statusSymbol[record.status] ?? "?"}</Link> : <span className="timesheet-matrix__blank">—</span>}</td>; })}<td><strong>{summary.actualWorkdays}</strong></td></tr>)}{!summaries.length ? <tr><td colSpan={days.length + 2}>Kỳ này chưa được tổng hợp.</td></tr> : null}</tbody></table></div>
+      <div className="timesheet-mobile-list">
+        {summaries.map((summary) => <article className="timesheet-mobile-card" key={summary.employeeId}>
+          <header><Link href={employeePath(period.id, summary)}><strong>{summary.employeeName}</strong></Link><span><small>Tổng công</small><strong>{summary.actualWorkdays}</strong></span></header>
+          <div className="timesheet-mobile-days">{days.map((date) => {
+            const record = byEmployeeDate.get(`${summary.employeeId}:${date}`);
+            return record ? <Link aria-label={`${summary.employeeName}, ${date}: ${record.status}`} className={`timesheet-mobile-day is-${record.status}`} href={employeePath(period.id, summary, date)} key={date}><small>{date.slice(-2)}</small><strong>{statusSymbol[record.status] ?? "?"}</strong></Link> : <span className="timesheet-mobile-day is-empty" key={date}><small>{date.slice(-2)}</small><strong>—</strong></span>;
+          })}</div>
+        </article>)}
+        {!summaries.length ? <p>Kỳ này chưa được tổng hợp.</p> : null}
+      </div>
+    </>}
     <div className="timesheet-matrix-legend"><span>X · Đủ công</span><span>M · Đi muộn/về sớm</span><span>! · Thiếu công</span><span>P · Nghỉ phép</span><span>CT · Công tác</span><span>L · Ngày lễ</span></div>
   </Card>;
 }

@@ -8,6 +8,11 @@ describe("route registry", () => {
       title: "Hàng hóa",
       module: "Kho"
     });
+    expect(getRouteMeta("/projects/new")).toMatchObject({
+      title: "Tạo gói",
+      module: "Gói / Công trường"
+    });
+    expect(getBackHref("/projects/new")).toBe("/projects");
   });
 
   it("builds breadcrumbs for employee route-backed tabs", () => {
@@ -25,16 +30,17 @@ describe("route registry", () => {
     ]));
   });
 
-  it("uses the four package workspaces in business order", () => {
+  it("uses the field-operation package workspaces in business order", () => {
     expect(projectDetailSections).toEqual([
+      { value: "today", label: "Hôm nay" },
       { value: "progress", label: "Thi công" },
-      { value: "team", label: "Chấm công" },
-      { value: "profile", label: "Hồ sơ" },
+      { value: "team", label: "Nhân lực" },
+      { value: "profile", label: "Thông tin" },
       { value: "documents", label: "Tài liệu" }
     ]);
     expect(getBreadcrumbs("/projects/package-1/documents")).toEqual([
       { label: "Gói / Công trường", href: "/projects" },
-      { label: "package-1", href: "/projects/package-1/progress" },
+      { label: "package-1", href: "/projects/package-1/today" },
       { label: "Tài liệu" }
     ]);
   });
@@ -54,11 +60,13 @@ describe("route registry", () => {
     expect(getBackHref("/employees/NV001/contracts")).toBe("/employees/NV001/profile");
     expect(getBackHref("/warehouse/items/57/edit")).toBe("/warehouse/items/57");
     expect(getBackHref("/timesheets/periods/period-1/employees/employee-1")).toBe("/timesheets/periods/period-1");
-    expect(getBackHref("/employees")).toBe("/dashboard");
-    expect(getBackHref("/attendance/me")).toBe("/dashboard");
-    expect(getBackHref("/attendance/history")).toBe("/dashboard");
-    expect(getBackHref("/attendance/today")).toBe("/dashboard");
-    expect(getBackHref("/warehouse/inventory")).toBe("/dashboard");
+    expect(getBackHref("/employees")).toBeNull();
+    expect(getBackHref("/attendance/me")).toBeNull();
+    expect(getBackHref("/attendance/history")).toBeNull();
+    expect(getBackHref("/attendance/today")).toBeNull();
+    expect(getBackHref("/attendance/logs")).toBe("/attendance/today");
+    expect(getBackHref("/attendance/records/event-1")).toBe("/attendance/logs");
+    expect(getBackHref("/warehouse/inventory")).toBeNull();
     expect(getBackHref("/dashboard")).toBeNull();
   });
 });

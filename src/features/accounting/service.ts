@@ -10,7 +10,6 @@ import { recordAuditLog } from "@/services/audit/auditLog";
 import { readSettingsGroup } from "@/services/system-settings/systemSettingsService";
 import type { payrollActionSchema, payrollCreateSchema, payslipRevokeSchema, salaryInputSchema } from "./schemas";
 import type { PayrollDetail, PayrollLine, PayrollPeriod, Payslip, SalaryRecord } from "./types";
-import { generatePayslipPdf } from "./payslipPdf";
 
 type Row = Record<string, unknown>;
 function db(): SupabaseClient { const client = getSupabaseServiceClient(); if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình."); return client; }
@@ -25,7 +24,33 @@ export async function listEmployeeSalaries(user: AuthenticatedUser, employeeId: 
 export async function listSalaryEmployees(user: AuthenticatedUser) { requireAny(user, ["salary.view", "salary.edit"]); const { data, error } = await db().from("employees").select("id,employee_code,full_name").in("employment_status", ["active", "probation", "pending_onboarding"]).order("employee_code"); if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách nhân viên."); return (data ?? []).map((row) => ({ id: String(row.id), code: String(row.employee_code), name: String(row.full_name) })); }
 export async function saveSalary(user: AuthenticatedUser, input: z.infer<typeof salaryInputSchema>) { if (!can(user.permissions, "salary.edit")) throw new AppError("PERMISSION_DENIED"); const client = db(), actor = await identity(client, user); const { data: before } = await client.from("employee_salary_history").select("*").eq("employee_id", input.employeeId).order("effective_date", { ascending: false }).limit(1).maybeSingle(); const { data, error } = await client.from("employee_salary_history").insert({ employee_id: input.employeeId, base_salary: input.baseSalary, allowance: input.allowance, bonus: input.bonus, deduction: input.deduction, effective_date: input.effectiveDate, note: input.note ?? null, reason: input.reason, changed_by: actor.accountId }).select("*,employees(employee_code,full_name)").single(); if (error || !data) throw new AppError("SERVER_ERROR", "Không thể ghi nhận mức lương."); await recordAuditLog({ actorId: actor.accountId, action: "salary.changed", entityType: "employee", entityId: input.employeeId, before: before ?? undefined, after: input, reason: input.reason }); return salary(data as Row); }
 
-async function periodRows(client: SupabaseClient): Promise<PayrollPeriod[]> { const [{ data: periods, error: periodError }, { data: lines, error: lineError }] = await Promise.all([client.from("payroll_periods").select("*").order("period_month", { ascending: false }), client.from("payroll_lines").select("payroll_period_id,base_salary,allowance,bonus,deduction,net_salary")]); if (periodError || lineError) throw new AppError("SERVER_ERROR", "Không thể đọc kỳ lương."); return (periods ?? []).map((row) => { const related = (lines ?? []).filter((item) => item.payroll_period_id === row.id); return { id: String(row.id), periodMonth: String(row.period_month), timesheetPeriodId: row.timesheet_period_id ? String(row.timesheet_period_id) : undefined, status: row.status, rowVersion: Number(row.row_version), lineCount: related.length, grossTotal: related.reduce((sum, item) => sum + Number(item.base_salary) + Number(item.allowance) + Number(item.bonus), 0), deductionTotal: related.reduce((sum, item) => sum + Number(item.deduction), 0), netTotal: related.reduce((sum, item) => sum + Number(item.net_salary), 0), note: row.note ?? undefined, updatedAt: String(row.updated_at) }; }); }
+async function periodRows(client: SupabaseClient): Promise<PayrollPeriod[]> {
+  const [{ data: periods, error: periodError }, { data: lines, error: lineError }] = await Promise.all([
+    client.from("payroll_periods").select("*").order("period_month", { ascending: false }),
+    client.from("payroll_lines").select("payroll_period_id,base_salary,allowance,bonus,deduction,net_salary")
+  ]);
+  if (periodError || lineError) throw new AppError("SERVER_ERROR", "Không thể đọc kỳ lương.");
+  const totals = new Map<string, { count: number; gross: number; deduction: number; net: number }>();
+  for (const line of lines ?? []) {
+    const id = String(line.payroll_period_id);
+    const value = totals.get(id) ?? { count: 0, gross: 0, deduction: 0, net: 0 };
+    value.count += 1;
+    value.gross += Number(line.base_salary) + Number(line.allowance) + Number(line.bonus);
+    value.deduction += Number(line.deduction);
+    value.net += Number(line.net_salary);
+    totals.set(id, value);
+  }
+  return (periods ?? []).map((row) => {
+    const total = totals.get(String(row.id)) ?? { count: 0, gross: 0, deduction: 0, net: 0 };
+    return {
+      id: String(row.id), periodMonth: String(row.period_month),
+      timesheetPeriodId: row.timesheet_period_id ? String(row.timesheet_period_id) : undefined,
+      status: row.status, rowVersion: Number(row.row_version), lineCount: total.count,
+      grossTotal: total.gross, deductionTotal: total.deduction, netTotal: total.net,
+      note: row.note ?? undefined, updatedAt: String(row.updated_at)
+    };
+  });
+}
 export async function listPayroll(user: AuthenticatedUser) { requireAny(user, ["payroll.view", "payroll.create"]); return periodRows(db()); }
 export async function listPayrollReferences(user: AuthenticatedUser) { requireAny(user, ["payroll.view", "payroll.create"]); const { data, error } = await db().from("timesheet_periods").select("id,code,name,start_date,end_date,status").eq("status", "locked").order("start_date", { ascending: false }).limit(36); if (error) throw new AppError("SERVER_ERROR", "Không thể đọc kỳ công đã khóa."); return (data ?? []).map((row) => ({ id: String(row.id), code: String(row.code), name: String(row.name), startDate: String(row.start_date), endDate: String(row.end_date) })); }
 export async function createPayroll(user: AuthenticatedUser, input: z.infer<typeof payrollCreateSchema>) {
@@ -50,7 +75,26 @@ export async function createPayroll(user: AuthenticatedUser, input: z.infer<type
   await recordAuditLog({ actorId: actor.accountId, action: "payroll.created", entityType: "payroll_period", entityId: String(data.id), after: input });
   return getPayroll(user, String(data.id));
 }
-export async function getPayroll(user: AuthenticatedUser, id: string): Promise<PayrollDetail> { requireAny(user, ["payroll.view", "payroll.create"]); const client = db(); const periods = await periodRows(client), period = periods.find((item) => item.id === id); if (!period) throw new AppError("NOT_FOUND", "Không tìm thấy kỳ lương."); const { data, error } = await client.from("payroll_lines").select("*,employees(employee_code,full_name)").eq("payroll_period_id", id).order("employee_id"); if (error) throw new AppError("SERVER_ERROR", "Không thể đọc bảng lương."); return { ...period, lines: (data ?? []).map((row) => line(row as Row)) }; }
+export async function getPayroll(user: AuthenticatedUser, id: string): Promise<PayrollDetail> {
+  requireAny(user, ["payroll.view", "payroll.create"]);
+  const client = db();
+  const [{ data: period, error: periodError }, { data: rows, error: lineError }] = await Promise.all([
+    client.from("payroll_periods").select("*").eq("id", id).maybeSingle(),
+    client.from("payroll_lines").select("*,employees(employee_code,full_name)").eq("payroll_period_id", id).order("employee_id")
+  ]);
+  if (periodError || lineError) throw new AppError("SERVER_ERROR", "Không thể đọc bảng lương.");
+  if (!period) throw new AppError("NOT_FOUND", "Không tìm thấy kỳ lương.");
+  const lines = (rows ?? []).map((row) => line(row as Row));
+  return {
+    id: String(period.id), periodMonth: String(period.period_month),
+    timesheetPeriodId: period.timesheet_period_id ? String(period.timesheet_period_id) : undefined,
+    status: period.status, rowVersion: Number(period.row_version), lineCount: lines.length,
+    grossTotal: lines.reduce((sum, item) => sum + item.baseSalary + item.allowance + item.bonus, 0),
+    deductionTotal: lines.reduce((sum, item) => sum + item.deduction, 0),
+    netTotal: lines.reduce((sum, item) => sum + item.netSalary, 0),
+    note: period.note ?? undefined, updatedAt: String(period.updated_at), lines
+  };
+}
 
 async function calculate(client: SupabaseClient, period: PayrollDetail, actorId: string) {
   if (["locked", "published"].includes(period.status)) throw new AppError("CONFLICT", "Bảng lương đã khóa.");
@@ -149,22 +193,36 @@ export async function actOnPayroll(user: AuthenticatedUser, id: string, input: z
 
 function mapPayslip(row: Row): Payslip {
   const person = employee(row), lineValue = row.payroll_lines, payrollLine = (Array.isArray(lineValue) ? lineValue[0] : lineValue) as Row | undefined, periodValue = payrollLine?.payroll_periods, period = (Array.isArray(periodValue) ? periodValue[0] : periodValue) as Row | undefined;
-  return { id: String(row.id), payrollLineId: String(row.payroll_line_id), employeeId: String(row.employee_id), employeeCode: String(person?.employee_code ?? "—"), employeeName: String(person?.full_name ?? "—"), periodMonth: String(period?.period_month ?? (row.snapshot as Row)?.periodMonth ?? ""), version: Number(row.version), status: row.status as Payslip["status"], snapshot: row.snapshot as Row, publishedAt: row.published_at ? String(row.published_at) : undefined, viewedAt: row.viewed_at ? String(row.viewed_at) : undefined, revokedAt: row.revoked_at ? String(row.revoked_at) : undefined, revokeReason: row.revoke_reason ? String(row.revoke_reason) : undefined };
+  return { id: String(row.id), payrollLineId: String(row.payroll_line_id), employeeId: String(row.employee_id), employeeCode: String(person?.employee_code ?? "—"), employeeName: String(person?.full_name ?? "—"), periodMonth: String(period?.period_month ?? (row.snapshot as Row)?.periodMonth ?? ""), version: Number(row.version), status: row.status as Payslip["status"], snapshot: normalizePayslipSnapshot(row.snapshot as Row), publishedAt: row.published_at ? String(row.published_at) : undefined, viewedAt: row.viewed_at ? String(row.viewed_at) : undefined, revokedAt: row.revoked_at ? String(row.revoked_at) : undefined, revokeReason: row.revoke_reason ? String(row.revoke_reason) : undefined };
 }
 
-export async function listPayslips(user: AuthenticatedUser): Promise<Payslip[]> {
+function normalizePayslipSnapshot(snapshot: Row): Row {
+  return {
+    ...snapshot,
+    workDays: snapshot.workDays ?? snapshot.work_days,
+    baseSalary: snapshot.baseSalary ?? snapshot.base_salary,
+    allowance: snapshot.allowance,
+    bonus: snapshot.bonus,
+    deduction: snapshot.deduction,
+    netSalary: snapshot.netSalary ?? snapshot.net_salary
+  };
+}
+
+export async function listPayslips(user: AuthenticatedUser, scope: "all" | "self" = "all"): Promise<Payslip[]> {
   requireAny(user, ["payroll.view", "payslip.self.view"]);
+  if (scope === "self" && !can(user.permissions, "payslip.self.view")) throw new AppError("PERMISSION_DENIED");
   const client = db(), actor = await identity(client, user);
-  const isSelfService = !can(user.permissions, "payroll.view");
+  const isSelfService = scope === "self" || !can(user.permissions, "payroll.view");
   let query = client.from("payslips").select("*,payroll_lines(payroll_period_id,payroll_periods(period_month)),employees(employee_code,full_name)").order("created_at", { ascending: false });
   if (isSelfService) { if (!actor.employeeId) throw new AppError("PERMISSION_DENIED", "Tài khoản chưa liên kết nhân viên."); query = query.eq("employee_id", actor.employeeId).eq("status", "published"); }
   const { data, error } = await query; if (error) throw new AppError("SERVER_ERROR", "Không thể đọc phiếu lương.");
   return (data ?? []).map((row) => mapPayslip(row as Row));
 }
 
-export async function getPayslip(user: AuthenticatedUser, id: string): Promise<Payslip> {
+export async function getPayslip(user: AuthenticatedUser, id: string, scope: "all" | "self" = "all"): Promise<Payslip> {
   requireAny(user, ["payroll.view", "payslip.self.view"]);
-  const client = db(), actor = await identity(client, user), isSelfService = !can(user.permissions, "payroll.view");
+  if (scope === "self" && !can(user.permissions, "payslip.self.view")) throw new AppError("PERMISSION_DENIED");
+  const client = db(), actor = await identity(client, user), isSelfService = scope === "self" || !can(user.permissions, "payroll.view");
   let query = client.from("payslips").select("*,payroll_lines(payroll_period_id,payroll_periods(period_month)),employees(employee_code,full_name)").eq("id", id);
   if (isSelfService) {
     if (!actor.employeeId) throw new AppError("PERMISSION_DENIED", "Tài khoản chưa liên kết nhân viên.");
@@ -209,7 +267,8 @@ export async function getPayslipDownloadAsset(user: AuthenticatedUser, id: strin
   const existingValue = payslip.file_assets, existing = (Array.isArray(existingValue) ? existingValue[0] : existingValue) as Row | undefined;
   const fileName = `phieu-luong-${String(payslip.snapshot?.periodMonth ?? "ky-luong").slice(0, 7)}-v${payslip.version}.pdf`;
   if (existing) return { bucket: String(existing.bucket), path: String(existing.object_path), fileName };
-  const person = employee(payslip as Row), template = await readSettingsGroup("payslip"), bytes = await generatePayslipPdf({ employeeCode: String(person?.employee_code ?? "—"), employeeName: String(person?.full_name ?? "—"), periodMonth: String(payslip.snapshot?.periodMonth ?? ""), version: Number(payslip.version), publishedAt: payslip.published_at ?? undefined, snapshot: payslip.snapshot as Row, template });
+  const { generatePayslipPdf } = await import("./payslipPdf");
+  const person = employee(payslip as Row), template = await readSettingsGroup("payslip"), bytes = await generatePayslipPdf({ employeeCode: String(person?.employee_code ?? "—"), employeeName: String(person?.full_name ?? "—"), periodMonth: String(payslip.snapshot?.periodMonth ?? ""), version: Number(payslip.version), publishedAt: payslip.published_at ?? undefined, snapshot: normalizePayslipSnapshot(payslip.snapshot as Row), template });
   const assetId = crypto.randomUUID(), objectPath = `${payslip.employee_id}/${id}/${assetId}.pdf`;
   const { error: uploadError } = await client.storage.from("payslip-private").upload(objectPath, bytes, { contentType: "application/pdf", upsert: false });
   if (uploadError) throw new AppError("SERVER_ERROR", "Không thể tạo tệp phiếu lương.");

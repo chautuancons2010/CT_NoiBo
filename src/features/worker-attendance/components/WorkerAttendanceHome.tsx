@@ -9,41 +9,29 @@ import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
 import { Input, Select } from "@/components/shared/FormControls";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { captureAttendanceLocation } from "@/features/attendance/client/locationCapture";
 import { cacheWorkerTasks, deleteWorkerDraft, getLatestCachedWorkerTasks, listWorkerDrafts, saveWorkerDraft, type CachedWorkerTasks, type WorkerLocalDraft } from "@/features/worker-attendance/client/workerDraftStore";
 import { readWorkerResponse } from "@/features/worker-attendance/client/workerAttendanceSync";
 import type { WorkerAttendanceSession, WorkerAttendanceTask } from "@/features/worker-attendance/types/workerAttendanceTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+import { getBusinessDateKey } from "@/lib/time/timezone";
 
 const sessionLabels: Record<string, string> = { draft: "Nháp", in_progress: "Đang làm", submitted: "Đã gửi", locked: "Đã khóa", needs_review: "Cần rà soát" };
 const sessionTones: Record<string, "neutral" | "info" | "success" | "warning"> = { draft: "neutral", in_progress: "info", submitted: "success", locked: "neutral", needs_review: "warning" };
 
-function localDate() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-}
-
-function locate(): Promise<WorkerLocalDraft["location"]> {
-  if (!navigator.geolocation) return Promise.resolve(undefined);
-  return new Promise((resolve) => navigator.geolocation.getCurrentPosition(
-    ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy }),
-    () => resolve(undefined),
-    { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 }
-  ));
-}
-
-function makeLocalSession(task: WorkerAttendanceTask, clientSessionId: string): WorkerAttendanceSession {
+function makeLocalSession(task: WorkerAttendanceTask, clientSessionId: string, location?: WorkerLocalDraft["location"]): WorkerAttendanceSession {
   const now = new Date().toISOString();
   return {
     id: `local-${clientSessionId}`, clientSessionId, projectId: task.projectId, projectName: task.projectName,
     worksiteId: task.worksiteId, worksiteName: task.worksiteName, date: task.date, shiftCode: task.shiftCode,
     shiftName: task.shiftName, sessionType: "morning", supervisorEmployeeId: "local", supervisorName: "",
-    startedAt: now, capturedAtClient: now, geofenceStatus: "unavailable", status: "in_progress", syncStatus: "local_pending",
+    startedAt: now, capturedAtClient: now, geofenceStatus: location ? location.accuracy > (task.allowedAccuracyThresholdMeters ?? 100) ? "accuracy_low" : "valid" : task.gpsRequired === false ? "not_required" : "unavailable", latitude: location?.latitude, longitude: location?.longitude, accuracyMeters: location?.accuracy, status: "in_progress", syncStatus: "local_pending",
     photoStatus: "pending_upload", version: 1, photos: [], adjustments: [], checklist: task.checklist, checklistResponses: [],
     entries: task.roster.map((worker) => ({ id: `local-${worker.workerId}`, sessionId: `local-${clientSessionId}`, workerId: worker.workerId, employeeCode: worker.employeeCode, workerName: worker.workerName, assignmentRole: worker.assignmentRole, status: worker.approvedLeave ? "leave" : "unconfirmed", exceptionReason: worker.approvedLeave ? "approved_leave" : undefined, note: worker.approvedLeave ? `${worker.approvedLeave.leaveTypeName} · ${worker.approvedLeave.requestNumber}` : undefined, dayException: "none", isUnplanned: false }))
   };
 }
 
-export function WorkerAttendanceToday({ projectId }: { projectId?: string }) {
+export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: string; worksiteId?: string }) {
   const router = useRouter();
   const [data, setData] = useState<CachedWorkerTasks>();
   const [loading, setLoading] = useState(true);
@@ -51,8 +39,8 @@ export function WorkerAttendanceToday({ projectId }: { projectId?: string }) {
   const [error, setError] = useState("");
   const [starting, setStarting] = useState<string>();
   const [localDrafts, setLocalDrafts] = useState<WorkerLocalDraft[]>([]);
-  const date = localDate();
-  const visibleTasks = useMemo(() => data?.tasks.filter((task) => !projectId || task.projectId === projectId) ?? [], [data?.tasks, projectId]);
+  const date = getBusinessDateKey();
+  const visibleTasks = useMemo(() => data?.tasks.filter((task) => (!projectId || task.projectId === projectId) && (!worksiteId || task.worksiteId === worksiteId)) ?? [], [data?.tasks, projectId, worksiteId]);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -83,9 +71,20 @@ export function WorkerAttendanceToday({ projectId }: { projectId?: string }) {
     const resumable = localDrafts.find((item) => item.session.projectId === task.projectId && item.session.worksiteId === task.worksiteId && item.session.date === task.date && item.session.shiftCode === task.shiftCode);
     if (resumable) { router.push(`/worker-attendance/sessions/${resumable.id}/roster`); return; }
     setStarting(task.worksiteId);
+    setError("");
     const clientSessionId = crypto.randomUUID();
-    const location = await locate();
-    const localSession = makeLocalSession(task, clientSessionId);
+    let location: WorkerLocalDraft["location"];
+    try {
+      const coordinates = await captureAttendanceLocation(navigator.geolocation, window.isSecureContext);
+      location = { latitude: coordinates.latitude, longitude: coordinates.longitude, accuracy: coordinates.accuracy };
+    } catch (caught) {
+      if (task.gpsRequired !== false) {
+        setStarting(undefined);
+        setError(caught instanceof Error ? caught.message : "Chưa xác định được GPS.");
+        return;
+      }
+    }
+    const localSession = makeLocalSession(task, clientSessionId, location);
     const draft: WorkerLocalDraft = { id: localSession.id, ownerAccountId: data!.accountId, clientSessionId, session: localSession, location, photos: [], pendingSubmit: false, retryCount: 0, updatedAt: new Date().toISOString() };
     await saveWorkerDraft(draft);
     try {

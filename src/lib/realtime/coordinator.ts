@@ -42,6 +42,19 @@ let state: RealtimeConnectionState = "connecting";
 let stopLifecycle: (() => void) | undefined;
 let lifecycleAccountId: string | undefined;
 let lifecycleReferences = 0;
+let lifecycleToken: object | undefined;
+let lifecycleChannel: BroadcastChannel | undefined;
+
+function releaseLifecycle(token: object): () => void {
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (token !== lifecycleToken) return;
+    lifecycleReferences -= 1;
+    if (lifecycleReferences === 0) stopLifecycle?.();
+  };
+}
 
 function setState(next: RealtimeConnectionState): void {
   if (state === next) return;
@@ -105,7 +118,8 @@ export function emitRealtimeInvalidation(event: RealtimeInvalidation, broadcast?
 
 export function reconcileRealtimeDomain(domain: RealtimeDomain, source: Exclude<RealtimeInvalidationSource, "postgres" | "remote-tab">): void {
   const now = Date.now();
-  if (now - (lastLifecycleReconcile.get(domain) ?? 0) < LIFECYCLE_RECONCILE_GAP_MS) return;
+  const previous = lastLifecycleReconcile.get(domain);
+  if (source !== "reconnect" && previous !== undefined && now - previous < LIFECYCLE_RECONCILE_GAP_MS) return;
   lastLifecycleReconcile.set(domain, now);
   const bucket = Math.floor(Date.now() / 1_000);
   emitRealtimeInvalidation({ version: 1, domain, key: `reconcile:${domain}:${source}:${bucket}`, source, occurredAt: new Date().toISOString() });
@@ -120,29 +134,35 @@ export function markRealtimeTransportState(next: "connecting" | "connected" | "d
 
 export function startRealtimeCoordinator(accountId: string): () => void {
   if (typeof window === "undefined") return () => undefined;
-  if (stopLifecycle && lifecycleAccountId === accountId) {
+  if (stopLifecycle && lifecycleAccountId === accountId && lifecycleToken) {
     lifecycleReferences += 1;
-    return () => {
-      lifecycleReferences -= 1;
-      if (lifecycleReferences === 0) stopLifecycle?.();
-    };
+    return releaseLifecycle(lifecycleToken);
   }
 
   stopLifecycle?.();
   lifecycleAccountId = accountId;
   lifecycleReferences = 1;
+  const token = {};
+  lifecycleToken = token;
   const channel = typeof BroadcastChannel === "undefined" ? undefined : new BroadcastChannel(`ct-realtime:${accountId}`);
+  lifecycleChannel = channel;
+  let pendingReconnect = false;
   const reconcileMountedDomains = (source: "reconnect" | "resume" | "focus" | "poll") => {
-    for (const domain of invalidationListeners.keys()) reconcileRealtimeDomain(domain, source);
+    if (source === "reconnect") pendingReconnect = true;
+    if (!navigator.onLine || document.visibilityState !== "visible") return;
+    const effectiveSource = pendingReconnect ? "reconnect" : source;
+    pendingReconnect = false;
+    for (const domain of invalidationListeners.keys()) reconcileRealtimeDomain(domain, effectiveSource);
   };
   const online = () => { setState("reconnecting"); reconcileMountedDomains("reconnect"); };
   const offline = () => setState("offline");
   const visible = () => { if (document.visibilityState === "visible") reconcileMountedDomains("resume"); };
   const focus = () => reconcileMountedDomains("focus");
-  const pageShow = () => reconcileMountedDomains("resume");
+  const pageShow = (event: PageTransitionEvent) => { if (event.persisted) reconcileMountedDomains("resume"); };
   const message = (event: MessageEvent<RealtimeInvalidation>) => {
     const value = event.data;
-    if (!value || value.version !== 1 || !invalidationListeners.has(value.domain)) return;
+    if (!value || value.version !== 1 || !isRealtimeDomain(value.domain) || typeof value.key !== "string" || typeof value.occurredAt !== "string") return;
+    if (!invalidationListeners.has(value.domain) && !invalidationListeners.has("dashboard")) return;
     emitRealtimeInvalidation({ ...value, source: "remote-tab" });
   };
 
@@ -161,6 +181,7 @@ export function startRealtimeCoordinator(accountId: string): () => void {
   setState(navigator.onLine ? "connecting" : "offline");
 
   stopLifecycle = () => {
+    pendingReconnect = false;
     window.clearInterval(fallback);
     window.clearTimeout(degraded);
     window.removeEventListener("online", online);
@@ -170,23 +191,20 @@ export function startRealtimeCoordinator(accountId: string): () => void {
     document.removeEventListener("visibilitychange", visible);
     channel?.removeEventListener("message", message);
     channel?.close();
+    if (lifecycleToken !== token) return;
     stopLifecycle = undefined;
     lifecycleAccountId = undefined;
     lifecycleReferences = 0;
+    lifecycleToken = undefined;
+    lifecycleChannel = undefined;
     seen.clear();
     lastLifecycleReconcile.clear();
   };
-  return () => {
-    lifecycleReferences -= 1;
-    if (lifecycleReferences === 0) stopLifecycle?.();
-  };
+  return releaseLifecycle(token);
 }
 
 export function broadcastRealtimeInvalidation(event: RealtimeInvalidation): void {
-  if (typeof BroadcastChannel === "undefined" || !lifecycleAccountId) return;
-  const channel = new BroadcastChannel(`ct-realtime:${lifecycleAccountId}`);
-  channel.postMessage(event);
-  channel.close();
+  lifecycleChannel?.postMessage(event);
 }
 
 export function resetRealtimeCoordinatorForTests(): void {

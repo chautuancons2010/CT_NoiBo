@@ -34,7 +34,7 @@ export function EmployeeListFilters({ defaults, departments, positions, employme
   }
 
   return (
-    <form onSubmit={apply}>
+    <form key={JSON.stringify(defaults)} onSubmit={apply}>
       <FilterBar
         actions={
           <>
@@ -47,7 +47,7 @@ export function EmployeeListFilters({ defaults, departments, positions, employme
         <SearchInput defaultValue={defaults.q} label="Tìm nhân viên" name="q" placeholder="Tìm mã, tên, SĐT" />
         <Select defaultValue={defaults.departmentId ?? ""} label="Phòng ban" labelHidden name="departmentId" options={departments} placeholder="Phòng ban: Tất cả" />
         <Select defaultValue={defaults.positionId ?? ""} label="Chức vụ" labelHidden name="positionId" options={positions} placeholder="Chức vụ: Tất cả" />
-        <Select defaultValue={defaults.employmentTypeId ?? ""} label="Loại" labelHidden name="employmentTypeId" options={employmentTypes} placeholder="Loại: Tất cả" />
+        <Select defaultValue={defaults.employmentTypeId ?? ""} label="Nhóm làm việc" labelHidden name="employmentTypeId" options={employmentTypes} placeholder="Nhóm: Tất cả" />
         <Select defaultValue={defaults.status ?? ""} label="Trạng thái" labelHidden name="status" options={statuses} placeholder="Trạng thái: Tất cả" />
       </FilterBar>
     </form>

@@ -30,7 +30,7 @@ export function ProjectContextHeader({ project }: { project: ProjectDetail }) {
 
   return <section className="project-context-header">
     <div className="project-context-header__top"><BackLink href="/projects" label="Danh sách gói" /><StatusBadge tone={projectStatus[project.status].tone}>{projectStatus[project.status].label}</StatusBadge></div>
-    <div className="project-context-header__main"><span className="project-context-header__code">{project.code}</span><h1>{project.name}</h1></div>
+    <div className="project-context-header__main"><h1>{project.name}</h1></div>
     <div className="project-context-header__meta">
       {details.map((detail) => { const Icon = detail.icon; return <span key={detail.label}><Icon aria-hidden="true" size={15} /><strong>{detail.value}</strong></span>; })}
       <span>{project.startDate} → {project.expectedEndDate ?? "Chưa xác định"}</span>

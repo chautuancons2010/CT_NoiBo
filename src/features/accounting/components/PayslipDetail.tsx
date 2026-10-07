@@ -6,23 +6,31 @@ import { Card } from "@/components/shared/Card";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { Payslip } from "../types";
+import { useMobileViewport } from "@/lib/ui/useMobileViewport";
 
 const money = (value: unknown) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(Number(value ?? 0));
 
-export function PayslipDetail({ id }: { id: string }) {
+export function PayslipDetail({ id, selfOnly = false }: { id: string; selfOnly?: boolean }) {
+  const mobile = useMobileViewport();
+  const selfScope = selfOnly || mobile;
   const [item, setItem] = useState<Payslip>();
-  const [error, setError] = useState("");
+  const [loadedKey, setLoadedKey] = useState("");
+  const [failure, setFailure] = useState<{ key: string; message: string }>();
+  const requestKey = `${id}:${selfScope}`;
 
   useEffect(() => {
-    void fetch(`/api/v1/accounting/payslips/${id}`, { cache: "no-store" }).then(async (response) => {
+    if (selfScope === null) return;
+    let cancelled = false;
+    void fetch(`/api/v1/accounting/payslips/${id}${selfScope ? "?scope=self" : ""}`, { cache: "no-store" }).then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message);
-      setItem(body.data);
-    }).catch((reason) => setError(reason.message));
-  }, [id]);
+      if (!cancelled) { setItem(body.data); setLoadedKey(requestKey); setFailure(undefined); }
+    }).catch((reason) => { if (!cancelled) setFailure({ key: requestKey, message: reason.message }); });
+    return () => { cancelled = true; };
+  }, [id, selfScope, requestKey]);
 
-  if (error) return <ErrorState action={null} description={error} />;
-  if (!item) return <LoadingState />;
+  if (failure?.key === requestKey) return <ErrorState action={null} description={failure.message} />;
+  if (!item || loadedKey !== requestKey) return <LoadingState />;
   return (
     <div className="content-grid content-grid--two">
       <Card>
@@ -32,7 +40,6 @@ export function PayslipDetail({ id }: { id: string }) {
         </div>
         <dl className="detail-field-list">
           <div><dt>Nhân viên</dt><dd>{item.employeeName}</dd></div>
-          <div><dt>Mã nhân viên</dt><dd>{item.employeeCode}</dd></div>
           <div><dt>Phiên bản</dt><dd>v{item.version}</dd></div>
           <div><dt>Ngày công</dt><dd>{String(item.snapshot.workDays ?? 0)}</dd></div>
           <div><dt>Ngày phát hành</dt><dd>{item.publishedAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(item.publishedAt)) : "—"}</dd></div>

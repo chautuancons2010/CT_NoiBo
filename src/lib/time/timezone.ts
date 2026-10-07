@@ -25,3 +25,20 @@ export function formatBusinessDate(value: Date | string): string {
 export function nowServerReceivedAt(): string {
   return new Date().toISOString();
 }
+
+/** Returns a YYYY-MM-DD key in the configured business timezone. */
+export function getBusinessDateKey(value: Date | string = new Date()): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError("Invalid date value");
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: appConfig.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const valueByPart = new Map(parts.map((part) => [part.type, part.value]));
+  return `${valueByPart.get("year")}-${valueByPart.get("month")}-${valueByPart.get("day")}`;
+}

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppRail } from "@/components/layout/AppRail";
-import { MobileContextNav } from "@/components/layout/MobileContextNav";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileNavigationProvider } from "@/components/layout/MobileNavigationContext";
 import { BackLink } from "@/components/shared/BackLink";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { isPathEnabled } from "@/config/systemSettings";
@@ -14,26 +15,42 @@ import { SystemNoticeBanner } from "@/features/shared-platforms/components/Syste
 import { resolveLandingPage } from "@/features/dashboard/registry";
 import { getBackHref } from "@/config/routeRegistry";
 import { RealtimeProvider, useRealtimeConnectionState } from "@/components/providers/RealtimeProvider";
-import { ChatDock } from "@/features/messaging/ChatDock";
+import { ChatDockLauncher } from "@/features/messaging/ChatDockLauncher";
 import { can } from "@/lib/auth/permissions";
 import { CurrentUserProvider } from "@/components/providers/CurrentUserProvider";
 import { visibleApplications } from "@/config/moduleRegistry";
+import { installBackHistory } from "@/lib/navigation/backHistory";
+import { readWorkspacePreferences, type WorkspacePreferences } from "@/lib/ui/workspacePreferencesRequest";
 
 const INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
 function AppShellContent({ children, user }: { children: ReactNode; user: AuthenticatedUser }) {
   const pathname = usePathname();
   const router = useRouter();
+  useLayoutEffect(() => installBackHistory(user.id), [user.id]);
   const { settings } = useSystemSettings();
-  const [collapsed, setCollapsed] = useState(settings.appearance.sidebarDefault === "collapsed");
-  const [hasLocalBackLink, setHasLocalBackLink] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const railPreferenceKey = `ct:sidebar-layout:v2:${user.id}`;
+  const [localBackHref, setLocalBackHref] = useState<string>();
   const mainRef = useRef<HTMLElement>(null);
+  const preferencesRef = useRef<WorkspacePreferences | undefined>(undefined);
   const connectionState = useRealtimeConnectionState();
+  const isPackageRoute = /^\/projects\/[^/]+\/(?:today|progress|team|profile|documents|updates)$/.test(pathname);
   // The shared shell owns the fallback return control. A locally-declared
   // BackLink (for a wizard or a record with a specific parent) wins, so users
   // never see two competing return actions.
-  const backHref = pathname === "/dashboard" ? null : getBackHref(pathname) ?? "/dashboard";
+  const backHref = isPackageRoute ? "/projects" : getBackHref(pathname);
   const hasChatAccess = can(user.permissions, "chat.access");
+  const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const contentClassName = [
+    "app-content",
+    hasChatAccess && "app-content--chat",
+    isDashboardRoute && "app-content--dashboard",
+    isPackageRoute && "app-content--package",
+    /^\/messages\/[^/]+/.test(pathname) && "app-content--conversation",
+    (pathname === "/personal" || pathname === "/applications") && "app-content--mobile-home",
+    pathname === "/attendance/quick" && "app-content--capture"
+  ].filter(Boolean).join(" ");
 
   useEffect(() => {
     if (!isPathEnabled(pathname, settings.modules)) {
@@ -44,20 +61,52 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
   }, [pathname, router, settings.dashboard, settings.modules, user]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/v1/workspace/preferences", { cache: "no-store", signal: controller.signal }).then(async (response) => {
-      if (!response.ok) return;
-      const body = await response.json();
-      setCollapsed(Boolean(body.data?.sidebarCollapsed));
-      if (body.data?.density) document.documentElement.dataset.density = body.data.density === "default" ? "standard" : body.data.density;
+    let active = true;
+    const restoreRail = () => {
+      if (!active) return;
+      try { setCollapsed(window.localStorage.getItem(railPreferenceKey) === "compact"); }
+      catch { /* Keep navigation labels visible when storage is unavailable. */ }
+    };
+    queueMicrotask(restoreRail);
+    void readWorkspacePreferences().then((preferences) => {
+      if (!active || !preferences) return;
+      preferencesRef.current = preferences;
+      document.documentElement.dataset.density = preferences.density === "default" ? "standard" : preferences.density;
     }).catch(() => undefined);
     const update = (event: Event) => {
       const preferences = (event as CustomEvent<{ sidebarCollapsed?: boolean; density?: string }>).detail;
-      if (typeof preferences?.sidebarCollapsed === "boolean") setCollapsed(preferences.sidebarCollapsed);
+      if (typeof preferences?.sidebarCollapsed === "boolean") {
+        setCollapsed(preferences.sidebarCollapsed);
+        try { window.localStorage.setItem(railPreferenceKey, preferences.sidebarCollapsed ? "compact" : "expanded"); }
+        catch { /* The in-memory choice remains usable. */ }
+      }
     };
     window.addEventListener("ui-preferences-updated", update);
-    return () => { controller.abort(); window.removeEventListener("ui-preferences-updated", update); };
-  }, []);
+    return () => { active = false; window.removeEventListener("ui-preferences-updated", update); };
+  }, [railPreferenceKey]);
+
+  const changeSidebarState = useCallback((nextCollapsed: boolean) => {
+    setCollapsed(nextCollapsed);
+    try { window.localStorage.setItem(railPreferenceKey, nextCollapsed ? "compact" : "expanded"); }
+    catch { /* The existing server preference still persists the choice. */ }
+    const persist = async () => {
+      let current = preferencesRef.current;
+      if (!current) {
+        current = await readWorkspacePreferences();
+      }
+      if (!current) return;
+      const next = { ...current, sidebarCollapsed: nextCollapsed };
+      preferencesRef.current = next;
+      setCollapsed(nextCollapsed);
+      window.dispatchEvent(new CustomEvent("ui-preferences-updated", { detail: next }));
+      await fetch("/api/v1/workspace/preferences", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(next)
+      });
+    };
+    void persist().catch(() => undefined);
+  }, [railPreferenceKey]);
 
   useEffect(() => {
     const activityKey = `ct:last-activity:${user.id}`;
@@ -104,11 +153,12 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
     const main = mainRef.current;
     if (!main) return;
     const findLocalBackLink = () => {
-      setHasLocalBackLink(Boolean(main.querySelector(":scope > :not(.page-context-navigation) .back-link")));
+      const link = main.querySelector<HTMLAnchorElement>(":scope > :not(.page-context-navigation) .back-link");
+      setLocalBackHref(link?.getAttribute("href") ?? undefined);
     };
     findLocalBackLink();
     const observer = new MutationObserver(findLocalBackLink);
-    observer.observe(main, { childList: true, subtree: true });
+    observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ["href"] });
     return () => observer.disconnect();
   }, [pathname]);
 
@@ -116,19 +166,19 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
     <div className="app-shell">
       <AppRail
         collapsed={collapsed}
-        onCollapsedChange={setCollapsed}
+        onCollapsedChange={changeSidebarState}
         pathname={pathname}
         user={user}
       />
-      <div className={hasChatAccess ? "app-content app-content--chat" : "app-content"}>
-        <AppHeader connectionState={connectionState} pathname={pathname} user={user} />
+      <div className={contentClassName}>
+        <AppHeader backHrefOverride={localBackHref} connectionState={connectionState} pathname={pathname} user={user} />
         <SystemNoticeBanner />
-        <MobileContextNav pathname={pathname} user={user} />
         <main className="page-main" id="main-content" ref={mainRef} tabIndex={-1}>
-          {backHref && !hasLocalBackLink ? <nav aria-label="Điều hướng quay lại" className="page-context-navigation"><BackLink href={backHref} /></nav> : null}
+          {backHref && !localBackHref ? <nav aria-label="Điều hướng quay lại" className="page-context-navigation"><BackLink href={backHref} label={backHref === "/projects" ? "Danh sách gói" : "Trở lại"} /></nav> : null}
           {children}
         </main>
-        {hasChatAccess ? <ChatDock /> : null}
+        <MobileBottomNav pathname={pathname} user={user} />
+        {hasChatAccess ? <ChatDockLauncher /> : null}
       </div>
     </div>
   );
@@ -137,7 +187,7 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
 export function AppShell({ children, user }: { children: ReactNode; user: AuthenticatedUser }) {
   return (
     <CurrentUserProvider user={user}>
-      <RealtimeProvider accountId={user.id}><AppShellContent user={user}>{children}</AppShellContent></RealtimeProvider>
+      <RealtimeProvider accountId={user.id}><MobileNavigationProvider><AppShellContent user={user}>{children}</AppShellContent></MobileNavigationProvider></RealtimeProvider>
     </CurrentUserProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils/cn";
 
@@ -24,8 +24,28 @@ export function Button({
   type = "button",
   ...props
 }: ButtonProps) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const widestContent = useRef(0);
+
+  useLayoutEffect(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    const style = getComputedStyle(button);
+    const content = Array.from(button.children).reduce((width, child) => width + child.getBoundingClientRect().width, 0);
+    if (!content) return;
+    const gap = Number.parseFloat(style.columnGap) || 0;
+    const inset = [style.paddingLeft, style.paddingRight, style.borderLeftWidth, style.borderRightWidth]
+      .reduce((sum, value) => sum + (Number.parseFloat(value) || 0), 0);
+    const width = Math.ceil(content + gap * Math.max(0, button.children.length - 1) + inset);
+    if (width > widestContent.current) {
+      widestContent.current = width;
+      button.style.minWidth = `min(100%, ${width}px)`;
+    }
+  }, [children, leftIcon, rightIcon]);
+
   return (
     <button
+      ref={buttonRef}
       className={cn("button", `button--${variant}`, `button--${size}`, className)}
       type={type}
       {...props}

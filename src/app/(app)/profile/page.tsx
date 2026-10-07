@@ -27,7 +27,7 @@ export default async function Page() {
           <h2>{detail?.summary.fullName ?? user?.displayName ?? "Chưa đăng nhập"}</h2>
           <p>
             {detail
-              ? `${detail.summary.employeeCode} - ${detail.summary.departmentName} - ${detail.summary.positionName}`
+              ? `${detail.summary.departmentName} · ${detail.summary.positionName}`
               : user?.username}
           </p>
         </div>

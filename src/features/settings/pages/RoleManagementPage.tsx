@@ -24,7 +24,7 @@ export async function RoleManagementPage() {
   return (
     <SettingsShell activePath="/settings/roles">
       <div className="page-stack">
-        <PageHeader title="Vai trò & phân quyền" />
+        <PageHeader title="Nhóm quyền truy cập" />
         <RoleTable canManage={can(user.permissions, "role.manage")} permissionGroups={permissionGroups} roles={roles} />
       </div>
     </SettingsShell>

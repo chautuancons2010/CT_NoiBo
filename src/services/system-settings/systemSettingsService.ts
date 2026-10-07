@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { cache } from "react";
 
 import {
   defaultSystemSettings,
   isSystemSettingsGroup,
+  normalizeStoredDashboardSettings,
   normalizeStoredNavigationSettings,
   parseSystemSettingsGroup,
   systemSettingsSchemas,
@@ -37,24 +39,45 @@ const localSettings = new Map<SystemSettingsGroup, StoredSettingsGroup>(
 );
 const localVersions: SettingsVersion[] = [];
 let lastSettingsReadFailureLog = 0;
+const SETTINGS_CACHE_MS = 30_000;
+const SETTINGS_READ_TIMEOUT_MS = 2_000;
+let settingsSnapshot: { value: SystemSettingsDocument; expiresAt: number } | undefined;
+let settingsRead: Promise<SystemSettingsDocument> | undefined;
+let settingsGeneration = 0;
 
 function safeDefault<TGroup extends SystemSettingsGroup>(group: TGroup): SystemSettingsDocument[TGroup] {
   return structuredClone(defaultSystemSettings[group]);
 }
 
-export async function readSystemSettings(): Promise<SystemSettingsDocument> {
+function normalizeStoredSettings(group: SystemSettingsGroup, value: unknown): unknown {
+  if (group === "navigation") return normalizeStoredNavigationSettings(value);
+  if (group === "dashboard") return normalizeStoredDashboardSettings(value);
+  return value;
+}
+
+async function loadSystemSettings(): Promise<SystemSettingsDocument> {
   const groups = Object.keys(systemSettingsSchemas) as SystemSettingsGroup[];
   const result = structuredClone(defaultSystemSettings);
   const client = getSupabaseServiceClient();
 
   if (client) {
-    const { data, error } = await client.from("system_settings").select("group_key,value,version");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SETTINGS_READ_TIMEOUT_MS);
+    let data: Array<{ group_key: string; value: unknown }> | null = null;
+    let error: unknown;
+    try {
+      const response = await client.from("system_settings").select("group_key,value,version").abortSignal(controller.signal);
+      data = response.data;
+      error = response.error;
+    } catch (cause) {
+      error = cause;
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!error && data) {
       for (const row of data) {
         if (!isSystemSettingsGroup(row.group_key)) continue;
-        const storedValue = row.group_key === "navigation"
-          ? normalizeStoredNavigationSettings(row.value)
-          : row.value;
+        const storedValue = normalizeStoredSettings(row.group_key, row.value);
         const parsed = systemSettingsSchemas[row.group_key].safeParse(storedValue);
         if (parsed.success) {
           result[row.group_key] = parsed.data as never;
@@ -73,11 +96,32 @@ export async function readSystemSettings(): Promise<SystemSettingsDocument> {
   for (const group of groups) {
     const stored = localSettings.get(group);
     if (!stored) continue;
-    const parsed = systemSettingsSchemas[group].safeParse(stored.value);
+    const parsed = systemSettingsSchemas[group].safeParse(normalizeStoredSettings(group, stored.value));
     result[group] = (parsed.success ? parsed.data : safeDefault(group)) as never;
   }
   return result;
 }
+
+function refreshSettings(): Promise<SystemSettingsDocument> {
+  if (!settingsRead) {
+    const generation = settingsGeneration;
+    const pending = loadSystemSettings().then((value) => {
+      if (generation === settingsGeneration) settingsSnapshot = { value, expiresAt: Date.now() + SETTINGS_CACHE_MS };
+      return value;
+    });
+    settingsRead = pending;
+    void pending.finally(() => { if (settingsRead === pending) settingsRead = undefined; }).catch(() => undefined);
+  }
+  return settingsRead;
+}
+
+export const readSystemSettings = cache(async (): Promise<SystemSettingsDocument> => {
+  if (settingsSnapshot) {
+    if (settingsSnapshot.expiresAt <= Date.now()) void refreshSettings().catch(() => undefined);
+    return structuredClone(settingsSnapshot.value);
+  }
+  return structuredClone(await refreshSettings());
+});
 
 export async function readSettingsGroup<TGroup extends SystemSettingsGroup>(
   group: TGroup
@@ -130,6 +174,13 @@ export async function publishSettingsGroup<TGroup extends SystemSettingsGroup>(i
   }
 
   localSettings.set(input.group, { value: structuredClone(value), version });
+  settingsGeneration += 1;
+  if (settingsSnapshot) {
+    settingsSnapshot = {
+      value: { ...settingsSnapshot.value, [input.group]: structuredClone(value) },
+      expiresAt: Date.now() + SETTINGS_CACHE_MS
+    };
+  }
   localVersions.unshift({
     id: versionId,
     group: input.group,
@@ -164,7 +215,7 @@ export async function listSettingsVersions(): Promise<SettingsVersion[]> {
     if (!error && data) {
       return data.flatMap((row) => {
         if (!isSystemSettingsGroup(row.group_key)) return [];
-        const parsed = systemSettingsSchemas[row.group_key].safeParse(row.snapshot);
+        const parsed = systemSettingsSchemas[row.group_key].safeParse(normalizeStoredSettings(row.group_key, row.snapshot));
         if (!parsed.success) return [];
         const entry: SettingsVersion = {
             id: row.id,
@@ -197,6 +248,9 @@ export async function restoreSettingsVersion(versionId: string, actorId: string)
 }
 
 export function resetLocalSystemSettingsForTests(): void {
+  settingsGeneration += 1;
+  settingsSnapshot = undefined;
+  settingsRead = undefined;
   localVersions.splice(0, localVersions.length);
   for (const group of Object.keys(defaultSystemSettings) as SystemSettingsGroup[]) {
     localSettings.set(group, { value: structuredClone(defaultSystemSettings[group]), version: 1 });

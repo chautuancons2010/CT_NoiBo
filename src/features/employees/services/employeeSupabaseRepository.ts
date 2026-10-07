@@ -21,6 +21,10 @@ import type { EmployeeListFilters } from "@/features/employees/types";
 
 type Row = Record<string, unknown>;
 
+// The roster only needs identity, search, and summary fields. Account linkage is
+// embedded so the visible rows do not need a second database round trip.
+const employeeListSelect = "id,employee_code,full_name,display_name,avatar_file_id,personal_phone,normalized_phone,personal_email,company_email,country,department_id,position_id,employment_type_id,join_date,employment_status,profile_status,profile_completeness,created_at,updated_at,row_version,linked_accounts:app_accounts!app_accounts_employee_fk(employee_id)";
+
 function text(row: Row, key: string): string | undefined {
   const value = row[key];
   return typeof value === "string" && value ? value : undefined;
@@ -231,13 +235,13 @@ function mapAccount(row: Row, roleIds: string[]): AppAccountRecord {
   };
 }
 
-async function readTable(tableName: string): Promise<Row[]> {
+async function readTable(tableName: string, columns = "*"): Promise<Row[]> {
   const client = getSupabaseServiceClient();
   if (!client) {
     return [];
   }
 
-  const { data, error } = await client.from(tableName).select("*");
+  const { data, error } = await client.from(tableName).select(columns);
   if (error) {
     logger.error("supabase.employee_repository.read_failed", {
       entityType: "supabase_table",
@@ -249,7 +253,7 @@ async function readTable(tableName: string): Promise<Row[]> {
     );
   }
 
-  return (data ?? []) as Row[];
+  return (data ?? []) as unknown as Row[];
 }
 
 export async function getEmployeeDataSetFromSupabase(): Promise<EmployeeDataSet | null> {
@@ -314,18 +318,64 @@ export async function getEmployeeListFromSupabase(filters: EmployeeListFilters, 
   const client = getSupabaseServiceClient();
   if (!client) return null;
 
-  const [departmentRows, positionRows, employmentTypeRows] = await Promise.all([
-    readTable("departments"),
-    readTable("positions"),
-    readTable("employment_types")
+  const page = Math.max(1, filters.page);
+  const pageSize = Math.min(Math.max(1, filters.pageSize), 100);
+  const createEmployeeQuery = (count = false) => {
+    let query = client.from("employees")
+      .select(employeeListSelect, count ? { count: "exact" } : undefined)
+      .neq("profile_status", "archived");
+    if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
+    if (filters.positionId) query = query.eq("position_id", filters.positionId);
+    if (filters.employmentTypeId) query = query.eq("employment_type_id", filters.employmentTypeId);
+    if (filters.status) query = query.eq("employment_status", filters.status);
+    return query.order("employee_code");
+  };
+
+  const readSearchEmployees = async () => {
+    // Keep accent-insensitive and cross-catalog matching in the domain service.
+    // Apply structured filters first to reduce the rows transferred for search.
+    const rows: Row[] = [];
+    for (let offset = 0;; offset += 500) {
+      const { data, error } = await createEmployeeQuery().range(offset, offset + 499);
+      if (error) throw new AppError("SERVER_ERROR", "Không thể tìm nhân sự.");
+      rows.push(...((data ?? []) as Row[]));
+      if ((data ?? []).length < 500) break;
+    }
+    return { data: rows, count: null, error: null };
+  };
+
+  const readSearchSensitiveProfiles = async () => {
+    if (!filters.q || !can(permissions, "employee.view_sensitive")) return [];
+
+    const rows: Row[] = [];
+    for (let offset = 0;; offset += 500) {
+      const { data, error } = await client.from("employee_sensitive_profiles")
+        .select("employee_id,national_id_number,bank_account_number,personal_tax_code,social_insurance_code,updated_at")
+        .order("employee_id").range(offset, offset + 499);
+      if (error) throw new AppError("SERVER_ERROR", "Không thể tìm nhân sự.");
+      rows.push(...((data ?? []) as Row[]));
+      if ((data ?? []).length < 500) break;
+    }
+    return rows;
+  };
+
+  // Catalogs, employees, and permitted search fields are independent reads.
+  const [departmentRows, positionRows, employmentTypeRows, employeeResult, sensitiveRows] = await Promise.all([
+    readTable("departments", "id,code,name,parent_department_id,manager_employee_id,active,sort_order"),
+    readTable("positions", "id,code,name,department_id,active,sort_order"),
+    readTable("employment_types", "id,code,name,worker_category,active,sort_order"),
+    filters.q ? readSearchEmployees() : createEmployeeQuery(true).range((page - 1) * pageSize, page * pageSize - 1),
+    readSearchSensitiveProfiles()
   ]);
+  if (employeeResult.error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách nhân sự.");
+  const employeeRows = (employeeResult.data ?? []) as Row[];
   const dataSet: EmployeeDataSet = {
     ...defaultEmployeeDataSet,
-    employees: [],
+    employees: employeeRows.map(mapEmployee),
     departments: departmentRows.map(mapDepartment),
     positions: positionRows.map(mapPosition),
     employmentTypes: employmentTypeRows.map(mapEmploymentType),
-    sensitiveProfiles: [],
+    sensitiveProfiles: sensitiveRows.map(mapSensitiveProfile),
     emergencyContacts: [],
     contracts: [],
     documents: [],
@@ -335,41 +385,9 @@ export async function getEmployeeListFromSupabase(filters: EmployeeListFilters, 
 
   let result;
   if (filters.q) {
-    // Accent-insensitive and cross-catalog search retains the existing semantics.
-    // Only a search request needs the wider employee scan.
-    const rows: Row[] = [];
-    for (let offset = 0;; offset += 500) {
-      const { data, error } = await client.from("employees").select("*").order("employee_code").range(offset, offset + 499);
-      if (error) throw new AppError("SERVER_ERROR", "Không thể tìm nhân sự.");
-      rows.push(...((data ?? []) as Row[]));
-      if ((data ?? []).length < 500) break;
-    }
-    dataSet.employees = rows.map(mapEmployee);
-    if (can(permissions, "employee.view_sensitive")) {
-      const sensitiveRows: Row[] = [];
-      for (let offset = 0;; offset += 500) {
-        const { data, error } = await client.from("employee_sensitive_profiles")
-          .select("employee_id,national_id_number,bank_account_number,personal_tax_code,social_insurance_code,updated_at")
-          .order("employee_id").range(offset, offset + 499);
-        if (error) throw new AppError("SERVER_ERROR", "Không thể tìm nhân sự.");
-        sensitiveRows.push(...((data ?? []) as Row[]));
-        if ((data ?? []).length < 500) break;
-      }
-      dataSet.sensitiveProfiles = sensitiveRows.map(mapSensitiveProfile);
-    }
     result = listEmployees(filters, permissions, dataSet);
   } else {
-    const page = Math.max(1, filters.page);
-    const pageSize = Math.min(Math.max(1, filters.pageSize), 100);
-    let query = client.from("employees").select("*", { count: "exact" }).neq("profile_status", "archived");
-    if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
-    if (filters.positionId) query = query.eq("position_id", filters.positionId);
-    if (filters.employmentTypeId) query = query.eq("employment_type_id", filters.employmentTypeId);
-    if (filters.status) query = query.eq("employment_status", filters.status);
-    const { data, count, error } = await query.order("employee_code").range((page - 1) * pageSize, page * pageSize - 1);
-    if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách nhân sự.");
-    dataSet.employees = ((data ?? []) as Row[]).map(mapEmployee);
-    const total = count ?? 0;
+    const total = employeeResult.count ?? 0;
     result = {
       items: dataSet.employees.map((employee) => buildEmployeeSummary(employee, dataSet)),
       total,
@@ -380,12 +398,15 @@ export async function getEmployeeListFromSupabase(filters: EmployeeListFilters, 
     };
   }
 
-  const ids = result.items.map((item) => item.id);
-  if (ids.length) {
-    const { data, error } = await client.from("app_accounts").select("employee_id").in("employee_id", ids);
-    if (error) throw new AppError("SERVER_ERROR", "Không thể đọc trạng thái tài khoản nhân sự.");
-    const accountIds = new Set((data ?? []).map((row) => String(row.employee_id)));
-    result.items = result.items.map((item) => ({ ...item, hasAccount: accountIds.has(item.id) }));
-  }
+  const linkedEmployeeIds = new Set(employeeRows.flatMap((row) => {
+    const linkedAccounts = row.linked_accounts;
+    const accounts = Array.isArray(linkedAccounts) ? linkedAccounts : [jsonRecord(row, "linked_accounts")];
+    return accounts.flatMap((account) => {
+      if (!account || typeof account !== "object") return [];
+      const employeeId = text(account as Row, "employee_id");
+      return employeeId ? [employeeId] : [];
+    });
+  }));
+  result.items = result.items.map((item) => ({ ...item, hasAccount: linkedEmployeeIds.has(item.id) }));
   return { employees: result, filterOptions: getEmployeeFilterOptions(dataSet) };
 }

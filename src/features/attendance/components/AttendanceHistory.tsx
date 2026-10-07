@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, ImageIcon, MapPin, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, ImageIcon, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -8,6 +8,7 @@ import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Drawer } from "@/components/shared/Overlays";
 import type { AttendanceHistoryDay } from "@/features/attendance/types/attendanceTypes";
 import { formatBusinessDate } from "@/lib/time/timezone";
 
@@ -77,18 +78,20 @@ export function AttendanceHistory({ selectedDate }: { selectedDate?: string }) {
       const day = byDate.get(key);
       const outside = date.getMonth() !== month.getMonth();
       const meta = day ? statusMeta[day.status] : undefined;
-      return <button aria-label={`${formatBusinessDate(key)}${meta ? `, ${meta.label}` : ""}`} aria-pressed={activeDate === key} className={`${outside ? "is-outside " : ""}${day ? `is-${day.status}` : "is-empty"}`} disabled={!day || outside} key={key} onClick={() => setActiveDate(key)} type="button"><span>{date.getDate()}</span>{meta ? <><strong>{meta.label}</strong>{day?.checkIn || day?.checkOut ? <small>{time(day.checkIn?.effectiveAt)} – {time(day.checkOut?.effectiveAt)}</small> : null}</> : null}</button>;
+      return <button aria-label={`${formatBusinessDate(key)}${meta ? `, ${meta.label}` : ", chưa có lượt chấm"}`} aria-pressed={activeDate === key} className={`${outside ? "is-outside " : ""}${day ? `is-${day.status}` : "is-empty"}`} disabled={outside} key={key} onClick={() => setActiveDate(key)} type="button"><span>{date.getDate()}</span>{meta ? <><strong>{meta.label}</strong>{day?.checkIn || day?.checkOut ? <small>{time(day.checkIn?.effectiveAt)} – {time(day.checkOut?.effectiveAt)}</small> : null}</> : null}</button>;
     })}</div>
     <footer>{Object.entries(statusMeta).filter(([status]) => status !== "pending").map(([status, meta]) => <span className={`is-${status}`} key={status}>{meta.label}</span>)}</footer>
   </Card>
-    {selected ? <div className="attendance-day-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveDate(undefined); }} role="presentation"><aside aria-label={`Chi tiết công ${formatBusinessDate(selected.date)}`} aria-modal="true" className="attendance-day-drawer" role="dialog"><button aria-label="Đóng" className="attendance-day-drawer__close" onClick={() => setActiveDate(undefined)} type="button"><X size={18} /></button><AttendanceDayDetail day={selected} /></aside></div> : null}
+    <Drawer className="attendance-day-drawer" onClose={() => setActiveDate(undefined)} open={Boolean(activeDate)} title={activeDate ? `Chi tiết công ${formatBusinessDate(activeDate)}` : "Chi tiết công"}>
+      {selected ? <AttendanceDayDetail day={selected} showHeading={false} /> : <div className="attendance-day-detail"><p>Chưa có lượt chấm công.</p><dl className="attendance-day-summary"><div><dt>Giờ vào</dt><dd>—</dd></div><div><dt>Giờ ra</dt><dd>—</dd></div></dl></div>}
+    </Drawer>
   </div>;
 }
 
-function AttendanceDayDetail({ day }: { day: AttendanceHistoryDay }) {
+function AttendanceDayDetail({ day, showHeading = true }: { day: AttendanceHistoryDay; showHeading?: boolean }) {
   const minutes = day.checkIn && day.checkOut ? Math.max(0, Math.round((new Date(day.checkOut.effectiveAt).getTime() - new Date(day.checkIn.effectiveAt).getTime()) / 60000)) : 0;
   return <div className="attendance-day-detail">
-    <h3>{new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(`${day.date}T12:00:00+07:00`))}</h3>
+    {showHeading ? <h3>{new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(`${day.date}T12:00:00+07:00`))}</h3> : null}
     <StatusBadge tone={statusMeta[day.status].tone}>{statusMeta[day.status].label}</StatusBadge>
     <dl className="attendance-day-summary"><div><dt>Ca làm</dt><dd>{day.shiftName ?? "—"} · {day.shiftStart ?? "—"} – {day.shiftEnd ?? "—"}</dd></div><div><dt>Giờ vào</dt><dd>{time(day.checkIn?.effectiveAt)}</dd></div><div><dt>Giờ ra</dt><dd>{time(day.checkOut?.effectiveAt)}</dd></div><div><dt>Tổng thời gian</dt><dd>{minutes ? `${Math.floor(minutes / 60)} giờ ${minutes % 60} phút` : "—"}</dd></div></dl>
     {[day.checkIn, day.checkOut].map((event, index) => event ? <Card key={event.id}><div className="attendance-detail-heading"><span>{event.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</span><strong>{time(event.effectiveAt)}</strong></div><div className="attendance-detail-grid"><span><MapPin size={16} />{event.locationName ?? "Không có địa điểm"}</span><span><ImageIcon size={16} />{event.photoId ? <Link href={`/attendance/photos/${event.photoId}`}>Xem ảnh</Link> : "Chưa có ảnh"}</span></div></Card> : day.status === "missing_check_out" && index === 1 ? <div className="attendance-missing" key="missing"><AlertTriangle size={17} />Thiếu lượt chấm ra</div> : null)}
