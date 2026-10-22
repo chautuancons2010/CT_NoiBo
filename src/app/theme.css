@@ -1707,28 +1707,129 @@ html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card
   background: transparent;
 }
 
-/* CT-UI: soft-square interactive controls.
- * Action buttons are rectangular, with one clear 6px corner radius.
- * Navigation/inputs can use 8px. Only semantic circles such as the avatar,
- * chat launcher, switch thumb, and status badges remain fully rounded.
- * Keep overrides scoped to interactive controls instead of every button tag:
- * calendar dates, segmented controls, map actions and feature widgets own
- * deliberate specialized hit targets.
+/* CT-UI · Modern Rounded / option B — shared interactive controls.
+ * Pill treatment is applied to actions, not to cards, multiline fields,
+ * calendars, toggles, chat messages or rectangular data surfaces.
+ * Keep focus, disabled, loading and permission behavior in the components.
  */
 .button,
 .page-main .button,
 .icon-button,
 .icon-link,
 .dropdown > summary,
+.quick-create .dropdown > summary,
 .page-context-navigation .back-link,
 .page-main .page-stack > .back-link,
 .filter-chip,
-.compact-action-menu__trigger {
+.compact-action-menu__trigger,
+.app-header__mobile-back {
   border-radius: var(--radius-button);
 }
 
+/* A pill has enough horizontal breathing room without becoming oversized. */
+.button,
+.page-main .button {
+  padding-inline: 18px;
+  box-shadow: none;
+}
+.button--sm,
+.page-main .button--sm { padding-inline: 14px; }
+.button--lg,
+.page-main .button--lg { padding-inline: 22px; }
+
+.button--primary,
+.page-main .button--primary,
+.icon-button--primary {
+  background: var(--action-primary);
+  border-color: var(--action-primary);
+  color: #ffffff;
+  box-shadow: none;
+}
+.button--primary:not(:disabled):hover,
+.page-main .button--primary:not(:disabled):hover,
+.icon-button--primary:not(:disabled):hover {
+  background: var(--action-primary-hover);
+  border-color: var(--action-primary-hover);
+}
+.button--primary:not(:disabled):active,
+.page-main .button--primary:not(:disabled):active,
+.icon-button--primary:not(:disabled):active {
+  background: var(--action-primary-active);
+  border-color: var(--action-primary-active);
+}
+.button--secondary,
+.page-main .button--secondary,
+.icon-button--secondary {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border-color: var(--action-border);
+  box-shadow: none;
+}
+.button--secondary:not(:disabled):hover,
+.page-main .button--secondary:not(:disabled):hover,
+.icon-button--secondary:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--action-primary) 35%, var(--action-border));
+  background: var(--action-hover);
+}
+.button--soft,
+.page-main .button--soft,
+.icon-button--soft { box-shadow: none; }
+.button--ghost,
+.page-main .button--ghost,
+.icon-button--ghost { box-shadow: none; }
+
+/* Icon-only controls are genuinely round because their visual box is square.
+ * Size stays owned by the feature: no forced dimensions on dense tables.
+ */
+.icon-button,
+.icon-link,
+.compact-action-menu__trigger,
+.app-header__mobile-back {
+  border-radius: 50%;
+}
+.icon-button:hover,
+.icon-link:hover { transform: none; }
+
+/* Modern Rounded search/filter controls share the same pill silhouette. */
+.app-header__search .header-search,
+.page-main .search-input,
+.search-input,
+.page-main input.input[type="search"],
+.page-main .filter-bar .select,
+.page-main .filter-bar .search-input,
+.header-search {
+  border-radius: var(--radius-search);
+}
+.filter-chip {
+  background: var(--surface-1);
+  border-color: var(--action-border);
+  box-shadow: none;
+}
+.filter-chip:hover {
+  background: var(--action-hover);
+}
+
+/* Menu/sidebar items: consistent pills, not oversized floating cards. */
 .app-rail__link,
 .app-rail.is-collapsed .app-rail__link {
   border-radius: var(--radius-nav);
 }
+.dropdown > summary,
+.quick-create .dropdown > summary,
+.page-context-navigation .back-link {
+  box-shadow: none;
+}
+.page-context-navigation .back-link,
+.page-main .page-stack > .back-link { min-height: 40px; }
 
+/* Preserve keyboard focus, touch-friendly hit targets and flexible mobile flow. */
+@media (max-width: 700px) {
+  .button,
+  .page-main .button,
+  .dropdown > summary,
+  .page-main .filter-chip { min-height: 44px; }
+  .button,
+  .page-main .button { padding-inline: 16px; }
+  .button--sm,
+  .page-main .button--sm { min-height: 44px; padding-inline: 12px; }
+}
