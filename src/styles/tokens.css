@@ -115,6 +115,11 @@
   --surface-navigation: #0f766e;
   --surface-navigation-strong: #0b5a54;
   --shell-canvas: #eef2f5;
+  /* Gentle, reusable green-pastel canvas for all authenticated pages. */
+  --app-canvas-start: #dff3e5;
+  --app-canvas-mid: #eff9f0;
+  --app-canvas-end: #fafcfa;
+  --app-canvas-glow: rgb(110 192 136 / 12%);
   --app-bg: #f0fdfa;
   --app-bg-soft: #f8fafc;
   --surface: #ffffff;
