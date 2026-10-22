@@ -1683,3 +1683,26 @@ html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card
 .app-rail__collapse:focus-visible { background: var(--sidebar-hover); color: var(--sidebar-text-active); }
 .app-rail.is-collapsed .app-rail__section-label { background: var(--border-soft); }
 .app-rail.is-collapsed .app-rail__link.is-active { box-shadow: var(--shadow-sm); }
+
+/* Shared pastel-green application canvas (CT-UI).
+ * All module cards, tables, inputs, the navigation rail, and semantic
+ * feedback colors retain their existing backgrounds and contrast.
+ * This final shared-shell rule intentionally supersedes legacy flat-canvas
+ * background shorthands above; no per-module override is required.
+ */
+.app-shell {
+  background-color: var(--app-canvas-end);
+}
+
+.app-content {
+  background-color: var(--app-canvas-end);
+  background-image:
+    radial-gradient(ellipse at 8% 0%, var(--app-canvas-glow), transparent 46%),
+    linear-gradient(160deg, var(--app-canvas-start) 0%, var(--app-canvas-mid) 44%, var(--app-canvas-end) 100%);
+  background-repeat: no-repeat;
+}
+
+.page-main,
+.dashboard-page {
+  background: transparent;
+}
