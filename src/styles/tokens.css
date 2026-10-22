@@ -65,10 +65,10 @@
   --radius-md: 9px;
   --radius-lg: 12px;
   --radius-xl: 16px;
-  --radius-control: 9px;
+  --radius-control: 8px;
   --radius-input: var(--radius-control);
-  --radius-button: 9px;
-  --radius-nav: 9px;
+  --radius-button: 6px;
+  --radius-nav: 8px;
   --radius-card: 12px;
   --radius-card-large: 16px;
   --radius-panel: 16px;
