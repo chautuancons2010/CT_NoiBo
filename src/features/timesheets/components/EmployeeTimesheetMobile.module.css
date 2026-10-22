@@ -8,7 +8,7 @@
 .period > span { display: grid; gap: 4px; }
 .period strong { font-size: 14px; }
 .period small { color: var(--text-secondary); font-size: 12px; }
-.metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0; }
 .metrics > div { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface-2); }
 .metrics dt { color: var(--text-secondary); font-size: 13px; }
 .metrics dd { margin: 0; color: var(--text-primary); font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -64,7 +64,7 @@
   .identity { flex-direction: column; align-items: stretch; gap: 14px; }
   .identity h2 { font-size: 19px; }
   .period { padding-top: 12px; border-top: 1px solid var(--border-subtle); }
-  .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .metrics > div { padding: 10px 8px; gap: 5px; }
   .metrics dt { font-size: 12px; }
   .metrics dd { font-size: 21px; }

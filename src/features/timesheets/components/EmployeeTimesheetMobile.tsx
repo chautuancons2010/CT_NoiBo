@@ -53,7 +53,7 @@ export function EmployeeTimesheetMobile({ periodId, employeeId, selectedDate }: 
     while (dates.length % 7) dates.push(null);
     return { dates, days: Array.from({ length: dates.length / 7 }, (_, index) => dates.slice(index * 7, index * 7 + 7)) };
   }, [period]);
-  const activeDate = selectedDate && calendar.dates.includes(selectedDate) ? selectedDate : selected || calendar.dates.find((date): date is string => Boolean(date)) || "";
+  const activeDate = calendar.dates.includes(selected) ? selected : calendar.dates.find((date): date is string => Boolean(date)) || "";
   const activeRecord = daily.find((item) => item.workDate === activeDate);
   const dayLabel = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
   if (error) return <Card><p className="form-error" role="alert">{error}</p></Card>;
