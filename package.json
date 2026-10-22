@@ -20,6 +20,7 @@
     "ui:architecture-audit": "node scripts/ui-architecture-audit.mjs",
     "ui:screen-audit": "node scripts/ui-screen-audit.mjs",
     "ui:qa": "node scripts/ui-qa.mjs",
+    "ui:button-responsive": "node scripts/ui-button-responsive-check.mjs",
     "migration:dry-run": "node scripts/migration/dry-run.mjs",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs",
     "seed:storage": "node scripts/seed-development-storage.mjs",
