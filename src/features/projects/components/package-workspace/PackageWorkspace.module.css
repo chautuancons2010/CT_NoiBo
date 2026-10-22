@@ -124,7 +124,7 @@
 .taskProgress > span { height: 6px; overflow: hidden; border-radius: var(--radius-pill); background: var(--mint-100); }
 .taskProgress i { display: block; height: 100%; border-radius: inherit; background: var(--mint-500); }
 .taskProgress strong { color: var(--text-secondary); font-size: var(--font-meta); }
-.rowMenu { display: grid; width: 40px; height: 40px; place-items: center; border-radius: var(--radius-control); color: var(--text-secondary); }
+.rowMenu { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; color: var(--text-secondary); }
 .mobileQuickActions { display: none; }
 
 .lookaheadPanel { display: grid; align-content: start; }
@@ -153,7 +153,7 @@
 .drawerFooter > span { color: var(--text-secondary); font-size: var(--font-meta); }
 .segmentedControl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; border: 0; padding: 0; }
 .segmentedControl legend { grid-column: 1 / -1; margin-bottom: var(--space-1); color: var(--text-primary); font-size: 13px; font-weight: var(--font-weight-semibold); }
-.segmentedControl button { min-height: 44px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; }
+.segmentedControl button { min-height: 44px; border: 1px solid var(--border-default); border-radius: var(--radius-button); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; }
 .segmentedControl button[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); font-weight: var(--font-weight-semibold); }
 .progressEditor { display: grid; gap: var(--space-2); }
 .progressEditor header { display: flex; justify-content: space-between; color: var(--text-secondary); }
@@ -322,7 +322,7 @@
   .taskProgress { grid-column: 1 / -1; }
   .taskRow > :global(.dropdown) { grid-column: 2; grid-row: 1; }
   .mobileQuickActions { display: flex; grid-column: 1 / -1; gap: var(--space-2); }
-  .mobileQuickActions button { min-width: 64px; min-height: 44px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-1); color: var(--text-primary); font-weight: var(--font-weight-semibold); }
+  .mobileQuickActions button { min-width: 64px; min-height: 44px; border: 1px solid var(--action-border); border-radius: var(--radius-button); background: var(--surface-1); color: var(--text-primary); font-weight: var(--font-weight-semibold); }
   .lookaheadPanel { border-top: 1px solid var(--border-subtle); }
   .attendanceLayout { background: var(--surface-2); }
   .peoplePanel,
