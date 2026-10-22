@@ -1706,3 +1706,35 @@ html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card
 .dashboard-page {
   background: transparent;
 }
+
+/* CT-UI: soft-square interactive controls.
+ * Action buttons are rectangular, with one clear 6px corner radius.
+ * Navigation/inputs can use 8px. Only semantic circles such as the avatar,
+ * chat launcher, switch thumb, and status badges remain fully rounded.
+ * Keep overrides scoped to interactive controls instead of every button tag:
+ * calendar dates, segmented controls, map actions and feature widgets own
+ * deliberate specialized hit targets.
+ */
+.button,
+.page-main .button,
+.icon-button,
+.icon-link,
+.dropdown > summary,
+.page-context-navigation .back-link,
+.page-main .page-stack > .back-link,
+.filter-chip,
+.compact-action-menu__trigger {
+  border-radius: var(--radius-button);
+}
+
+.app-rail__link,
+.app-rail.is-collapsed .app-rail__link {
+  border-radius: var(--radius-nav);
+}
+
+/* Keep icon actions square rather than circular or irregularly pill-shaped. */
+.icon-button,
+.icon-link {
+  width: var(--control-height-md);
+  height: var(--control-height-md);
+}
