@@ -1732,9 +1732,3 @@ html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card
   border-radius: var(--radius-nav);
 }
 
-/* Keep icon actions square rather than circular or irregularly pill-shaped. */
-.icon-button,
-.icon-link {
-  width: var(--control-height-md);
-  height: var(--control-height-md);
-}
