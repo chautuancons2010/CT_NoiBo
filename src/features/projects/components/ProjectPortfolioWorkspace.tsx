@@ -107,7 +107,7 @@ export function ProjectPortfolioWorkspace() {
           ]}
           value={group}
         />
-        <Link href="/projects/new"><Button leftIcon={<Plus aria-hidden="true" size={17} />} variant="primary">Tạo gói</Button></Link>
+        <Link className="button button--primary" href="/projects/new"><Plus aria-hidden="true" size={17} /><span>Tạo gói</span></Link>
       </section>
 
       {!loading && !error ? (
