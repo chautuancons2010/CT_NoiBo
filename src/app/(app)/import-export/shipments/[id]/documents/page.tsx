@@ -1,1 +1,0 @@
-import { ShipmentDetailView } from "@/features/import-export/components/ImportExportViews";export default async function Page({params}:{params:Promise<{id:string}>}){return <ShipmentDetailView id={(await params).id} section="documents"/>;}

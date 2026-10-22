@@ -1,1 +1,0 @@
-import { PageHeader } from "@/components/shared/PageHeader";import { SystemNoticeManager } from "@/features/shared-platforms/components/SystemNoticeManager";export default function Page(){return <div className="page-stack"><PageHeader title="Thông báo hệ thống"/><SystemNoticeManager/></div>}

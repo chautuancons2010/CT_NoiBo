@@ -1,2 +1,0 @@
-import { BackLink } from "@/components/shared/BackLink";import { PageHeader } from "@/components/shared/PageHeader";import { AttendanceSettings } from "@/features/attendance/components/AttendanceSettings";
-export default function Page(){return <div className="page-stack"><BackLink href="/settings/attendance"/><PageHeader title="Chính sách chấm công"/><AttendanceSettings activeTab="policy"/></div>;}

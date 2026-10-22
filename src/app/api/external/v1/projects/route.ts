@@ -1,1 +1,0 @@
-import{externalProjects}from"@/features/integrations/services/externalDataRepository";import{withExternalApi}from"@/features/integrations/services/externalApi";export async function GET(request:Request){return withExternalApi(request,{scope:"projects.read",category:"projects.read"},()=>externalProjects(request));}

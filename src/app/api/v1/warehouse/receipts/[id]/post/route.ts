@@ -1,1 +1,0 @@
-import { documentPost } from "@/features/warehouse/services/documentRouteHandlers"; export function POST(request:Request,context:RouteContext<"/api/v1/warehouse/receipts/[id]/post">){return documentPost(request,context.params,"receipt");}

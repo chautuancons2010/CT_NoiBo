@@ -1,1 +1,0 @@
-import { BackLink } from "@/components/shared/BackLink";import { PageHeader } from "@/components/shared/PageHeader";import { LeaveRequestList } from "@/features/leave/components/LeaveRequestList";export default function Page(){return <div className="page-stack"><BackLink href="/approvals"/><PageHeader title="Phê duyệt nghỉ phép"/><LeaveRequestList scope="approval"/></div>}

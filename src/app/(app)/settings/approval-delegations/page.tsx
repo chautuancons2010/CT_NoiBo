@@ -1,1 +1,0 @@
-import { PageHeader } from "@/components/shared/PageHeader";import { DelegationManager } from "@/features/shared-platforms/components/DelegationManager";export default function Page(){return <div className="page-stack"><PageHeader title="Ủy quyền phê duyệt"/><DelegationManager/></div>}

@@ -1,1 +1,0 @@
-import { DocumentTypeSettingsView,ImportExportSettingsView } from "@/features/import-export/components/ImportExportViews";export default function Page(){return <div className="page-stack"><ImportExportSettingsView/><DocumentTypeSettingsView/></div>;}
