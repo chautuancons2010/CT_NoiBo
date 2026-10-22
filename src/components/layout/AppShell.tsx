@@ -1,0 +1,193 @@
+"use client";
+
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+
+import type { AuthenticatedUser } from "@/lib/auth/permissions";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { AppRail } from "@/components/layout/AppRail";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileNavigationProvider } from "@/components/layout/MobileNavigationContext";
+import { BackLink } from "@/components/shared/BackLink";
+import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
+import { isPathEnabled } from "@/config/systemSettings";
+import { SystemNoticeBanner } from "@/features/shared-platforms/components/SystemNoticeBanner";
+import { resolveLandingPage } from "@/features/dashboard/registry";
+import { getBackHref } from "@/config/routeRegistry";
+import { RealtimeProvider, useRealtimeConnectionState } from "@/components/providers/RealtimeProvider";
+import { ChatDockLauncher } from "@/features/messaging/ChatDockLauncher";
+import { can } from "@/lib/auth/permissions";
+import { CurrentUserProvider } from "@/components/providers/CurrentUserProvider";
+import { visibleApplications } from "@/config/moduleRegistry";
+import { installBackHistory } from "@/lib/navigation/backHistory";
+import { readWorkspacePreferences, type WorkspacePreferences } from "@/lib/ui/workspacePreferencesRequest";
+
+const INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
+
+function AppShellContent({ children, user }: { children: ReactNode; user: AuthenticatedUser }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  useLayoutEffect(() => installBackHistory(user.id), [user.id]);
+  const { settings } = useSystemSettings();
+  const [collapsed, setCollapsed] = useState(false);
+  const railPreferenceKey = `ct:sidebar-layout:v2:${user.id}`;
+  const [localBackHref, setLocalBackHref] = useState<string>();
+  const mainRef = useRef<HTMLElement>(null);
+  const preferencesRef = useRef<WorkspacePreferences | undefined>(undefined);
+  const connectionState = useRealtimeConnectionState();
+  const isPackageRoute = /^\/projects\/[^/]+\/(?:today|progress|team|profile|documents|updates)$/.test(pathname);
+  // The shared shell owns the fallback return control. A locally-declared
+  // BackLink (for a wizard or a record with a specific parent) wins, so users
+  // never see two competing return actions.
+  const backHref = isPackageRoute ? "/projects" : getBackHref(pathname);
+  const hasChatAccess = can(user.permissions, "chat.access");
+  const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const contentClassName = [
+    "app-content",
+    hasChatAccess && "app-content--chat",
+    isDashboardRoute && "app-content--dashboard",
+    isPackageRoute && "app-content--package",
+    /^\/messages\/[^/]+/.test(pathname) && "app-content--conversation",
+    (pathname === "/personal" || pathname === "/applications") && "app-content--mobile-home",
+    pathname === "/attendance/quick" && "app-content--capture"
+  ].filter(Boolean).join(" ");
+
+  useEffect(() => {
+    if (!isPathEnabled(pathname, settings.modules)) {
+      const contextualLanding = resolveLandingPage(user, settings.dashboard);
+      const enabledLanding = visibleApplications(user, settings.modules)[0]?.defaultRoute ?? "/profile";
+      router.replace(isPathEnabled(contextualLanding, settings.modules) ? contextualLanding : enabledLanding);
+    }
+  }, [pathname, router, settings.dashboard, settings.modules, user]);
+
+  useEffect(() => {
+    let active = true;
+    const restoreRail = () => {
+      if (!active) return;
+      try { setCollapsed(window.localStorage.getItem(railPreferenceKey) === "compact"); }
+      catch { /* Keep navigation labels visible when storage is unavailable. */ }
+    };
+    queueMicrotask(restoreRail);
+    void readWorkspacePreferences().then((preferences) => {
+      if (!active || !preferences) return;
+      preferencesRef.current = preferences;
+      document.documentElement.dataset.density = preferences.density === "default" ? "standard" : preferences.density;
+    }).catch(() => undefined);
+    const update = (event: Event) => {
+      const preferences = (event as CustomEvent<{ sidebarCollapsed?: boolean; density?: string }>).detail;
+      if (typeof preferences?.sidebarCollapsed === "boolean") {
+        setCollapsed(preferences.sidebarCollapsed);
+        try { window.localStorage.setItem(railPreferenceKey, preferences.sidebarCollapsed ? "compact" : "expanded"); }
+        catch { /* The in-memory choice remains usable. */ }
+      }
+    };
+    window.addEventListener("ui-preferences-updated", update);
+    return () => { active = false; window.removeEventListener("ui-preferences-updated", update); };
+  }, [railPreferenceKey]);
+
+  const changeSidebarState = useCallback((nextCollapsed: boolean) => {
+    setCollapsed(nextCollapsed);
+    try { window.localStorage.setItem(railPreferenceKey, nextCollapsed ? "compact" : "expanded"); }
+    catch { /* The existing server preference still persists the choice. */ }
+    const persist = async () => {
+      let current = preferencesRef.current;
+      if (!current) {
+        current = await readWorkspacePreferences();
+      }
+      if (!current) return;
+      const next = { ...current, sidebarCollapsed: nextCollapsed };
+      preferencesRef.current = next;
+      setCollapsed(nextCollapsed);
+      window.dispatchEvent(new CustomEvent("ui-preferences-updated", { detail: next }));
+      await fetch("/api/v1/workspace/preferences", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(next)
+      });
+    };
+    void persist().catch(() => undefined);
+  }, [railPreferenceKey]);
+
+  useEffect(() => {
+    const activityKey = `ct:last-activity:${user.id}`;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastStoredAt = 0;
+    let expiring = false;
+    const expire = async () => {
+      if (expiring) return;
+      expiring = true;
+      try { await fetch("/api/v1/auth/logout", { method: "POST" }); }
+      finally {
+        window.localStorage.removeItem(activityKey);
+        router.replace("/login?reason=session-expired");
+        router.refresh();
+      }
+    };
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      const stored = Number(window.localStorage.getItem(activityKey));
+      const lastActivity = Number.isFinite(stored) && stored > 0 ? stored : Date.now();
+      const remaining = INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivity);
+      if (remaining <= 0) { void expire(); return; }
+      timer = setTimeout(() => void expire(), remaining);
+    };
+    const markActivity = () => {
+      const now = Date.now();
+      if (now - lastStoredAt < 60_000) return;
+      lastStoredAt = now;
+      window.localStorage.setItem(activityKey, String(now));
+      schedule();
+    };
+    window.localStorage.setItem(activityKey, String(Date.now()));
+    for (const eventName of ["pointerdown", "keydown", "touchstart"] as const) window.addEventListener(eventName, markActivity, { passive: true });
+    window.addEventListener("storage", schedule);
+    schedule();
+    return () => {
+      if (timer) clearTimeout(timer);
+      for (const eventName of ["pointerdown", "keydown", "touchstart"] as const) window.removeEventListener(eventName, markActivity);
+      window.removeEventListener("storage", schedule);
+    };
+  }, [pathname, router, user.id]);
+
+  useLayoutEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    const findLocalBackLink = () => {
+      const link = main.querySelector<HTMLAnchorElement>(":scope > :not(.page-context-navigation) .back-link");
+      setLocalBackHref(link?.getAttribute("href") ?? undefined);
+    };
+    findLocalBackLink();
+    const observer = new MutationObserver(findLocalBackLink);
+    observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ["href"] });
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  return (
+    <div className="app-shell">
+      <AppRail
+        collapsed={collapsed}
+        onCollapsedChange={changeSidebarState}
+        pathname={pathname}
+        user={user}
+      />
+      <div className={contentClassName}>
+        <AppHeader backHrefOverride={localBackHref} connectionState={connectionState} pathname={pathname} user={user} />
+        <SystemNoticeBanner />
+        <main className="page-main" id="main-content" ref={mainRef} tabIndex={-1}>
+          {backHref && !localBackHref ? <nav aria-label="Điều hướng quay lại" className="page-context-navigation"><BackLink href={backHref} label={backHref === "/projects" ? "Danh sách gói" : "Trở lại"} /></nav> : null}
+          {children}
+        </main>
+        <MobileBottomNav pathname={pathname} user={user} />
+        {hasChatAccess ? <ChatDockLauncher /> : null}
+      </div>
+    </div>
+  );
+}
+
+export function AppShell({ children, user }: { children: ReactNode; user: AuthenticatedUser }) {
+  return (
+    <CurrentUserProvider user={user}>
+      <RealtimeProvider accountId={user.id}><MobileNavigationProvider><AppShellContent user={user}>{children}</AppShellContent></MobileNavigationProvider></RealtimeProvider>
+    </CurrentUserProvider>
+  );
+}

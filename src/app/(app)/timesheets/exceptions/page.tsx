@@ -1,0 +1,2 @@
+import { BackLink } from "@/components/shared/BackLink";import { PageHeader } from "@/components/shared/PageHeader";import { TimesheetExceptions } from "@/features/timesheets/components/TimesheetExceptions";
+export default async function Page({searchParams}:{searchParams:Promise<{periodId?:string}>}){const {periodId}=await searchParams;return <div className="page-stack"><BackLink href={periodId?`/timesheets/periods/${periodId}`:"/timesheets"}/><PageHeader title="Ngoại lệ bảng công"/><TimesheetExceptions periodId={periodId}/></div>;}

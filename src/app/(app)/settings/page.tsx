@@ -1,0 +1,1 @@
+import { PageHeader } from "@/components/shared/PageHeader";import { SettingsIndex } from "@/features/shared-platforms/components/SettingsIndex";export default function Page(){return <div className="page-stack"><PageHeader title="Cấu hình nghiệp vụ"/><SettingsIndex/></div>}
