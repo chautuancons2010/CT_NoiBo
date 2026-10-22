@@ -67,8 +67,14 @@
   --radius-xl: 16px;
   --radius-control: 8px;
   --radius-input: var(--radius-control);
-  --radius-button: 6px;
-  --radius-nav: 8px;
+  --radius-button: 999px;
+  --radius-search: 999px;
+  --action-primary: #266e59;
+  --action-primary-hover: #205e4c;
+  --action-primary-active: #194d3d;
+  --action-border: #d5e3da;
+  --action-hover: #f0f7f2;
+  --radius-nav: 999px;
   --radius-card: 12px;
   --radius-card-large: 16px;
   --radius-panel: 16px;
