@@ -2,7 +2,7 @@ name: quality
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, erp-v2-stages-00-02]
 jobs:
   verify:
     runs-on: ubuntu-latest
