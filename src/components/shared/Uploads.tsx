@@ -1,28 +1,43 @@
 "use client";
 
-import type { InputHTMLAttributes, ReactNode } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
 import { FileText, FileUp, ImagePlus, Paperclip } from "lucide-react";
 
 import { cn } from "@/lib/utils/cn";
 
-import { Input } from "@/components/shared/FormControls";
+import { FormField } from "@/components/shared/FormControls";
 
-export function FileUpload(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: string }) {
-  return (
-    <div className="upload-field">
-      <FileUp aria-hidden="true" size={18} />
-      <Input type="file" {...props} />
-    </div>
-  );
+type UploadInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: string; ref?: Ref<HTMLInputElement> };
+
+function UploadInput({ label, id, required, disabled, className, onChange, icon, ref: forwardedRef, ...props }: UploadInputProps & { icon: ReactNode }) {
+  const [names, setNames] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useImperativeHandle(forwardedRef, () => inputRef.current!, []);
+  useEffect(() => {
+    const form = inputRef.current?.form;
+    const reset = () => setNames([]);
+    form?.addEventListener("reset", reset);
+    return () => form?.removeEventListener("reset", reset);
+  }, [props.form]);
+  const selected = names.length > 1 ? `${names.length} tệp` : names[0] ?? "Chưa chọn tệp";
+  return <div className="upload-field">
+    {icon}
+    <FormField id={id} label={label} required={required} disabled={disabled}>
+      {(fieldId, describedBy) => <span className="upload-control" data-disabled={disabled || undefined}>
+        <input {...props} aria-describedby={[props["aria-describedby"], describedBy, `${fieldId}-selection`].filter(Boolean).join(" ")} className={cn("upload-control__native", className)} disabled={disabled} id={fieldId} ref={inputRef} required={required} type="file" onChange={(event) => { setNames(Array.from(event.currentTarget.files ?? []).map(file => file.name)); onChange?.(event); }} />
+        <span aria-hidden="true" className="upload-control__button">Chọn tệp</span>
+        <span aria-live="polite" className="upload-control__value" id={`${fieldId}-selection`} title={names.join(", ") || undefined}>{selected}</span>
+      </span>}
+    </FormField>
+  </div>;
+}
+
+export function FileUpload(props: UploadInputProps) {
+  return <UploadInput {...props} icon={<FileUp aria-hidden="true" size={20} />} />;
 }
 
 export function ImageUpload(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "accept"> & { label: string }) {
-  return (
-    <div className="upload-field">
-      <ImagePlus aria-hidden="true" size={18} />
-      <Input accept="image/*" type="file" {...props} />
-    </div>
-  );
+  return <UploadInput {...props} accept="image/*" icon={<ImagePlus aria-hidden="true" size={20} />} />;
 }
 
 /** Shared file-field name used by feature forms. */

@@ -1,233 +1,175 @@
 "use client";
 
-import { Plus, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
-
+import { ChevronDown, Download, PackageCheck, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { Button, IconButton } from "@/components/shared/Button";
 import { Input, Select, Textarea } from "@/components/shared/FormControls";
+import { ConfirmDialog, Modal } from "@/components/shared/Overlays";
+import { LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { CommandBar, Inspector, WorkbenchLayout, WorkCanvas } from "@/components/shared/Workbench";
-import { ItemImagePreview } from "@/features/warehouse/components/ItemImagePreview";
-import type { InventoryDocument, InventoryDocumentType, InventoryItem, Warehouse } from "@/features/warehouse/types/warehouseTypes";
+import { CommandBar, DocumentActions, EditableLine, EditableLines, Inspector, WorkbenchLayout, WorkCanvas } from "@/components/shared/Workbench";
+import { can } from "@/lib/auth/permissions";
+import { ItemImagePreview } from "./ItemImagePreview";
+import { warehouseRequest as api, warehouseWrite as write } from "../client/warehouseClient";
+import type { InventoryBalance, InventoryDocument, InventoryDocumentLine, InventoryDocumentType, InventoryItem, Warehouse } from "../types/warehouseTypes";
+import styles from "./WarehouseUi.module.css";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 type DocumentType = Exclude<InventoryDocumentType, "reversal">;
-type EditLine = { itemId: string; quantity: number; adjustmentQuantity?: number; uomId: string; reference?: string };
-type TransactionType = { code: string; label: string };
+type EditLine = Omit<InventoryDocumentLine, "id" | "rowVersion"> & { key: string };
 type References = { projects: Array<{ id: string; code: string; name: string }>; worksites: Array<{ id: string; projectId: string; name: string }> };
+type TransactionType = { code: string; label: string; projectRequired?: boolean; project_required?: boolean };
 type Attachment = { id: string; fileId: string; fileName: string; sizeBytes: number };
-type ApiBody<T> = { ok: boolean; data?: T; error?: { message?: string } };
-
-const paths: Record<DocumentType, string> = { receipt: "receipts", issue: "issues", transfer: "transfers", adjustment: "adjustments" };
-const labels: Record<DocumentType, string> = { receipt: "Phiếu nhập kho", issue: "Phiếu xuất kho", transfer: "Phiếu chuyển kho", adjustment: "Phiếu điều chỉnh kho" };
+const paths = { receipt: "receipts", issue: "issues", transfer: "transfers", adjustment: "adjustments" };
+const labels = { receipt: "Phiếu nhập kho", issue: "Phiếu xuất kho", transfer: "Phiếu chuyển kho", adjustment: "Phiếu điều chỉnh kho" };
 const statusLabels: Record<string, string> = { draft: "Nháp", submitted: "Chờ ghi sổ", posted: "Đã ghi sổ", cancelled: "Đã hủy", reversed: "Đã đảo" };
+const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 });
+const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+const blank = (): EditLine => ({ key: crypto.randomUUID(), itemId: "", itemCode: "", itemName: "", quantity: 1, uomId: "", uomCode: "" });
+const editLines = (document: InventoryDocument): EditLine[] => document.lines.map(({ id, rowVersion, ...line }) => { void rowVersion; return { ...line, key: id }; });
 
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  const body = await response.json() as ApiBody<T>;
-  if (!response.ok || body.data === undefined) throw new Error(body.error?.message || "Không thể xử lý yêu cầu.");
-  return body.data;
-}
-
-function today() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-}
-
-export function InventoryDocumentEditor({ type, id, canCreate, canPost, canReverse }: { type: DocumentType; id?: string; canCreate: boolean; canPost: boolean; canReverse: boolean }) {
-  const router = useRouter();
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
-  const [references, setReferences] = useState<References>({ projects: [], worksites: [] });
-  const [document, setDocument] = useState<Partial<InventoryDocument>>({ type, documentDate: today() });
-  const [lines, setLines] = useState<EditLine[]>([{ itemId: "", quantity: 1, uomId: "" }]);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    void Promise.all([
-      api<InventoryItem[]>("/api/v1/items?status=active"),
-      api<Warehouse[]>("/api/v1/warehouses"),
-      api<TransactionType[]>(`/api/v1/warehouse/transaction-types?type=${type}`),
-      api<References>("/api/v1/warehouse/references"),
-      id ? api<InventoryDocument>(`/api/v1/warehouse/${paths[type]}/${id}`) : Promise.resolve(undefined)
-    ]).then(([itemRows, warehouseRows, types, referenceRows, current]) => {
-      setItems(itemRows);
-      setWarehouses(warehouseRows.filter((row) => row.status === "active"));
-      setTransactionTypes(types);
-      setReferences(referenceRows);
-      if (current) {
-        setDocument(current);
-        setLines(current.lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity, adjustmentQuantity: line.adjustmentQuantity, uomId: line.uomId, reference: line.reference })));
-      } else if (types[0]) {
-        setDocument((value) => ({ ...value, transactionTypeCode: types[0].code }));
+export function InventoryDocumentEditor({ type, id, canCreate, canPost, canReverse, canViewProjects = false }: { type: DocumentType; id?: string; canCreate: boolean; canPost: boolean; canReverse: boolean; canViewProjects?: boolean }) {
+  const user = useCurrentUser();
+  const router = useRouter(), query = useSearchParams(), form = useRef<HTMLFormElement>(null), mutation = useRef(false), creationId = useRef<string | undefined>(undefined), postKey = useRef<string | undefined>(undefined), reversalKey = useRef<string | undefined>(undefined);
+  const [items, setItems] = useState<InventoryItem[]>([]), [warehouses, setWarehouses] = useState<Warehouse[]>([]), [types, setTypes] = useState<TransactionType[]>([]), [references, setReferences] = useState<References>({ projects: [], worksites: [] });
+  const [document, setDocument] = useState<Partial<InventoryDocument>>({ type, documentDate: today() }), [lines, setLines] = useState<EditLine[]>([]);
+  const [loading, setLoading] = useState(true), [error, setError] = useState(""), [busy, setBusy] = useState(false), [dirty, setDirty] = useState(false);
+  const [stock, setStock] = useState<{ warehouseId: string; rows: InventoryBalance[] }>(), [stockError, setStockError] = useState("");
+  const [reasonAction, setReasonAction] = useState<"reverse" | "cancel">(), [reason, setReason] = useState(""), [postingDate, setPostingDate] = useState(today), [reasonError, setReasonError] = useState("");
+  const [confirmReload, setConfirmReload] = useState(false);
+  const initial = useRef(query.toString());
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const [catalog, stores, transactionTypes, refs, current] = await Promise.all([
+        canCreate ? api<InventoryItem[]>("/api/v1/items?status=active") : Promise.resolve([]), api<Warehouse[]>("/api/v1/warehouses"), api<TransactionType[]>(`/api/v1/warehouse/transaction-types?type=${type}`), api<References>("/api/v1/warehouse/references"), id ? api<InventoryDocument>(`/api/v1/warehouse/${paths[type]}/${id}`) : Promise.resolve(undefined)
+      ]);
+      setItems(catalog); setWarehouses(stores); setTypes(transactionTypes.filter(row => row.code !== "COUNT_VARIANCE")); setReferences(refs);
+      if (current) { setDocument(current); setLines(editLines(current)); }
+      else {
+        const params = new URLSearchParams(initial.current), warehouseId = params.get("warehouseId") ?? "", warehouse = stores.find(row => row.id === warehouseId), item = catalog.find(row => row.id === params.get("itemId"));
+        setDocument({ type, documentDate: today(), transactionTypeCode: transactionTypes.find(row => row.code !== "COUNT_VARIANCE")?.code, ...(type === "receipt" ? { targetWarehouseId: warehouse?.id } : { sourceWarehouseId: warehouse?.id }), projectId: params.get("projectId") ?? warehouse?.projectId, worksiteId: params.get("worksiteId") ?? warehouse?.worksiteId });
+        setLines([item ? { ...blank(), itemId: item.id, itemCode: item.itemCode, itemName: item.name, uomId: item.baseUomId, uomCode: item.uomCode } : blank()]);
       }
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : "Không thể tải chứng từ."));
-  }, [id, type]);
-
-  function updateLine(index: number, patch: Partial<EditLine>) {
-    setLines((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
-  }
-
-  function chooseItem(index: number, itemId: string) {
-    updateLine(index, { itemId, uomId: items.find((row) => row.id === itemId)?.baseUomId ?? "" });
-  }
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
+      setDirty(false);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Không thể tải chứng từ."); }
+    finally { setLoading(false); }
+  }, [canCreate, id, type]);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) void load(); }); return () => { active = false; }; }, [load]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  const sourceId = document.sourceWarehouseId;
+  useEffect(() => {
+    if (!sourceId || document.status && !["draft", "submitted"].includes(document.status)) return;
+    const controller = new AbortController();
+    void api<InventoryBalance[]>(`/api/v1/warehouse/inventory?warehouseId=${sourceId}`, { signal: controller.signal }).then(rows => { setStock({ warehouseId: sourceId, rows }); setStockError(""); }).catch(caught => { if (!controller.signal.aborted) setStockError(caught instanceof Error ? caught.message : "Không thể đọc tồn kho."); });
+    return () => controller.abort();
+  }, [sourceId, document.status]);
+  const locked = Boolean(document.id && document.status !== "draft") || !canCreate;
+  const change = (patch: Partial<InventoryDocument>) => { setDocument(current => ({ ...current, ...patch })); setDirty(true); };
+  const changeLine = (key: string, patch: Partial<EditLine>) => { setLines(current => current.map(line => line.key === key ? { ...line, ...patch } : line)); setDirty(true); };
+  const currentStock = stock && stock.warehouseId === sourceId ? stock.rows : undefined;
+  const shortage = lines.some(line => {
+    const available = currentStock?.find(row => row.itemId === line.itemId)?.onHand ?? 0;
+    return currentStock && line.itemId && available + (type === "adjustment" ? line.adjustmentQuantity ?? 0 : -line.quantity) < -0.00001;
+  });
+  const needsStock = type !== "receipt" && sourceId && (!document.status || ["draft", "submitted"].includes(document.status));
+  const canSubmitPost = !needsStock || Boolean(currentStock && !stockError && !shortage);
+  function accept(saved: InventoryDocument) { setDocument(saved); setLines(editLines(saved)); setDirty(false); }
+  async function persist(operation: "save" | "post") {
+    if (mutation.current || !form.current?.reportValidity()) return;
+    if (operation === "post" && !postingDate) { setError("Chọn ngày ghi sổ."); return; }
+    if (type === "transfer" && document.sourceWarehouseId === document.targetWarehouseId) { setError("Kho nguồn và kho đích phải khác nhau."); return; }
+    mutation.current = true; setBusy(true); setError("");
+    let current = document;
     try {
-      const payload = {
-        documentDate: document.documentDate,
-        sourceWarehouseId: document.sourceWarehouseId || undefined,
-        targetWarehouseId: document.targetWarehouseId || undefined,
-        transactionTypeCode: document.transactionTypeCode,
-        supplierReference: document.supplierReference || undefined,
-        deliveredBy: document.deliveredBy || undefined,
-        projectId: document.projectId || undefined,
-        worksiteId: document.worksiteId || undefined,
-        receivedBy: document.receivedBy || undefined,
-        recipient: document.recipient || undefined,
-        receivingDepartment: document.receivingDepartment || undefined,
-        note: document.note || undefined,
-        lines,
-        ...(id ? { rowVersion: document.rowVersion } : { clientRequestId: crypto.randomUUID() })
-      };
-      const saved = await api<InventoryDocument>(id ? `/api/v1/warehouse/${paths[type]}/${id}` : `/api/v1/warehouse/${paths[type]}`, {
-        method: id ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      router.push(`/warehouse/${paths[type]}/${saved.id}`);
-      router.refresh();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không thể lưu chứng từ.");
-    } finally {
-      setSaving(false);
-    }
+      if (!current.id || dirty) {
+        creationId.current ??= crypto.randomUUID();
+        const payload = { documentDate: current.documentDate, sourceWarehouseId: current.sourceWarehouseId || undefined, targetWarehouseId: current.targetWarehouseId || undefined, transactionTypeCode: current.transactionTypeCode, supplierReference: current.supplierReference || undefined, shipmentId: current.shipmentId, shipmentReceiptReference: current.shipmentReceiptReference, projectId: current.projectId || undefined, worksiteId: current.worksiteId || undefined, deliveredBy: current.deliveredBy || undefined, receivedBy: current.receivedBy || undefined, recipient: current.recipient || undefined, receivingDepartment: current.receivingDepartment || undefined, note: current.note || undefined, lines: lines.map(({ key, ...line }) => { void key; return line; }), ...(current.id ? { rowVersion: current.rowVersion } : { clientRequestId: creationId.current }) };
+        current = await write<InventoryDocument>(`/api/v1/warehouse/${paths[type]}${current.id ? `/${current.id}` : ""}`, current.id ? "PATCH" : "POST", payload);
+        accept(current as InventoryDocument);
+      }
+      if (operation === "post") {
+        postKey.current ??= crypto.randomUUID();
+        current = await write<InventoryDocument>(`/api/v1/warehouse/${paths[type]}/${current.id}/post`, "POST", { rowVersion: current.rowVersion, postingDate, idempotencyKey: postKey.current, allowNegativeOverride: false });
+        accept(current as InventoryDocument);
+      }
+      router.replace(`/warehouse/${paths[type]}/${current.id}`); router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Không thể lưu chứng từ.");
+      if (current.id) try { const actual = await api<InventoryDocument>(`/api/v1/warehouse/${paths[type]}/${current.id}`); if (actual.status !== "draft") accept(actual); } catch { /* Retain entered data until the user reloads. */ }
+    } finally { mutation.current = false; setBusy(false); }
   }
+  async function applyReason(event: FormEvent) {
+    event.preventDefault(); if (!document.id || mutation.current || reason.trim().length < 3) return;
+    mutation.current = true; setBusy(true); setReasonError("");
+    try {
+      const saved = reasonAction === "cancel" ? await write<InventoryDocument>(`/api/v1/warehouse/${paths[type]}/${document.id}`, "PATCH", { action: "cancel", rowVersion: document.rowVersion, reason: reason.trim() }) : await write<InventoryDocument>(`/api/v1/warehouse/${paths[type]}/${document.id}/reverse`, "POST", { postingDate, reason: reason.trim(), idempotencyKey: reversalKey.current ??= crypto.randomUUID() });
+      accept(saved); setReasonAction(undefined); setReason("");
+    } catch (caught) { setReasonError(caught instanceof Error ? caught.message : "Không thể xử lý chứng từ."); }
+    finally { mutation.current = false; setBusy(false); }
+  }
+  if (loading) return <LoadingState title="Đang mở chứng từ kho" />;
+  if (!types.length && error) return <div className={styles.formCard}><p className="form-error" role="alert">{error}</p><Button onClick={() => void load()}>Tải lại</Button></div>;
+  const selectedType = types.find(row => row.code === document.transactionTypeCode);
+  const projectRequired = selectedType?.projectRequired ?? selectedType?.project_required ?? false;
+  const warehouseOptions = warehouses.filter(row => row.status === "active" || [document.sourceWarehouseId, document.targetWarehouseId].includes(row.id)).map(row => ({ value: row.id, label: `${row.code} · ${row.name}` }));
+  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const submitter = (event.nativeEvent as SubmitEvent).submitter; void persist(submitter?.getAttribute("value") === "post" ? "post" : "save"); };
+  return <WorkbenchLayout className={`warehouse-workbench document-workspace ${styles.documentEditor}`}>
+    <form className="warehouse-workbench__main document-workspace__main" onSubmit={submit} ref={form}>
+      <CommandBar label="Thao tác chứng từ kho"><div className="warehouse-document-heading document-heading"><strong>{document.documentNumber ?? labels[type]}</strong><StatusBadge tone={document.status === "posted" ? "success" : "neutral"}>{statusLabels[document.status ?? ""] ?? "Chưa lưu"}</StatusBadge>{dirty ? <StatusBadge tone="warning">Chưa lưu thay đổi</StatusBadge> : null}</div><IconButton disabled={busy} label="Tải lại chứng từ" onClick={() => { if (dirty) setConfirmReload(true); else void load(); }}><RefreshCw size={17} /></IconButton></CommandBar>
+      <WorkCanvas><fieldset className={styles.editorFields} disabled={locked || busy}>
+        <section className="warehouse-document-section"><h2>Thông tin chứng từ</h2><div className={styles.documentFields}>
+          <Input label="Ngày chứng từ" onChange={event => change({ documentDate: event.target.value })} required type="date" value={document.documentDate ?? ""} />
+          <Select disabled={Boolean(document.shipmentId)} label="Loại giao dịch" onChange={event => change({ transactionTypeCode: event.target.value })} options={types.map(row => ({ value: row.code, label: row.label }))} placeholder="Chọn loại giao dịch" required value={document.transactionTypeCode ?? ""} />
+          {type !== "receipt" ? <Select label={type === "adjustment" ? "Kho điều chỉnh" : "Kho xuất"} onChange={event => change({ sourceWarehouseId: event.target.value })} options={warehouseOptions} placeholder="Chọn kho" required value={document.sourceWarehouseId ?? ""} /> : null}
+          {type === "receipt" || type === "transfer" ? <Select label={type === "receipt" ? "Kho nhận" : "Kho đích"} onChange={event => { const warehouse = warehouses.find(row => row.id === event.target.value); change({ targetWarehouseId: event.target.value, ...(warehouse?.projectId ? { projectId: warehouse.projectId, worksiteId: warehouse.worksiteId } : {}) }); }} options={warehouseOptions.filter(row => type !== "transfer" || row.value !== sourceId)} placeholder="Chọn kho" required value={document.targetWarehouseId ?? ""} /> : null}
+          {projectRequired ? <><Select label="Dự án" required={projectRequired} onChange={event => change({ projectId: event.target.value, worksiteId: undefined })} options={references.projects.map(row => ({ value: row.id, label: `${row.code} · ${row.name}` }))} placeholder="Không gắn dự án" value={document.projectId ?? ""} /><Select disabled={!document.projectId} label="Công trường" onChange={event => change({ worksiteId: event.target.value })} options={references.worksites.filter(row => row.projectId === document.projectId).map(row => ({ value: row.id, label: row.name }))} placeholder="Không gắn công trường" value={document.worksiteId ?? ""} /></> : null}
+        </div>{type === "adjustment" ? <Textarea label={type === "adjustment" ? "Lý do điều chỉnh" : "Ghi chú"} onChange={event => change({ note: event.target.value })} required={type === "adjustment"} rows={2} value={document.note ?? ""} /> : null}
 
-  const locked = Boolean(id && (document.status !== "draft" || !canCreate));
-  const warehouseOptions = warehouses.map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }));
-  const currentWarehouse = document.sourceWarehouseName ?? document.targetWarehouseName ?? "Chưa chọn";
-
-  return (
-    <WorkbenchLayout className="warehouse-workbench">
-      <form className="warehouse-workbench__main" onSubmit={submit}>
-        <CommandBar label="Lệnh chứng từ kho">
-          <div className="warehouse-document-heading">
-            <strong>{document.documentNumber ?? labels[type]}</strong>
-            {document.status ? <StatusBadge tone={document.status === "posted" ? "success" : document.status === "submitted" ? "warning" : "neutral"}>{statusLabels[document.status] ?? document.status}</StatusBadge> : <StatusBadge tone="neutral">Chưa lưu</StatusBadge>}
-          </div>
-          {!locked ? <div className="warehouse-command-actions"><Button onClick={() => router.back()}>Quay lại</Button><Button disabled={saving} type="submit" variant="primary">{saving ? "Đang lưu…" : "Lưu nháp"}</Button></div> : null}
-        </CommandBar>
-        <WorkCanvas>
-          <section className="warehouse-document-section" aria-labelledby="warehouse-document-information">
-            <h2 id="warehouse-document-information">Thông tin chứng từ</h2>
-            <div className="form-grid">
-              <Input disabled={locked} label="Ngày chứng từ" required type="date" value={document.documentDate ?? ""} onChange={(event) => setDocument({ ...document, documentDate: event.target.value })} />
-              <Select disabled={locked} label="Loại giao dịch" required options={transactionTypes.map((row) => ({ value: row.code, label: row.label }))} placeholder="Chọn loại giao dịch" value={document.transactionTypeCode ?? ""} onChange={(event) => setDocument({ ...document, transactionTypeCode: event.target.value })} />
-              {type !== "receipt" ? <Select disabled={locked} label={type === "adjustment" ? "Kho điều chỉnh" : "Kho nguồn"} required options={warehouseOptions} placeholder="Chọn kho" value={document.sourceWarehouseId ?? ""} onChange={(event) => setDocument({ ...document, sourceWarehouseId: event.target.value })} /> : null}
-              {type === "receipt" || type === "transfer" ? <Select disabled={locked} label={type === "receipt" ? "Kho nhận" : "Kho đích"} required options={warehouseOptions} placeholder="Chọn kho" value={document.targetWarehouseId ?? ""} onChange={(event) => setDocument({ ...document, targetWarehouseId: event.target.value })} /> : null}
-              {type === "receipt" ? <><Input disabled={locked} label="Tham chiếu nhà cung cấp" value={document.supplierReference ?? ""} onChange={(event) => setDocument({ ...document, supplierReference: event.target.value })} /><Input disabled={locked} label="Người giao" value={document.deliveredBy ?? ""} onChange={(event) => setDocument({ ...document, deliveredBy: event.target.value })} /><Input disabled={locked} label="Người nhận" value={document.receivedBy ?? ""} onChange={(event) => setDocument({ ...document, receivedBy: event.target.value })} /></> : null}
-              {type === "issue" ? <><Input disabled={locked} label="Người nhận" value={document.recipient ?? ""} onChange={(event) => setDocument({ ...document, recipient: event.target.value })} /><Input disabled={locked} label="Bộ phận nhận" value={document.receivingDepartment ?? ""} onChange={(event) => setDocument({ ...document, receivingDepartment: event.target.value })} /></> : null}
-              {type === "issue" ? <><Select disabled={locked} label="Dự án" options={references.projects.map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }))} placeholder="Không gắn dự án" value={document.projectId ?? ""} onChange={(event) => setDocument({ ...document, projectId: event.target.value, worksiteId: "" })} /><Select disabled={locked || !document.projectId} label="Công trường" options={references.worksites.filter((row) => row.projectId === document.projectId).map((row) => ({ value: row.id, label: row.name }))} placeholder="Không gắn công trường" value={document.worksiteId ?? ""} onChange={(event) => setDocument({ ...document, worksiteId: event.target.value })} /></> : null}
-            </div>
-            <Textarea disabled={locked} label="Ghi chú" rows={2} value={document.note ?? ""} onChange={(event) => setDocument({ ...document, note: event.target.value })} />
-          </section>
-
-          <section className="warehouse-document-section warehouse-lines-section" aria-labelledby="warehouse-document-lines">
-            <div className="warehouse-lines-heading"><h2 id="warehouse-document-lines">Dòng hàng</h2>{!locked ? <Button leftIcon={<Plus size={16} />} onClick={() => setLines([...lines, { itemId: "", quantity: 1, uomId: "" }])}>Thêm dòng</Button> : null}</div>
-            <div className="warehouse-line-list">{lines.map((line, index) => <div className="warehouse-line" key={index}>
-              <div className="warehouse-line__item">
-                <ItemImagePreview assetId={items.find((row) => row.id === line.itemId)?.imageAssetId} itemName={items.find((row) => row.id === line.itemId)?.name ?? "hàng hóa"} />
-                <Select disabled={locked} label="Hàng hóa" required options={items.map((row) => ({ value: row.id, label: `${row.itemCode} · ${row.name}` }))} placeholder="Chọn hàng" value={line.itemId} onChange={(event) => chooseItem(index, event.target.value)} />
-              </div>
-              {type === "adjustment" ? <Input disabled={locked} label="Chênh lệch" required step="0.0001" type="number" value={line.adjustmentQuantity ?? ""} onChange={(event) => updateLine(index, { adjustmentQuantity: Number(event.target.value), quantity: Math.abs(Number(event.target.value)) || 1 })} /> : <Input disabled={locked} label="Số lượng" min="0.0001" required step="0.0001" type="number" value={line.quantity} onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })} />}
-              <Input disabled={locked} label="Tham chiếu" value={line.reference ?? ""} onChange={(event) => updateLine(index, { reference: event.target.value })} />
-              {!locked && lines.length > 1 ? <IconButton label="Xóa dòng" onClick={() => setLines(lines.filter((_, rowIndex) => rowIndex !== index))} variant="danger"><Trash2 size={16} /></IconButton> : null}
-            </div>)}</div>
-          </section>
-          {error ? <p className="form-error warehouse-workbench__error" role="alert">{error}</p> : null}
-        </WorkCanvas>
-      </form>
-
-      <Inspector title="Kiểm soát chứng từ">
-        <dl className="warehouse-inspector-summary">
-          <div><dt>Trạng thái</dt><dd>{statusLabels[document.status ?? ""] ?? "Chưa lưu"}</dd></div>
-          <div><dt>Kho</dt><dd>{currentWarehouse}</dd></div>
-          <div><dt>Ngày chứng từ</dt><dd>{document.documentDate ?? "—"}</dd></div>
-          <div><dt>Số dòng</dt><dd>{lines.length}</dd></div>
-          {document.postedByName ? <div><dt>Người ghi sổ</dt><dd>{document.postedByName}</dd></div> : null}
-        </dl>
-        {id ? <DocumentActions canCreate={canCreate} canPost={canPost} canReverse={canReverse} document={document as InventoryDocument} onChange={setDocument} /> : <p className="warehouse-inspector-note">Lưu nháp để mở thao tác ghi sổ và tệp đính kèm.</p>}
-      </Inspector>
-    </WorkbenchLayout>
-  );
+        </section>
+        <section className="warehouse-document-section warehouse-lines-section"><div className="warehouse-lines-heading"><h2>Hàng hóa <small>{lines.length}</small></h2>{!locked && !document.shipmentId ? <Button leftIcon={<Plus size={16} />} onClick={() => { setLines(current => [...current, blank()]); setDirty(true); }}>Thêm hàng</Button> : null}</div>
+          <EditableLines columns={[{ key: "item", label: "Hàng hóa", size: "minmax(160px,2fr)" }, { key: "quantity", label: type === "adjustment" ? "Chênh lệch (+/−)" : "Số lượng", size: "minmax(92px,.7fr)" }, { key: "unit", label: "Đơn vị", size: "minmax(70px,.5fr)" }, { key: "price", label: "Đơn giá", size: "minmax(108px,.8fr)" }]}>{lines.map((line, index) => {
+            const item = items.find(row => row.id === line.itemId), balance = currentStock?.find(row => row.itemId === line.itemId)?.onHand ?? 0;
+            const delta = type === "adjustment" ? line.adjustmentQuantity ?? 0 : type === "issue" || type === "transfer" ? -line.quantity : line.quantity;
+            const options = items.filter(row => row.id === line.itemId || !lines.some(other => other.itemId === row.id)).map(row => ({ value: row.id, label: `${row.itemCode} · ${row.name}` }));
+            if (line.itemId && !items.some(row => row.id === line.itemId)) options.push({ value: line.itemId, label: `${line.itemCode} · ${line.itemName}` });
+            return <EditableLine actions={!locked ? <IconButton disabled={busy || lines.length === 1} label={`Xóa dòng ${index + 1}`} onClick={() => { setLines(current => current.filter(row => row.key !== line.key)); setDirty(true); }} variant="danger"><Trash2 size={16} /></IconButton> : null} details={<div className="form-grid"><Input label="Tham chiếu" onChange={event => changeLine(line.key, { reference: event.target.value })} value={line.reference ?? ""} /><Input label="Mục đích" onChange={event => changeLine(line.key, { purpose: event.target.value })} value={line.purpose ?? ""} /><Input label="Ghi chú dòng" onChange={event => changeLine(line.key, { note: event.target.value })} value={line.note ?? ""} /></div>} index={index + 1} key={line.key} label={(item?.name ?? line.itemName) || "Chọn hàng hóa"} meta={needsStock && line.itemId ? <div className={styles.stockFacts} data-shortage={currentStock && balance + delta < 0 || undefined}><span>Tồn kho <strong>{currentStock ? number.format(balance) : "—"} {line.uomCode}</strong></span><span>Sau ghi sổ <strong>{currentStock && Number.isFinite(delta) ? number.format(balance + delta) : "—"} {line.uomCode}</strong></span></div> : null}>
+              <div className="editable-line__cell" data-primary><div className={styles.itemPicker}><ItemImagePreview assetId={item?.imageAssetId} itemName={item?.name ?? line.itemName} /><Select disabled={Boolean(line.shipmentLineId)} label={`Hàng hóa ${index + 1}`} onChange={event => { const selected = items.find(row => row.id === event.target.value); changeLine(line.key, { itemId: event.target.value, itemName: selected?.name ?? "", itemCode: selected?.itemCode ?? "", uomId: selected?.baseUomId ?? "", uomCode: selected?.uomCode ?? "" }); }} options={options} placeholder="Tìm hoặc chọn hàng hóa" required value={line.itemId} /></div></div>
+              <div className="editable-line__cell"><Input label={type === "adjustment" ? "Chênh lệch (+/−)" : "Số lượng"} min={type === "adjustment" ? undefined : 0.0001} onChange={event => changeLine(line.key, type === "adjustment" ? { adjustmentQuantity: event.target.value === "" ? undefined : Number(event.target.value), quantity: Math.abs(Number(event.target.value)) || 1 } : { quantity: event.target.value === "" ? NaN : Number(event.target.value) })} required step="0.0001" type="number" value={type === "adjustment" ? line.adjustmentQuantity ?? "" : Number.isFinite(line.quantity) ? line.quantity : ""} /></div>
+              <div className="editable-line__cell"><Input label="Đơn vị" readOnly value={line.uomCode || item?.uomCode || ""} /></div>
+              <div className="editable-line__cell"><Input label="Đơn giá" min="0" onChange={event => changeLine(line.key, { unitPrice: event.target.value === "" ? undefined : Number(event.target.value) })} step="any" type="number" value={line.unitPrice ?? ""} /></div>
+            </EditableLine>;
+          })}</EditableLines>
+        </section>
+        {(!projectRequired || type !== "adjustment") ? <section aria-label="Thông tin bổ sung" className="warehouse-document-section">{!projectRequired ? <details className="document-disclosure" open={Boolean(id || document.projectId || document.worksiteId)}><summary>Phân bổ công trình<ChevronDown aria-hidden="true" size={15} /></summary><div className="form-grid"><Select label="Dự án" required={projectRequired} onChange={event => change({ projectId: event.target.value, worksiteId: undefined })} options={references.projects.map(row => ({ value: row.id, label: `${row.code} · ${row.name}` }))} placeholder="Không gắn dự án" value={document.projectId ?? ""} /><Select disabled={!document.projectId} label="Công trường" onChange={event => change({ worksiteId: event.target.value })} options={references.worksites.filter(row => row.projectId === document.projectId).map(row => ({ value: row.id, label: row.name }))} placeholder="Không gắn công trường" value={document.worksiteId ?? ""} /></div></details> : null}
+{type !== "adjustment" ? <details className="document-disclosure" open={Boolean(id)}><summary>{type === "transfer" ? "Ghi chú" : "Giao nhận & ghi chú"}<ChevronDown aria-hidden="true" size={15} /></summary><div className="form-grid">          {type === "receipt" ? <><Input label="Người giao" onChange={event => change({ deliveredBy: event.target.value })} value={document.deliveredBy ?? ""} /><Input label="Người nhận" onChange={event => change({ receivedBy: event.target.value })} value={document.receivedBy ?? ""} /></> : null}
+          {type === "issue" ? <><Input label="Người nhận" onChange={event => change({ recipient: event.target.value })} value={document.recipient ?? ""} /><Input label="Bộ phận nhận" onChange={event => change({ receivingDepartment: event.target.value })} value={document.receivingDepartment ?? ""} /></> : null}<Textarea label="Ghi chú" onChange={event => change({ note: event.target.value })} rows={2} value={document.note ?? ""} /></div></details> : null}</section> : null}
+      </fieldset>{stockError && needsStock ? <p className="form-error" role="alert">{stockError}</p> : null}{shortage && needsStock ? <p className="form-error" role="status">Có mặt hàng vượt tồn kho khả dụng.</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}</WorkCanvas>
+      <DocumentActions context={<><StatusBadge tone={dirty ? "warning" : "neutral"}>{dirty ? "Chưa lưu thay đổi" : statusLabels[document.status ?? ""] ?? "Chưa lưu"}</StatusBadge><span>{lines.filter(line => line.itemId).length} / {lines.length} dòng đã chọn</span></>}>{!locked ? <Button busy={busy} disabled={busy} name="operation" type="submit" value="save" variant={canPost ? "secondary" : "primary"}>Lưu nháp</Button> : null}{canPost && (!document.id || ["draft", "submitted"].includes(document.status ?? "")) ? <Button busy={busy} disabled={busy || !canSubmitPost} leftIcon={<PackageCheck size={17} />} name="operation" type="submit" value="post" variant="primary">{!document.id || dirty ? "Lưu & ghi sổ" : "Ghi sổ"}</Button> : null}</DocumentActions>
+    </form>
+    <Inspector title="Thông tin ghi sổ"><dl className="warehouse-inspector-summary"><div><dt>Trạng thái</dt><dd>{statusLabels[document.status ?? ""] ?? "Chưa lưu"}</dd></div><div><dt>Mặt hàng</dt><dd>{lines.length}</dd></div>{document.createdByName ? <div><dt>Người lập</dt><dd>{document.createdByName}</dd></div> : null}{document.postedAt ? <div><dt>Ghi sổ lúc</dt><dd>{new Date(document.postedAt).toLocaleString("vi-VN")}</dd></div> : null}{document.postedByName ? <div><dt>Người ghi sổ</dt><dd>{document.postedByName}</dd></div> : null}</dl>{["draft", "submitted"].includes(document.status ?? "") && canPost ? <Input disabled={busy} label="Ngày ghi sổ" onChange={event => setPostingDate(event.target.value)} required type="date" value={postingDate} /> : !document.id && canPost ? <Input label="Ngày ghi sổ" onChange={event => setPostingDate(event.target.value)} required type="date" value={postingDate} /> : null}<div className={styles.recordLinks}>{can(user.permissions, "warehouse.view") && (document.sourceWarehouseId || document.targetWarehouseId) ? <Link href={`/warehouse/inventory?warehouseId=${document.sourceWarehouseId ?? document.targetWarehouseId}`}>Xem tồn kho</Link> : null}{document.projectId && canViewProjects ? <Link href={`/projects/${document.projectId}/today`}>Công trường</Link> : null}{document.status === "draft" && canCreate ? <Button disabled={busy} onClick={() => { setReasonAction("cancel"); setReason(""); setReasonError(""); }} variant="danger">Hủy phiếu</Button> : null}{document.status === "posted" && canReverse && ["receipt", "issue"].includes(type) ? <Button disabled={busy} onClick={() => { setReasonAction("reverse"); setReason(""); setReasonError(""); }} variant="danger">Đảo chứng từ</Button> : null}</div>{document.id ? <DocumentAttachments canCreate={canCreate} id={document.id} /> : null}</Inspector>
+    <ConfirmDialog cancelLabel="Tiếp tục chỉnh sửa" confirmLabel="Tải lại" danger onClose={() => setConfirmReload(false)} onConfirm={() => { setConfirmReload(false); void load(); }} open={confirmReload} title="Tải lại và bỏ thay đổi chưa lưu?">{null}</ConfirmDialog>
+    <Modal onClose={() => { if (!busy) setReasonAction(undefined); }} open={Boolean(reasonAction)} title={reasonAction === "reverse" ? "Đảo chứng từ" : "Hủy phiếu"}><SectionedForm className={`${styles.formCard}`} onSubmit={applyReason}>
+<FormFields><Textarea disabled={busy} label="Lý do" maxLength={1000} minLength={3} onChange={event => setReason(event.target.value)} required rows={3} value={reason} />{reasonAction === "reverse" ? <Input disabled={busy} label="Ngày ghi sổ đảo" onChange={event => setPostingDate(event.target.value)} required type="date" value={postingDate} /> : null}{reasonError ? <p className="form-error" role="alert">{reasonError}</p> : null}</FormFields>
+<FormActions className="form-actions"><Button disabled={busy} onClick={() => setReasonAction(undefined)}>Quay lại</Button><Button busy={busy} disabled={busy || reason.trim().length < 3} type="submit" variant="danger">{reasonAction === "reverse" ? "Đảo chứng từ" : "Hủy phiếu"}</Button></FormActions></SectionedForm></Modal>
+  </WorkbenchLayout>;
 }
 
-function DocumentActions({ document, onChange, canCreate, canPost, canReverse }: { document: InventoryDocument; onChange: (value: InventoryDocument) => void; canCreate: boolean; canPost: boolean; canReverse: boolean }) {
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const path = paths[document.type as DocumentType];
-
-  useEffect(() => {
-    void api<Attachment[]>(`/api/v1/warehouse/documents/${document.id}/attachments`).then(setAttachments).catch(() => undefined);
-  }, [document.id]);
-
-  async function post() {
-    setBusy(true); setError("");
-    try {
-      onChange(await api<InventoryDocument>(`/api/v1/warehouse/${path}/${document.id}/post`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postingDate: today(), idempotencyKey: crypto.randomUUID(), allowNegativeOverride: false }) }));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể ghi sổ."); }
-    finally { setBusy(false); }
-  }
-
-  async function reverse() {
-    const reason = window.prompt("Lý do đảo chứng từ");
-    if (!reason) return;
-    setBusy(true); setError("");
-    try {
-      onChange(await api<InventoryDocument>(`/api/v1/warehouse/${path}/${document.id}/reverse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason, postingDate: today(), idempotencyKey: crypto.randomUUID() }) }));
-    } catch (value) { setError(value instanceof Error ? value.message : "Không thể đảo chứng từ."); }
-    finally { setBusy(false); }
-  }
-
+function DocumentAttachments({ id, canCreate }: { id: string; canCreate: boolean }) {
+  const [files, setFiles] = useState<Attachment[]>([]), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  useEffect(() => { const controller = new AbortController(); void api<Attachment[]>(`/api/v1/warehouse/documents/${id}/attachments`, { signal: controller.signal }).then(setFiles).catch(caught => { if (!controller.signal.aborted) setError(caught.message); }); return () => controller.abort(); }, [id]);
   async function upload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const file = form.get("file");
-    if (!(file instanceof File) || !file.size) return;
-    setBusy(true);
-    try {
-      const attachment = await api<Attachment>(`/api/v1/warehouse/documents/${document.id}/attachments`, { method: "POST", body: form });
-      setAttachments([...attachments, attachment]);
-      formElement.reset();
-    } catch (value) { setError(value instanceof Error ? value.message : "Không thể tải tệp."); }
-    finally { setBusy(false); }
+    event.preventDefault(); if (busy) return; const element = event.currentTarget, data = new FormData(element); setBusy(true); setError("");
+    try { const file = await api<Attachment>(`/api/v1/warehouse/documents/${id}/attachments`, { method: "POST", body: data }); setFiles(current => [...current, file]); element.reset(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Không thể tải tệp."); } finally { setBusy(false); }
   }
-
-  return (
-    <div className="warehouse-inspector-actions">
-      <div className="warehouse-posting-actions">
-        {document.status === "draft" && canPost ? <Button disabled={busy} onClick={() => void post()} variant="primary">Ghi sổ</Button> : null}
-        {document.status === "posted" && canReverse && ["receipt", "issue"].includes(document.type) ? <Button disabled={busy} onClick={() => void reverse()} variant="danger">Đảo chứng từ</Button> : null}
-      </div>
-      <section className="warehouse-posting-history" aria-labelledby="posting-history-title">
-        <h3 id="posting-history-title">Vòng đời</h3>
-        <ol><li className="is-complete"><span>Tạo nháp</span></li><li className={document.status === "posted" || document.status === "reversed" ? "is-complete" : undefined}><span>Ghi sổ</span></li>{document.status === "reversed" ? <li className="is-warning"><span>Đã đảo chứng từ</span></li> : null}</ol>
-      </section>
-      {canCreate ? <form className="warehouse-upload" onSubmit={upload}>
-        <label htmlFor={`warehouse-file-${document.id}`}>Tệp đính kèm</label>
-        <input id={`warehouse-file-${document.id}`} name="file" required type="file" />
-        <Button disabled={busy} leftIcon={<Upload size={16} />} type="submit">Tải lên</Button>
-      </form> : null}
-      {attachments.length ? <ul className="warehouse-simple-list">{attachments.map((file) => <li key={file.id}><Link className="text-link" href={`/api/v1/files/${file.fileId}/signed-url`} target="_blank">{file.fileName}</Link><span>{Math.ceil(file.sizeBytes / 1024)} KB</span></li>)}</ul> : null}
-      {error ? <p className="form-error" role="alert">{error}</p> : null}
-    </div>
-  );
+  return <section className={styles.attachments}><h3>Tệp đính kèm <small>{files.length}</small></h3>{canCreate ? <form className="warehouse-upload" onSubmit={upload}><input accept=".pdf,.xlsx,.docx,.jpg,.jpeg,.png,.webp" aria-label="Chọn tệp chứng từ" disabled={busy} name="file" required type="file" /><Button busy={busy} disabled={busy} leftIcon={<Upload size={16} />} type="submit">Tải lên</Button></form> : null}{files.map(file => <a className={styles.attachment} href={`/api/v1/files/${file.fileId}/signed-url`} key={file.id} rel="noreferrer" target="_blank"><Download aria-hidden="true" size={16} /><span>{file.fileName}<small>{number.format(Math.ceil(file.sizeBytes / 1024))} KB</small></span></a>)}{error ? <p className="form-error" role="alert">{error}</p> : null}</section>;
 }

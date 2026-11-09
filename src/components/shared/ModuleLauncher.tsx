@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { WorkspaceLink as Link } from "@/components/shared/WorkspaceLink";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 
@@ -10,6 +10,9 @@ import { useSystemSettings } from "@/components/providers/SystemSettingsProvider
 import { visibleApplications, type ApplicationDefinition } from "@/config/moduleRegistry";
 import { readWorkspacePreferences } from "@/lib/ui/workspacePreferencesRequest";
 import { LinkLoadingIndicator } from "@/components/shared/LinkLoadingIndicator";
+import styles from "./ModuleLauncher.module.css";
+
+const mobileLabels: Partial<Record<ApplicationDefinition["id"], string>> = { projects: "Công trường", operations: "Đơn từ" };
 
 export function ModuleIconCard({ application }: { application: ApplicationDefinition }) {
   const Icon = navigationIconMap[application.icon];
@@ -19,16 +22,16 @@ export function ModuleIconCard({ application }: { application: ApplicationDefini
   } as CSSProperties;
 
   return (
-    <Link className="module-icon-card" href={application.defaultRoute} style={style}>
-      <span className="module-icon-card__icon"><Icon aria-hidden="true" size={navigationIconSizes.module} strokeWidth={1.9} /></span>
-      <strong>{application.label}</strong>
+    <Link className={`module-icon-card ${styles.card}`} href={application.defaultRoute} style={style}>
+      <span className={`module-icon-card__icon ${styles.icon}`}><Icon aria-hidden="true" size={navigationIconSizes.module} strokeWidth={1.9} /></span>
+      <strong>{mobileLabels[application.id] ? <><span className="module-icon-card__label-desktop">{application.label}</span><span className="module-icon-card__label-mobile">{mobileLabels[application.id]}</span></> : application.label}</strong>
       <ArrowRight aria-hidden="true" className="module-icon-card__arrow" size={navigationIconSizes.launcherArrow} />
       <LinkLoadingIndicator />
     </Link>
   );
 }
 
-export function ModuleLauncher({ showHeading = true, excludePersonal = false }: { showHeading?: boolean; excludePersonal?: boolean } = {}) {
+export function ModuleLauncher({ showHeading = true, excludePersonal = false, layout = "grid" }: { showHeading?: boolean; excludePersonal?: boolean; layout?: "grid" | "bar" | "menu" } = {}) {
   const user = useCurrentUser();
   const { settings } = useSystemSettings();
   const [pinned, setPinned] = useState<string[]>([]);
@@ -54,9 +57,9 @@ export function ModuleLauncher({ showHeading = true, excludePersonal = false }: 
   if (!applications.length) return null;
 
   return (
-    <section aria-label={showHeading ? undefined : "Ứng dụng được phép sử dụng"} aria-labelledby={showHeading ? "my-modules-title" : undefined} className="module-launcher">
-      {showHeading ? <header className="dashboard-section-heading"><h2 id="my-modules-title">Ứng dụng của tôi</h2></header> : null}
-      <div className="module-launcher__grid">
+    <section aria-label={showHeading ? "Ứng dụng của tôi" : "Ứng dụng được phép sử dụng"} className={`module-launcher ${styles.launcher}`} data-layout={layout}>
+      {showHeading ? <header className={`dashboard-section-heading ${styles.heading}`}><h2>Ứng dụng của tôi</h2></header> : null}
+      <div className={`module-launcher__grid ${styles.grid}`}>
         {applications.map((application) => <ModuleIconCard application={application} key={application.id} />)}
       </div>
     </section>

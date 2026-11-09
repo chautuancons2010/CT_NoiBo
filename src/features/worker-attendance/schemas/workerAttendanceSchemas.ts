@@ -2,6 +2,14 @@ import { z } from "zod";
 
 const locationSchema = z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180), accuracy: z.number().finite().nonnegative() });
 
+export const workerSafetyReportSchema = z.object({
+  contractorName: z.string().trim().min(1).max(120),
+  supervisorCount: z.number().int().min(1).max(100),
+  briefing: z.array(z.object({ content: z.string().trim().max(500), checked: z.boolean() })).min(1).max(20),
+  healthStatus: z.string().trim().max(120),
+  workArea: z.string().trim().max(200)
+});
+
 export const createWorkerSessionSchema = z.object({
   clientSessionId: z.string().uuid(), projectId: z.string().uuid(), worksiteId: z.string().uuid(), date: z.string().date(),
   shiftCode: z.string().trim().min(1).max(30).default("DAY"), sessionType: z.enum(["morning", "end_of_day"]).default("morning"),
@@ -10,6 +18,7 @@ export const createWorkerSessionSchema = z.object({
 
 export const workerEntryPatchSchema = z.object({
   id: z.string().uuid(), status: z.enum(["unconfirmed", "present", "absent", "leave", "late", "transferred"]),
+  isSelected: z.boolean().optional(),
   exceptionReason: z.enum(["approved_leave", "unapproved", "unknown", "other_worksite", "other"]).nullable().optional(),
   dayException: z.enum(["none", "early_leave", "transferred", "half_day", "overtime", "left_worksite"]).default("none"),
   exceptionTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(), note: z.string().trim().max(500).nullable().optional()
@@ -18,6 +27,8 @@ export const workerEntryPatchSchema = z.object({
 export const workerSessionDraftSchema = z.object({
   version: z.number().int().positive(), entries: z.array(workerEntryPatchSchema).max(500),
   workNote: z.string().trim().max(1500).nullable().optional(), note: z.string().trim().max(1000).nullable().optional(),
+  safetyConfirmed: z.boolean().optional(),
+  safetyReport: workerSafetyReportSchema.optional(),
   checklistResponses: z.array(z.object({
     itemId: z.string().uuid(), checked: z.boolean(), note: z.string().trim().max(500).nullable().optional()
   })).max(100).default([]),

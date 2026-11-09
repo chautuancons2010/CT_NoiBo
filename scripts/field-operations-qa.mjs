@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -33,7 +34,7 @@ try {
     const page = await context.newPage();
     await page.goto(`${baseUrl}/login`, { waitUntil: "networkidle" });
     await page.locator('[name="username"]').fill("test.supervisor");
-    await page.locator('[name="password"]').fill(process.env.SEED_TEST_PASSWORD || "12345678");
+    await page.locator('[name="password"]').fill(getTestPassword());
     await Promise.all([page.waitForURL(/\/dashboard/), page.getByRole("button", { name: /Đăng nhập/i }).click()]);
 
     await page.goto(`${baseUrl}/projects/${projectId}/today`, { waitUntil: "networkidle" });

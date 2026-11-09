@@ -73,7 +73,7 @@ export function ProjectDocumentWorkspace({ projectId, updates, canUpload }: { pr
       <div><span>Tài liệu gói</span><h2>{documents.length} tệp</h2></div>
       {canUpload ? <>
         <input accept="application/pdf,.docx,.xlsx" aria-label="Chọn tài liệu" hidden multiple onChange={(event) => void upload(Array.from(event.target.files ?? []))} ref={inputRef} type="file" />
-        <Button disabled={saving} leftIcon={<Upload aria-hidden="true" size={16} />} onClick={() => inputRef.current?.click()} variant="primary">{saving ? "Đang tải" : "Thêm tài liệu"}</Button>
+        <Button disabled={saving} leftIcon={<Upload aria-hidden="true" size={16} />} onClick={() => inputRef.current?.click()} variant="primary" busy={saving}>{"Thêm tài liệu"}</Button>
       </> : null}
     </header>
     {message ? <div className="project-documents__message" role="status">{message}</div> : null}

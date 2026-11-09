@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 
@@ -30,7 +31,7 @@ if (process.argv.includes("--check-test-login")) {
   if (!authKey) throw new Error("Thiếu cấu hình public auth client.");
   const auth = createClient(url, authKey, { auth: { persistSession: false, autoRefreshToken: false } });
   for (const account of disposablePrivileged) {
-    const { data, error: authError } = await auth.auth.signInWithPassword({ email: account.primary_email, password: process.env.SEED_TEST_PASSWORD || "12345678" });
+    const { data, error: authError } = await auth.auth.signInWithPassword({ email: account.primary_email, password: getTestPassword() });
     console.log(JSON.stringify({ username: account.username, testLogin: Boolean(data.user && !authError) }));
     if (data.session) await auth.auth.signOut();
   }

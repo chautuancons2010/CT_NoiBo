@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Copy, Eye, Pencil } from "lucide-react";
 import { Card } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { DropdownMenu } from "@/components/shared/DropdownMenu";
+import { FileDownloadLink } from "@/components/shared/FileDownloadLink";
 import { DataSurface, ReportPageTemplate } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { reportFieldRegistry } from "../services/reportFieldRegistry";
@@ -120,6 +121,6 @@ export function ReportTemplateDesigner() {
       <div className="form-actions"><button className="button button--secondary" type="button" onClick={() => setPreview(value => !value)}><Eye size={16}/>Xem trước</button><button className="button button--secondary" type="button" onClick={() => setEditing(undefined)}>Hủy</button><button className="button button--primary">Lưu mẫu</button></div>
       {preview ? <div className="template-preview">{editing.definition.sheets.filter(item => item.enabled).map(item => <section key={item.key}><strong>{item.name}</strong><div>{[...(item.columns ?? [])].filter(column => column.enabled).sort((a, b) => a.order - b.order).map(column => <span key={column.key}>{column.label}</span>)}</div></section>)}</div> : null}
     </form></Card> : null}
-    <DataSurface><header className="data-surface__toolbar"><h3 className="section-title">Lịch sử xuất</h3></header><DataTable actions={(item) => item.status === "completed" ? <DropdownMenu label={`Thao tác tệp ${item.fileName || item.id}`}><a href={`/api/v1/report-exports/${item.id}/download`}>Tải xuống</a></DropdownMenu> : null} columns={exportColumns} data={exports} emptyDescription="" emptyTitle="Chưa có tệp xuất" getRowId={(item) => item.id} /></DataSurface>
+    <DataSurface><header className="data-surface__toolbar"><h3 className="section-title">Lịch sử xuất</h3></header><DataTable actions={(item) => item.status === "completed" ? <DropdownMenu label={`Thao tác tệp ${item.fileName || item.id}`}><FileDownloadLink format="xlsx" href={`/api/v1/report-exports/${item.id}/download`}>Tải xuống</FileDownloadLink></DropdownMenu> : null} columns={exportColumns} data={exports} emptyDescription="" emptyTitle="Chưa có tệp xuất" getRowId={(item) => item.id} /></DataSurface>
   </ReportPageTemplate>;
 }

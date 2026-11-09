@@ -5,4 +5,4 @@ import { successResponse } from "@/lib/api/responses";
 import { parseJsonBody } from "@/lib/api/validation";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
-export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{const user=requireAuthenticatedUser(await getRequestUser());const body=await parseJsonBody(request,leaveRejectSchema);return successResponse(await decideLeaveRequest(user,(await params).id,"reject",body.comment));}catch(error){return errorResponse(error);}}
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{const user=requireAuthenticatedUser(await getRequestUser());const body=await parseJsonBody(request,leaveRejectSchema);return successResponse(await decideLeaveRequest(user,(await params).id,"reject",body.comment,body.version));}catch(error){return errorResponse(error);}}

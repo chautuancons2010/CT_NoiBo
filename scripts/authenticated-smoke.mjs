@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import nextEnv from "@next/env";
 import { chromium } from "playwright-core";
 
@@ -6,7 +7,7 @@ loadEnvConfig(process.cwd());
 
 const baseUrl = process.env.E2E_BASE_URL || "http://localhost:3000";
 const browserPath = process.env.UI_QA_BROWSER || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const password = process.env.SEED_TEST_PASSWORD || "12345678";
+const password = getTestPassword();
 const scenarios = [
   {
     username: "test.supervisor",

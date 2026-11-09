@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { projectDetailSections } from "@/config/routeRegistry";
 import { PackageWorkspace } from "@/features/projects/components/package-workspace/PackageWorkspace";
 import { getProject, getProjectRoster, listProjectProgress } from "@/features/projects/services/projectRepository";
-import { listProjectUpdates } from "@/features/projects/services/projectUpdateRepository";
+import { listProjectIssues, listProjectUpdates } from "@/features/projects/services/projectUpdateRepository";
 import type { ProjectUpdate } from "@/features/projects/types/projectTypes";
 import { listWorkerSessions } from "@/features/worker-attendance/services/workerAttendanceRepository";
 import { can } from "@/lib/auth/permissions";
@@ -31,11 +31,13 @@ export async function ProjectDetailPage({ projectId, section }: { projectId: str
   const canViewAttendance = can(user.permissions, "worker_attendance.view")
     || can(user.permissions, "worker_attendance.view_all")
     || can(user.permissions, "worker_attendance.view_project");
-  const [progressResult, updateResult, rosterResult, sessionResult] = await Promise.allSettled([
+  const canViewIssues = can(user.permissions, "project_issue.view");
+  const [progressResult, updateResult, rosterResult, sessionResult, issueResult] = await Promise.allSettled([
     listProjectProgress(user, projectId),
     canViewUpdates ? listProjectUpdates(user, projectId, { limit: 100 }) : Promise.resolve({ items: [] as ProjectUpdate[], nextCursor: undefined }),
     getProjectRoster(projectId, todayKey, undefined, user),
-    canViewAttendance ? listWorkerSessions(user, { from: monthStart, to: todayKey, projectId }) : Promise.resolve([])
+    canViewAttendance ? listWorkerSessions(user, { from: monthStart, to: todayKey, projectId }) : Promise.resolve([]),
+    canViewIssues ? listProjectIssues(user, { projectId }) : Promise.resolve(undefined)
   ]);
   const progressNodes = progressResult.status === "fulfilled" ? progressResult.value : [];
   const documentUpdates = updateResult.status === "fulfilled" ? updateResult.value.items : [];
@@ -52,11 +54,15 @@ export async function ProjectDetailPage({ projectId, section }: { projectId: str
 
   const editProgress = can(user.permissions, "project.edit") || can(user.permissions, "project.manage_schedule");
   return <PackageWorkspace
+    key={project.id}
     accountId={user.id}
+    openIssues={issueResult.status === "fulfilled" ? issueResult.value?.filter(issue => !["resolved", "closed"].includes(issue.status)) : undefined}
+    issueLoadError={issueResult.status === "rejected" ? "Không thể tải vướng mắc công trường." : undefined}
     attendanceLoadError={attendanceLoadError}
     attendanceSessions={attendanceSessions}
     permissions={{
       editProgress,
+      editProject: can(user.permissions, "project.edit"),
       fieldUpdate: can(user.permissions, "project_update.create"),
       manageTeam: can(user.permissions, "project.manage_team"),
       manageWorksites: can(user.permissions, "worksite.manage"),
@@ -66,8 +72,14 @@ export async function ProjectDetailPage({ projectId, section }: { projectId: str
       viewAttendance: canViewAttendance,
       updateHealth: can(user.permissions, "project_health.update"),
       uploadDocuments: can(user.permissions, "project_update.create"),
-      viewRecords: canViewUpdates,
-      viewDocuments: canViewUpdates
+      viewRecords: true,
+      viewDocuments: canViewUpdates,
+      viewMaterials: can(user.permissions, "warehouse.view"),
+      createMaterialReceipt: can(user.permissions, "warehouse.receipt.create"),
+      createMaterialIssue: can(user.permissions, "warehouse.issue.create"),
+      createMaterialTransfer: can(user.permissions, "warehouse.transfer.create"),
+      viewMaterialLedger: can(user.permissions, "warehouse.ledger.view"),
+      viewMaterialItems: can(user.permissions, "warehouse.item.view")
     }}
     progressLoadError={progressLoadError}
     progressNodes={progressNodes}

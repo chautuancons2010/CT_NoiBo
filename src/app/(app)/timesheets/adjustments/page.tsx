@@ -15,7 +15,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
   return <div className="page-stack">
     <BackLink href={defaults.periodId ? `/timesheets/periods/${defaults.periodId}` : "/timesheets"} />
     <PageHeader title="Điều chỉnh công" />
-    {canViewRequests ? <AttendanceAdjustmentRequests scope="all" canReview={canReview} /> : null}
-    {canEditTimesheet ? <section className="page-stack"><h2 className="section-title">Điều chỉnh bảng công</h2><TimesheetAdjustmentForm defaults={defaults} /></section> : null}
+    {canViewRequests && !defaults.periodId ? <AttendanceAdjustmentRequests scope="all" canReview={canReview} /> : null}
+    {canEditTimesheet ? <TimesheetAdjustmentForm defaults={defaults} /> : null}
   </div>;
 }

@@ -1,29 +1,19 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ContextTabs } from "./Tabs";
 
-import { ContextTabs } from "@/components/shared/Tabs";
+vi.mock("next/navigation", () => ({ usePathname: () => "/shipments/one/containers" }));
+afterEach(cleanup);
 
-describe("ContextTabs", () => {
-  it("announces the active route and keeps one horizontal scroller", () => {
-    const { container } = render(
-      <ContextTabs
-        items={[
-          { active: true, href: "/projects/1/progress", label: "Thi công" },
-          { href: "/projects/1/team", label: "Chấm công" }
-        ]}
-        label="Không gian làm việc gói"
-      />
-    );
-
-    expect(screen.getByRole("navigation", { name: "Không gian làm việc gói" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Thi công" })).toHaveAttribute("aria-current", "page");
-    expect(container.querySelectorAll(".context-tabs__scroller")).toHaveLength(1);
-  });
-
-  it("supports instant in-workspace selection without route navigation", () => {
-    const onSelect = vi.fn();
-    render(<ContextTabs items={[{ label: "Hôm nay", onSelect }]} label="Không gian làm việc gói" />);
-    fireEvent.click(screen.getByRole("button", { name: "Hôm nay" }));
-    expect(onSelect).toHaveBeenCalledOnce();
+describe("context tab selection", () => {
+  it("marks only the most specific active route", () => {
+    render(<ContextTabs label="Lô hàng" items={[
+      { label: "Lô hàng", href: "/shipments", active: true },
+      { label: "Tổng quan", href: "/shipments/one", active: true },
+      { label: "Container", href: "/shipments/one/containers", active: true }
+    ]} />);
+    expect(screen.getByRole("link", { name: "Container" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("navigation").querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Tổng quan" })).not.toHaveClass("is-active");
   });
 });

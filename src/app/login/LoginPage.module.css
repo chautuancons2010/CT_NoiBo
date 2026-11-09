@@ -1,0 +1,43 @@
+﻿/* Preserve the established login palette and geometry independently of the
+   internal workspace redesign. Layout and animation remain in their original
+   login styles and LoginBackdrop. */
+.preserved {
+  color: var(--text-primary);
+  --section-gap: 16px;
+  --ui-radius-control: 10px;
+  --ui-radius-card: 16px;
+  --ui-radius-inset: 10px;
+  --ui-radius-overlay: 20px;
+  --radius-control: 10px;
+  --radius-input: 10px;
+  --radius-button: 10px;
+  --radius-search: 10px;
+  --radius-card: 16px;
+  --radius-card-large: 16px;
+  --radius-panel: 20px;
+  --radius-modal: 20px;
+  --app-canvas-start: #d7eadd;
+  --app-canvas-mid: #e3f1ea;
+  --app-canvas-end: #eaf7f0;
+  --app-bg: #eaf7f0;
+  --app-bg-soft: #e3f1ea;
+  --workspace-canvas: #e3f1ea;
+  --surface-2: #f1f8f4;
+  --surface-hover: #edf6f0;
+  --reference-text: #1f352b;
+  --reference-muted: #607669;
+  --text-primary: #1f352b;
+  --text-secondary: #465e51;
+  --text-muted: #607669;
+  --color-text: #1f352b;
+  --color-text-secondary: #465e51;
+  --color-text-muted: #607669;
+  --border-subtle: #c7dbce;
+  --border-default: #adc9b7;
+  --border-soft: #c7dbce;
+  --color-border: #adc9b7;
+  --surface-border: #c7dbce;
+  --shadow-card: 0 2px 8px rgb(31 53 43 / 4%);
+}
+
+.preserved :global(.button--primary) { box-shadow: var(--shadow-sm); }

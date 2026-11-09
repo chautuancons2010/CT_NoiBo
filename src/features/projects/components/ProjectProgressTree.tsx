@@ -26,6 +26,7 @@ import { Drawer } from "@/components/shared/Overlays";
 import { EmptyState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { DailySchedule, ProjectProgressNode } from "@/features/projects/types/projectTypes";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 interface AssigneeOption {
   id: string;
@@ -311,7 +312,7 @@ export function ProjectProgressTree({
           </div>
 
           {error && !editorOpen ? (
-            <div className="construction-inline-error" role="alert"><CircleAlert size={17} /><span>{error}</span><Button disabled={reloading} onClick={() => void reload()} size="sm">{reloading ? "Đang tải" : "Thử lại"}</Button></div>
+            <div className="construction-inline-error" role="alert"><CircleAlert size={17} /><span>{error}</span><Button disabled={reloading} onClick={() => void reload()} size="sm" busy={reloading}>{"Thử lại"}</Button></div>
           ) : null}
 
           <div className="construction-package-table">
@@ -350,7 +351,8 @@ export function ProjectProgressTree({
       />
 
       <Drawer onClose={closeEditor} open={editorOpen} title={editing ? "Cập nhật gói / hạng mục" : parentId ? "Thêm hạng mục con" : "Thêm gói công việc"}>
-        <form className="drawer-form leave-form" key={editing?.id ?? parentId ?? "new"} onSubmit={submit}>
+        <SectionedForm className="" key={editing?.id ?? parentId ?? "new"} onSubmit={submit}>
+<FormFields>
           <div className="form-grid">
             <Input defaultValue={editing?.name} label="Tên gói / hạng mục" name="name" required />
             <Select defaultValue={editing?.nodeType ?? (parentId ? "task" : "work_item")} label="Loại công việc" name="nodeType" options={Object.entries(typeLabels).map(([value, label]) => ({ value, label }))} />
@@ -360,8 +362,9 @@ export function ProjectProgressTree({
             <Select defaultValue={editing?.assigneeEmployeeId} disabled={loadingAssignees} label="Người phụ trách" name="assigneeEmployeeId" options={assignees.map((employee) => ({ value: employee.id, label: employee.label }))} placeholder={loadingAssignees ? "Đang tải nhân sự" : "Chưa phân công"} />
           </div>
           {error ? <p className="form-error" role="alert">{error}</p> : null}
-          <div className="form-actions"><Button onClick={closeEditor} type="button">Hủy</Button><Button type="submit" variant="primary">Lưu</Button></div>
-        </form>
+          </FormFields>
+<FormActions className="form-actions"><Button onClick={closeEditor} type="button">Hủy</Button><Button type="submit" variant="primary">Lưu</Button></FormActions>
+        </SectionedForm>
       </Drawer>
     </section>
   );
@@ -466,7 +469,8 @@ function FieldUpdateDrawer({ projectId, nodes, initialNodeId, open, onClose, onS
     }
   }
 
-  return <Drawer onClose={() => { if (!saving) onClose(); }} open={open} title="Cập nhật hiện trường"><form className="field-update-form" onSubmit={save}>
+  return <Drawer onClose={() => { if (!saving) onClose(); }} open={open} title="Cập nhật hiện trường"><SectionedForm className="field-update-form" onSubmit={save}>
+<FormFields>
     <div className="field-update-form__body">
       <Select label="Hạng mục" name="nodeId" onChange={(event) => chooseNode(event.target.value)} options={selectableNodes.map((node) => ({ value: node.id, label: node.name }))} placeholder="Chọn hạng mục" required value={nodeId} />
       <fieldset className="field-update-status"><legend>Trạng thái</legend>{(["in_progress", "blocked", "completed"] as const).map((value) => <button aria-pressed={status === value} className={status === value ? "is-active" : ""} key={value} onClick={() => { setStatus(value); if (value === "blocked") setHasIssue(true); if (value === "completed") setPercent(100); }} type="button">{statusLabels[value]}</button>)}</fieldset>
@@ -477,6 +481,7 @@ function FieldUpdateDrawer({ projectId, nodes, initialNodeId, open, onClose, onS
       <Textarea label="Ghi chú" maxLength={500} onChange={(event) => setNote(event.target.value)} rows={3} value={note} />
       {error ? <p className="form-error" role="alert">{error}</p> : null}
     </div>
-    <footer className="field-update-form__footer"><Checkbox checked={continueNext} label="Cập nhật hạng mục tiếp theo" onChange={(event) => setContinueNext(event.target.checked)} /><div><Button disabled={saving} onClick={onClose}>Hủy</Button><Button disabled={saving || !selectedNode} type="submit" variant="primary">{saving ? "Đang lưu" : "Lưu cập nhật"}</Button></div></footer>
-  </form></Drawer>;
+    </FormFields>
+<FormActions className="field-update-form__footer"><Checkbox checked={continueNext} label="Cập nhật hạng mục tiếp theo" onChange={(event) => setContinueNext(event.target.checked)} /><div><Button disabled={saving} onClick={onClose}>Hủy</Button><Button disabled={saving || !selectedNode} type="submit" variant="primary" busy={saving}>{"Lưu cập nhật"}</Button></div></FormActions>
+  </SectionedForm></Drawer>;
 }

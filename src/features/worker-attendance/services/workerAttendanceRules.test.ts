@@ -31,4 +31,16 @@ describe("worker attendance rules", () => {
     expect(workerLocationLabel({ latitude: 21.0278, longitude: 105.8342, accuracyMeters: 500, geofenceStatus: "accuracy_low" })).toBe("21.02780, 105.83420 · ±500 m · Cần kiểm tra");
     expect(workerLocationLabel({ latitude: 21.0278, longitude: 105.8342, geofenceStatus: "outside" })).toBe("21.02780, 105.83420");
   });
+
+  it("counts only selected workers without turning rotating workers into absences", () => {
+    expect(countWorkerAttendance([{ ...entry("present"), isSelected: true }, { ...entry("unconfirmed"), isSelected: false }])).toMatchObject({ total: 1, present: 1, absent: 0, unconfirmed: 0 });
+  });
+
+  it("allows selection submit with unchecked candidates and no work note", () => {
+    expect(validateSessionForSubmit({ selectionMode: true, safetyConfirmed: true, entries: [{ ...entry("present"), isSelected: true }, { ...entry("unconfirmed"), isSelected: false }], photoCount: 1, geofenceStatus: "not_required", checklist: [], checklistResponses: [] }, { minimumPhotos: 0, workNoteRequired: true, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 })).toEqual([]);
+  });
+
+  it("requires a selected worker, a photo and the safety confirmation even with a relaxed legacy policy", () => {
+    expect(validateSessionForSubmit({ selectionMode: true, safetyConfirmed: false, entries: [{ ...entry("unconfirmed"), isSelected: false }], photoCount: 0, geofenceStatus: "not_required", checklist: [], checklistResponses: [] }, { minimumPhotos: 0, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 })).toEqual(["Chọn ít nhất một công nhân.", "Cần ít nhất 1 ảnh điểm danh.", "Cần xác nhận an toàn lao động."]);
+  });
 });

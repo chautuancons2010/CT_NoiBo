@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { stockCountUpdateSchema } from "@/features/warehouse/schemas/warehouseSchemas";
-import { getStockCount, updateStockCount } from "@/features/warehouse/services/warehouseRepository";
+import { cancelWarehouseRecordSchema, stockCountUpdateSchema } from "@/features/warehouse/schemas/warehouseSchemas";
+import { cancelWarehouseRecord, getStockCount, updateStockCount } from "@/features/warehouse/services/warehouseRepository";
 import { errorResponse } from "@/lib/api/errors";
 import { successResponse } from "@/lib/api/responses";
 import { parseJsonBody, parseWithSchema } from "@/lib/api/validation";
@@ -20,6 +20,7 @@ export async function PATCH(request: Request, context: RouteContext<"/api/v1/war
   try {
     const { id } = parseWithSchema(paramsSchema, await context.params);
     const user = requireAuthenticatedUser(await getRequestUser());
-    return successResponse(await updateStockCount(user, id, await parseJsonBody(request, stockCountUpdateSchema)));
+    const input = await parseJsonBody(request, z.union([cancelWarehouseRecordSchema, stockCountUpdateSchema]));
+    return successResponse(await ("action" in input ? cancelWarehouseRecord(user, id, "stock_count", input) : updateStockCount(user, id, input)));
   } catch (error) { return errorResponse(error); }
 }

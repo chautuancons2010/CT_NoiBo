@@ -4,7 +4,6 @@ import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/shared/Button";
 import { BackLink } from "@/components/shared/BackLink";
 import { Card, StatCard } from "@/components/shared/Card";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -12,6 +11,7 @@ import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ItemImagePreview } from "@/features/warehouse/components/ItemImagePreview";
 import type { InventoryBalance, InventoryItem, StockLedgerEntry } from "@/features/warehouse/types/warehouseTypes";
+import styles from "./WarehouseUi.module.css";
 
 type ApiBody<T> = { ok: boolean; data?: T; error?: { message?: string } };
 const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 });
@@ -78,7 +78,7 @@ export function InventoryItemDetail({ id, canManage, canViewLedger }: { id: stri
   ];
 
   return (
-    <div className="page-stack">
+    <div className={`page-stack ${styles.itemDetail}`}>
       <BackLink href="/warehouse/items" />
       <Card className="item-detail-card">
         <div className="item-detail-heading">
@@ -104,7 +104,7 @@ export function InventoryItemDetail({ id, canManage, canViewLedger }: { id: stri
           </div>
         </div>
         {item.note ? <div className="item-detail-note"><strong>Ghi chú</strong><p>{item.note}</p></div> : null}
-        {canManage ? <div className="item-detail-actions"><Link href={`/warehouse/items/${item.id}/edit`}><Button leftIcon={<Pencil size={16} />} variant="primary">Chỉnh sửa</Button></Link></div> : null}
+        {canManage ? <div className="item-detail-actions"><Link className="button button--primary button--md" href={`/warehouse/items/${item.id}/edit`}><Pencil aria-hidden="true" size={16} /><span>Chỉnh sửa</span></Link></div> : null}
       </Card>
 
       <div className="content-grid warehouse-kpis">

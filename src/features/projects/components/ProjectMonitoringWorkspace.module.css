@@ -1,0 +1,46 @@
+.workspace { display: grid; min-width: 0; gap: var(--section-gap); }
+.workbench { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); gap: var(--space-5); align-items: start; }
+.workbench > * { min-width: 0; }
+.completion { display: flex; min-width: 136px; align-items: center; gap: var(--space-3); }
+.completion progress { appearance: none; width: 100%; min-width: 72px; height: 6px; overflow: hidden; border: 0; border-radius: var(--radius-pill); background: var(--surface-2); accent-color: var(--primary); }
+.completion progress::-webkit-progress-bar { background: var(--surface-2); }
+.completion progress::-webkit-progress-value { border-radius: var(--radius-pill); background: var(--primary); }
+.completion progress::-moz-progress-bar { border-radius: var(--radius-pill); background: var(--primary); }
+.completion strong { flex: 0 0 38px; font-size: var(--font-meta); font-variant-numeric: tabular-nums; text-align: right; }
+.issueCount { color: var(--warning); font-weight: 600; }
+.updateTime { display: grid; gap: var(--space-1); color: var(--text-secondary); font-size: var(--font-meta); }
+.updateTime > span:has(> svg) { display: flex; align-items: center; gap: var(--space-1); color: var(--warning); }
+.recent { min-width: 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); }
+.attention > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border-bottom: 1px solid var(--border-subtle); padding: var(--space-4) var(--space-5); }
+.attention > header > span:first-child { display: flex; align-items: center; gap: var(--space-2); }
+.attention h2 { margin: 0; color: var(--text-primary); font-size: 15px; font-weight: 600; }
+.attention > header svg { color: var(--warning); }
+.attention ul, .recent ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.attention li { display: grid; min-width: 0; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border-subtle); }
+.issueHeading { display: flex; align-items: start; justify-content: space-between; gap: var(--space-3); }
+.issueHeading a { display: flex; min-width: 0; align-items: start; gap: var(--space-2); color: var(--text-primary); text-decoration: none; }
+.issueHeading strong { font-size: 14px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.issueHeading a > svg { flex: 0 0 15px; margin-top: 3px; color: var(--text-muted); }
+.issueHeading > :global(.status-badge) { flex: 0 0 auto; }
+.attention li > span, .attention li footer { color: var(--text-secondary); font-size: var(--font-meta); }
+.attention li footer { display: flex; justify-content: space-between; gap: var(--space-3); }
+.allIssues { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3) var(--space-5); color: var(--primary); font-size: var(--font-meta); text-decoration: none; }
+.empty { padding: var(--space-6); color: var(--text-secondary); font-size: var(--font-meta); }
+.recent > summary { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); color: var(--text-primary); font-size: 15px; font-weight: 600; list-style: none; cursor: pointer; }
+.recent > summary::-webkit-details-marker { display: none; }
+.recent summary small { margin-left: var(--space-2); color: var(--text-muted); font-size: var(--font-meta); font-weight: 400; }
+.recent[open] > summary { border-bottom: 1px solid var(--border-subtle); }
+.recent[open] > summary > svg { transform: rotate(180deg); }
+.recent li { display: flex; min-width: 0; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--border-subtle); }
+.recent li > span:not(:global(.status-badge)) { display: grid; min-width: 0; flex: 1; gap: var(--space-1); }
+.recent li a { color: var(--text-primary); font-size: 14px; text-decoration: none; }
+.recent li small, .recent li time { color: var(--text-secondary); font-size: var(--font-meta); }
+.workspace a:focus-visible, .recent > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+@media (max-width: 767px) {
+  .completion { min-width: 0; }
+  .workbench { gap: var(--space-4); }
+  .recent li { flex-wrap: wrap; padding-inline: var(--space-4); }
+  .recent li time { width: 100%; padding-left: 0; }
+}
+
+.attention { min-width: 0; border: 0; background: transparent; box-shadow: none; }

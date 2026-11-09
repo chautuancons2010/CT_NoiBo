@@ -14,15 +14,15 @@ vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn() } }));
 
 import { ACCESS_COOKIE, resolveRequestUser, SESSION_COOKIE, SESSION_INACTIVITY_TIMEOUT_MS } from "./sessionService";
 
-function activeSession() {
+function activeSession(employeeId: string | null = "employee-id", roleCode = "employee") {
   return {
     id: "session-id",
     account_id: "account-id",
     last_seen_at: new Date().toISOString(),
     account: {
-      id: "account-id", auth_user_id: "auth-user-id", employee_id: "employee-id",
+      id: "account-id", auth_user_id: "auth-user-id", employee_id: employeeId,
       username: "tester", display_name: "Nhân viên", primary_email: "tester@example.invalid", status: "active",
-      account_roles: [{ roles: { role_permissions: [{ permission_key: "employee.view" }, { permission_key: "unknown.permission" }] } }]
+      account_roles: [{ roles: { code: roleCode, role_permissions: [{ permission_key: "employee.view" }, { permission_key: "unknown.permission" }] } }]
     }
   };
 }
@@ -67,6 +67,18 @@ describe("request session resolution", () => {
     const { update } = mockSession(session);
     expect(await resolveRequestUser()).toBeNull();
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it.each([null, "employee-id"])("keeps admin management access and own account security without personal attendance (employee: %s)", async (employeeId) => {
+    const session = activeSession(employeeId, "admin");
+    session.account.account_roles[0].roles.role_permissions = ["attendance.self", "attendance.self.create", "attendance.view_all", "attendance.manage", "payslip.self.view", "payroll.view"].map((permission_key) => ({ permission_key }));
+    mockSession(session);
+    const user = await resolveRequestUser();
+    expect(user?.permissions).toEqual(expect.arrayContaining(["profile.view", "attendance.view_all", "attendance.manage", "payroll.view"]));
+    expect(user?.permissions).not.toContain("attendance.self");
+    expect(user?.permissions).not.toContain("attendance.self.create");
+    expect(user?.permissions).not.toContain("payslip.self.view");
+    expect(user?.employeeId).toBe(employeeId);
   });
 
   it.each(["disabled", "locked", "pending_activation"])("rejects %s accounts", async (status) => {

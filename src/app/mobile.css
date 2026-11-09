@@ -1,3 +1,5 @@
+/* Compatibility layer. Shared ERP contracts live outside this layer. */
+@layer legacy {
 /* Phone interaction layer. Desktop and tablet composition stay in theme.css;
    this file owns touch-first behavior and is deliberately imported last. */
 
@@ -69,11 +71,13 @@
   }
 
   .personal-home__mobile-only { display: grid; }
-  .personal-home__links { overflow: hidden; border: 1px solid var(--mobile-workspace-line); border-radius: 16px; background: var(--surface-1); }
-  .personal-home__links a { display: grid; min-height: 58px; grid-template-columns: 25px minmax(0, 1fr) 20px; align-items: center; gap: 12px; border-bottom: 1px solid var(--mobile-workspace-line); padding: 0 16px; color: var(--text-primary); font-size: 14px; font-weight: 600; text-decoration: none; }
+  .personal-home__links { width: 100%; grid-template-columns: minmax(0, 1fr); overflow: hidden; border: 1px solid var(--mobile-workspace-line); border-radius: 16px; background: var(--surface-1); }
+  .personal-home__links a { display: grid; min-height: 58px; grid-template-columns: 25px minmax(0, 1fr) 20px; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--mobile-workspace-line); border-radius: 0; padding: 0 16px; background: transparent; color: var(--text-primary); font-size: 14px; font-weight: 600; text-decoration: none; box-shadow: none; }
   .personal-home__links a:last-child { border-bottom: 0; }
   .personal-home__links a > svg:first-child { color: var(--primary); }
   .personal-home__links a > svg:last-child { color: var(--text-secondary); }
+  .personal-home__links a:hover { box-shadow: none; transform: none; }
+  .personal-home__links a:active { background: var(--mobile-workspace-canvas); }
   .personal-home__links a:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
   .personal-home__logout .button { width: 100%; min-height: 48px; justify-content: center; }
   .personal-supervisor-work { gap: 10px; }
@@ -344,7 +348,7 @@
   .attendance-primary-action {
     position: fixed;
     right: var(--mobile-page-padding);
-    bottom: calc(72px + env(safe-area-inset-bottom));
+    bottom: calc(8px + env(safe-area-inset-bottom));
     left: var(--mobile-page-padding);
     z-index: 23;
     width: auto;
@@ -860,7 +864,7 @@
   .sticky-action-bar,
   .page-main .sticky-action-bar {
     position: sticky;
-    bottom: calc(72px + env(safe-area-inset-bottom));
+    bottom: calc(8px + env(safe-area-inset-bottom));
     gap: 8px;
     padding: 10px;
   }
@@ -1253,4 +1257,5 @@
     grid-column: 2;
     grid-row: 1;
   }
+}
 }

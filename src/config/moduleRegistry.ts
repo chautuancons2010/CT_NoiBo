@@ -6,7 +6,7 @@ import {
   type NavigationIcon,
   type NavigationItem
 } from "@/config/navigation";
-import type { ModuleKey, ModuleSettings, NavigationSettings } from "@/config/systemSettings";
+import { isPathEnabled, type ModuleKey, type ModuleSettings, type NavigationSettings } from "@/config/systemSettings";
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
 import { can } from "@/lib/auth/permissions";
 import { applicationPermissionSets } from "@/lib/auth/applicationAccess";
@@ -36,14 +36,14 @@ export interface LauncherApplication extends ApplicationDefinition {
 
 export const applicationRegistry: readonly ApplicationDefinition[] = [
   { id: "overview", label: "Dashboard", ...moduleIconRegistry.overview, baseRoute: "/dashboard", defaultRoute: "/dashboard", routePrefixes: ["/dashboard", "/home"], navigationGroups: ["Tổng quan"], requiredAny: applicationPermissionSets.overview, launcher: true },
-  { id: "human-resources", label: "Nhân sự", ...moduleIconRegistry["human-resources"], baseRoute: "/employees", defaultRoute: "/employees", routePrefixes: ["/dashboard/hr", "/employees", "/attendance/today", "/attendance/logs", "/timesheets", "/shifts", "/leave/manage"], navigationGroups: ["Nhân sự", "Quản trị công"], moduleFlag: "human_resources", requiredAny: applicationPermissionSets["human-resources"], launcher: true },
+  { id: "human-resources", label: "Nhân sự", ...moduleIconRegistry["human-resources"], baseRoute: "/employees", defaultRoute: "/employees", routePrefixes: ["/dashboard/hr", "/employees", "/attendance/today", "/attendance/logs", "/timesheets", "/shifts", "/leave/manage", "/settings/attendance", "/settings/leave", "/settings/export-templates"], navigationGroups: ["Nhân sự", "Quản trị công"], moduleFlag: "human_resources", requiredAny: applicationPermissionSets["human-resources"], launcher: true },
   { id: "attendance", label: "Cá nhân", ...moduleIconRegistry.attendance, baseRoute: "/attendance/me", defaultRoute: "/attendance/me", routePrefixes: ["/personal", "/attendance", "/leave"], navigationGroups: ["Cá nhân"], moduleFlag: "attendance", requiredAny: applicationPermissionSets.attendance, launcher: true },
   { id: "projects", label: "Gói / Công trường", ...moduleIconRegistry.projects, baseRoute: "/projects", defaultRoute: "/projects", routePrefixes: ["/projects", "/project-monitoring", "/worker-attendance"], navigationGroups: ["Gói / Công trường"], moduleFlag: "projects", requiredAny: applicationPermissionSets.projects, launcher: true },
   { id: "warehouse", label: "Kho", ...moduleIconRegistry.warehouse, baseRoute: "/warehouse", defaultRoute: "/warehouse/inventory", routePrefixes: ["/dashboard/warehouse", "/warehouse", "/settings/warehouse"], navigationGroups: ["Kho", "Hệ thống"], moduleFlag: "warehouse", requiredAny: applicationPermissionSets.warehouse, launcher: true },
   { id: "import-export", label: "Xuất nhập khẩu", ...moduleIconRegistry["import-export"], baseRoute: "/import-export", defaultRoute: "/import-export/shipments", routePrefixes: ["/dashboard/import-export", "/import-export", "/settings/import-export"], navigationGroups: ["Xuất nhập khẩu", "Hệ thống"], moduleFlag: "import_export", requiredAny: applicationPermissionSets["import-export"], launcher: true },
-  { id: "accounting", label: "Kế toán", ...moduleIconRegistry.accounting, baseRoute: "/accounting", defaultRoute: "/accounting/salaries", routePrefixes: ["/accounting"], navigationGroups: ["Kế toán"], requiredAny: applicationPermissionSets.accounting, launcher: true },
+  { id: "accounting", label: "Kế toán", ...moduleIconRegistry.accounting, baseRoute: "/accounting", defaultRoute: "/accounting/salaries", routePrefixes: ["/accounting"], navigationGroups: ["Kế toán"], moduleFlag: "accounting", requiredAny: applicationPermissionSets.accounting, launcher: true },
   { id: "messaging", label: "Tin nhắn", ...moduleIconRegistry.messaging, baseRoute: "/messages", defaultRoute: "/messages", routePrefixes: ["/messages"], navigationGroups: [], requiredAny: applicationPermissionSets.messaging, launcher: false },
-  { id: "operations", label: "Đơn từ & Điều hành", ...moduleIconRegistry.operations, baseRoute: "/approvals", defaultRoute: "/approvals", routePrefixes: ["/dashboard/management", "/approvals", "/documents", "/reports", "/notifications", "/profile"], navigationGroups: ["Quản lý"], requiredAny: applicationPermissionSets.operations, launcher: true },
+  { id: "operations", label: "Đơn từ & Điều hành", ...moduleIconRegistry.operations, baseRoute: "/approvals", defaultRoute: "/approvals", routePrefixes: ["/dashboard/management", "/approvals", "/documents", "/reports", "/notifications", "/profile"], navigationGroups: ["Quản lý"], moduleFlag: "operations", requiredAny: applicationPermissionSets.operations, launcher: true },
   { id: "system", label: "Quản trị", ...moduleIconRegistry.system, baseRoute: "/system-admin", defaultRoute: "/system-admin", routePrefixes: ["/system-admin", "/settings"], navigationGroups: ["Hệ thống"], requiredAny: applicationPermissionSets.system, launcher: true }
 ] as const;
 
@@ -75,20 +75,17 @@ export function visibleApplications(
     application.launcher &&
     (!application.moduleFlag || !modules || modules[application.moduleFlag]) &&
     application.requiredAny.some((permission) => can(user.permissions, permission))
-  ).map((application) => ({ ...application, defaultRoute: applicationDefaultRoute(application, user) }));
+  ).map((application) => ({ ...application, defaultRoute: applicationDefaultRoute(application, user, modules) }));
 }
 
-function applicationDefaultRoute(application: ApplicationDefinition, user: AuthenticatedUser): string {
+function applicationDefaultRoute(application: ApplicationDefinition, user: AuthenticatedUser, modules?: ModuleSettings): string {
   if (application.id === "human-resources") {
     if (can(user.permissions, "attendance.view_all") || can(user.permissions, "attendance.manage")) return "/attendance/today";
     if (can(user.permissions, "attendance.period.manage")) return "/timesheets";
     if (can(user.permissions, "attendance.adjust")) return "/timesheets/adjustments";
   }
-  if (application.id === "accounting" && can(user.permissions, "payslip.self.view") && !can(user.permissions, "payroll.view") && !can(user.permissions, "payroll.create") && !can(user.permissions, "salary.view")) {
-    return "/accounting/payslips";
-  }
   const firstAccessibleItem = filterNavigationByPermissions(
-    desktopNavigation.flatMap((group) => group.items).filter((item) => itemBelongsToApplication(item, application)),
+    desktopNavigation.flatMap((group) => group.items).filter((item) => itemBelongsToApplication(item, application) && (!modules || isPathEnabled(item.href, modules))),
     user.permissions
   )[0];
   return firstAccessibleItem?.href ?? application.defaultRoute;
@@ -102,7 +99,7 @@ export function applicationsForLauncher(
     .filter((application) => application.launcher && (!application.moduleFlag || !modules || modules[application.moduleFlag]))
     .map((application) => ({
       ...application,
-      defaultRoute: applicationDefaultRoute(application, user),
+      defaultRoute: applicationDefaultRoute(application, user, modules),
       accessible: application.requiredAny.some((permission) => can(user.permissions, permission))
     }));
 }
@@ -130,27 +127,30 @@ export function contextualNavigationGroups(
   if (application.id === "messaging") return dashboardGroup;
   if (application.id === "warehouse") {
     const sections = [
-      { label: "VẬN HÀNH KHO", paths: ["/warehouse/inventory", "/warehouse/receipts", "/warehouse/issues", "/warehouse/transfers", "/warehouse/adjustments", "/warehouse/stock-counts", "/warehouse/ledger"] },
-      { label: "DANH MỤC & CẤU HÌNH", paths: ["/warehouse/items", "/warehouse/warehouses", "/settings/warehouse"] }
-    ];
-    return [...dashboardGroup, ...sections.map((section) => ({ label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
+      { id: "warehouse-operations", icon: "Boxes", label: "Vận hành kho", paths: ["/warehouse/inventory", "/warehouse/receipts", "/warehouse/issues", "/warehouse/transfers"] },
+      { id: "warehouse-reconciliation", icon: "ClipboardCheck", label: "Đối soát kho", paths: ["/warehouse/ledger", "/warehouse/adjustments", "/warehouse/stock-counts"] },
+      { id: "warehouse-catalog", icon: "Library", label: "Danh mục", paths: ["/warehouse/items", "/warehouse/warehouses", "/settings/warehouse"] }
+    ] satisfies { id: string; icon: NavigationIcon; label: string; paths: string[] }[];
+    return [...dashboardGroup, ...sections.map((section) => ({ id: section.id, icon: section.icon, label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
       .filter((section) => section.items.length > 0)];
   }
   if (application.id === "import-export") {
     const sections = [
-      { label: "VẬN HÀNH", paths: ["/import-export/shipments", "/import-export/transport", "/import-export/customs"] },
-      { label: "HỒ SƠ & ĐỐI TÁC", paths: ["/import-export/contracts", "/import-export/documents", "/import-export/partners"] },
-      { label: "CẤU HÌNH", paths: ["/settings/import-export"] }
-    ];
-    return [...dashboardGroup, ...sections.map((section) => ({ label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
+      { id: "trade-operations", icon: "Ship", label: "Vận hành", paths: ["/import-export/shipments", "/import-export/transport", "/import-export/customs"] },
+      { id: "trade-records", icon: "FolderArchive", label: "Hồ sơ & đối tác", paths: ["/import-export/contracts", "/import-export/documents", "/import-export/partners"] },
+      { id: "trade-settings", icon: "Settings", label: "Thiết lập", paths: ["/settings/import-export"] }
+    ] satisfies { id: string; icon: NavigationIcon; label: string; paths: string[] }[];
+    return [...dashboardGroup, ...sections.map((section) => ({ id: section.id, icon: section.icon, label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
       .filter((section) => section.items.length > 0)];
   }
   if (application.id !== "human-resources") return [...dashboardGroup, ...(items.length ? [{ label: application.label, items }] : [])];
   const sections = [
-    { label: "HỒ SƠ", paths: ["/employees", "/employees/departments", "/employees/positions", "/employees/contracts", "/employees/insurance"] },
-    { label: "QUẢN LÝ CÔNG", paths: ["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/leave/manage", "/timesheets/adjustments"] }
-  ];
-  return [...dashboardGroup, ...sections.map((section) => ({ label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
+    { id: "hr-records", icon: "Users", label: "Hồ sơ nhân sự", paths: ["/employees", "/employees/contracts", "/employees/insurance"] },
+    { id: "hr-attendance", icon: "Clock3", label: "Công & nghỉ phép", paths: ["/attendance/today", "/timesheets/matrix", "/timesheets", "/timesheets/adjustments", "/leave/manage"] },
+    { id: "hr-catalog", icon: "Library", label: "Danh mục", paths: ["/employees/departments", "/employees/positions", "/shifts"] },
+    { id: "hr-settings", icon: "Settings", label: "Thiết lập", paths: ["/settings/attendance"] }
+  ] satisfies { id: string; icon: NavigationIcon; label: string; paths: string[] }[];
+  return [...dashboardGroup, ...sections.map((section) => ({ id: section.id, icon: section.icon, label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
     .filter((section) => section.items.length > 0)];
 }
 

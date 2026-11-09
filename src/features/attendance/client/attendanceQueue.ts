@@ -29,9 +29,14 @@ async function transactStore<T>(
   const database = await openDatabase();
   return new Promise<T>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, mode);
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => reject(transaction.error ?? new Error("Không thể truy cập hàng đợi."));
-    action(transaction.objectStore(STORE_NAME), resolve, reject);
+    let result: T;
+    transaction.oncomplete = () => { database.close(); resolve(result); };
+    const failed = () => { database.close(); reject(transaction.error ?? new Error("Không thể truy cập hàng đợi.")); };
+    transaction.onerror = failed;
+    transaction.onabort = failed;
+    // A successful put request is not yet a durable commit. Only acknowledge
+    // attendance after IndexedDB has completed its transaction.
+    action(transaction.objectStore(STORE_NAME), (value) => { result = value; }, reject);
   });
 }
 

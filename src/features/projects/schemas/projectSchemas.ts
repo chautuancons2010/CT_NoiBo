@@ -4,6 +4,9 @@ const optionalText = (maximum: number) => z.preprocess((value) => value === "" |
 const optionalDate = z.preprocess((value) => value === "" || value == null ? undefined : value, z.string().date().optional());
 const optionalUuid = z.preprocess((value) => value === "" || value == null ? undefined : value, z.string().uuid().optional());
 
+export const projectNamePatchSchema = z.object({ name: z.string().trim().min(3).max(180), rowVersion: z.number().int().positive() });
+export const endAssignmentSchema = z.object({ rowVersion: z.number().int().positive() });
+
 export const projectInputSchema = z.object({
   code: z.string().trim().min(2).max(40),
   name: z.string().trim().min(3).max(180),

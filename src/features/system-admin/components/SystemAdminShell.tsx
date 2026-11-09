@@ -35,7 +35,7 @@ const adminRoutes: readonly AdminRoute[] = [
   { href: "/system-admin/appearance", label: "Giao diện", permission: "appearance.view", icon: Palette },
   { href: "/system-admin/navigation", label: "Điều hướng", permission: "navigation.manage", icon: Compass },
   { href: "/system-admin/dashboard", label: "Bố cục Dashboard", permission: "navigation.manage", icon: LayoutDashboard },
-  { href: "/system-admin/modules", label: "Phân hệ", permission: "module.manage", icon: Boxes },
+  { href: "/system-admin/modules", label: "Khóa module", permission: "module.manage", icon: Boxes },
   { href: "/system-admin/organization", label: "Tổ chức", permission: "organization_settings.view", icon: Building2 },
   { href: "/system-admin/payslip-template", label: "Mẫu phiếu lương", permission: "module.manage", icon: ReceiptText },
   { href: "/system-admin/attendance-checklist", label: "Checklist điểm danh", permission: "system_admin.access", icon: ClipboardCheck },

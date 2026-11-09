@@ -128,11 +128,12 @@ export interface AttendanceHistoryDay {
   shiftName?: string;
   shiftStart?: string;
   shiftEnd?: string;
-  status: "complete" | "missing_check_out" | "late" | "pending" | "leave" | "holiday" | "rest_day" | "business_trip";
+  status: "complete" | "checked_in" | "missing_check_out" | "late" | "pending" | "leave" | "holiday" | "rest_day" | "business_trip";
 }
 
 export interface AttendanceRecordInput {
   clientEventId: string;
+  intendedType?: AttendanceType;
   capturedAtClient: string;
   capturedOffline: boolean;
   location?: AttendanceCoordinates;

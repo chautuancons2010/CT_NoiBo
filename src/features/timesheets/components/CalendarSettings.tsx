@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
+import { DataTable } from "@/components/shared/DataTable";
 import { Input, Select } from "@/components/shared/FormControls";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 import type { CalendarDay } from "../types/timesheetTypes";
@@ -84,15 +85,13 @@ export function CalendarSettings() {
 
   return <div className="content-grid content-grid--two calendar-settings">
     <Card>
-      <div className="data-table-scroll">
-        <table className="data-table">
-          <thead><tr><th>Ngày áp dụng</th><th>Tên ngày</th><th>Phân loại</th><th>Phạm vi</th><th>Chế độ tính công</th></tr></thead>
-          <tbody>
-            {items.map((item) => <tr key={item.id}><td>{formatCalendarDate(item.date)}</td><td>{item.name}</td><td>{dayTypeLabels[item.dayType]}</td><td>{scopeLabels[item.scopeType]}</td><td>{item.isWorkingDay ? "Ngày làm việc" : "Ngày nghỉ"}</td></tr>)}
-            {!items.length ? <tr><td colSpan={5}>Chưa thiết lập ngày nghỉ hoặc ngày làm bù.</td></tr> : null}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<CalendarDay> columns={[
+        { id: "date", header: "Ngày áp dụng", cell: item => formatCalendarDate(item.date) },
+        { id: "name", header: "Tên ngày", accessor: "name", priority: "primary" },
+        { id: "type", header: "Phân loại", cell: item => dayTypeLabels[item.dayType] },
+        { id: "scope", header: "Phạm vi", cell: item => scopeLabels[item.scopeType] },
+        { id: "mode", header: "Chế độ tính công", cell: item => item.isWorkingDay ? "Ngày làm việc" : "Ngày nghỉ" }
+      ]} data={items} emptyDescription="" emptyTitle="Chưa thiết lập ngày nghỉ hoặc ngày làm bù" getRowId={item => item.id} />
     </Card>
     <Card>
       <h3 className="section-title">Thêm ngày nghỉ hoặc ngày làm bù</h3>

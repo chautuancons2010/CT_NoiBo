@@ -1,4 +1,10 @@
 -- Remove only the fixed development dataset. Run in local/staging only.
+-- Legacy helper: posted/audit records remain protected. Prefer test:reset.
+do $$ begin
+  if not exists(select 1 from public.app_configurations where key='testing.environment.guard' and value->>'owner'='ct-noibo-test-v1') then
+    raise exception 'TEST_DATABASE_CONFIRMATION_REQUIRED';
+  end if;
+end $$;
 begin;
 delete from public.message_attachments where conversation_id='98600000-0000-4000-8000-000000000001';
 delete from public.message_attachments where conversation_id='98600000-0000-4000-8000-000000000002';

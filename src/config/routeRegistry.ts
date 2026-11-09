@@ -12,7 +12,9 @@ export interface BreadcrumbItem {
 }
 
 export const routeMetaByPath: Record<string, RouteMeta> = {
+  "/profile/password": { title: "Đổi mật khẩu", description: "", module: "Cá nhân" },
   "/personal": { title: "Cá nhân", description: "", module: "Cá nhân" },
+  "/personal/payslips": { title: "Phiếu lương của tôi", description: "", module: "Cá nhân" },
   "/applications": { title: "Ứng dụng", description: "", module: "Cá nhân" },
   "/workspace": { title: "Không gian làm việc", description: "", module: "Tổng quan" },
   "/settings": { title: "Cấu hình nghiệp vụ", description: "", module: "Hệ thống" },
@@ -91,6 +93,7 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     module: "Cá nhân"
   },
   "/leave/manage": { title: "Quản lý nghỉ phép", description: "", module: "Quản trị công" },
+  "/leave/settlements": { title: "Thanh toán phép cuối năm", description: "", module: "Quản trị công" },
   "/projects": {
     title: "Gói / Công trường",
     description: "Quản lý project, worksite, phân công và roster theo cấu trúc mở rộng.",
@@ -256,7 +259,8 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/system-admin/appearance": { title: "Giao diện", description: "", module: "Trung tâm quản trị" },
   "/system-admin/navigation": { title: "Điều hướng", description: "", module: "Trung tâm quản trị" },
   "/system-admin/dashboard": { title: "Bố cục bản tin", description: "", module: "Trung tâm quản trị" },
-  "/system-admin/modules": { title: "Phân hệ", description: "", module: "Trung tâm quản trị" },
+  "/system-admin/modules": { title: "Khóa module", description: "", module: "Trung tâm quản trị" },
+  "/module-locked": { title: "Module tạm khóa", description: "", module: "Hệ thống" },
   "/system-admin/organization": { title: "Tổ chức", description: "", module: "Trung tâm quản trị" },
   "/system-admin/payslip-template": { title: "Mẫu phiếu lương", description: "", module: "Trung tâm quản trị" },
   "/system-admin/localization": { title: "Định dạng & thời gian", description: "", module: "Trung tâm quản trị" },
@@ -291,6 +295,7 @@ const projectSectionLabels: Record<string, string> = {
   today: "Hôm nay",
   progress: "Thi công",
   team: "Nhân lực",
+  materials: "Vật tư",
   profile: "Thông tin",
   documents: "Tài liệu"
 };
@@ -303,6 +308,12 @@ export function getRouteMeta(pathname: string): RouteMeta {
   const exact = routeMetaByPath[pathname];
   if (exact) {
     return exact;
+  }
+
+  const workerSession = pathname.match(/^\/worker-attendance\/sessions\/[^/]+(?:\/(roster|photos|review))?$/);
+  if (workerSession) {
+    const stepTitles: Record<string, string> = { roster: "Điểm danh công nhân", photos: "Ảnh điểm danh", review: "Xác nhận điểm danh" };
+    return { title: stepTitles[workerSession[1]] ?? "Chi tiết điểm danh", description: "", module: "Gói / Công trường" };
   }
 
   const approvalCaseMatch = pathname.match(/^\/approvals\/([^/]+)$/);
@@ -331,6 +342,10 @@ export function getRouteMeta(pathname: string): RouteMeta {
     }
     const contractMatch = pathname.match(/^\/import-export\/contracts\/(new|[^/]+)$/);
     if (contractMatch) return { title: contractMatch[1] === "new" ? "Tạo hợp đồng mua hàng" : "Hợp đồng mua hàng", description: "", module: "Xuất nhập khẩu" };
+    const personalPayslipMatch = pathname.match(/^\/personal\/payslips\/([^/]+)$/);
+    if (personalPayslipMatch) return { title: "Chi tiết phiếu lương", description: "", module: "Cá nhân" };
+    const employeePayrollMatch = pathname.match(/^\/accounting\/payroll\/([^/]+)\/employees\/([^/]+)$/);
+    if (employeePayrollMatch) return { title: "Phiếu lương nhân viên", description: "", module: "Kế toán" };
     const payrollMatch = pathname.match(/^\/accounting\/payroll\/([^/]+)$/);
     if (payrollMatch) return { title: "Chi tiết bảng lương", description: "", module: "Kế toán" };
   }
@@ -354,8 +369,8 @@ export function getRouteMeta(pathname: string): RouteMeta {
   if (projectMatch) {
     const section = projectSectionLabels[projectMatch[2]] ?? "Chi tiết";
     return {
-      title: `Gói ${projectMatch[1]} · ${section}`,
-      description: "Route-backed tab cho dự án/công trường.",
+      title: projectMatch[2] === "materials" ? "Vật tư công trường" : section,
+      description: "",
       module: "Gói / Công trường"
     };
   }
@@ -395,7 +410,7 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (projectMatch) {
     return [
       { label: "Gói / Công trường", href: "/projects" },
-      { label: projectMatch[1], href: `/projects/${projectMatch[1]}/today` },
+      { label: /^[0-9a-f-]{36}$/i.test(projectMatch[1]) ? "Công trường" : projectMatch[1], href: `/projects/${projectMatch[1]}/today` },
       { label: projectSectionLabels[projectMatch[2]] ?? "Chi tiết" }
     ];
   }
@@ -410,6 +425,13 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
 export function getBackHref(pathname: string): string | null {
   if (pathname === "/attendance/quick") return "/personal";
+  const workerSession = pathname.match(/^\/worker-attendance\/sessions\/([^/]+)(?:\/(roster|photos|review))?$/);
+  if (workerSession) {
+    const [, id, step] = workerSession;
+    if (step === "review") return `/worker-attendance/sessions/${id}/photos`;
+    if (step === "photos") return `/worker-attendance/sessions/${id}/roster`;
+    return step === "roster" ? "/worker-attendance/today" : "/worker-attendance";
+  }
   const functionRoutes = new Set([
     ...desktopNavigation.flatMap((group) => group.items.map((item) => item.href)),
     ...mobileNavigation.map((item) => item.href),

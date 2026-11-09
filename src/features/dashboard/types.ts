@@ -1,4 +1,5 @@
 import type { Permission } from "@/lib/auth/permissions";
+import type { NavigationIcon } from "@/config/navigation";
 
 export const dashboardProfileKeys = [
   "management",
@@ -76,6 +77,8 @@ export interface DashboardItem {
   type: string;
   title: string;
   context?: string;
+  reference?: string;
+  ageHours?: number;
   priority?: AttentionPriority;
   dueOrAge?: string;
   href: string;
@@ -89,19 +92,30 @@ export interface DashboardAction {
   requiredPermission: Permission;
 }
 
+export interface DashboardShortcut {
+  key: string;
+  label: string;
+  href: string;
+  icon: NavigationIcon;
+}
+
 export interface DashboardChartSeries {
   label: string;
   value: number;
+  href?: string;
   tone?: keyof typeof import("@/config/dataVisualization").semanticChartColors;
 }
 
 export interface DashboardChart {
+  layout?: "horizontal";
   key: string;
   title: string;
   series: DashboardChartSeries[];
   kind?: "bar" | "line" | "donut";
   unit?: string;
   maxValue?: number;
+  context?: string;
+  emptyLabel?: string;
 }
 
 export interface DashboardWidgetData {
@@ -121,6 +135,7 @@ export interface DashboardWidgetResult {
 }
 
 export interface DashboardReadModel {
+  shortcuts?: DashboardShortcut[];
   profile: DashboardProfileKey;
   profileLabel: string;
   generatedAt: string;

@@ -7,6 +7,7 @@ import { Button } from "@/components/shared/Button";
 import { DatePicker, Input } from "@/components/shared/FormControls";
 import { Drawer } from "@/components/shared/Overlays";
 import type { EmployeeSensitiveAllowedView } from "@/features/employees/types";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 export function EmployeeSensitiveEdit({ employeeId, profile }: { employeeId: string; profile: EmployeeSensitiveAllowedView }) {
   const router = useRouter();
@@ -42,7 +43,8 @@ export function EmployeeSensitiveEdit({ employeeId, profile }: { employeeId: str
     <>
       <Button onClick={() => setOpen(true)} size="sm">Chỉnh sửa</Button>
       <Drawer open={open} title="Thông tin nhạy cảm" onClose={() => setOpen(false)}>
-        <form className="overlay-form" onSubmit={handleSubmit}>
+        <SectionedForm className="" onSubmit={handleSubmit}>
+<FormFields>
           {error ? <div className="form-alert form-alert--error">{error}</div> : null}
           <Input defaultValue={profile.nationalIdNumber} label="Số CCCD/CMND" name="nationalIdNumber" inputMode="numeric" />
           <DatePicker defaultValue={profile.nationalIdIssuedDate} label="Ngày cấp" name="nationalIdIssuedDate" />
@@ -55,11 +57,12 @@ export function EmployeeSensitiveEdit({ employeeId, profile }: { employeeId: str
           <Input defaultValue={profile.personalTaxCode} label="Mã số thuế" name="personalTaxCode" />
           <Input defaultValue={profile.socialInsuranceCode} label="Mã BHXH" name="socialInsuranceCode" />
           <Input label="Lý do thay đổi" name="reason" required />
-          <footer>
+          </FormFields>
+<FormActions>
             <Button onClick={() => setOpen(false)}>Hủy</Button>
-            <Button disabled={submitting} type="submit" variant="primary">{submitting ? "Đang lưu" : "Lưu"}</Button>
-          </footer>
-        </form>
+            <Button disabled={submitting} type="submit" variant="primary" busy={submitting}>{"Lưu"}</Button>
+          </FormActions>
+        </SectionedForm>
       </Drawer>
     </>
   );

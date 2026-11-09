@@ -1,53 +1,85 @@
 "use client";
 
 /* eslint-disable react-hooks/set-state-in-effect -- chat state is reconciled with the API and realtime feed. */
-import { ChevronDown, MessageCircle, Paperclip, Send, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ExternalLink, LoaderCircle, MessageCircle, Search, Send, Users, X } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { Button, IconButton } from "@/components/shared/Button";
 import { ImageUploader } from "@/components/shared/ImageUploader";
 import { getAuthenticatedSupabaseRealtimeClient } from "@/lib/supabase/client";
+import { ChatTranscript } from "./ChatTranscript";
 import type { ChatMessage, ConversationSummary } from "./types";
+import styles from "./ChatDock.module.css";
 
-const when = (value: string) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value));
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(-2).map((part) => part[0]).join("").toLocaleUpperCase("vi-VN") || "CT";
+}
+
+function lastActivity(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+  return new Intl.DateTimeFormat("vi-VN", day.format(date) === day.format(new Date())
+    ? { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }
+    : { day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }).format(date);
+}
 
 export function ChatDock({ initiallyOpen = false }: { initiallyOpen?: boolean } = {}) {
   const bottom = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLElement>(null);
   const composer = useRef<HTMLFormElement>(null);
+  const activeConversation = useRef<string | undefined>(undefined);
+  const drafts = useRef(new Map<string, { body: string; file?: File }>());
   const [open, setOpen] = useState(initiallyOpen);
   const [minimized, setMinimized] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selfId, setSelfId] = useState("");
+  const [search, setSearch] = useState("");
+  const [draftText, setDraftText] = useState("");
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File>();
   const [attachmentError, setAttachmentError] = useState("");
   const unread = conversations.reduce((sum, item) => sum + item.unreadCount, 0);
   const active = conversations.find((item) => item.id === activeId);
+  const visibleConversations = conversations.filter((item) => item.title.toLocaleLowerCase("vi-VN").includes(search.trim().toLocaleLowerCase("vi-VN")));
 
   const loadConversations = useCallback(async () => {
     const response = await fetch("/api/v1/chat/conversations", { cache: "no-store" });
     const body = await response.json();
-    if (!response.ok) throw new Error(body.error?.message);
+    if (!response.ok) throw new Error(body.error?.message ?? "Không thể tải hội thoại.");
     setConversations(body.data ?? []);
   }, []);
   const loadMessages = useCallback(async () => {
-    if (!activeId) { setMessages([]); return; }
+    if (!activeId) return;
     const response = await fetch(`/api/v1/chat/conversations/${activeId}/messages`, { cache: "no-store" });
     const body = await response.json();
-    if (!response.ok) throw new Error(body.error?.message);
+    if (!response.ok) throw new Error(body.error?.message ?? "Không thể tải tin nhắn.");
+    if (activeConversation.current !== activeId) return;
     setMessages(body.data.items ?? []);
     setSelfId(body.data.selfAccountId ?? "");
     await fetch(`/api/v1/chat/conversations/${activeId}/read`, { method: "POST" });
     await loadConversations();
-    queueMicrotask(() => bottom.current?.scrollIntoView());
   }, [activeId, loadConversations]);
 
-  useEffect(() => { if (open && !activeId) void loadConversations().catch(() => undefined); }, [activeId, loadConversations, open]);
-  useEffect(() => { if (open && activeId) void loadMessages().catch((reason) => setError(reason.message)); }, [activeId, loadMessages, open]);
+  useEffect(() => {
+    if (!open) return;
+    let disposed = false;
+    setLoading(true);
+    setError("");
+    const load = activeId ? loadMessages() : loadConversations();
+    void load.catch((reason: unknown) => {
+      if (!disposed) setError(reason instanceof Error ? reason.message : "Không thể tải tin nhắn.");
+    }).finally(() => { if (!disposed) setLoading(false); });
+    return () => { disposed = true; };
+  }, [activeId, loadConversations, loadMessages, open]);
+  useEffect(() => {
+    if (open && !minimized && !loading && activeId) bottom.current?.scrollIntoView({ block: "nearest" });
+  }, [activeId, loading, messages, minimized, open]);
   useEffect(() => {
     if (!open) return;
     const closeOutside = (event: PointerEvent) => {
@@ -64,15 +96,33 @@ export function ChatDock({ initiallyOpen = false }: { initiallyOpen?: boolean } 
     let cleanup = () => {};
     void getAuthenticatedSupabaseRealtimeClient().then((client) => {
       if (!client || disposed) return;
+      const refresh = () => {
+        const load = activeId ? loadMessages() : loadConversations();
+        void load.catch((reason: unknown) => { if (!disposed) setError(reason instanceof Error ? reason.message : "Không thể cập nhật tin nhắn."); });
+      };
       const channel = client.channel("global-chat-dock").on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        if (activeId && (payload.new as { conversation_id?: string }).conversation_id === activeId) void loadMessages();
-        else void loadConversations();
+        if (activeId && (payload.new as { conversation_id?: string }).conversation_id === activeId) refresh();
+        else void loadConversations().catch(() => undefined);
       }).subscribe();
       cleanup = () => { void client.removeChannel(channel); };
       if (disposed) cleanup();
-    });
+    }).catch(() => undefined);
     return () => { disposed = true; cleanup(); };
   }, [activeId, loadConversations, loadMessages, open]);
+
+  function selectConversation(id?: string) {
+    if (sending) return;
+    if (activeId) drafts.current.set(activeId, { body: draftText, file: attachmentFile });
+    const draft = id ? drafts.current.get(id) : undefined;
+    activeConversation.current = id;
+    setActiveId(id);
+    setMessages([]);
+    setSelfId("");
+    setDraftText(draft?.body ?? "");
+    setAttachmentFile(draft?.file);
+    setAttachmentError("");
+    setError("");
+  }
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,6 +142,8 @@ export function ChatDock({ initiallyOpen = false }: { initiallyOpen?: boolean } 
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message);
       formElement.reset();
+      drafts.current.delete(activeId);
+      setDraftText("");
       setAttachmentFile(undefined);
       await loadMessages();
     } catch (reason) {
@@ -102,6 +154,41 @@ export function ChatDock({ initiallyOpen = false }: { initiallyOpen?: boolean } 
       setSending(false);
     }
   }
-  if (!open) return <button aria-label="Mở chat" className="chat-dock-launcher" onClick={() => { setOpen(true); setMinimized(false); }}><MessageCircle size={21}/></button>;
-  return <aside aria-label="Chat nội bộ" className={`chat-dock${minimized ? " is-minimized" : ""}`} ref={dockRef}><header><button onClick={() => setMinimized(false)}><MessageCircle size={18}/><strong>{active?.title ?? "Tin nhắn"}</strong>{unread ? <span>{unread}</span> : null}</button><IconButton label={minimized ? "Mở rộng" : "Thu nhỏ"} onClick={() => setMinimized((value) => !value)}><ChevronDown size={17}/></IconButton><IconButton label="Đóng chat" onClick={() => setOpen(false)}><X size={17}/></IconButton></header>{!minimized ? <>{activeId ? <><div className="chat-dock__messages">{messages.map((item) => <article className={item.senderAccountId === selfId ? "is-own" : ""} key={item.id}><p>{item.body}</p>{item.metadata?.payslipId?<a className="message-payslip" href={`/accounting/payslips/${item.metadata.payslipId}`}><span>Phiếu lương {item.metadata.payslipPeriod??""}</span><strong>Xem · Tải PDF</strong></a>:null}{item.attachments.map((attachment) => <a href={`/api/v1/chat/conversations/${activeId}/attachments/${attachment.id}`} key={attachment.id} rel="noreferrer" target="_blank"><Paperclip size={13}/>{attachment.fileName}</a>)}<time>{when(item.createdAt)}</time></article>)}<div ref={bottom}/></div><form className="chat-dock__composer" onSubmit={send} ref={composer}><input aria-label="Tin nhắn" className="input" name="body" placeholder="Nhập tin nhắn" required/><ImageUploader accept="image/jpeg,image/png,image/webp,application/pdf" compact error={attachmentError} file={attachmentFile} label="Tệp" onFileChange={(file)=>{setAttachmentFile(file);setAttachmentError("");}} onRetry={()=>composer.current?.requestSubmit()} uploading={sending&&Boolean(attachmentFile)}/><Button aria-label="Gửi" disabled={sending} size="sm" type="submit" variant="primary"><Send size={16}/></Button></form></> : <div className="chat-dock__conversations">{conversations.map((item) => <button key={item.id} onClick={() => setActiveId(item.id)}><span><strong>{item.title}</strong><small>{item.lastMessage?.body ?? "Chưa có tin nhắn"}</small></span>{item.unreadCount ? <b>{item.unreadCount}</b> : null}</button>)}{conversations.length === 0 ? <p>Chưa có hội thoại.</p> : null}</div>}{error ? <p className="chat-dock__error">{error}</p> : null}</> : null}</aside>;
+
+  if (!open) return <button aria-label={unread ? `Mở tin nhắn, ${unread} tin chưa đọc` : "Mở tin nhắn"} className={`chat-dock-launcher ${styles.launcher}`} onClick={() => { setOpen(true); setMinimized(false); }} type="button"><MessageCircle aria-hidden="true" size={22} />{unread ? <span>{unread > 99 ? "99+" : unread}</span> : null}</button>;
+
+  return (
+    <aside aria-label="Tin nhắn nội bộ" className={`chat-dock ${styles.dock}${minimized ? ` is-minimized ${styles.minimized}` : ""}`} ref={dockRef}>
+      <header className={styles.header}>
+        {activeId && !minimized ? <IconButton className={styles.iconControl} disabled={sending} label="Danh sách hội thoại" onClick={() => selectConversation()}><ArrowLeft size={19} /></IconButton> : null}
+        <button className={styles.identity} onClick={() => setMinimized(false)} type="button">
+          <span aria-hidden="true" className={`${styles.avatar} ${active?.type === "group" ? styles.groupAvatar : ""}`}>{active ? active.type === "group" ? <Users size={19} /> : initials(active.title) : <MessageCircle size={21} />}</span>
+          <span className={styles.heading}><strong>{active?.title ?? "Tin nhắn"}</strong><small>{active ? active.type === "group" ? `${active.members.length} thành viên` : "Hội thoại riêng" : unread ? `${unread} tin chưa đọc` : "Hộp thư nội bộ"}</small></span>
+        </button>
+        <Link aria-label="Mở trang tin nhắn" className={styles.iconControl} href={activeId ? `/messages/${activeId}` : "/messages"} onClick={() => setOpen(false)} title="Mở trang tin nhắn"><ExternalLink aria-hidden="true" size={17} /></Link>
+        <IconButton aria-expanded={!minimized} className={`${styles.iconControl} ${minimized ? styles.expandControl : ""}`} label={minimized ? "Mở rộng" : "Thu nhỏ"} onClick={() => setMinimized((value) => !value)}><ChevronDown size={19} /></IconButton>
+        <IconButton className={styles.iconControl} label="Đóng tin nhắn" onClick={() => setOpen(false)}><X size={18} /></IconButton>
+      </header>
+      {!minimized ? <>
+        {activeId ? <>
+          {loading && messages.length === 0 ? <div aria-live="polite" className={styles.loading}><LoaderCircle aria-hidden="true" size={23} /><span>Đang tải tin nhắn…</span></div> : <ChatTranscript bottomRef={bottom} className={styles.transcript} compact conversationId={activeId} messages={messages} selfId={selfId} />}
+          <form className={styles.composer} onSubmit={send} ref={composer}>
+            <ImageUploader accept="image/jpeg,image/png,image/webp,application/pdf" className={styles.uploader} compact disabled={sending} error={attachmentError} file={attachmentFile} label="Đính kèm tệp" onFileChange={(file) => { setAttachmentFile(file); setAttachmentError(""); }} onRetry={() => composer.current?.requestSubmit()} uploading={sending && Boolean(attachmentFile)} />
+            <input aria-label="Tin nhắn" autoComplete="off" className={styles.messageInput} disabled={sending} name="body" onChange={(event) => setDraftText(event.target.value)} placeholder="Nhập tin nhắn…" required value={draftText} />
+            <Button aria-label={sending ? "Đang gửi tin nhắn" : "Gửi tin nhắn"} busy={sending} className={styles.sendButton} size="sm" type="submit" variant="primary">{sending ? <LoaderCircle aria-hidden="true" size={18} /> : <Send aria-hidden="true" size={18} />}</Button>
+          </form>
+        </> : <>
+          <div className={styles.search}><Search aria-hidden="true" size={17} /><input aria-label="Tìm hội thoại" onChange={(event) => setSearch(event.target.value)} placeholder="Tìm hội thoại" value={search} />{search ? <button aria-label="Xóa tìm kiếm" onClick={() => setSearch("")} type="button"><X aria-hidden="true" size={15} /></button> : null}</div>
+          <div aria-busy={loading} className={styles.conversations}>
+            {loading && conversations.length === 0 ? <div className={styles.loading}><LoaderCircle aria-hidden="true" size={23} /><span>Đang tải hội thoại…</span></div> : visibleConversations.map((item) => <button className={`${styles.conversation} ${item.unreadCount ? styles.unreadConversation : ""}`} key={item.id} onClick={() => selectConversation(item.id)} type="button">
+              <span aria-hidden="true" className={`${styles.avatar} ${item.type === "group" ? styles.groupAvatar : ""}`}>{item.type === "group" ? <Users size={20} /> : initials(item.title)}</span>
+              <span className={styles.conversationBody}><span className={styles.conversationTop}><strong>{item.title}</strong><time dateTime={item.lastMessage?.createdAt ?? item.updatedAt}>{lastActivity(item.lastMessage?.createdAt ?? item.updatedAt)}</time></span><span className={styles.conversationBottom}><small>{item.lastMessage?.body ?? "Chưa có tin nhắn"}</small>{item.unreadCount ? <b aria-label={`${item.unreadCount} tin chưa đọc`}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</b> : null}</span></span>
+            </button>)}
+            {!loading && visibleConversations.length === 0 ? <div className={styles.empty}><MessageCircle aria-hidden="true" size={30} /><strong>{search ? "Không có hội thoại phù hợp" : "Chưa có hội thoại"}</strong><Link href="/messages" onClick={() => setOpen(false)}>Mở trang tin nhắn</Link></div> : null}
+          </div>
+        </>}
+        {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      </> : null}
+    </aside>
+  );
 }

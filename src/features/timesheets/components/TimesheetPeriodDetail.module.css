@@ -1,0 +1,28 @@
+.page { gap: var(--space-4); }
+.warning { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); border: 1px solid color-mix(in srgb,var(--warning) 22%,var(--surface)); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); background: var(--warning-soft); color: var(--warning); font-size: var(--font-meta); }
+.warning a { margin-left: auto; color: inherit; font-weight: 600; }
+.reconciliation { min-width: 0; overflow: hidden; border: 1px solid color-mix(in srgb,var(--warning) 22%,var(--surface)); border-radius: var(--radius-control); background: var(--warning-soft); }
+.reconciliation > summary { display: flex; min-width: 0; min-height: 46px; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); color: var(--warning); font-size: var(--font-meta); list-style: none; cursor: pointer; }
+.reconciliation > summary::-webkit-details-marker { display: none; }
+.reconciliation > summary > span { min-width: 0; flex: 1; }
+.reconciliation > summary > svg { flex: 0 0 18px; }
+.reconciliation[open] > summary > svg:last-child { transform: rotate(180deg); }
+.reconciliation ul { max-height: 240px; overflow: auto; margin: 0; border-top: 1px solid var(--border-subtle); padding: 0; background: var(--surface); list-style: none; }
+.reconciliation li a { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-3); border-bottom: 1px solid var(--border-subtle); padding: var(--space-3) var(--space-4); color: var(--text-primary); font-size: var(--font-meta); text-decoration: none; }
+.reconciliation li a > span:last-child { display: flex; align-items: center; gap: var(--space-2); color: var(--warning); }
+.tabsBar { border-bottom: 1px solid var(--border-subtle); padding-inline: var(--space-4); }
+.tabsBar :global(.context-tabs) { border: 0; }
+.exportPanel { justify-self: end; width: max-content; max-width: 100%; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface); }
+.exportPanel > summary { display: flex; min-height: 36px; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text-secondary); font-size: var(--font-meta); list-style: none; cursor: pointer; }
+.exportPanel > summary::-webkit-details-marker { display: none; }
+.exportPanel > div { display: flex; min-width: 0; align-items: end; flex-wrap: wrap; gap: var(--space-3); border-top: 1px solid var(--border-subtle); padding: var(--space-4); }
+.exportPanel > div > :global(.field) { width: 240px; max-width: 100%; }
+.page summary:focus-visible, .page a:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+@media (max-width: 767px) {
+  .tabsBar { padding-inline: var(--space-2); }
+  .exportPanel { width: 100%; }
+  .exportPanel > summary { min-height: 44px; }
+  .exportPanel > div > :global(.field) { width: 100%; }
+  .exportPanel > div > :global(.button) { width: 100%; min-height: 44px; }
+  .reconciliation li a { align-items: start; flex-wrap: wrap; gap: var(--space-1); }
+}

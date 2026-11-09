@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { Archive, FileUp, Plus } from "lucide-react";
+import { Archive, FileUp, Pencil, Plus } from "lucide-react";
 
 import { Button } from "@/components/shared/Button";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -13,6 +13,9 @@ import { DataSurface } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { EmployeeContract } from "@/features/employees/types";
 import { buildInternalFileUrl } from "@/services/storage/storageService";
+import styles from "./EmployeeContractManager.module.css";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
+import { FileUpload } from "@/components/shared/Uploads";
 
 const statusLabels = { draft: "Nháp", active: "Đang hiệu lực", expired: "Hết hạn", terminated: "Đã chấm dứt" } as const;
 const date = (value?: string) => value ? new Intl.DateTimeFormat("vi-VN").format(new Date(`${value}T00:00:00`)) : "—";
@@ -25,10 +28,14 @@ export function EmployeeContractManager({ employeeId, initialContracts, canEdit,
   const [error, setError] = useState("");
   const [templates,setTemplates]=useState<ContractTemplateOption[]>([]);
   const [fileHistory, setFileHistory] = useState<EmployeeContract>();
+  const [editing, setEditing] = useState<EmployeeContract>();
+  const [archiving, setArchiving] = useState<EmployeeContract>();
+  const [archiveReason, setArchiveReason] = useState("");
+  const mutation = useRef(false);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   async function reload() {
-    const response = await fetch(`/api/v1/employees/${employeeId}/contracts`, { cache: "no-store" });
+    const response = await fetch(`/api/v1/employees/${employeeId}/contracts`, { cache: "no-store", signal: AbortSignal.timeout(30_000) });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error?.message ?? "Không thể đọc lịch sử hợp đồng.");
     const rows = body.data?.contracts ?? [];
@@ -48,36 +55,43 @@ export function EmployeeContractManager({ employeeId, initialContracts, canEdit,
   }
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); if (mutation.current) return; mutation.current = true; setBusy(true); setError("");
     const formElement = event.currentTarget;
-    const response = await fetch(`/api/v1/employees/${employeeId}/contracts`, { method: "POST", body: new FormData(formElement) });
-    const body = await response.json(); setBusy(false);
-    if (!response.ok) { setError(body.error?.message ?? "Không thể tạo hợp đồng."); return; }
-    setOpen(false); formElement.reset(); await reload();
+    try {
+      const response = await fetch(`/api/v1/employees/${employeeId}/contracts${editing ? `/${editing.id}` : ""}`, { method: editing ? "PATCH" : "POST", body: new FormData(formElement), signal: AbortSignal.timeout(30_000) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error?.message ?? "Không thể lưu hợp đồng.");
+      setOpen(false); setEditing(undefined); formElement.reset(); await reload();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể kết nối. Vui lòng thử lại."); }
+    finally { mutation.current = false; setBusy(false); }
   }
 
   async function replaceFile(contract: EmployeeContract, file?: File) {
-    if (!file) return; setBusy(true); setError("");
+    if (!file || mutation.current) return; mutation.current = true; setBusy(true); setError("");
     const form = new FormData();
-    form.set("contractNumber", contract.contractNumber); form.set("contractType", contract.contractType); form.set("effectiveDate", contract.effectiveDate ?? contract.startDate); form.set("status", contract.status); form.set("file", file);
-    if (contract.signedDate) form.set("signedDate", contract.signedDate); if (contract.endDate) form.set("endDate", contract.endDate); if (contract.note) form.set("note", contract.note);
-    const response = await fetch(`/api/v1/employees/${employeeId}/contracts/${contract.id}`, { method: "PATCH", body: form });
-    const body = await response.json(); setBusy(false);
-    if (!response.ok) { setError(body.error?.message ?? "Không thể thay file hợp đồng."); return; }
-    await reload();
+    form.set("fileOnly", "true"); form.set("rowVersion", String(contract.rowVersion ?? 1)); form.set("file", file);
+    try {
+      const response = await fetch(`/api/v1/employees/${employeeId}/contracts/${contract.id}`, { method: "PATCH", body: form, signal: AbortSignal.timeout(30_000) });
+      const body = await response.json(); if (!response.ok) throw new Error(body.error?.message ?? "Không thể thay file hợp đồng.");
+      await reload();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể kết nối. Vui lòng thử lại."); }
+    finally { mutation.current = false; setBusy(false); const input = fileInputs.current[contract.id]; if (input) input.value = ""; }
   }
 
-  async function archive(contract: EmployeeContract) {
-    const reason = window.prompt("Lý do lưu trữ hợp đồng"); if (!reason) return;
-    setBusy(true); setError("");
-    const response = await fetch(`/api/v1/employees/${employeeId}/contracts/${contract.id}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }) });
-    const body = await response.json(); setBusy(false);
-    if (!response.ok) { setError(body.error?.message ?? "Không thể lưu trữ hợp đồng."); return; }
-    await reload();
+  async function archive(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!archiving || mutation.current) return;
+    if (archiveReason.trim().length < 3) { setError("Cần nhập lý do ít nhất 3 ký tự."); return; }
+    mutation.current = true; setBusy(true); setError("");
+    try {
+      const response = await fetch(`/api/v1/employees/${employeeId}/contracts/${archiving.id}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason: archiveReason.trim(), rowVersion: archiving.rowVersion ?? 1 }), signal: AbortSignal.timeout(30_000) });
+      const body = await response.json(); if (!response.ok) throw new Error(body.error?.message ?? "Không thể lưu trữ hợp đồng.");
+      setArchiving(undefined); await reload();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể kết nối. Vui lòng thử lại."); }
+    finally { mutation.current = false; setBusy(false); }
   }
 
   const columns: DataTableColumn<EmployeeContract>[] = [
-    { id: "number", header: "Số hợp đồng", accessor: "contractNumber" },
+    { id: "number", header: "Số hợp đồng", accessor: "contractNumber", priority: "primary" },
     { id: "type", header: "Loại", accessor: "contractType" },
     { id: "signed", header: "Ngày ký", cell: (item) => date(item.signedDate), hiddenOnMobile: true },
     { id: "effective", header: "Hiệu lực", cell: (item) => date(item.effectiveDate ?? item.startDate) },
@@ -86,17 +100,29 @@ export function EmployeeContractManager({ employeeId, initialContracts, canEdit,
     { id: "file", header: "Tài liệu", cell: (item) => item.attachmentFileId && canViewFile ? <Link className="private-file-link" href={buildInternalFileUrl(item.attachmentFileId)}>{item.attachmentMimeType?.includes("wordprocessingml")?"Tải file Word":"Xem tài liệu"}</Link> : "—" }
   ];
 
+  const renderActions = (contract: EmployeeContract) => {
+    const canArchive = canEdit && !contract.archivedAt;
+    const canReadHistory = canViewFile && Boolean(contract.attachmentFileId);
+    if (!canUpload && !canArchive && !canReadHistory) return "—";
+    return <><input accept="application/pdf" hidden onChange={(event)=>void replaceFile(contract,event.target.files?.[0])} ref={(node)=>{fileInputs.current[contract.id]=node;}} type="file"/><DropdownMenu label={`Thao tác hợp đồng ${contract.contractNumber}`} mobileTriggerLabel="Thao tác">{canReadHistory?<button onClick={()=>void showFileHistory(contract)} type="button">Lịch sử file</button>:null}{canEdit&&!contract.archivedAt?<button disabled={busy} onClick={()=>{setEditing(contract);setError("");setOpen(true);}} type="button"><Pencil aria-hidden="true" size={14}/>Sửa hợp đồng</button>:null}{canUpload&&!contract.archivedAt?<button disabled={busy} onClick={()=>fileInputs.current[contract.id]?.click()} type="button"><FileUp aria-hidden="true" size={14}/>{contract.attachmentFileId?"Thay file":"Tải file"}</button>:null}{canArchive?<button disabled={busy} onClick={()=>{setArchiving(contract);setArchiveReason("");setError("");}} type="button"><Archive aria-hidden="true" size={14}/>Lưu trữ</button>:null}</DropdownMenu></>;
+  };
+
   return <>
-    <DataSurface>
-      <div className="data-surface__toolbar panel-header"><h2>Hợp đồng lao động</h2>{canEdit ? <Button leftIcon={<Plus size={15}/>} onClick={()=>{void reload().then(()=>setOpen(true)).catch(reason=>setError(reason instanceof Error?reason.message:"Không thể tải mẫu Word."));}} size="sm" variant="primary">Thêm hợp đồng</Button> : null}</div>
-      {error ? <p className="form-error">{error}</p> : null}
-      <DataTable actions={(contract)=><><input accept="application/pdf" hidden onChange={(event)=>void replaceFile(contract,event.target.files?.[0])} ref={(node)=>{fileInputs.current[contract.id]=node;}} type="file"/><DropdownMenu label={`Thao tác hợp đồng ${contract.contractNumber}`}>{canViewFile&&contract.attachmentFileId?<button onClick={()=>void showFileHistory(contract)} type="button">Lịch sử file</button>:null}{canUpload?<button disabled={busy} onClick={()=>fileInputs.current[contract.id]?.click()} type="button"><FileUp size={14}/>{contract.attachmentFileId?"Thay file":"Tải file"}</button>:null}{canEdit&&!contract.archivedAt?<button disabled={busy} onClick={()=>void archive(contract)} type="button"><Archive size={14}/>Lưu trữ</button>:null}</DropdownMenu></>} columns={columns} data={contracts} emptyDescription="" emptyTitle="Chưa có hợp đồng" getRowId={(contract)=>contract.id}/>
+    <DataSurface className={styles.surface}>
+      <div className="data-surface__toolbar panel-header"><h2>Hợp đồng lao động</h2>{canEdit ? <Button disabled={busy} leftIcon={<Plus size={15}/>} onClick={()=>{setEditing(undefined);setError("");void reload().then(()=>setOpen(true)).catch(reason=>setError(reason instanceof Error?reason.message:"Không thể tải hợp đồng."));}} size="sm" variant="primary">Thêm hợp đồng</Button> : null}</div>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      <DataTable ariaLabel="Hợp đồng lao động" actions={canEdit || canUpload || canViewFile ? renderActions : undefined} columns={columns} data={contracts} emptyDescription="" emptyTitle="Chưa có hợp đồng" getRowId={(contract)=>contract.id}/>
     </DataSurface>
     <Drawer onClose={()=>setFileHistory(undefined)} open={Boolean(fileHistory)} title={`Lịch sử file · ${fileHistory?.contractNumber??""}`}>
-      <ul className="warehouse-simple-list">{(fileHistory?.fileVersions??[]).map((version,index)=><li key={version.fileId}><Link className="private-file-link" href={buildInternalFileUrl(version.fileId)} target="_blank">{version.fileName}</Link><span>{index===0?"Hiện tại · ":"Bản trước · "}{new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short",timeZone:"Asia/Ho_Chi_Minh"}).format(new Date(version.uploadedAt))}</span></li>)}</ul>
+      <ul className={`warehouse-simple-list ${styles.history}`}>{(fileHistory?.fileVersions??[]).map((version)=><li key={version.fileId}><Link className="private-file-link" href={buildInternalFileUrl(version.fileId)} target="_blank">{version.fileName}</Link><span>{version.fileId===fileHistory?.attachmentFileId?"Hiện tại · ":"Bản trước · "}{new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short",timeZone:"Asia/Ho_Chi_Minh"}).format(new Date(version.uploadedAt))}</span></li>)}{!fileHistory?.fileVersions?.length?<li>Chưa có lịch sử file</li>:null}</ul>
     </Drawer>
-    <Drawer onClose={()=>setOpen(false)} open={open} title="Thêm hợp đồng lao động"><form className="overlay-form" onSubmit={create}>
-      <Input label="Số hợp đồng" name="contractNumber" required/><Input label="Loại hợp đồng" name="contractType" required/><DatePicker label="Ngày ký" name="signedDate"/><DatePicker label="Ngày hiệu lực" name="effectiveDate" required/><DatePicker label="Ngày hết hạn" name="endDate"/><Select label="Trạng thái" name="status" options={Object.entries(statusLabels).map(([value,label])=>({value,label}))}/>{canUpload&&templates.length?<Select label="Mẫu Word" name="templateId" options={templates.map(template=>({value:template.id,label:template.name}))} placeholder="Chọn mẫu Word"/>:null}{canUpload?<label><span>File hợp đồng PDF</span><input accept="application/pdf" className="input" name="file" type="file"/></label>:null}<Textarea label="Ghi chú" name="note"/>{error?<p className="form-error">{error}</p>:null}<footer><Button onClick={()=>setOpen(false)}>Hủy</Button><Button disabled={busy} type="submit" variant="primary">{busy?"Đang lưu…":"Lưu hợp đồng"}</Button></footer>
-    </form></Drawer>
+    <Drawer onClose={()=>{if(!busy)setOpen(false);}} open={open} title={editing?"Sửa hợp đồng lao động":"Thêm hợp đồng lao động"}><SectionedForm className={`${styles.form}`} key={editing?.id??"new"} onSubmit={create}>
+<FormFields>
+      {editing?<input name="rowVersion" type="hidden" value={editing.rowVersion ?? 1}/>:null}<Input defaultValue={editing?.contractNumber} label="Số hợp đồng" name="contractNumber" required/><Input defaultValue={editing?.contractType} label="Loại hợp đồng" name="contractType" required/><DatePicker defaultValue={editing?.signedDate} label="Ngày ký" name="signedDate"/><DatePicker defaultValue={editing?.effectiveDate??editing?.startDate} label="Ngày hiệu lực" name="effectiveDate" required/><DatePicker defaultValue={editing?.endDate} label="Ngày hết hạn" name="endDate"/><Select defaultValue={editing?.status??"draft"} label="Trạng thái" name="status" options={Object.entries(statusLabels).map(([value,label])=>({value,label}))}/>{!editing&&canUpload&&templates.length?<Select label="Mẫu Word" name="templateId" options={templates.map(template=>({value:template.id,label:template.name}))} placeholder="Không dùng mẫu"/>:null}{canUpload?<FileUpload accept="application/pdf" label="File hợp đồng PDF" name="file" />:null}<div className={styles.fullWidth}><Textarea defaultValue={editing?.note} label="Ghi chú" name="note"/></div>{error?<p className="form-error" role="alert">{error}</p>:null}</FormFields>
+<FormActions><Button disabled={busy} onClick={()=>setOpen(false)}>Hủy</Button><Button disabled={busy} type="submit" variant="primary" busy={busy}>{editing?"Lưu thay đổi":"Lưu hợp đồng"}</Button></FormActions>
+    </SectionedForm></Drawer>
+    <Drawer onClose={()=>{if(!busy)setArchiving(undefined);}} open={Boolean(archiving)} title={`Lưu trữ · ${archiving?.contractNumber??""}`}><SectionedForm className={`${styles.archiveForm}`} onSubmit={archive}>
+<FormFields><Input label="Lý do lưu trữ" maxLength={500} minLength={3} onChange={(event)=>setArchiveReason(event.target.value)} required value={archiveReason}/>{error?<p className="form-error" role="alert">{error}</p>:null}</FormFields>
+<FormActions className="form-actions"><Button disabled={busy} onClick={()=>setArchiving(undefined)}>Hủy</Button><Button busy={busy} disabled={archiveReason.trim().length<3} type="submit" variant="danger">Lưu trữ hợp đồng</Button></FormActions></SectionedForm></Drawer>
   </>;
 }

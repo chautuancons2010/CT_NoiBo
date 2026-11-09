@@ -23,6 +23,8 @@ export interface LeaveRequest {
   calculatedDays: number; reason: string; status: LeaveRequestStatus; submittedAt?: string;
   approvedAt?: string; rejectedAt?: string; withdrawnAt?: string; cancelledAt?: string;
   version: number; createdAt: string; warnings: string[]; approvalSteps: LeaveApprovalStep[]; attachments: LeaveAttachment[];
+  availableActions?: { submit: boolean; edit: boolean; withdraw: boolean; cancel: boolean; approve: boolean; exportPdf: boolean };
+  workingDates?: string[];
 }
 
 export interface LeaveLedgerEntry {
@@ -33,7 +35,7 @@ export interface LeaveLedgerEntry {
 
 export interface LeaveBalance {
   employeeId: string; employeeCode: string; employeeName: string; departmentName: string; year: number;
-  leaveTypeId: string; leaveTypeName: string; granted: number; carryover: number; adjustments: number;
+  leaveTypeId: string; leaveTypeName: string; leaveTypeCode?: string; granted: number; carryover: number; adjustments: number;
   used: number; pending: number; officialRemaining: number; availableAfterPending: number;
 }
 

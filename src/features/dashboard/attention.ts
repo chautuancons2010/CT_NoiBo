@@ -15,6 +15,9 @@ export function sortAttention(items: DashboardItem[]): DashboardItem[] {
     const leftOverdue = /quá hạn/i.test(left.dueOrAge ?? "") ? 1 : 0;
     const rightOverdue = /quá hạn/i.test(right.dueOrAge ?? "") ? 1 : 0;
     if (leftOverdue !== rightOverdue) return rightOverdue - leftOverdue;
+    const leftAge = Number.isFinite(left.ageHours) ? Math.max(0, left.ageHours!) : 0;
+    const rightAge = Number.isFinite(right.ageHours) ? Math.max(0, right.ageHours!) : 0;
+    if (leftAge !== rightAge) return rightAge - leftAge;
     return left.title.localeCompare(right.title, "vi");
   });
 }

@@ -1,8 +1,10 @@
+import { assertSeedTarget } from "./testing/guard.mjs";
 import { createHash } from "node:crypto";
 import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 
 nextEnv.loadEnvConfig(process.cwd());
+await assertSeedTarget();
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;

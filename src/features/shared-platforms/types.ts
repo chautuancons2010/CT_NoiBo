@@ -32,6 +32,7 @@ export interface ApprovalCase {
   waitingHours: number;
   metadata: Record<string, unknown>;
   steps: ApprovalStep[];
+  availableActions?: { approve: boolean; reject: boolean; reassign: boolean };
 }
 
 export interface AppNotification {

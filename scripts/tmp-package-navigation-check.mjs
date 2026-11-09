@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import { chromium } from "playwright-core";
 
 const baseUrl = "http://localhost:3000";
@@ -12,7 +13,7 @@ try {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`${baseUrl}/login`, { waitUntil: "networkidle" });
     await page.locator('[name="username"]').fill("test.supervisor");
-    await page.locator('[name="password"]').fill("12345678");
+    await page.locator('[name="password"]').fill(getTestPassword());
     await Promise.all([
       page.waitForURL((url) => url.pathname !== "/login"),
       page.getByRole("button", { name: "Đăng nhập" }).click()

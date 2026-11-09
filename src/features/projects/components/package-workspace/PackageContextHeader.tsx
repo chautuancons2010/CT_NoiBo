@@ -1,13 +1,18 @@
-"use client";
+﻿"use client";
 
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, MapPin, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
+import { Button } from "@/components/shared/Button";
 import { Select } from "@/components/shared/FormControls";
-import { EntityContextHeader } from "@/components/shared/PageHeader";
+import { Drawer } from "@/components/shared/Overlays";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { EntityContextHeader } from "@/components/shared/PageHeader";
 import type { ProjectDetail, ProjectStatus } from "@/features/projects/types/projectTypes";
 import { formatBusinessDate } from "@/lib/time/timezone";
 
+import { WorksiteEditor } from "../WorksiteEditor";
 import styles from "./PackageWorkspace.module.css";
 
 const statusMap: Record<ProjectStatus, { label: string; tone: "info" | "success" | "warning" | "neutral" }> = {
@@ -21,7 +26,8 @@ const statusMap: Record<ProjectStatus, { label: string; tone: "info" | "success"
 export function PackageContextHeader({
   project,
   selectedWorksiteId,
-  onWorksiteChange
+  onWorksiteChange,
+  canManageWorksites
 }: {
   project: ProjectDetail;
   completionPercent?: number;
@@ -30,35 +36,47 @@ export function PackageContextHeader({
   selectedWorksiteId?: string;
   onWorksiteChange: (worksiteId?: string) => void;
 }) {
+  const router = useRouter();
+  const [addingWorksite, setAddingWorksite] = useState(false);
+  const [worksiteBusy, setWorksiteBusy] = useState(false);
+  const [editorVersion, setEditorVersion] = useState(0);
   const status = statusMap[project.status];
   const activeWorksites = project.worksites.filter((site) => site.status === "active");
   const selectedWorksite = activeWorksites.find((site) => site.id === selectedWorksiteId);
+  const closeEditor = () => { if (!worksiteBusy) setAddingWorksite(false); };
 
   return (
-    <EntityContextHeader
-      className={styles.contextHeader}
-      meta={<dl className={styles.contextMeta}>
-        <div>
-          <dt><MapPin aria-hidden="true" size={16} /><span className="sr-only">Công trường</span></dt>
-          <dd className={styles.worksiteSwitcher}>
-            <Select
-              aria-label="Chọn công trường"
-              label="Công trường"
-              labelHidden
-              onChange={(event) => onWorksiteChange(event.target.value || undefined)}
-              options={activeWorksites.map((site) => ({ value: site.id, label: site.name }))}
-              placeholder="Tất cả công trường"
-              value={selectedWorksite?.id ?? ""}
-            />
-          </dd>
-        </div>
-        <div>
-          <dt><CalendarDays aria-hidden="true" size={16} /><span className="sr-only">Thời gian</span></dt>
-          <dd>{formatBusinessDate(project.startDate)} – {project.expectedEndDate ? formatBusinessDate(project.expectedEndDate) : "Chưa xác định"}</dd>
-        </div>
-      </dl>}
-      status={<StatusBadge tone={status.tone}>{status.label}</StatusBadge>}
-      title={project.name}
-    />
+    <>
+      <EntityContextHeader
+        className={styles.contextHeader}
+        code={`Gói ${project.code}`}
+        title={<span className={styles.contextTitle}><span>{project.name}</span><StatusBadge tone={status.tone}>{status.label}</StatusBadge></span>}
+        action={canManageWorksites && project.status !== "closed" ? <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => { setEditorVersion(current => current + 1); setAddingWorksite(true); }} variant="secondary">Thêm công trường</Button> : undefined}
+        meta={<div className={styles.contextToolbar}>
+          <dl className={styles.contextMeta}>
+            <div>
+              <dt><MapPin aria-hidden="true" size={16} />Công trường</dt>
+              <dd className={activeWorksites.length > 1 ? styles.worksiteSwitcher : styles.worksiteName}>
+                {activeWorksites.length > 1 ? <Select
+                  aria-label="Lọc công trường trong gói"
+                  label="Công trường"
+                  labelHidden
+                  onChange={(event) => onWorksiteChange(event.target.value || undefined)}
+                  options={[{ value: "", label: "Toàn bộ gói" }, ...activeWorksites.map((site) => ({ value: site.id, label: site.name }))]}
+                  value={selectedWorksite?.id ?? ""}
+                /> : activeWorksites[0]?.name ?? "Chưa có công trường hoạt động"}
+              </dd>
+            </div>
+            <div className={styles.contextDates}>
+              <dt><CalendarDays aria-hidden="true" size={16} /><span className="sr-only">Thời gian</span></dt>
+              <dd>{formatBusinessDate(project.startDate)} – {project.expectedEndDate ? formatBusinessDate(project.expectedEndDate) : "Chưa xác định"}</dd>
+            </div>
+          </dl>
+        </div>}
+      />
+      <Drawer onClose={closeEditor} open={addingWorksite} title="Thêm công trường">
+        <WorksiteEditor key={editorVersion} onBusyChange={setWorksiteBusy} onCancel={closeEditor} onSaved={() => { setAddingWorksite(false); router.refresh(); }} projectId={project.id} />
+      </Drawer>
+    </>
   );
 }

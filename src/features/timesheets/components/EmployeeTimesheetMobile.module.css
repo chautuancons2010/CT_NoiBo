@@ -1,0 +1,51 @@
+.workspace { display: grid; width: 100%; min-width: 0; max-width: 1120px; align-content: start; gap: 16px; }
+.summary { padding: 16px; }
+.identity { display: flex; min-width: 0; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.identity > div:first-child { min-width: 0; }
+.identity h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.identity > div > span { color: var(--text-secondary); font-size: 12px; }
+.period { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); }
+.period > span { display: grid; gap: 3px; }
+.period strong { color: var(--text-primary); font-size: 13px; font-weight: 500; }
+.period small { font-size: 12px; }
+.layout { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) 288px; align-items: start; gap: 16px; }
+.calendar { min-width: 0; padding: 16px; }
+.calendarHeading, .detailToolbar { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.calendarHeading h2, .inspector h2, .detailToolbar h2 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.calendarHeading > :global(.button) { width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; }
+.dataAlert { margin: 0 0 12px; border-left: 3px solid var(--warning); border-radius: var(--radius-control); padding: 10px 12px; background: var(--warning-soft); color: var(--warning); font-size: 13px; line-height: 1.5; }
+.inspector, .selectedDetail { min-width: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); padding: 16px; background: var(--surface); box-shadow: var(--shadow-card); }
+.inspector h2 { margin-bottom: 12px; }
+.metrics { display: grid; margin: 0; }
+.metrics > div { display: flex; min-width: 0; min-height: 40px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border-subtle); padding: 8px 0; }
+.metrics > div:last-child { border-bottom: 0; }
+.metrics dt { color: var(--text-secondary); font-size: 13px; }
+.metrics dd { margin: 0; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.metrics > div:first-child dd { color: var(--color-primary-active); }
+.legend { margin-top: 12px; color: var(--text-secondary); font-size: 12px; }
+.legend summary { width: fit-content; min-height: 28px; cursor: pointer; }
+.legend > div { display: flex; flex-wrap: wrap; gap: 8px 12px; padding-top: 8px; }
+.legend > div > span { display: inline-flex; align-items: center; gap: 5px; }
+.legend b { font-size: 11px; font-weight: 600; }
+.dayDetail { display: grid; min-width: 0; align-content: start; gap: 16px; }
+.dayHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.dayHeading > strong { font-size: 14px; font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; border: 0; padding: 0; background: transparent; }
+.facts > div { min-width: 0; }
+.facts dt { color: var(--text-secondary); font-size: 12px; }
+.facts dd { margin: 4px 0 0; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.dayDetail h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.dayDetail p { margin: 0; font-size: 13px; }
+.sources, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.adjustment { display: grid; gap: 4px; border-bottom: 1px solid var(--border-subtle); padding: 8px 0; font-size: 12px; }
+.adjustment small { color: var(--text-secondary); }
+@media (max-width: 1023px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) {
+  .workspace { gap: 12px; }
+  .summary, .calendar, .inspector, .selectedDetail { padding: 12px; }
+  .identity { align-items: flex-start; gap: 12px; }
+  .identity h2 { font-size: 16px; }
+  .period { width: 100%; }
+  .calendarHeading > :global(.button) { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  .legend summary { min-height: 44px; display: flex; align-items: center; }
+}

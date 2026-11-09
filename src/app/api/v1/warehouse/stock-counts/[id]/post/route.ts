@@ -7,7 +7,7 @@ import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
 
 const paramsSchema = z.object({ id: z.string().uuid() });
-const inputSchema = z.object({ postingDate: z.string().date(), idempotencyKey: z.string().uuid() });
+const inputSchema = z.object({ rowVersion: z.number().int().positive().optional(), postingDate: z.string().date(), idempotencyKey: z.string().uuid() });
 
 export async function POST(request: Request, context: RouteContext<"/api/v1/warehouse/stock-counts/[id]/post">) {
   try {

@@ -1,4 +1,5 @@
 import "server-only";
+import { readSharedShiftCatalog } from "@/services/attendanceShiftService";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
@@ -39,7 +40,7 @@ function nested(row: Row, key: string): Row | undefined {
 function mapWorksite(row: Row): Worksite {
   return {
     id: required(row, "id"), projectId: required(row, "project_id"), name: required(row, "name"),
-    address: optional(row, "address"), radiusMeters: Number(row.radius_meters), gpsRequired: Boolean(row.gps_required),
+    address: optional(row, "address"), latitude: row.latitude == null ? undefined : Number(row.latitude), longitude: row.longitude == null ? undefined : Number(row.longitude), updatedAt: optional(row, "updated_at"), radiusMeters: Number(row.radius_meters), gpsRequired: Boolean(row.gps_required),
     allowedAccuracyThresholdMeters: Number(row.allowed_accuracy_threshold_meters),
     status: required(row, "status") as Worksite["status"], activeFrom: optional(row, "active_from"), activeTo: optional(row, "active_to")
   };
@@ -65,7 +66,7 @@ function mapProgressNode(row: Row): ProjectProgressNode {
 }
 
 const projectSelect = "*,manager:employees!projects_project_manager_employee_id_fkey(full_name)";
-const assignmentSelect = "*,employees!project_assignments_employee_id_fkey(employee_code,full_name,employment_status),worksites(name)";
+const assignmentSelect = "*,employees!project_assignments_employee_id_fkey(employee_code,full_name,employment_status,department_id),worksites(name)";
 
 async function actorAccountId(client: SupabaseClient, user: AuthenticatedUser): Promise<string | undefined> {
   let query = client.from("app_accounts").select("id").limit(1);
@@ -291,30 +292,67 @@ export async function createAssignment(user: AuthenticatedUser, projectId: strin
   const project = await getProject(projectId, user);
   if (project.status === "closed") throw new AppError("CONFLICT", "Dự án đã đóng, không thể phân công mới.");
   if (input.worksiteId && !project.worksites.some((site) => site.id === input.worksiteId && site.status === "active")) throw new AppError("VALIDATION_ERROR", "Công trường không hoạt động hoặc không thuộc dự án.");
-  const { data: current } = await client.from("project_assignments").select("*").eq("employee_id", input.employeeId).eq("status", "active");
-  const conflict = (current ?? []).find((row) => rangesOverlap(input.startDate, input.endDate, row.start_date, row.end_date ?? undefined) && timesOverlap(input.shiftStart, input.shiftEnd, String(row.shift_start).slice(0, 5), String(row.shift_end).slice(0, 5)) && row.worksite_id !== (input.worksiteId ?? null));
+  const { data: current, error: currentError } = await client.from("project_assignments").select("*").eq("employee_id", input.employeeId);
+  if (currentError) throw new AppError("SERVER_ERROR", "Không thể kiểm tra danh sách phân công.");
+  const conflict = input.assignmentRole === "worker" ? undefined : (current ?? []).find((row) => row.status === "active" && rangesOverlap(input.startDate, input.endDate, row.start_date, row.end_date ?? undefined) && timesOverlap(input.shiftStart, input.shiftEnd, String(row.shift_start).slice(0, 5), String(row.shift_end).slice(0, 5)) && row.worksite_id !== (input.worksiteId ?? null));
   if (conflict) throw new AppError("CONFLICT", "Nhân sự này đã có phân công trùng thời gian tại công trường khác.");
   const accountId = await actorAccountId(client, user);
-  const { data, error } = await client.from("project_assignments").insert({
+  const previous = (current ?? []).find(row => row.project_id === projectId && (row.worksite_id ?? null) === (input.worksiteId ?? null) && row.assignment_role === input.assignmentRole && row.start_date === input.startDate);
+  if (previous?.status === "active") throw new AppError("CONFLICT", "Nhân sự đã có trong danh sách phân công này.");
+  const values = {
     project_id: projectId, worksite_id: input.worksiteId || null, employee_id: input.employeeId, assignment_role: input.assignmentRole,
     start_date: input.startDate, end_date: input.endDate || null, shift_code: input.shiftCode, shift_name: input.shiftName,
-    shift_start: input.shiftStart, shift_end: input.shiftEnd, note: input.note || null, assigned_by: accountId
-  }).select(assignmentSelect).single();
+    shift_start: input.shiftStart, shift_end: input.shiftEnd, note: input.note || null, assigned_by: accountId, status: "active"
+  };
+  const write = previous
+    ? client.from("project_assignments").update(values).eq("id", previous.id).eq("row_version", previous.row_version)
+    : client.from("project_assignments").insert(values);
+  const { data, error } = await write.select(assignmentSelect).single();
   if (error || !data) throw new AppError(error?.code === "23505" ? "CONFLICT" : "SERVER_ERROR", error?.code === "23505" ? "Phân công này đã tồn tại." : "Không thể phân công nhân sự.");
   await recordAuditLog({ actorId: accountId ?? user.id, action: "project.assignment_created", entityType: "project_assignment", entityId: data.id, metadata: { projectId, employeeId: input.employeeId } });
   return mapAssignment(data as Row);
 }
 
-export async function getProjectRoster(projectId: string, date: string, worksiteId?: string, user?: AuthenticatedUser): Promise<ProjectAssignment[]> {
+export async function renameProject(user: AuthenticatedUser, projectId: string, input: { name: string; rowVersion: number }): Promise<ProjectDetail> {
+  if (!can(user.permissions, "project.edit")) throw new AppError("PERMISSION_DENIED");
+  const client = db();
+  const project = await getProject(projectId, user);
+  const { data, error } = await client.from("projects").update({ name: input.name }).eq("id", projectId).eq("row_version", input.rowVersion).select("id").maybeSingle();
+  if (error) throw new AppError("SERVER_ERROR", "Không thể đổi tên gói.");
+  if (!data) throw new AppError("CONFLICT", "Gói đã được cập nhật. Hãy tải lại.");
+  await recordAuditLog({ actorId: await actorAccountId(client, user) ?? user.id, action: "project.renamed", entityType: "project", entityId: projectId, before: { name: project.name }, after: { name: input.name } });
+  return getProject(projectId, user);
+}
+
+export async function endAssignment(user: AuthenticatedUser, projectId: string, assignmentId: string, rowVersion: number): Promise<ProjectAssignment> {
+  if (!can(user.permissions, "project.manage_team")) throw new AppError("PERMISSION_DENIED");
+  const client = db();
+  const project = await getProject(projectId, user);
+  const assignment = project.assignments.find((item) => item.id === assignmentId);
+  if (!assignment) throw new AppError("NOT_FOUND", "Không tìm thấy phân công trong gói.");
+  const { data, error } = await client.from("project_assignments").update({ status: "inactive" }).eq("id", assignmentId).eq("project_id", projectId).eq("row_version", rowVersion).select(assignmentSelect).maybeSingle();
+  if (error) throw new AppError("SERVER_ERROR", "Không thể ngừng phân công.");
+  if (!data) throw new AppError("CONFLICT", "Phân công đã được cập nhật. Hãy tải lại.");
+  await recordAuditLog({ actorId: await actorAccountId(client, user) ?? user.id, action: "project.assignment_ended", entityType: "project_assignment", entityId: assignmentId, before: { status: assignment.status }, after: { status: "inactive" } });
+  return mapAssignment(data as Row);
+}
+
+export async function getProjectRoster(projectId: string, date: string, worksiteId?: string, user?: AuthenticatedUser, sharedCatalog?: Awaited<ReturnType<typeof readSharedShiftCatalog>>): Promise<ProjectAssignment[]> {
   const client = db();
   if (user) await assertProjectScope(client, user, projectId);
   let query = client.from("project_assignments").select(assignmentSelect).eq("project_id", projectId).eq("status", "active").lte("start_date", date).or("end_date.is.null,end_date.gte." + date);
-  if (worksiteId) query = query.eq("worksite_id", worksiteId);
+  if (worksiteId) query = query.or(`worksite_id.eq.${worksiteId},worksite_id.is.null`);
   const { data, error } = await query;
   if (error) throw new AppError("SERVER_ERROR", "Không thể tạo roster theo ngày.");
-  const roster=(data ?? []).map((row) => mapAssignment(row as Row));
+  const roster=(data ?? []).filter(row => nested(row as Row, "employees")?.employment_status === "active").map((row) => mapAssignment(row as Row));
   const leaveByEmployee=await getApprovedLeaveForEmployeesDate(roster.map(item=>item.employeeId),date);
-  return roster.map(item=>({...item,approvedLeave:leaveByEmployee.get(item.employeeId)}));
+  const resolveShift = sharedCatalog ?? await readSharedShiftCatalog(client, date);
+  const departments = new Map((data ?? []).map(row => [String(row.employee_id), nested(row as Row, "employees")?.department_id]));
+  return roster.map(item => {
+    const departmentId = departments.get(item.employeeId);
+    const shift = resolveShift({ employeeId: item.employeeId, departmentId: typeof departmentId === "string" ? departmentId : undefined, projectIds: [projectId], fallbackCode: item.shiftCode });
+    return { ...item, ...(shift ? { shiftCode: String(shift.code), shiftName: String(shift.name), shiftStart: String(shift.start_time).slice(0,5), shiftEnd: String(shift.end_time).slice(0,5), shiftBreakMinutes: Number(shift.break_minutes ?? 0) } : {}), approvedLeave: leaveByEmployee.get(item.employeeId) };
+  });
 }
 
 export async function getProjectSchedule(projectId: string, from: string, to: string, user?: AuthenticatedUser): Promise<DailySchedule[]> {
@@ -331,4 +369,15 @@ export async function getProjectSchedule(projectId: string, from: string, to: st
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return result;
+}
+
+export async function updateWorksite(user: AuthenticatedUser, projectId: string, worksiteId: string, input: z.infer<typeof worksiteInputSchema> & { updatedAt: string; status: Worksite["status"] }): Promise<Worksite> {
+  if (!can(user.permissions, "worksite.manage")) throw new AppError("PERMISSION_DENIED");
+  const project = await getProject(projectId, user);
+  if (!project.worksites.some(site => site.id === worksiteId)) throw new AppError("NOT_FOUND", "Công trường không thuộc dự án này.");
+  const client = db(), accountId = await actorAccountId(client, user);
+  const { data, error } = await client.from("worksites").update({ name: input.name, address: input.address || null, latitude: input.latitude ?? null, longitude: input.longitude ?? null, radius_meters: input.radiusMeters, gps_required: input.gpsRequired, allowed_accuracy_threshold_meters: input.allowedAccuracyThresholdMeters, active_from: input.activeFrom || null, active_to: input.activeTo || null, status: input.status, updated_at: new Date().toISOString() }).eq("id", worksiteId).eq("project_id", projectId).eq("updated_at", input.updatedAt).select("*").maybeSingle();
+  if (error || !data) throw new AppError("CONFLICT", error?.code === "23505" ? "Tên công trường đã tồn tại." : "Công trường vừa được cập nhật. Tải lại trước khi lưu.");
+  await recordAuditLog({ actorId: accountId ?? user.id, action: "worksite.updated", entityType: "worksite", entityId: worksiteId, metadata: { projectId, status: input.status } });
+  return mapWorksite(data as Row);
 }

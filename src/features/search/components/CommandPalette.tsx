@@ -139,5 +139,5 @@ export function CommandPalette({ user }: { user: AuthenticatedUser }) {
     </div>
   ) : null;
 
-  return <><button aria-haspopup="dialog" className="header-search" onClick={() => setOpen(true)} type="button"><Search aria-hidden="true" size={17} /><span>Tìm nhân viên, gói, lô hàng, chứng từ...</span><kbd>Ctrl K</kbd></button><IconButton className="header-search-mobile" label="Tìm kiếm" onClick={() => setOpen(true)}><Search aria-hidden="true" size={19} /></IconButton>{typeof document !== "undefined" && overlay ? createPortal(overlay, document.body) : null}</>;
+  return <><button aria-haspopup="dialog" className="header-search" onClick={() => setOpen(true)} type="button"><Search aria-hidden="true" size={17} /><span>Tìm kiếm</span><kbd>Ctrl K</kbd></button><IconButton className="header-search-mobile" label="Tìm kiếm" onClick={() => setOpen(true)}><Search aria-hidden="true" size={19} /></IconButton>{typeof document !== "undefined" && overlay ? createPortal(overlay, document.body) : null}</>;
 }

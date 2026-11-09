@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Inspector, WorkbenchLayout, WorkCanvas } from "@/components/shared/Workbench";
 import type { ApprovalCase } from "@/features/shared-platforms/types";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+import { useLoadingActivity } from "@/lib/ui/useLoadingActivity";
 
 const domainLabels: Record<string, string> = { LEAVE: "Nghỉ phép", TIMESHEET_ADJUSTMENT: "Điều chỉnh công", WAREHOUSE: "Kho", IMPORT_EXPORT: "Xuất nhập khẩu" };
 const statusLabels: Record<string, string> = { pending: "Chờ duyệt", approved: "Đã duyệt", rejected: "Đã từ chối", cancelled: "Đã hủy", withdrawn: "Đã rút" };
@@ -28,6 +29,7 @@ export function ApprovalCenter({ view }: { view: "pending" | "completed" | "dele
   const [selected, setSelected] = useState<ApprovalCase>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  useLoadingActivity(refreshing);
   const [error, setError] = useState("");
 
   const load = useCallback(async (initial = false) => {
@@ -59,7 +61,7 @@ export function ApprovalCenter({ view }: { view: "pending" | "completed" | "dele
   return (
     <WorkbenchLayout className={selected ? "approval-queue" : "approval-queue workbench-layout--solo"}>
       <WorkCanvas className="approval-queue__canvas">
-        <div className="approval-queue__status"><span>{items.length} yêu cầu</span>{refreshing ? <span role="status">Đang cập nhật…</span> : null}</div>
+        <div aria-busy={refreshing} className="approval-queue__status"><span>{items.length} yêu cầu</span></div>
         <div className="platform-table platform-table--approvals" role="group" aria-label="Yêu cầu phê duyệt">
           <div className="platform-table__head" aria-hidden="true"><span>Loại yêu cầu</span><span>Nội dung</span><span>Trạng thái</span><span>{view === "pending" ? "Thời gian chờ" : "Ngày xử lý"}</span></div>
           {items.map((item) => <button aria-pressed={selected?.id === item.id} className={`platform-table__row${selected?.id === item.id ? " is-selected" : ""}`} key={item.id} onClick={() => setSelected((current) => current?.id === item.id ? undefined : item)} type="button">

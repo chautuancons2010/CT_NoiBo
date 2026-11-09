@@ -53,16 +53,43 @@ export function matchAttendanceLocation(
   };
 }
 
-export function getNextAttendanceAction(events: readonly Pick<AttendanceEvent, "eventType">[]): AttendanceType | "completed" {
-  const hasCheckIn = events.some((event) => event.eventType === "check_in");
-  const hasCheckOut = events.some((event) => event.eventType === "check_out");
-  if (!hasCheckIn) return "check_in";
-  if (!hasCheckOut) return "check_out";
-  return "completed";
+type SequenceEvent = Pick<AttendanceEvent, "eventType"> & Partial<Pick<AttendanceEvent, "effectiveAt" | "attendanceStatus">>;
+function orderedAttendance(events: readonly SequenceEvent[]) {
+  return events.filter(event => event.attendanceStatus !== "rejected").map((event, index) => ({ event, index }))
+    .sort((a, b) => a.event.effectiveAt && b.event.effectiveAt ? a.event.effectiveAt.localeCompare(b.event.effectiveAt) || a.index - b.index : a.index - b.index).map(item => item.event);
+}
+
+export function getNextAttendanceAction(events: readonly SequenceEvent[]): AttendanceType {
+  return orderedAttendance(events).at(-1)?.eventType === "check_in" ? "check_out" : "check_in";
+}
+
+export function getAttendanceSequenceWarning(events: readonly SequenceEvent[], intendedType: AttendanceType): string | undefined {
+  const latest = orderedAttendance(events).at(-1);
+  if (latest?.eventType === intendedType) return intendedType === "check_in" ? "Lượt gần nhất đã chấm vào. Bạn đang chấm vào thêm lần nữa." : "Lượt gần nhất đã chấm ra. Bạn đang chấm ra thêm lần nữa.";
+  if (!latest && intendedType === "check_out") return "Hôm nay chưa có lượt chấm vào. Bạn đang chấm ra.";
+  return undefined;
+}
+
+export function summarizeAttendanceIntervals<T extends Pick<AttendanceEvent, "eventType" | "effectiveAt" | "attendanceStatus">>(events: readonly T[]) {
+  const ordered = orderedAttendance(events) as T[];
+  let opened: typeof ordered[number] | undefined, workMinutes = 0, intervals = 0;
+  for (const event of ordered) {
+    if (event.eventType === "check_in") opened ??= event;
+    else if (opened) { workMinutes += Math.max(0, Math.round((Date.parse(event.effectiveAt) - Date.parse(opened.effectiveAt)) / 60_000)); opened = undefined; intervals++; }
+  }
+  return { firstCheckIn: ordered.find(event => event.eventType === "check_in"), lastCheckOut: [...ordered].reverse().find(event => event.eventType === "check_out"), workMinutes, intervals, hasOpenCheckIn: Boolean(opened) };
 }
 
 export function retryDelayMilliseconds(retryCount: number): number {
   return Math.min(60_000, 1_000 * 2 ** Math.min(Math.max(retryCount, 0), 6));
+}
+
+export function getAttendanceLateMinutes(effectiveAt: string, policy: Pick<AttendancePolicy, "timezone" | "shiftStart" | "lateThresholdMinutes">): number {
+  const time = new Intl.DateTimeFormat("en-GB", { timeZone: policy.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(new Date(effectiveAt));
+  const parts = Object.fromEntries(time.map((part) => [part.type, part.value]));
+  const [hour, minute] = policy.shiftStart.split(":").map(Number);
+  const elapsedSeconds = (Number(parts.hour) * 60 + Number(parts.minute) - hour * 60 - minute) * 60 + Number(parts.second);
+  return elapsedSeconds > policy.lateThresholdMinutes * 60 ? Math.ceil(elapsedSeconds / 60) : 0;
 }
 
 export function itemsOwnedBy(

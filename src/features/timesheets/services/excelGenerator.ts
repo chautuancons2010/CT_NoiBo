@@ -4,6 +4,7 @@ import { allowedFields, reportSheetPermission, type ReportField } from "./report
 import { addTimesheetMatrix } from "./timesheetMatrixExcel";
 import type { ReportTemplate } from "../types/timesheetTypes";
 import { sanitizeSpreadsheetCell } from "@/lib/security/filePolicy";
+import { safeWorksheetName } from "@/lib/documents/spreadsheet";
 
 type RecordRow = Record<string, unknown>;
 
@@ -119,7 +120,7 @@ export async function generateReportWorkbook(input: {
       continue;
     }
 
-    const sheet = workbook.addWorksheet(sheetDefinition.name.slice(0, 31), {
+    const sheet = workbook.addWorksheet(safeWorksheetName(workbook, sheetDefinition.name), {
       views: input.template.definition.freezeHeader ? [{ state: "frozen", ySplit: 2 }] : undefined
     });
     sheet.mergeCells(1, 1, 1, fields.length);

@@ -30,7 +30,6 @@ export function ProjectUpdateTimeline() {
       <header className="panel-header">
         <div>
           <h2>Cập nhật dự án</h2>
-          <p>Theo dòng thời gian, ưu tiên nội dung, attachment và mức độ xử lý.</p>
         </div>
       </header>
       <ol className="project-timeline">

@@ -1,0 +1,42 @@
+.workspace { min-width: 0; }
+.surface { min-width: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--surface-card, var(--color-surface)); }
+.toolbar { display: grid; grid-template-columns: minmax(180px, 1.2fr) 112px minmax(180px, 1fr) minmax(180px, 1fr) auto; align-items: end; gap: 14px; padding: 22px; border-bottom: 1px solid var(--color-border); }
+.toolbar > * { min-width: 0; }
+.toolbar :global(.field) { margin: 0; }
+.search { display: flex; align-items: center; gap: 10px; min-height: 44px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); padding: 0 12px; color: var(--color-text-muted); }
+.search:focus-within { outline: 3px solid var(--color-focus-ring); outline-offset: 2px; }
+.search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: var(--color-text); font: inherit; }
+.summaries { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); padding: var(--card-padding); border-bottom: 1px solid var(--border-subtle); }
+.summaries article { display: grid; gap: var(--space-1); min-width: 0; }
+.summaries article > span { color: var(--color-text-secondary); font-size: 13px; }
+.summaries strong { color: var(--color-text); font-size: clamp(18px, 1.6vw, 25px); line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--color-border); padding: 16px 22px; color: var(--color-text-muted); font-size: 12px; }
+.pagination > span { min-width: 0; overflow-wrap: anywhere; }
+.pagination > div { display: flex; align-items: center; gap: 12px; font-variant-numeric: tabular-nums; }
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 180px; padding: 28px 20px; color: var(--color-text-secondary); text-align: center; }
+.error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 20px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-danger-soft); padding: 16px; color: var(--color-danger-text); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.notice { margin: 18px 22px 0; border-radius: 12px; background: var(--color-success-soft); padding: 14px 16px; color: var(--color-success); font-size: 14px; }
+.rateModal:global(.modal) { width: min(560px, 100%); }
+.rateForm { display: grid; grid-auto-rows: max-content; gap: 20px; padding: 24px; }
+.rateIdentity { display: grid; gap: 8px; border-bottom: 1px solid var(--color-border); padding-bottom: 18px; }
+.rateIdentity strong { color: var(--color-text); font-size: 17px; line-height: 1.4; overflow-wrap: anywhere; }
+.rateIdentity span { color: var(--color-text-secondary); font-size: 13px; overflow-wrap: anywhere; }
+.rateForm > .error { margin: 0; }
+.rateForm > footer { display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--color-border); padding-top: 18px; }
+@media (max-width: 1120px) { .toolbar { grid-template-columns: minmax(180px, 1fr) 110px minmax(180px, 1fr); } .toolbar > :nth-child(4) { grid-column: 1 / 3; } .toolbar > :last-child { justify-self: end; } }
+@media (max-width: 700px) {
+  .surface { border-radius: 20px; }
+  .toolbar { grid-template-columns: 100px minmax(0, 1fr); gap: 14px 10px; padding: 16px; }
+  .search { grid-column: 1 / -1; grid-row: 1; min-height: 48px; }
+  .search input { font-size: 16px; }
+  .toolbar > :nth-child(3) { grid-column: 1 / -1; grid-row: 3; }
+  .toolbar > :nth-child(4) { grid-column: 2; grid-row: 2; }
+  .toolbar > :last-child { grid-column: 1 / -1; justify-self: stretch; min-height: 48px; }
+  .summaries { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px; }
+  .summaries strong { font-size: 19px; }
+  .pagination { padding: 16px; }
+  .pagination > div { justify-content: space-between; width: 100%; }
+  .notice { margin-inline: 16px; }
+  .rateForm { gap: 18px; padding: 20px 16px; }
+  .rateForm footer > :global(.button) { flex: 1; min-height: 48px; }
+}

@@ -9,5 +9,6 @@
 - Report engine: timesheet report registry/generator for Excel, leave PDF generator.
 - Operations: structured logs/error IDs, `/api/health/live`, `/api/health/ready`, admin operations page and job/integration aggregates.
 - Integrations: API keys, webhook signature/SSRF checks, idempotency/rate limits, sync/import queues.
+- Business workflow map: [business-workflows.md](business-workflows.md) maps the current construction operations, cross-module handoffs and intentionally out-of-scope accounting domains.
 
 Browser code không được import server env/service-role client. Schema/business transitions phải nằm trong service/RPC, không chỉ UI.

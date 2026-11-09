@@ -1,0 +1,22 @@
+.calendar { --calendar-line: color-mix(in srgb, var(--border-subtle) 55%, var(--surface)); width: 100%; min-width: 0; overflow: hidden; border: 1px solid var(--calendar-line); border-radius: 14px; background: var(--calendar-line); }
+.weekdays, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; }
+.weekdays { border-bottom: 1px solid var(--calendar-line); }
+.weekdays > span { display: grid; height: 36px; place-items: center; background: var(--surface-2); color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.day, .blank { min-width: 0; min-height: var(--calendar-cell-height, 64px); margin: 0; border: 0; border-radius: 0; padding: 8px; background: var(--surface); box-shadow: none; }
+.day { position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 5px; color: var(--text-primary); font: inherit; cursor: pointer; touch-action: manipulation; }
+.blank { background: var(--surface-2); }
+.number { display: inline-flex; align-items: baseline; gap: 1px; color: var(--text-primary); font-size: 14px; font-weight: 500; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.number small { font-size: 10px; font-weight: 400; }
+.value { display: inline-flex; min-width: 26px; min-height: 22px; align-items: center; justify-content: center; border-radius: 6px; padding: 2px 6px; background: var(--surface-2); color: var(--text-secondary); font-size: 12px; font-weight: 600; line-height: 1.3; }
+.day[data-tone="success"] .value { background: var(--color-primary-soft); color: var(--color-primary-active); }
+.day[data-tone="warning"] .value { background: var(--warning-soft); color: var(--warning); }
+.day[data-tone="info"] .value { background: var(--info-soft); color: var(--info); }
+.day[data-tone="danger"] .value { background: var(--danger-soft); color: var(--danger); }
+.day:hover { background: var(--surface-hover); }
+.selected { z-index: 1; background: var(--color-primary-soft); box-shadow: inset 0 0 0 2px var(--color-primary); }
+.day:focus-visible { z-index: 2; outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.day:disabled { background: var(--surface-2); color: var(--text-muted); cursor: default; opacity: .55; }
+.day[aria-current="date"] .number { color: var(--color-primary-active); font-weight: 700; }
+.indicator { width: 6px; min-width: 6px; height: 6px; min-height: 6px; border-radius: 50%; padding: 0; }
+.day[data-tone] .indicator { background: currentColor; }
+@media (max-width: 767px) { .day, .blank { min-height: 56px; padding: 6px 2px; } }

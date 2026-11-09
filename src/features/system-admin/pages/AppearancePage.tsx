@@ -49,7 +49,7 @@ export function AppearancePage() {
           </div>
         </FormSection>
         {editor.message ? <div aria-live="polite" className="save-feedback">{editor.message}</div> : null}
-        <StickyActionBar><Button onClick={restoreDefaults} variant="ghost">Khôi phục mặc định</Button><Button disabled={!editor.dirty || editor.saving} onClick={editor.reset}>Hoàn tác</Button><Button disabled={!editor.dirty || editor.saving || !/^#[0-9A-F]{6}$/.test(editor.draft.primaryColor)} onClick={() => void editor.save()} variant="primary">{editor.saving ? "Đang lưu" : "Xuất bản"}</Button></StickyActionBar>
+        <StickyActionBar><Button onClick={restoreDefaults} variant="ghost">Khôi phục mặc định</Button><Button disabled={!editor.dirty || editor.saving} onClick={editor.reset}>Hoàn tác</Button><Button disabled={!editor.dirty || editor.saving || !/^#[0-9A-F]{6}$/.test(editor.draft.primaryColor)} onClick={() => void editor.save()} variant="primary" busy={editor.saving}>{"Xuất bản"}</Button></StickyActionBar>
       </section>
     </AdminPage>
   );

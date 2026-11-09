@@ -16,5 +16,9 @@ export default async function Page() {
     redirect("/attendance/me");
   }
 
+  if (can(user.permissions, "attendance.view_all") || can(user.permissions, "attendance.manage")) {
+    redirect("/attendance/today");
+  }
+
   return <PermissionDeniedState />;
 }

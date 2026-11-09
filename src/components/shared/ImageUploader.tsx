@@ -5,6 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button, IconButton } from "@/components/shared/Button";
 import { cn } from "@/lib/utils/cn";
+import { useLoadingActivity } from "@/lib/ui/useLoadingActivity";
 
 export interface ImageUploaderProps {
   file?: File;
@@ -41,6 +42,7 @@ export function ImageUploader({
   className,
   label = "Đính kèm"
 }: ImageUploaderProps) {
+  useLoadingActivity(uploading);
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [validationError, setValidationError] = useState("");

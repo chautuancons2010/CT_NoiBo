@@ -1,5 +1,5 @@
 import { BackLink } from "@/components/shared/BackLink";
-import { PageHeader } from "@/components/shared/PageHeader";
+
 import { TimesheetPeriodDetail } from "@/features/timesheets/components/TimesheetPeriodDetail";
 import { can } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
@@ -11,8 +11,9 @@ export default async function Page({ params }: { params: Promise<{ periodId: str
   const canManage = can(user.permissions, "attendance.period.manage");
   return <div className="page-stack">
     <BackLink href="/timesheets" />
-    <PageHeader title="Chi tiết kỳ công" />
+    
     <TimesheetPeriodDetail
+      canTransferPayroll={can(user.permissions, "payroll.create")}
       canAdjust={can(user.permissions, "timesheet.adjust")}
       canExport={can(user.permissions, "timesheet.export")}
       canLock={canManage || can(user.permissions, "timesheet.lock")}

@@ -13,10 +13,19 @@ export function calculateLeaveDays(input: { startDate: string; endDate: string; 
   return Math.max(0, days);
 }
 
+export function calculateLeaveWorkingDates(input: { startDate: string; endDate: string; weekendDays: number[]; holidays: string[] }): string[] {
+  const dates: string[] = []; const end = new Date(`${input.endDate}T12:00:00Z`); const holidays = new Set(input.holidays);
+  for (const cursor = new Date(`${input.startDate}T12:00:00Z`); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const date = cursor.toISOString().slice(0, 10);
+    if (!input.weekendDays.includes(cursor.getUTCDay()) && !holidays.has(date)) dates.push(date);
+  }
+  return dates;
+}
+
 export function summarizeLedger(entries: readonly LeaveLedgerEntry[]) {
   const sum = (types: LeaveLedgerEntry["transactionType"][]) => entries.filter((entry) => types.includes(entry.transactionType)).reduce((total, entry) => total + entry.amount, 0);
   const granted = sum(["grant"]); const carryover = sum(["carryover"]); const adjustments = sum(["adjustment_add", "adjustment_subtract"]); const usageNet = sum(["leave_usage", "leave_reversal", "expiry"]);
-  return { granted, carryover, adjustments, used: Math.abs(sum(["leave_usage"])), officialRemaining: granted + carryover + adjustments + usageNet };
+  return { granted, carryover, adjustments, used: Math.max(0, -sum(["leave_usage", "leave_reversal"])), officialRemaining: granted + carryover + adjustments + usageNet };
 }
 
 export function withPending(balance: Omit<LeaveBalance, "pending" | "availableAfterPending">, pending: number): LeaveBalance {

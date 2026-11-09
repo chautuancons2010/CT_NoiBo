@@ -7,6 +7,10 @@ const eslintConfig = [
   {
     ignores: [
       ".next/**",
+      ".next-e2e/**",
+      ".next-review/**",
+      ".tmp/**",
+      "test-results/**",
       ".agents/**",
       "node_modules/**",
       "coverage/**",

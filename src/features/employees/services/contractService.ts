@@ -36,20 +36,59 @@ export async function listContracts(user:AuthenticatedUser,employeeId:string){re
 
 export async function createContract(user:AuthenticatedUser,employeeId:string,input:Input,file?:File,templateId?:string){
   required(user,"contract.edit");const client=db(),id=crypto.randomUUID();
+  if(file&&templateId)throw new AppError("VALIDATION_ERROR","Chọn mẫu Word hoặc file PDF, không dùng đồng thời.");
   const stored=file?await upload(user,employeeId,id,file):undefined;
-  const{data,error}=await client.from("employee_contracts").insert({id,employee_id:employeeId,contract_number:input.contractNumber,contract_type:input.contractType,signed_date:input.signedDate??null,effective_date:input.effectiveDate,start_date:input.effectiveDate,end_date:input.endDate??null,status:input.status,attachment_file_id:stored?.assetId??null,template_id:templateId??null,note:input.note??null,created_by:user.id}).select("*").single();
-  if(error||!data){if(stored){await client.from("file_assets").delete().eq("id",stored.assetId);await client.storage.from("employee-private").remove([stored.path]);}throw new AppError(error?.code==="23505"?"CONFLICT":"SERVER_ERROR","Không thể tạo hợp đồng.");}
+  const result=await client.from("employee_contracts").insert({id,employee_id:employeeId,contract_number:input.contractNumber,contract_type:input.contractType,signed_date:input.signedDate??null,effective_date:input.effectiveDate,start_date:input.effectiveDate,end_date:input.endDate??null,status:input.status,attachment_file_id:stored?.assetId??null,template_id:templateId??null,note:input.note??null,created_by:user.id}).select("*").single();
+  let data=result.data;
+  if(result.error||!data){
+    const verified=await client.from("employee_contracts").select("*").eq("id",id).eq("employee_id",employeeId).maybeSingle();
+    if(verified.data)data=verified.data;
+    else{
+      if(stored&&!verified.error){await client.from("file_assets").delete().eq("id",stored.assetId);await client.storage.from("employee-private").remove([stored.path]);}
+      throw new AppError(result.error?.code==="23505"?"CONFLICT":"SERVER_ERROR","Không thể xác nhận đã tạo hợp đồng. Vui lòng tải lại.");
+    }
+  }
   if(templateId){try{await generateContractDocument(user,id,templateId);}catch(reason){await client.from("employee_contracts").delete().eq("id",id);if(stored){await client.from("file_assets").delete().eq("id",stored.assetId);await client.storage.from("employee-private").remove([stored.path]);}throw reason;}}
   await recordAuditLog({actorId:user.id,action:"employee.contract.created",entityType:"employee_contract",entityId:id,after:{employeeId,contractNumber:input.contractNumber,status:input.status,templateId}});
   const{data:created}=await client.from("employee_contracts").select("*").eq("id",id).single();return map((created??data) as Row);
 }
 
-export async function updateContract(user:AuthenticatedUser,employeeId:string,contractId:string,input:Input,file?:File){
-  required(user,"contract.edit");const client=db(),{data:current}=await client.from("employee_contracts").select("*").eq("id",contractId).eq("employee_id",employeeId).maybeSingle();if(!current)throw new AppError("NOT_FOUND","Không tìm thấy hợp đồng.");
+async function persistContractUpdate(user:AuthenticatedUser,employeeId:string,contractId:string,rowVersion:number,input?:Input,file?:File){
+  if(input)required(user,"contract.edit");else required(user,"contract.file.upload");
+  const client=db(),{data:current,error:readError}=await client.from("employee_contracts").select("*").eq("id",contractId).eq("employee_id",employeeId).maybeSingle();
+  if(readError)throw new AppError("SERVER_ERROR","Không thể đọc hợp đồng.");if(!current)throw new AppError("NOT_FOUND","Không tìm thấy hợp đồng.");
+  if(Number(current.row_version??1)!==rowVersion)throw new AppError("CONFLICT","Hợp đồng đã thay đổi, vui lòng tải lại.");
+  if(current.archived_at)throw new AppError("CONFLICT","Hợp đồng đã lưu trữ không thể chỉnh sửa.");
   const stored=file?await upload(user,employeeId,contractId,file):undefined;
-  const{data,error}=await client.from("employee_contracts").update({contract_number:input.contractNumber,contract_type:input.contractType,signed_date:input.signedDate??null,effective_date:input.effectiveDate,start_date:input.effectiveDate,end_date:input.endDate??null,status:input.status,attachment_file_id:stored?.assetId??current.attachment_file_id,note:input.note??null,row_version:Number(current.row_version??1)+1}).eq("id",contractId).eq("row_version",Number(current.row_version??1)).select("*").maybeSingle();
-  if(error||!data){if(stored){await client.from("file_assets").delete().eq("id",stored.assetId);await client.storage.from("employee-private").remove([stored.path]);}throw new AppError("CONFLICT","Hợp đồng đã thay đổi, vui lòng tải lại.");}
-  await recordAuditLog({actorId:user.id,action:stored?"employee.contract.file_replaced":"employee.contract.updated",entityType:"employee_contract",entityId:contractId,before:{status:current.status,attachmentFileId:current.attachment_file_id},after:{status:input.status,attachmentFileId:data.attachment_file_id}});return map(data as Row);
+  const payload:Row={row_version:rowVersion+1,...(stored?{attachment_file_id:stored.assetId}:{})};
+  if(input)Object.assign(payload,{contract_number:input.contractNumber,contract_type:input.contractType,signed_date:input.signedDate??null,effective_date:input.effectiveDate,start_date:input.effectiveDate,end_date:input.endDate??null,status:input.status,note:input.note??null});
+  const result=await client.from("employee_contracts").update(payload).eq("id",contractId).eq("employee_id",employeeId).eq("row_version",rowVersion).is("archived_at",null).select("*").maybeSingle();
+  let data=result.data;
+  if(result.error||!data){
+    if(stored){
+      // A lost response does not imply rollback. Never remove an object that
+      // the committed contract still references, or one we cannot verify.
+      const verified=await client.from("employee_contracts").select("*").eq("id",contractId).eq("employee_id",employeeId).maybeSingle();
+      if(verified.data?.attachment_file_id===stored.assetId)data=verified.data;
+      else if(!verified.error){await client.from("file_assets").delete().eq("id",stored.assetId);await client.storage.from("employee-private").remove([stored.path]);}
+    }
+    if(!data)throw new AppError(result.error?"SERVER_ERROR":"CONFLICT",result.error?"Không thể xác nhận đã lưu hợp đồng. Vui lòng tải lại.":"Hợp đồng đã thay đổi, vui lòng tải lại.");
+  }
+  await recordAuditLog({actorId:user.id,action:stored?"employee.contract.file_replaced":"employee.contract.updated",entityType:"employee_contract",entityId:contractId,before:{status:current.status,attachmentFileId:current.attachment_file_id,rowVersion},after:{status:data.status,attachmentFileId:data.attachment_file_id,rowVersion:Number(data.row_version)}});return map(data as Row);
 }
 
-export async function archiveContract(user:AuthenticatedUser,employeeId:string,contractId:string,reason:string){required(user,"contract.edit");if(reason.trim().length<3)throw new AppError("VALIDATION_ERROR","Cần nhập lý do lưu trữ.");const client=db(),{data:current}=await client.from("employee_contracts").select("id,status,archived_at").eq("id",contractId).eq("employee_id",employeeId).maybeSingle();if(!current)throw new AppError("NOT_FOUND","Không tìm thấy hợp đồng.");const{data,error}=await client.from("employee_contracts").update({archived_at:new Date().toISOString(),archived_by:user.id,status:"terminated"}).eq("id",contractId).is("archived_at",null).select("*").maybeSingle();if(error||!data)throw new AppError("CONFLICT","Hợp đồng đã được lưu trữ.");await recordAuditLog({actorId:user.id,action:"employee.contract.archived",entityType:"employee_contract",entityId:contractId,before:{status:current.status},after:{status:"terminated"},reason});return map(data as Row);}
+export async function updateContract(user:AuthenticatedUser,employeeId:string,contractId:string,input:Input&{rowVersion:number},file?:File){return persistContractUpdate(user,employeeId,contractId,input.rowVersion,input,file);}
+export async function replaceContractFile(user:AuthenticatedUser,employeeId:string,contractId:string,rowVersion:number,file?:File){if(!file)throw new AppError("VALIDATION_ERROR","Chọn file hợp đồng PDF.");return persistContractUpdate(user,employeeId,contractId,rowVersion,undefined,file);}
+
+export async function archiveContract(user:AuthenticatedUser,employeeId:string,contractId:string,reason:string,rowVersion:number){
+  required(user,"contract.edit");
+  if(reason.trim().length<3)throw new AppError("VALIDATION_ERROR","Cần nhập lý do lưu trữ.");
+  const client=db(),{data:current,error:readError}=await client.from("employee_contracts").select("id,status,archived_at,row_version").eq("id",contractId).eq("employee_id",employeeId).maybeSingle();
+  if(readError)throw new AppError("SERVER_ERROR","Không thể đọc hợp đồng.");
+  if(!current)throw new AppError("NOT_FOUND","Không tìm thấy hợp đồng.");
+  if(current.archived_at||Number(current.row_version??1)!==rowVersion)throw new AppError("CONFLICT","Hợp đồng đã thay đổi, vui lòng tải lại.");
+  const{data,error}=await client.from("employee_contracts").update({archived_at:new Date().toISOString(),archived_by:user.id,status:"terminated",row_version:rowVersion+1}).eq("id",contractId).eq("employee_id",employeeId).eq("row_version",rowVersion).is("archived_at",null).select("*").maybeSingle();
+  if(error)throw new AppError("SERVER_ERROR","Không thể xác nhận đã lưu trữ hợp đồng. Vui lòng tải lại.");
+  if(!data)throw new AppError("CONFLICT","Hợp đồng đã thay đổi, vui lòng tải lại.");
+  await recordAuditLog({actorId:user.id,action:"employee.contract.archived",entityType:"employee_contract",entityId:contractId,before:{status:current.status,rowVersion},after:{status:"terminated",rowVersion:rowVersion+1},reason});return map(data as Row);
+}

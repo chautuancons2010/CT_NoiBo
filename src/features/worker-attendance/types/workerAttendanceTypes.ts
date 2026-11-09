@@ -23,6 +23,9 @@ export interface WorkerAttendanceEntry {
   workerName: string;
   assignmentRole: string;
   status: WorkerEntryStatus;
+  isSelected?: boolean;
+  checkedInAt?: string;
+  checkedOutAt?: string;
   exceptionReason?: "approved_leave" | "unapproved" | "unknown" | "other_worksite" | "other";
   dayException: "none" | "early_leave" | "transferred" | "half_day" | "overtime" | "left_worksite";
   exceptionTime?: string;
@@ -32,6 +35,9 @@ export interface WorkerAttendanceEntry {
 }
 
 export interface WorkerAttendancePhoto {
+  address?: string;
+  latitude?: number;
+  longitude?: number;
   id: string;
   sessionId: string;
   capturedAt: string;
@@ -47,6 +53,14 @@ export interface WorkerAttendanceAdjustment {
   createdAt: string;
 }
 
+export interface WorkerSafetyReport {
+  contractorName: string;
+  supervisorCount: number;
+  briefing: Array<{ content: string; checked: boolean }>;
+  healthStatus: string;
+  workArea: string;
+}
+
 export interface WorkerAttendanceSession {
   id: string;
   clientSessionId: string;
@@ -54,9 +68,13 @@ export interface WorkerAttendanceSession {
   projectName: string;
   worksiteId: string;
   worksiteName: string;
+  worksiteAddress?: string;
   date: string;
   shiftCode: string;
   shiftName: string;
+  shiftStart?: string;
+  shiftEnd?: string;
+  shiftBreakMinutes?: number;
   sessionType: "morning" | "end_of_day";
   supervisorEmployeeId: string;
   supervisorName: string;
@@ -75,6 +93,10 @@ export interface WorkerAttendanceSession {
   syncStatus: "local_pending" | "syncing" | "synced" | "sync_failed";
   photoStatus: "not_required" | "pending_upload" | "uploading" | "uploaded" | "upload_failed";
   version: number;
+  selectionMode?: boolean;
+  safetyConfirmed?: boolean;
+  safetyReport?: WorkerSafetyReport;
+  minimumPhotos?: number;
   entries: WorkerAttendanceEntry[];
   photos: WorkerAttendancePhoto[];
   adjustments: WorkerAttendanceAdjustment[];

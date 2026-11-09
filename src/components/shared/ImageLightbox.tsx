@@ -86,9 +86,7 @@ export function ImageLightbox({ images, initialImageId, open, onClose }: ImageLi
                   </div>
                 ))}
               </dl>
-            ) : (
-              <p className="muted-text">Metadata ảnh sẽ được nối từ file metadata.</p>
-            )}
+            ) : null}
           </aside>
           <div className="image-lightbox__controls">
             <IconButton

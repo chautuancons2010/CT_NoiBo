@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import "@fontsource/inter/400.css";
@@ -7,13 +7,19 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@/styles/inter-vietnamese.css";
 import "@/styles/tokens.css";
-import "@/app/globals.css";
-import "@/app/theme.css";
-import "@/app/mobile.css";
-import "@/styles/enterprise.css";
+import "@/styles/legacy.css";
+import "@/styles/erp-components.css";
+import "@/styles/mobile-restored.css";
 import { SystemSettingsProvider } from "@/components/providers/SystemSettingsProvider";
+import { GlobalLoadingIndicator } from "@/components/shared/GlobalLoadingIndicator";
 import { deriveBrandColorTokens } from "@/config/systemSettings";
 import { readSystemSettings } from "@/services/system-settings/systemSettingsService";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover"
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await readSystemSettings();
@@ -51,6 +57,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     >
       <body className="font-inter">
         <SystemSettingsProvider initialSettings={settings}>{children}</SystemSettingsProvider>
+        <GlobalLoadingIndicator />
       </body>
     </html>
   );

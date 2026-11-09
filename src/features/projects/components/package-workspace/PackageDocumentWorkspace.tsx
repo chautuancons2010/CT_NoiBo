@@ -96,8 +96,8 @@ export function PackageDocumentWorkspace({ projectId, updates, canUpload, select
   }
 
   const uploadButton = (
-    <Button disabled={saving} leftIcon={<Upload aria-hidden="true" size={17} />} onClick={() => inputRef.current?.click()} variant="primary">
-      {saving ? "Đang tải" : "Tải tài liệu"}
+    <Button disabled={saving} leftIcon={<Upload aria-hidden="true" size={17} />} onClick={() => inputRef.current?.click()} variant="primary" busy={saving}>
+      {"Tải tài liệu"}
     </Button>
   );
 

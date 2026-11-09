@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { RetryButton } from "@/components/shared/RetryButton";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { ContentSkeleton } from "@/components/shared/LoadingExperience";
 import { cn } from "@/lib/utils/cn";
 
 interface StateProps {
@@ -12,12 +13,11 @@ interface StateProps {
   className?: string;
 }
 
-export function EmptyState({ title, description, action, className }: StateProps) {
+export function EmptyState({ title, action, className }: StateProps) {
   return (
-    <div className={cn("state-box", className)}>
+    <div className={cn("state-box", "state-box--empty", className)}>
       <Inbox aria-hidden="true" size={22} />
       <h2>{title}</h2>
-      {description ? <p>{description}</p> : null}
       {action}
     </div>
   );
@@ -28,9 +28,10 @@ export function LoadingState({
   className
 }: Partial<StateProps>) {
   return (
-    <div aria-label={title} aria-live="polite" className={cn("state-box state-box--loading-pattern", className)} role="status">
+    <div aria-label={title} aria-live="polite" className={cn("state-box state-box--loading", className)} role="status">
       <span className="sr-only">{title}</span>
       <LoadingSpinner />
+      <ContentSkeleton />
     </div>
   );
 }
@@ -41,7 +42,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function ErrorState({
   title = "Không thể tải dữ liệu",
-  description = "Vui lòng thử lại. Nếu lỗi tiếp tục xảy ra, hãy báo quản trị hệ thống.",
+  description,
   action,
   className
 }: Partial<StateProps>) {
@@ -57,7 +58,7 @@ export function ErrorState({
 
 export function PermissionDeniedState({
   title = "Không có quyền truy cập",
-  description = "Bạn không có quyền xem nội dung này.",
+  description,
   className
 }: Partial<StateProps>) {
   return (
@@ -73,7 +74,7 @@ export const NoPermission = PermissionDeniedState;
 
 export function OfflineState({
   title = "Đang offline",
-  description = "Thao tác có thể được lưu trên thiết bị và đồng bộ khi có mạng.",
+  description,
   className
 }: Partial<StateProps>) {
   return (

@@ -109,11 +109,11 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
           </PermissionGate>
         }
         title="Nhân viên"
+        meta={<span>{result.total} nhân viên</span>}
       />
 
       <WorkbenchLayout className={selectedEmployee ? "employee-roster" : "employee-roster workbench-layout--solo"}>
         <WorkCanvas className="employee-roster__canvas">
-          <header className="employee-roster__heading"><h2>Danh sách nhân viên</h2><span>{firstRecord}–{lastRecord} / {result.total} bản ghi</span></header>
           <EmployeeListFilters
             defaults={filters}
             departments={filterOptions.departments.map((item) => ({ label: item.name, value: item.id }))}
@@ -121,8 +121,7 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
             positions={filterOptions.positions.map((item) => ({ label: item.name, value: item.id }))}
             statuses={Object.entries(employeeStatusMeta).map(([value, meta]) => ({ label: meta.label, value }))}
           />
-          <div className="list-summary-bar"><span>{result.total} hồ sơ</span></div>
-          <EmployeeListTable employees={result.items} permissions={user.permissions} selectionBaseHref={selectionHref(filters)} />
+          <EmployeeListTable employees={result.items} filtered={Boolean(filters.q || filters.departmentId || filters.positionId || filters.employmentTypeId || filters.status)} permissions={user.permissions} />
           <footer className="employee-table-footer">
             <span>{firstRecord}–{lastRecord} / {result.total} bản ghi</span>
             <nav aria-label="Phân trang" className="pagination">

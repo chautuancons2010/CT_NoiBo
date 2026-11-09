@@ -1,0 +1,625 @@
+/* Compatibility layer. Shared ERP contracts live outside this layer. */
+@layer legacy {
+/* Shared geometry for workspaces. Feature styles own content and color. */
+.app-shell .page-main,
+.overlay,
+.floating-panel {
+  --radius-control: var(--ui-radius-control);
+  --radius-input: var(--ui-radius-control);
+  --radius-button: var(--ui-radius-control);
+  --radius-search: var(--ui-radius-control);
+  --radius-card: var(--ui-radius-card);
+  --radius-panel: var(--ui-radius-overlay);
+  --radius-modal: var(--ui-radius-overlay);
+}
+
+/* A single quiet canvas sits behind the authenticated application surfaces. */
+.app-shell { background: var(--app-canvas-end); }
+.app-shell .app-content {
+  background: var(--workspace-canvas);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+.app-shell .page-main,
+.app-shell .dashboard-page { background: transparent; }
+
+.app-shell .page-main :is(.card, .data-surface, .data-management-workspace, .workbench-layout, .work-canvas, .operational-workspace, .detail-panel, .form-section, .detail-section) {
+  border-radius: var(--radius-card);
+  background-clip: padding-box;
+}
+body .app-shell .page-main .card,
+body .app-shell .page-main .data-surface,
+body .app-shell .page-main .workbench-layout,
+body .app-shell .page-main .form-section,
+body .app-shell .page-main .detail-section {
+  border-radius: var(--radius-card);
+}
+
+.app-shell .page-main .data-surface {
+  overflow: hidden;
+}
+
+.app-shell .page-main :is(.input, .select, .textarea, .dropdown__trigger),
+.overlay :is(.input, .select, .textarea, .dropdown__trigger) {
+  border-radius: var(--radius-control);
+}
+
+/* ERP controls share one shape and consistent hit boxes. */
+.app-shell .page-main .button,
+.overlay .button,
+.app-shell .page-main .dropdown > summary,
+.overlay .dropdown > summary,
+.app-shell .page-main .filter-chip,
+.app-shell .page-main .page-context-navigation .back-link,
+.app-shell .page-main .page-stack > .back-link {
+  border-radius: var(--radius-button);
+  box-shadow: none;
+}
+body .app-shell .page-main .button.button,
+body .app-shell .page-main .function-toolbar .button,
+body .app-shell .page-main .page-action-bar .button,
+body .app-shell .page-main .page-toolbar .button,
+body .app-shell .page-main .filter-bar .button,
+body .overlay .button.button {
+  border-radius: var(--radius-button);
+}
+
+.app-shell .page-main .button--primary,
+.overlay .button--primary {
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+  color: #fff;
+  box-shadow: none;
+}
+.app-shell .page-main .button--primary:not(:disabled):hover,
+.overlay .button--primary:not(:disabled):hover {
+  border-color: var(--action-primary-hover);
+  background: var(--action-primary-hover);
+}
+.app-shell .page-main .button--primary:not(:disabled):active,
+.overlay .button--primary:not(:disabled):active {
+  border-color: var(--action-primary-active);
+  background: var(--action-primary-active);
+}
+.app-shell .page-main .button--secondary,
+.overlay .button--secondary {
+  border-color: var(--action-border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+.app-shell .page-main .button--secondary:not(:disabled):hover,
+.overlay .button--secondary:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--action-primary) 35%, var(--action-border));
+  background: var(--action-hover);
+}
+
+.app-shell .page-main .icon-button,
+.overlay .icon-button {
+  width: var(--action-control-height, var(--control-height-md));
+  min-width: var(--action-control-height, var(--control-height-md));
+  height: var(--action-control-height, var(--control-height-md));
+  min-height: var(--action-control-height, var(--control-height-md));
+  flex: 0 0 var(--action-control-height, var(--control-height-md));
+  border-radius: var(--radius-control);
+  padding: 0;
+  box-shadow: none;
+}
+
+.app-shell .page-main :is(.card, .data-surface, .form-section, .detail-section),
+.overlay :is(.card, .data-surface, .form-section, .detail-section) {
+  background-color: var(--surface-1);
+  background-image: none;
+  box-shadow: var(--shadow-card);
+}
+.app-shell .page-main :is(.dashboard-overview__metric, .module-icon-card, .personal-home__links > a) {
+  border-color: var(--border-subtle);
+  background: var(--surface-1);
+  box-shadow: none;
+}
+.app-shell .page-main :is(.card--interactive:hover, .module-icon-card:hover, .dashboard-overview__metric:has(a):hover) {
+  transform: none;
+  box-shadow: none;
+}
+
+.app-shell .page-main .button:not(:disabled):hover,
+.overlay .button:not(:disabled):hover,
+.app-shell .page-main .icon-button:not(:disabled):hover,
+.overlay .icon-button:not(:disabled):hover {
+  transform: none;
+}
+
+.app-shell .page-main :is(.action-bar, .form-actions, .sticky-action-bar, [data-ui="actions"]),
+.overlay :is(.action-bar, .form-actions, .confirm-dialog > footer, [data-ui="actions"]) {
+  --action-control-height: 44px;
+  align-items: center;
+  gap: var(--toolbar-gap);
+}
+
+.app-shell .page-main :is(.action-bar, .form-actions, .sticky-action-bar, [data-ui="actions"]) :is(.button, .icon-button, .dropdown__trigger),
+.overlay :is(.action-bar, .form-actions, .confirm-dialog > footer, [data-ui="actions"]) :is(.button, .icon-button, .dropdown__trigger) {
+  height: var(--action-control-height);
+  min-height: var(--action-control-height);
+  align-self: center;
+  padding-block: 0;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.app-shell .page-main :is(.action-bar, .form-actions, .sticky-action-bar, [data-ui="actions"]) .icon-button,
+.overlay :is(.action-bar, .form-actions, .confirm-dialog > footer, [data-ui="actions"]) .icon-button {
+  width: var(--action-control-height);
+  min-width: var(--action-control-height);
+  flex-shrink: 0;
+}
+
+/* One border and focus ring belong to the search shell, never its input. */
+.app-shell .page-main .search-input[data-ui="search-input"],
+.overlay .search-input[data-ui="search-input"],
+.app-shell .page-main [data-ui="filter-search"] {
+  width: min(100%, var(--toolbar-search-width));
+  min-width: 0;
+  min-height: var(--toolbar-control-height);
+  height: var(--toolbar-control-height);
+  gap: var(--toolbar-gap);
+  border-radius: var(--radius-search);
+  padding-inline: 11px;
+}
+
+.app-shell .page-main .search-input[data-ui="search-input"] > .input,
+.overlay .search-input[data-ui="search-input"] > .input,
+.app-shell .page-main [data-ui="filter-search"] > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
+  font-size: var(--toolbar-font-size);
+  line-height: 1.4;
+}
+
+.app-shell .page-main .search-input,
+.overlay .search-input,
+.app-shell .page-main [data-ui="filter-search"],
+.app-shell .app-header__search .header-search {
+  border-radius: var(--radius-search);
+}
+
+.app-shell .page-main .filter-bar :is(.select, .select-control__trigger),
+.app-shell .page-main [data-ui="filter-controls"] :is(.select, .select-control__trigger) {
+  border-radius: var(--radius-search);
+}
+
+.app-shell .page-main .search-input[data-ui="search-input"] > svg,
+.overlay .search-input[data-ui="search-input"] > svg,
+.app-shell .page-main [data-ui="filter-search"] > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.app-shell .page-main .search-input[data-ui="search-input"]:focus-within,
+.overlay .search-input[data-ui="search-input"]:focus-within,
+.app-shell .page-main [data-ui="filter-search"]:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+  outline: 0;
+  outline-offset: 0;
+}
+
+.app-shell .page-main .filter-bar[data-ui="filter-bar"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border-radius: var(--radius-control);
+}
+
+/* Standalone settings navigation follows the same rounded surface. */
+.app-shell .page-main :is(.settings-subnav, .system-admin-subnav) {
+  min-width: 0;
+  border-radius: var(--radius-card);
+  background-clip: padding-box;
+}
+
+.app-shell .page-main :is(.settings-subnav, .system-admin-subnav) nav {
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
+
+.app-shell .page-main :is(.settings-subnav, .system-admin-subnav) a {
+  display: inline-flex;
+  min-height: var(--toolbar-control-height);
+  align-items: center;
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  font-size: var(--toolbar-font-size);
+  line-height: 1.4;
+}
+
+.app-shell .app-rail__link { border-radius: var(--radius-nav); }
+.app-shell .app-rail.is-collapsed .app-rail__link { border-radius: var(--radius-nav); }
+.app-shell .app-rail__brand { border-bottom: 1px solid var(--border-subtle); }
+.app-shell .app-rail__nav { gap: var(--space-5); padding: var(--space-4) var(--space-3); }
+.app-shell .app-rail__nav ul { gap: var(--space-1); }
+.app-shell .app-header {
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  box-shadow: none;
+}
+.app-shell .app-rail {
+  border-right: 1px solid var(--border-subtle);
+  background: var(--sidebar-bg);
+  box-shadow: none;
+}
+.app-shell .app-rail__link { color: var(--sidebar-text); }
+.app-shell .app-rail__link svg { color: var(--sidebar-icon); filter: none; }
+.app-shell .app-rail__link.is-active {
+  background: var(--sidebar-active);
+  color: var(--sidebar-text-active);
+  box-shadow: none;
+}
+.app-shell .app-rail__link.is-active svg { color: var(--sidebar-icon-active); }
+.app-shell .app-rail__link.is-active::before { display: none; }
+.app-shell .app-rail__footer { border-top: 1px solid var(--border-subtle); }
+.app-shell .app-header__mobile-back,
+.app-shell .app-header__nav-toggle,
+.app-shell .compact-action-menu__trigger { border-radius: 50%; }
+
+@media (min-width: 768px) {
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .filter-bar__desktop {
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: var(--toolbar-gap) 12px;
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .filter-bar__controls,
+  .app-shell .page-main [data-ui="filter-controls"] {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 360px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: var(--toolbar-gap);
+  }
+
+  .app-shell .page-main [data-ui="filter-controls"] {
+    flex: 0 1 auto;
+    justify-content: flex-start;
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .filter-bar__controls > .field,
+  .app-shell .page-main [data-ui="filter-controls"] > .field {
+    width: min(100%, var(--toolbar-filter-width));
+    min-width: 0;
+    flex: 0 1 var(--toolbar-filter-width);
+    gap: 4px;
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .filter-bar__controls > .search-input,
+  .app-shell .page-main [data-ui="filter-controls"] > :is(.search-input, [data-ui="filter-search"], :has(> .search-input)) {
+    width: min(100%, var(--toolbar-search-width));
+    min-width: min(200px, 100%);
+    flex: 0 1 var(--toolbar-search-width);
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .field__label,
+  .app-shell .page-main [data-ui="filter-controls"] .field__label {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .field :is(.input, .select, .select-control__trigger),
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] :is(.button, .icon-button, .dropdown__trigger),
+  .app-shell .page-main [data-ui="filter-controls"] .field :is(.input, .select, .select-control__trigger),
+  .app-shell .page-main [data-ui="filter-controls"] :is(.button, .icon-button, .dropdown__trigger),
+  .app-shell .page-main [data-ui="filter-controls"] button:not([role="switch"]),
+  .app-shell .page-main :is(.page-action-bar, .page-toolbar, .table-action-bar, .function-toolbar, .row-actions) :is(.button, .icon-button, .dropdown__trigger) {
+    --action-control-height: var(--toolbar-control-height);
+    height: var(--toolbar-control-height);
+    min-height: var(--toolbar-control-height);
+    padding-block: 0;
+    font-size: var(--toolbar-font-size);
+    line-height: 1.4;
+  }
+
+  .app-shell .page-main [data-ui="filter-controls"] .field .select-control__trigger > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-shell .page-main [data-ui="filter-controls"] > .field:has(input:is([type="date"], [type="month"])) {
+    width: min(100%, 160px);
+    flex-basis: 160px;
+  }
+
+  .app-shell .page-main [data-ui="filter-controls"] > .field:has(input[type="number"]) {
+    width: min(100%, 112px);
+    flex-basis: 112px;
+  }
+
+  .app-shell .page-main [data-ui="filter-controls"] > [data-ui="actions"] {
+    --action-control-height: var(--toolbar-control-height);
+    flex: 0 0 auto;
+    margin-inline-start: auto;
+  }
+
+  .app-shell .page-main :is(.page-action-bar, .page-toolbar, .table-action-bar, .function-toolbar, .row-actions) {
+    --action-control-height: var(--toolbar-control-height);
+    min-height: var(--toolbar-control-height);
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .filter-bar__actions {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    margin-inline-start: auto;
+  }
+
+  .app-shell .page-main .data-surface__toolbar:has(> .filter-bar[data-ui="filter-bar"]) {
+    min-height: 0;
+    padding-block: 10px;
+  }
+
+  .app-shell .page-main nav.context-tabs[data-ui="context-tabs"] > .context-tabs__scroller > .tabs__item {
+    min-height: var(--toolbar-control-height);
+    padding-block: 8px;
+    border-radius: var(--radius-control);
+    font-size: var(--toolbar-font-size);
+    line-height: 1.4;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .app-shell .page-main,
+  .overlay,
+  .floating-panel {
+    --toolbar-control-height: 44px;
+    --toolbar-font-size: 14px;
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] :is(.button, .icon-button, .dropdown__trigger),
+  .app-shell .page-main [data-ui="filter-controls"] :is(.button, .icon-button, .dropdown__trigger),
+  .app-shell .page-main [data-ui="filter-controls"] button:not([role="switch"]),
+  .app-shell .page-main :is(.action-bar, .form-actions, .sticky-action-bar, [data-ui="actions"]) :is(.button, .icon-button, .dropdown__trigger) {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .app-shell .page-main .search-input[data-ui="search-input"],
+  .overlay .search-input[data-ui="search-input"],
+  .app-shell .page-main [data-ui="filter-search"] {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .app-shell .page-main .search-input[data-ui="search-input"] > .input,
+  .overlay .search-input[data-ui="search-input"] > .input,
+  .app-shell .page-main [data-ui="filter-search"] > input {
+    min-height: 0;
+    height: 100%;
+    font-size: 16px;
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .field :is(.input, .select, .select-control__trigger),
+  .app-shell .page-main [data-ui="filter-controls"] .field :is(.input, .select, .select-control__trigger) {
+    height: 44px;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .app-shell .page-main .filter-bar[data-ui="filter-bar"] .field :is(.select, .select-control__trigger),
+  .app-shell .page-main [data-ui="filter-controls"] .field :is(.select, .select-control__trigger),
+  .overlay .filter-sheet .field :is(.select, .select-control__trigger) {
+    border-radius: var(--radius-search);
+  }
+
+  .app-shell .page-main .button,
+  .overlay .button,
+  .app-shell .page-main .dropdown > summary,
+  .overlay .dropdown > summary { border-radius: var(--radius-button); }
+
+  .app-shell .page-main .icon-button,
+  .overlay .icon-button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex-basis: 44px;
+    border-radius: 50%;
+  }
+
+  .app-shell .page-main .mobile-filter-bar__primary > .search-input[data-ui="search-input"] {
+    width: 100%;
+  }
+
+  .app-shell .page-main [data-ui="filter-controls"] > :is(.search-input, [data-ui="filter-search"]),
+  .app-shell .page-main [data-ui="filter-controls"] > :has(> .search-input) > .search-input {
+    width: 100%;
+  }
+
+  .app-shell .page-main nav.context-tabs[data-ui="context-tabs"] {
+    border-radius: var(--radius-card);
+  }
+
+  .app-shell .page-main nav.context-tabs[data-ui="context-tabs"] .tabs__item {
+    border-radius: var(--radius-control);
+  }
+}
+
+@media (max-width: 620px) {
+  body .overlay.overlay--drawer:not([hidden]):not(:has(.mobile-app-sheet)):has(.filter-sheet) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  body .overlay.overlay--drawer:not([hidden]):not(:has(.mobile-app-sheet)) > .drawer.filter-sheet {
+    width: 100%;
+    height: auto;
+    max-height: min(82dvh, 720px);
+    margin: auto 0 0;
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (forced-colors: active) {
+  .app-shell .page-main .search-input[data-ui="search-input"]:focus-within,
+  .overlay .search-input[data-ui="search-input"]:focus-within,
+  .app-shell .page-main [data-ui="filter-search"]:focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* Canonical working surfaces. Brand colors continue to come from tokens.css. */
+.app-shell .page-main .page-header[data-ui="page-header"] {
+  min-height: var(--toolbar-control-height);
+}
+.app-shell .page-main .page-header[data-ui="page-header"] .page-header__copy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+.app-shell .page-main .page-header__meta { font-size: var(--font-meta); }
+.app-shell .page-main :is(.button, .icon-button) {
+  min-height: var(--toolbar-control-height);
+  border-radius: var(--radius-button);
+  font-size: var(--font-meta);
+}
+.app-shell .page-main .button--lg { min-height: var(--control-height-md); }
+.app-shell .page-main .icon-button {
+  width: var(--action-control-height, var(--toolbar-control-height));
+  min-width: var(--action-control-height, var(--toolbar-control-height));
+  height: var(--action-control-height, var(--toolbar-control-height));
+}
+.app-shell .page-main :is(.form-actions, .sticky-action-bar) :is(.button, .icon-button) {
+  min-height: var(--control-height-md);
+  height: var(--control-height-md);
+  font-size: var(--font-body);
+}
+.app-shell .page-main .filter-bar__compact {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.app-shell .page-main .filter-bar__compact .filter-bar__search {
+  flex: 0 1 var(--toolbar-search-width);
+  min-width: 160px;
+}
+.app-shell .page-main .filter-bar__compact .filter-bar__tools {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+.app-shell .page-main .filter-bar__compact .filter-bar__compact-actions {
+  display: flex;
+  width: max-content;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  margin-inline-start: auto;
+  gap: var(--space-2);
+}
+.app-shell .page-main .filter-bar__compact .filter-bar__search > .search-input { width: 100%; }
+.filter-sheet .mobile-filter-sheet { display: grid; gap: var(--space-4); }
+.filter-sheet .mobile-filter-sheet .field > label.sr-only {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  font-size: var(--font-meta);
+  font-weight: var(--font-weight-medium);
+}
+
+/* A desktop list stays a list, including when an inspector is open. */
+.app-shell .page-main .data-table-scroll {
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+  border-radius: 0;
+}
+.app-shell .page-main .data-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
+  border-radius: 0;
+}
+.app-shell .page-main .data-table :is(th, td) {
+  min-width: 112px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+  line-height: var(--line-height-normal);
+}
+.app-shell .page-main .data-table th { height: var(--table-header-height); font-weight: var(--font-weight-medium); }
+.app-shell .page-main .data-table td { height: var(--table-row-height); }
+.app-shell .page-main .data-table :is(th, td)[data-priority="primary"] { min-width: 220px; }
+.app-shell .page-main .data-table :is(th, td)[data-column="selection"] { min-width: var(--table-selection-column-width); }
+.app-shell .page-main .data-table :is(th, td)[data-column="actions"] { min-width: var(--table-action-column-width); white-space: nowrap; }
+.app-shell .page-main .data-table :is(.status-badge, .badge) { white-space: nowrap; overflow-wrap: normal; }
+.app-shell .page-main .data-table__sort { text-align: start; }
+.app-shell .page-main .data-table tr:hover { background: var(--surface-hover); }
+
+/* Tabs mark the active context without another row of boxed actions. */
+.app-shell .page-main nav.context-tabs[data-ui="context-tabs"] {
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.app-shell .page-main nav.context-tabs[data-ui="context-tabs"] .context-tabs__scroller {
+  gap: var(--space-4);
+  padding: 0;
+}
+.app-shell .page-main nav.context-tabs[data-ui="context-tabs"] .context-tabs__scroller > .tabs__item {
+  min-height: var(--control-height-md);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: var(--space-2) var(--space-1);
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+  font-size: var(--font-body);
+}
+.app-shell .page-main nav.context-tabs[data-ui="context-tabs"] .tabs__item[aria-current="page"] {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-primary-active);
+  font-weight: var(--font-weight-semibold);
+}
+.app-shell .page-main :is(.form-section, .detail-section) { padding: var(--card-padding); }
+.app-shell .page-main .form-section__header { margin: 0; border-bottom: 1px solid var(--border-subtle); padding: 0 0 var(--space-3); }
+.app-shell .page-main .form-section__header h2 { font-size: var(--font-card); }
+.app-shell .page-main .state-box { min-height: 180px; gap: var(--space-3); padding: var(--space-6); }
+.app-shell .page-main .state-box h2 { font-size: var(--font-card); font-weight: var(--font-weight-semibold); }
+.account-security-page { width: 100%; max-width: 520px !important; }
+.account-action-row:has(.password-change-form) { display: grid; }
+.password-change-form { width: 100%; }
+.record-identity { display: grid; min-width: 0; gap: var(--space-1); text-align: inherit; }
+.record-identity > strong { font-weight: var(--font-weight-semibold); }
+.record-identity > small { color: var(--text-secondary); font-size: var(--font-meta); font-weight: var(--font-weight-regular); }
+.record-identity--button { border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; }
+
+@media (max-width: 767px), (pointer: coarse) {
+  .app-shell .page-main :is(.button, .icon-button) { min-height: var(--mobile-control-height); font-size: var(--font-body); }
+  .app-shell .page-main .mobile-record { border-radius: var(--radius-card); }
+  .app-shell .page-main nav.context-tabs[data-ui="context-tabs"] .context-tabs__scroller { gap: var(--space-3); }
+  .app-shell .page-main .page-header[data-ui="page-header"] h1 { font-size: var(--font-page); }
+}
+}

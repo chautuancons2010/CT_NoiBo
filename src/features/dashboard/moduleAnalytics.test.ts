@@ -22,10 +22,10 @@ describe("module analytics authorization", () => {
     const account = user(["warehouse.view", "salary.view", "notification.view", "audit.view"]);
     expect(analyticsDefinitionsFor(account, { ...defaultSystemSettings.modules, warehouse: false }).map((widget) => widget.key)).toEqual(["accounting_summary"]);
   });
-  it("keeps self payslips in accounting without granting HR or payroll permissions", () => {
+  it("keeps self payslips in personal without granting accounting analytics", () => {
     const account = user(["payslip.self.view"]);
-    expect(dashboardModulesFor(account).map((module) => module.id)).toEqual(["accounting"]);
-    expect(analyticsDefinitionsFor(account, defaultSystemSettings.modules).map((widget) => widget.key)).toEqual(["accounting_summary"]);
+    expect(dashboardModulesFor(account).map((module) => module.id)).toEqual(["attendance"]);
+    expect(analyticsDefinitionsFor(account, defaultSystemSettings.modules)).toEqual([]);
   });
   it("supports multiple permitted modules without mixing notification or audit widgets", () => {
     const account = user(["employee.view", "warehouse.view", "payroll.view", "audit.view", "notification.view"]);

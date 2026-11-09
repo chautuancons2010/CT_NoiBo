@@ -10,18 +10,21 @@ import { normalizeUsername } from "@/lib/auth/username";
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
-import { withEmployeeBaseline } from "@/services/authorization/employeeAccessPolicy";
+import { isJwtClockError } from "@/lib/supabase/fetchWithJwtClockRetry";
+import { resolveAccountPermissions } from "@/services/authorization/employeeAccessPolicy";
+import { productionAccountAllowed, sessionCookieNames } from "@/lib/testing/policy.mjs";
 
-export const ACCESS_COOKIE = "ct_access_token";
-export const REFRESH_COOKIE = "ct_refresh_token";
-export const SESSION_COOKIE = "ct_session_id";
+const cookieNames = sessionCookieNames();
+export const ACCESS_COOKIE = cookieNames.access;
+export const REFRESH_COOKIE = cookieNames.refresh;
+export const SESSION_COOKIE = cookieNames.session;
 export const SESSION_INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
 type CookieWriter = { set: (name: string, value: string, options: Record<string, unknown>) => void };
 
 const validStatuses = new Set<AccountStatus>(["pending_activation", "active", "disabled", "locked", "invited"]);
 const validPermissions = new Set<string>(allFoundationPermissions);
-const accountFields = "id,employee_id,username,display_name,primary_email,status,account_roles!account_roles_account_id_fkey(roles(role_permissions(permission_key)))";
+const accountFields = "id,employee_id,username,display_name,primary_email,status,metadata,account_roles!account_roles_account_id_fkey(roles(code,role_permissions(permission_key)))";
 const pendingSessionResolutions = new Map<string, Promise<AuthenticatedUser | null>>();
 
 interface StoredAccount {
@@ -32,7 +35,8 @@ interface StoredAccount {
   display_name: string;
   primary_email?: string | null;
   status: string;
-  account_roles?: Array<{ roles?: { role_permissions?: Array<{ permission_key?: string }> } | null }>;
+  metadata?: unknown;
+  account_roles?: Array<{ roles?: { code?: string; role_permissions?: Array<{ permission_key?: string }> } | null }>;
 }
 
 export function isSessionInactive(lastSeenAt: string, now = Date.now()): boolean {
@@ -81,6 +85,7 @@ export async function assertLoginAllowed(identifier: string, ip?: string | null)
   const { data, error } = await client.rpc("check_auth_login_allowed", { p_key_hash: keyHash });
   if (error) {
     logger.error("auth.login_limit_check_failed", { metadata: { code: error.code, message: error.message.slice(0, 200) } });
+    if (isJwtClockError(error)) throw new AppError("NETWORK_ERROR", "Dịch vụ dữ liệu đang gián đoạn. Vui lòng thử lại sau ít giây.");
     throw new AppError("SERVER_ERROR", "Không thể kiểm tra giới hạn đăng nhập.");
   }
   if (data === false) throw new AppError("RATE_LIMITED", "Quá nhiều lần đăng nhập không thành công. Vui lòng thử lại sau.");
@@ -101,7 +106,7 @@ export async function signInWithPassword(input: { username: string; password: st
   if (!serviceClient) throw new AppError("SERVER_ERROR", "Cơ sở dữ liệu chưa được cấu hình.");
   const { data: loginAccount, error: lookupError } = await serviceClient
     .from("app_accounts")
-    .select("primary_email")
+    .select("primary_email,metadata")
     .eq("username", username)
     .maybeSingle();
   if (lookupError) {
@@ -112,6 +117,7 @@ export async function signInWithPassword(input: { username: string; password: st
     await recordLoginResult(username, input.ip, false);
     throw new AppError("INVALID_CREDENTIALS", "Tên tài khoản hoặc mật khẩu không đúng.");
   }
+  if (!productionAccountAllowed(loginAccount.metadata)) throw new AppError("ACCOUNT_DISABLED", "Tài khoản kiểm thử không được sử dụng trong production.");
   let data: Awaited<ReturnType<ReturnType<typeof publicAuthClient>["auth"]["signInWithPassword"]>>["data"];
   let error: Awaited<ReturnType<ReturnType<typeof publicAuthClient>["auth"]["signInWithPassword"]>>["error"];
   try {
@@ -160,12 +166,15 @@ async function resolveAccount(authUserId: string, fallbackEmail: string): Promis
 }
 
 function mapAccount(account: StoredAccount, fallbackEmail: string): AuthenticatedUser {
+  if (!productionAccountAllowed(account.metadata)) throw new AppError("ACCOUNT_DISABLED");
   const rawRoles = account.account_roles || [];
   const assignedPermissions = [...new Set(rawRoles.flatMap(item => item.roles?.role_permissions || []).map(item => item.permission_key).filter((key): key is Permission => Boolean(key && validPermissions.has(key))))];
-  const permissions = account.employee_id ? withEmployeeBaseline(assignedPermissions) : assignedPermissions;
+  const managementOnly = rawRoles.some((item) => item.roles?.code === "admin");
+  const permissions = resolveAccountPermissions(assignedPermissions, account.employee_id, managementOnly);
   const status = String(account.status);
   return {
     id: String(account.id),
+    employeeId: account.employee_id ? String(account.employee_id) : null,
     displayName: String(account.display_name),
     username: String(account.username),
     email: String(account.primary_email || fallbackEmail),

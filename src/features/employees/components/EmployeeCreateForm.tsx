@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { DatePicker, Input, Select, Textarea } from "@/components/shared/FormControls";
-import { FormSection, StickyActionBar } from "@/components/shared/FormLayout";
+import { FormSection, FormWorkspace, StickyActionBar } from "@/components/shared/FormLayout";
 import { ImageUploader } from "@/components/shared/ImageUploader";
 import type { Department, EmployeePickerOption, EmploymentType, Position } from "@/features/employees/types";
 import { employeeStatusMeta } from "@/features/employees/services/employeeService";
@@ -108,22 +108,32 @@ export function EmployeeCreateForm({
 
   return (
     <form className={`employee-create-form ${styles.form}`} onSubmit={handleSubmit}>
-      {error ? <div className="form-alert form-alert--error">{error}</div> : null}
-      {warnings.length > 0 ? (
-        <div className="form-alert form-alert--warning">
-          {warnings.map((warning) => (
-            <p key={warning}>{warning}</p>
-          ))}
+      {error || warnings.length > 0 ? (
+        <div className={styles.alerts}>
+          {error ? <div className="form-alert form-alert--error" role="alert">{error}</div> : null}
+          {warnings.length > 0 ? (
+            <div className="form-alert form-alert--warning">
+              {warnings.map(warning => <p key={warning}>{warning}</p>)}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
-      <div className={`${styles.sectionCard} ${styles.photoCard}`}>
+      <FormWorkspace aside={<><div className={`${styles.sectionCard} ${styles.photoCard}`}>
         <FormSection columns={1} title="Ảnh nhân viên">
           <ImageUploader disabled={submitting} file={avatar} label="Chọn ảnh nhân viên" maxBytes={5 * 1024 * 1024} onFileChange={setAvatar} uploading={submitting && Boolean(avatar)} />
         </FormSection>
       </div>
-
-      <div className={`${styles.sectionCard} ${styles.personalCard}`}>
+<div className={`${styles.sectionCard} ${styles.additionalCard}`}>
+        <FormSection columns={1} title="Thông tin bổ sung">
+          <Input label="CCCD/CMND" name="nationalIdNumber" />
+          <DatePicker label="Ngày cấp" name="nationalIdIssuedDate" />
+          <Input label="Nơi cấp" name="nationalIdIssuedPlace" />
+          <Input label="Mã số thuế cá nhân" name="personalTaxCode" />
+          <Textarea label="Ghi chú" name="note" />
+        </FormSection>
+      </div></>}>
+<div className={`${styles.sectionCard} ${styles.personalCard}`}>
         <FormSection title="Thông tin cá nhân">
           <Input label="Mã nhân viên" name="employeeCode" required />
           <Input label="Họ và tên" name="fullName" required />
@@ -131,12 +141,11 @@ export function EmployeeCreateForm({
           <DatePicker label="Ngày sinh" name="dateOfBirth" />
           <Select label="Giới tính" name="gender" options={[{ value: "male", label: "Nam" }, { value: "female", label: "Nữ" }, { value: "other", label: "Khác" }, { value: "undisclosed", label: "Không cung cấp" }]} placeholder="Chưa cập nhật" />
           <Select label="Tình trạng hôn nhân" name="maritalStatus" options={[{ value: "single", label: "Độc thân" }, { value: "married", label: "Đã kết hôn" }, { value: "other", label: "Khác" }]} placeholder="Chưa cập nhật" />
-          <Input label="Số điện thoại" name="personalPhone" />
+          <Input label="Số điện thoại" name="personalPhone" type="tel" />
           <Input label="Email cá nhân" name="personalEmail" type="email" />
         </FormSection>
       </div>
-
-      <div className={`${styles.sectionCard} ${styles.employmentCard}`}>
+<div className={`${styles.sectionCard} ${styles.employmentCard}`}>
         <FormSection title="Thông tin công việc">
         <Select
           label="Phòng ban"
@@ -192,27 +201,25 @@ export function EmployeeCreateForm({
         <Input label="Email công ty" name="companyEmail" type="email" />
         </FormSection>
       </div>
-
-      <div className={`${styles.sectionCard} ${styles.contactCard}`}>
+<div className={`${styles.sectionCard} ${styles.contactCard}`}>
         <FormSection title="Liên hệ">
           <Input label="Địa chỉ hiện tại" name="currentAddress" />
           <Input label="Địa chỉ thường trú" name="permanentAddress" />
           <Input label="Tỉnh/Thành" name="province" />
           <Input label="Người liên hệ khẩn cấp" name="emergencyContactName" />
           <Input label="Quan hệ" name="emergencyContactRelation" />
-          <Input label="Số điện thoại khẩn cấp" name="emergencyContactPhone" />
+          <Input label="Số điện thoại khẩn cấp" name="emergencyContactPhone" type="tel" />
         </FormSection>
       </div>
+</FormWorkspace>
 
-      <div className={`${styles.sectionCard} ${styles.additionalCard}`}>
-        <FormSection columns={1} title="Thông tin bổ sung">
-          <Input label="CCCD/CMND" name="nationalIdNumber" />
-          <DatePicker label="Ngày cấp" name="nationalIdIssuedDate" />
-          <Input label="Nơi cấp" name="nationalIdIssuedPlace" />
-          <Input label="Mã số thuế cá nhân" name="personalTaxCode" />
-          <Textarea label="Ghi chú" name="note" />
-        </FormSection>
-      </div>
+      
+
+      
+
+      
+
+      
 
       <StickyActionBar>
         <Button disabled={submitting} onClick={() => router.back()} type="button" variant="secondary">
@@ -223,8 +230,8 @@ export function EmployeeCreateForm({
           leftIcon={<Save aria-hidden="true" size={16} />}
           type="submit"
           variant="primary"
-        >
-          {submitting ? "Đang lưu" : "Lưu hồ sơ"}
+         busy={submitting}>
+          {"Lưu hồ sơ"}
         </Button>
       </StickyActionBar>
     </form>

@@ -9,6 +9,7 @@ const coordinatesSchema = z.object({
 
 export const attendanceRecordInputSchema = z.object({
   clientEventId: z.string().uuid(),
+  intendedType: z.enum(["check_in", "check_out"]).optional(),
   capturedAtClient: z.string().datetime(),
   capturedOffline: z.boolean(),
   location: coordinatesSchema.optional(),

@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright-core";
@@ -21,7 +22,7 @@ try {
   const login = await context.request.post(`${baseUrl}/api/v1/auth/login`, {
     data: {
       username: process.env.UI_QA_USERNAME || "test.supervisor",
-      password: process.env.SEED_TEST_PASSWORD || "12345678"
+      password: getTestPassword()
     }
   });
   if (!login.ok()) {

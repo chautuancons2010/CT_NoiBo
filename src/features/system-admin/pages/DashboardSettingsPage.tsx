@@ -66,7 +66,7 @@ export function DashboardSettingsPage() {
           </div>
         </div>
         {editor.message ? <div aria-live="polite" className="save-feedback">{editor.message}</div> : null}
-        <StickyActionBar><Button disabled={!editor.dirty || editor.saving} onClick={editor.reset}>Hoàn tác</Button><Button disabled={!editor.dirty || editor.saving} onClick={() => void editor.save()} variant="primary">{editor.saving ? "Đang lưu" : "Xuất bản"}</Button></StickyActionBar>
+        <StickyActionBar><Button disabled={!editor.dirty || editor.saving} onClick={editor.reset}>Hoàn tác</Button><Button disabled={!editor.dirty || editor.saving} onClick={() => void editor.save()} variant="primary" busy={editor.saving}>{"Xuất bản"}</Button></StickyActionBar>
       </section>
     </AdminPage>
   );

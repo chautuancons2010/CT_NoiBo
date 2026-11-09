@@ -12,11 +12,12 @@ interface FloatingPanelProps {
   role?: "listbox" | "menu" | "presentation";
   label?: string;
   matchWidth?: boolean;
+  preferredWidth?: number;
 }
 
 /** Portals remain inside their owning dialog for its focus lock. The native
  * popover top layer prevents clipping by tables and scrolling form sections. */
-export function FloatingPanel({ anchor, children, className = "", id, onClose, role = "presentation", label, matchWidth = true }: FloatingPanelProps) {
+export function FloatingPanel({ anchor, children, className = "", id, onClose, role = "presentation", label, matchWidth = true, preferredWidth }: FloatingPanelProps) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   const [position, setPosition] = useState<CSSProperties>();
@@ -34,7 +35,7 @@ export function FloatingPanel({ anchor, children, className = "", id, onClose, r
       const topOffset = viewport?.offsetTop ?? 0;
       const leftOffset = viewport?.offsetLeft ?? 0;
       const gutter = 12;
-      const panelWidth = Math.min(matchWidth ? Math.max(rect.width, 224) : 240, width - gutter * 2);
+      const panelWidth = Math.min(preferredWidth ?? (matchWidth ? Math.max(rect.width, 224) : 240), width - gutter * 2);
       const below = height + topOffset - rect.bottom - gutter;
       const above = rect.top - topOffset - gutter;
       const up = below < 200 && above > below;
@@ -75,7 +76,7 @@ export function FloatingPanel({ anchor, children, className = "", id, onClose, r
       document.removeEventListener("keydown", escape, true);
       if (typeof element.hidePopover === "function" && element.matches(":popover-open")) element.hidePopover();
     };
-  }, [anchor, matchWidth]);
+  }, [anchor, matchWidth, preferredWidth]);
 
   const host = anchor.current?.closest('[role="dialog"]') ?? (typeof document !== "undefined" ? document.body : null);
   if (!host) return null;

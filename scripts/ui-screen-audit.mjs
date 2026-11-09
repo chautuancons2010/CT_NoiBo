@@ -42,7 +42,8 @@ for (const page of pageSources) {
   assert(!/PlaceholderPage|SettingsPlaceholderPage/.test(page.source), `Route ${page.route} vẫn dùng placeholder.`);
   assert(!/coming soon|sắp ra mắt|đang phát triển/i.test(page.source), `Route ${page.route} còn nội dung tạm.`);
   assert(
-    /\bredirect\s*\(|<(?:PageHeader|h1)\b|from\s*["']@\/(?:features|components)\//.test(page.source) || /export\s*\{\s*default\s*\}\s*from/.test(page.source),
+    /\bredirect\s*\(|<(?:PageHeader|h1)\b|from\s*["']@\/(?:features|components)\//.test(page.source) || /export\s*\{\s*default\s*\}\s*from/.test(page.source)
+      || (/^\/import-export\/shipments\/\[id\]\//.test(page.route) && /\breturn null\s*;/.test(page.source) && /ShipmentWorkspace|ShipmentDetail/.test(await readFile(path.join(appRoot, "import-export/shipments/[id]/layout.tsx"), "utf8"))),
     `Route ${page.route} chưa có screen owner.`
   );
 }
@@ -72,15 +73,16 @@ for (const { route } of pageSources) {
 await Promise.all([
   assertContract("src/features/dashboard/components/DashboardView.tsx", ["model?.widgets", "model?.attention", "styles.metrics", "styles.chartGrid", "<ModuleChart", "<ModuleLauncher"]),
   assertContract("src/features/employees/pages/EmployeeDetailPage.tsx", ["EmployeeAttendanceTab", "EmployeeProjectsTab", "<Tabs", "PermissionDeniedState", "EmptyState"]),
-  assertContract("src/features/attendance/components/AttendanceCameraExperience.tsx", ["capturedOffline", "LoadingState", "ErrorState", "attendance-success-card"]),
-  assertContract("src/features/timesheets/components/TimesheetPeriodDetail.tsx", ["StatusBadge", "EntityContextHeader", "ContextTabs", "LoadingState", "ErrorState", "disabled={busy}"]),
+  assertContract("src/features/attendance/components/AttendanceCameraExperience.tsx", ["capturedOffline", "LoadingState", "ErrorState", "styles.successCard"]),
+  assertContract("src/features/timesheets/components/TimesheetPeriodDetail.tsx", ["StatusBadge", "RecordHeader", "ListWorkspace", "ContextTabs", "LoadingState", "ErrorState", "disabled={busy}"]),
   assertContract("src/features/leave/components/LeaveRequestDetail.tsx", ["LoadingState", "ErrorState", "styles.timeline", "item.approvalSteps.map", "router.refresh"]),
   assertContract("src/features/projects/components/package-workspace/PackageWorkspace.tsx", ["PackageConstructionWorkspace", "PackageAttendanceWorkspace", "PackageDocumentWorkspace", "PackageRecordWorkspace", "PermissionDeniedState"]),
   assertContract("src/features/projects/components/package-workspace/PackageContextHeader.tsx", ["StatusBadge", "EntityContextHeader", "Select"]),
   assertContract("src/features/projects/components/package-workspace/PackageRecordWorkspace.tsx", ["ProjectHealthControl", "healthDisplay", "Thông tin gói"]),
   assertContract("src/features/warehouse/components/InventoryDocumentEditor.tsx", ["warehouse-document-heading", "StatusBadge", "disabled={busy}"]),
-  assertContract("src/features/warehouse/components/StockCountEditor.tsx", ["LoadingState", "ErrorState", "data-table-scroll", "disabled={busy}"]),
-  assertContract("src/features/import-export/components/ImportExportViews.tsx", ["DataTable", "StatusBadge", "emptyTitle", "Tabs"]),
+  assertContract("src/features/warehouse/components/StockCountEditor.tsx", ["LoadingState", "DataTable", "role=\"alert\"", "disabled={busy}"]),
+  assertContract("src/features/import-export/components/ImportExportViews.tsx", ["DataTable", "StatusBadge", "emptyTitle"]),
+  assertContract("src/features/import-export/components/ShipmentWorkspace.tsx", ["Tabs", "DataTable"]),
   assertContract("src/features/messaging/MessageCenter.tsx", ["message-center", "ImageUploader", "sending", "postgres_changes"]),
   assertContract("src/features/shared-platforms/components/NotificationCenter.tsx", ["LoadingState", "ErrorState", "EmptyState", "useDomainReconciliation"]),
   assertContract("src/app/(app)/profile/page.tsx", ["<PageHeader", "self-profile-card", "ChangePasswordForm", "PersonalUiSettings"]),

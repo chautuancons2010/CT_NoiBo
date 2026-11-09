@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/shared/States";
+import { PageSkeleton } from "@/components/shared/LoadingExperience";
 
 export default function Loading() {
-  return <LoadingState title="Đang tải trang" />;
+  return <PageSkeleton />;
 }

@@ -1,66 +1,43 @@
 "use client";
 
-import {
-  ArrowRight,
-  BriefcaseBusiness,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  MapPin,
-  Plus,
-  UserRound,
-  UsersRound
-} from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, Plus, RefreshCw, UsersRound, X } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-import { Button } from "@/components/shared/Button";
-import { FilterBar } from "@/components/shared/FilterBar";
-import { SearchInput, Select } from "@/components/shared/FormControls";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Avatar } from "@/components/shared/Avatar";
+import { Button, IconButton } from "@/components/shared/Button";
+import { Worklist, type DataTableColumn } from "@/components/shared/DataTable";
+import { FilterTabs } from "@/components/shared/FilterBar";
+import { ListWorkspace } from "@/components/shared/PageLayouts";
+import { SearchInput } from "@/components/shared/FormControls";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { ProjectStatus, ProjectSummary } from "@/features/projects/types/projectTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
-
+import { formatBusinessDate, getBusinessDateKey } from "@/lib/time/timezone";
+import { filterPortfolio, portfolioStatus, projectIsOverdue, projectStatusPresentation } from "./projectPortfolioPresentation";
 import styles from "./ProjectPortfolioWorkspace.module.css";
 
-type PortfolioGroup = "active" | "upcoming" | "completed";
+const primaryStatuses: ProjectStatus[] = ["active", "preparing", "completed"];
+const optionalStatuses: ProjectStatus[] = ["paused", "closed"];
 
-const statusMeta: Record<ProjectStatus, { label: string; tone: "info" | "success" | "warning" | "neutral" }> = {
-  preparing: { label: "Sắp tới", tone: "info" },
-  active: { label: "Đang thực hiện", tone: "success" },
-  paused: { label: "Tạm dừng", tone: "warning" },
-  completed: { label: "Hoàn thành", tone: "success" },
-  closed: { label: "Đã đóng", tone: "neutral" }
-};
-
-const groupMeta: Record<PortfolioGroup, { title: string; icon: typeof BriefcaseBusiness; tone: string }> = {
-  active: { title: "Đang thực hiện", icon: BriefcaseBusiness, tone: "active" },
-  upcoming: { title: "Sắp tới", icon: Clock3, tone: "upcoming" },
-  completed: { title: "Đã hoàn thành", icon: CheckCircle2, tone: "completed" }
-};
-
-function groupFor(project: ProjectSummary): PortfolioGroup {
-  if (project.status === "preparing") return "upcoming";
-  if (project.status === "completed" || project.status === "closed") return "completed";
-  return "active";
-}
-
-function shortDate(value?: string) {
-  if (!value) return "Chưa xác định";
-  const [year, month, day] = value.split("-");
-  return day && month && year ? `${day}/${month}/${year}` : value;
-}
-
-export function ProjectPortfolioWorkspace({ canCreate = false }: { canCreate?: boolean }) {
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ProjectPortfolioWorkspace({ canCreate = false, initialProjects }: { canCreate?: boolean; initialProjects?: ProjectSummary[] }) {
+  const [projects, setProjects] = useState<ProjectSummary[]>(initialProjects ?? []);
+  const [loading, setLoading] = useState(initialProjects === undefined);
   const [error, setError] = useState<string>();
-  const [query, setQuery] = useState("");
-  const [group, setGroup] = useState<PortfolioGroup | "">("");
+  const request = useRef<AbortController | null>(null);
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const query = params.get("q") ?? "";
+  const status = portfolioStatus(params.get("status"));
+  const today = getBusinessDateKey();
+  const hasFilters = Boolean(query || params.get("status"));
+  const initialLoading = loading && !projects.length;
 
   const load = useCallback(async () => {
+    request.current?.abort();
     const controller = new AbortController();
+    request.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), 12_000);
     setLoading(true);
     setError(undefined);
@@ -68,105 +45,53 @@ export function ProjectPortfolioWorkspace({ canCreate = false }: { canCreate?: b
       const response = await fetch("/api/v1/projects", { cache: "no-store", signal: controller.signal });
       const body = await response.json() as { data?: ProjectSummary[]; error?: { message?: string } };
       if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể tải danh sách gói.");
-      setProjects(body.data);
+      if (request.current === controller) setProjects(body.data);
     } catch (reason) {
-      setError(reason instanceof DOMException && reason.name === "AbortError" ? "Máy chủ chưa phản hồi." : reason instanceof Error ? reason.message : "Không thể tải danh sách gói.");
+      if (request.current === controller) setError(reason instanceof DOMException && reason.name === "AbortError" ? "Máy chủ chưa phản hồi." : reason instanceof Error ? reason.message : "Không thể tải danh sách gói.");
     } finally {
       window.clearTimeout(timeout);
-      setLoading(false);
+      if (request.current === controller) { request.current = null; setLoading(false); }
     }
   }, []);
-
-  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
+  useEffect(() => {
+    if (initialProjects !== undefined) return;
+    let mounted = true;
+    queueMicrotask(() => { if (mounted) void load(); });
+    return () => { mounted = false; request.current?.abort(); request.current = null; };
+  }, [initialProjects, load]);
   useDomainReconciliation("projects", load);
 
-  const filtered = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase("vi-VN");
-    return projects.filter((project) => {
-      const matchesGroup = !group || group === groupFor(project);
-      const matchesSearch = !term || [project.name, project.customerName, project.projectManagerName]
-        .some((value) => value?.toLocaleLowerCase("vi-VN").includes(term));
-      return matchesGroup && matchesSearch;
-    });
-  }, [group, projects, query]);
+  function updateFilters(next: { query?: string; status?: ProjectStatus | "" }) {
+    const search = new URLSearchParams(window.location.search);
+    if (next.query !== undefined) { if (next.query) search.set("q", next.query); else search.delete("q"); }
+    if (next.status !== undefined) { if (next.status) search.set("status", next.status); else search.delete("status"); }
+    window.history.replaceState(null, "", `${pathname}${search.size ? `?${search}` : ""}${window.location.hash}`);
+  }
+  function clearFilters() { updateFilters({ query: "", status: "" }); }
 
-  const grouped = useMemo(() => ({
-    active: filtered.filter((project) => groupFor(project) === "active"),
-    upcoming: filtered.filter((project) => groupFor(project) === "upcoming"),
-    completed: filtered.filter((project) => groupFor(project) === "completed")
-  }), [filtered]);
+  const counts = useMemo(() => {
+    const result: Record<ProjectStatus, number> = { active: 0, preparing: 0, paused: 0, completed: 0, closed: 0 };
+    projects.forEach(project => { result[project.status] += 1; });
+    return result;
+  }, [projects]);
+  const filtered = useMemo(() => filterPortfolio(projects, query, status, today), [projects, query, status, today]);
+  const overdueCount = filtered.filter(project => projectIsOverdue(project, today)).length;
+  const statuses = [...primaryStatuses, ...optionalStatuses.filter(value => counts[value] || status === value)];
+  const columns: DataTableColumn<ProjectSummary>[] = [
+    { id: "name", header: "Gói / Công trường", priority: "primary", cell: project => <Link className={`record-identity ${styles.identity}`} href={`/projects/${encodeURIComponent(project.id)}/today`}><span aria-hidden="true" className={styles.projectIcon} data-status={project.status}><Building2 size={19} strokeWidth={1.7} /></span><span className={styles.identityCopy}><strong>{project.name}</strong><small><span className={styles.code}>{project.code}</span>{project.customerName ? <span className={styles.customer}>{project.customerName}</span> : null}</small></span></Link> },
+    { id: "manager", header: "Phụ trách", cell: project => project.projectManagerName ? <span className={styles.manager}><span aria-hidden="true"><Avatar className={styles.managerAvatar} name={project.projectManagerName} /></span><span>{project.projectManagerName}</span></span> : <span className={styles.missing}>Chưa phân công</span> },
+    { id: "people", header: "Nhân sự", hiddenOnMobile: true, cell: project => <span className={styles.scope}><span><UsersRound aria-hidden="true" size={15} /><strong>{project.currentPeople}</strong></span><small>{project.worksiteCount} công trường</small></span> },
+    { id: "deadline", header: "Hạn hoàn thành", cell: project => <span className={styles.deadline} data-overdue={projectIsOverdue(project, today) || undefined}>{project.expectedEndDate ? <span className={styles.date}><CalendarDays aria-hidden="true" size={15} /><time dateTime={project.expectedEndDate}>{formatBusinessDate(project.expectedEndDate)}</time></span> : <span aria-label="Chưa có hạn hoàn thành" className={styles.missing}>—</span>}{projectIsOverdue(project, today) ? <small><AlertTriangle aria-hidden="true" size={12} />Quá hạn</small> : null}</span> },
+    { id: "status", header: "Trạng thái", cell: project => <StatusBadge tone={projectStatusPresentation[project.status].tone}>{projectStatusPresentation[project.status].label}</StatusBadge> }
+  ];
 
-  return (
-    <div className={styles.workspace}>
-      <section className={styles.surface}>
-        <FilterBar
-          actions={canCreate ? <Link aria-label="Tạo gói" href="/projects/new"><Button className={styles.createButton} leftIcon={<Plus aria-hidden="true" size={17} />} variant="primary">Tạo gói</Button></Link> : undefined}
-          label="Tìm và lọc gói"
-        >
-          <SearchInput label="Tìm gói" onChange={(event) => setQuery(event.target.value)} placeholder="Tên gói, khách hàng, phụ trách" value={query} />
-          <Select
-            label="Nhóm gói"
-            onChange={(event) => setGroup(event.target.value as PortfolioGroup | "")}
-            options={[
-              { value: "", label: "Tất cả nhóm" },
-              { value: "active", label: "Đang thực hiện" },
-              { value: "upcoming", label: "Sắp tới" },
-              { value: "completed", label: "Đã hoàn thành" }
-            ]}
-            value={group}
-          />
-        </FilterBar>
-
-        {loading ? <LoadingState /> : error ? (
-          <ErrorState action={<Button onClick={() => void load()} variant="secondary">Tải lại</Button>} description={error} />
-        ) : filtered.length === 0 ? <EmptyState title="Chưa có gói phù hợp" /> : (
-          <div className={styles.groups}>
-            {(["active", "upcoming", "completed"] as const).map((key) => {
-              const items = grouped[key];
-              if (!items.length) return null;
-              const meta = groupMeta[key];
-              const Icon = meta.icon;
-              return (
-                <section className={styles.group} data-tone={meta.tone} key={key}>
-                  <header className={styles.groupHeader}>
-                    <div><span className={styles.groupIcon}><Icon aria-hidden="true" size={18} /></span><h2>{meta.title}</h2></div>
-                    <span>{items.length} gói</span>
-                  </header>
-                  <div className={styles.list}>{items.map((project) => <ProjectRow key={project.id} project={project} />)}</div>
-                </section>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function ProjectRow({ project }: { project: ProjectSummary }) {
-  const meta = statusMeta[project.status];
-  return (
-    <Link className={styles.row} href={`/projects/${project.id}/today`}>
-      <div className={styles.identity}>
-        <strong>{project.name}</strong>
-        <small>{project.customerName ?? "Chưa có khách hàng"}</small>
-      </div>
-      <div className={styles.manager}>
-        <UserRound aria-hidden="true" size={16} />
-        <span><small>Phụ trách</small><strong>{project.projectManagerName ?? "Chưa phân công"}</strong></span>
-      </div>
-      <div className={styles.operationalMeta}>
-        <span><MapPin aria-hidden="true" size={15} />{project.worksiteCount} công trường</span>
-        <span><UsersRound aria-hidden="true" size={15} />{project.currentPeople} nhân sự</span>
-      </div>
-      <div className={styles.deadline}>
-        <CalendarDays aria-hidden="true" size={16} />
-        <span><small>Bắt đầu {shortDate(project.startDate)}</small><strong>Hạn {shortDate(project.expectedEndDate ?? project.actualEndDate)}</strong></span>
-      </div>
-      <div className={styles.rowEnd}>
-        <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>
-        <span className={styles.openAction}>Mở gói <ArrowRight aria-hidden="true" size={17} /></span>
-      </div>
-    </Link>
-  );
+  return <ListWorkspace label="Danh sách gói"
+    navigation={<FilterTabs label="Lọc trạng thái gói" value={status ?? ""} onChange={value => updateFilters({ status: portfolioStatus(value) })} options={[{ value: "", label: `Tất cả ${initialLoading ? "—" : projects.length}` }, ...statuses.map(value => ({ value, label: `${projectStatusPresentation[value].label} ${initialLoading ? "—" : counts[value]}` }))]} />}
+    filters={<><SearchInput label="Tìm gói" onChange={event => updateFilters({ query: event.target.value })} placeholder="Tìm mã, tên gói, khách hàng, phụ trách" value={query} /><div className={styles.toolbarActions}>{hasFilters ? <Button className={styles.clear} leftIcon={<X aria-hidden="true" size={15} />} onClick={clearFilters} variant="ghost">Xóa lọc</Button> : null}<IconButton className={styles.refresh} disabled={loading} label="Cập nhật danh sách gói" onClick={() => void load()}><RefreshCw aria-hidden="true" className={loading ? styles.spinning : undefined} size={17} /></IconButton></div></>}>
+    {initialLoading ? <LoadingState /> : error && !projects.length ? <ErrorState title="Không thể tải danh sách gói" description={error} action={<Button onClick={() => void load()}>Thử lại</Button>} /> : <>
+      {error ? <div className={styles.error} role="alert"><span>{error}</span><Button onClick={() => void load()} size="sm">Thử lại</Button></div> : null}
+      {filtered.length ? <Worklist ariaLabel="Danh sách gói" className={styles.table} columns={columns} data={filtered} getRowId={project => project.id} getRowHref={project => `/projects/${encodeURIComponent(project.id)}/today`} rowActivation="open" /> : <EmptyState title={projects.length ? "Không tìm thấy gói" : "Chưa có gói"} action={hasFilters ? <Button onClick={clearFilters}>Xóa bộ lọc</Button> : canCreate ? <Link className="button button--primary button--md" href="/projects/new"><Plus aria-hidden="true" size={17} />Tạo gói</Link> : undefined} />}
+      <footer aria-live="polite" aria-atomic="true" className={styles.footer} role="status"><span>{loading ? "Đang cập nhật…" : `${filtered.length} / ${projects.length} gói`}</span>{!loading && overdueCount > 0 ? <span className={styles.overdueTotal}><AlertTriangle aria-hidden="true" size={14} />{overdueCount} quá hạn</span> : null}</footer>
+    </>}
+  </ListWorkspace>;
 }

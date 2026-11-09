@@ -62,7 +62,7 @@ export function PayslipTemplatePage() {
           {message ? <div className="save-feedback" role="status">{message}</div> : null}
           <StickyActionBar>
             <Button disabled={!dirty || saving} onClick={() => setTemplate(structuredClone(settings.payslip))}>Hoàn tác</Button>
-            <Button disabled={!dirty || saving} onClick={() => void save()} variant="primary">{saving ? "Đang lưu" : "Lưu mẫu"}</Button>
+            <Button disabled={!dirty || saving} onClick={() => void save()} variant="primary" busy={saving}>{"Lưu mẫu"}</Button>
           </StickyActionBar>
         </section>
         <section className="payslip-template-preview" style={{ "--payslip-accent": template.primaryColor } as CSSProperties}>

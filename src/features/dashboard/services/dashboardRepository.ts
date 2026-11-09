@@ -19,7 +19,7 @@ export async function getDashboardProjectSummary(user: AuthenticatedUser) {
   const projects = (await listProjects(user)).filter((project) => project.status !== "closed");
   if (!projects.length) return { active: 0, averageCompletion: 0, atRisk: 0, delayed: 0, projects: [], attention: [] };
   const [issues, { data: progressRows, error }] = await Promise.all([
-    listProjectIssues(user),
+    can(user.permissions, "project_issue.view") ? listProjectIssues(user) : Promise.resolve([]),
     client.from("project_progress_nodes").select("project_id,completion_percent")
       .in("project_id", projects.map((project) => project.id)).is("parent_id", null)
   ]);

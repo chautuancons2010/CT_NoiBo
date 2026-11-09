@@ -1,5 +1,6 @@
 import type ExcelJS from "exceljs";
 import { sanitizeSpreadsheetCell } from "@/lib/security/filePolicy";
+import { safeWorksheetName } from "@/lib/documents/spreadsheet";
 import type { ReportField } from "./reportFieldRegistry";
 
 type Row = Record<string, unknown>;
@@ -47,7 +48,7 @@ export function addTimesheetMatrix(workbook: ExcelJS.Workbook, input: {
   const identity = input.fields.filter((field) => identityKeys.has(field.key));
   const totals = input.fields.filter((field) => !identityKeys.has(field.key));
   const columnCount = identity.length + dates.length + totals.length;
-  const sheet = workbook.addWorksheet(input.name.slice(0, 31), {
+  const sheet = workbook.addWorksheet(safeWorksheetName(workbook, input.name), {
     views: input.freezeHeader ? [{ state: "frozen", ySplit: 3, xSplit: identity.length }] : undefined,
     pageSetup: { orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "1:3" }
   });

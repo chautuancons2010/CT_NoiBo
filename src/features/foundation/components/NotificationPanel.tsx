@@ -30,7 +30,6 @@ export function NotificationPanel() {
       <header className="panel-header">
         <div>
           <h2>Thông báo</h2>
-          <p>Theo dõi trạng thái đọc, loại thông báo và thời điểm phát sinh.</p>
         </div>
         <Button leftIcon={<CheckCheck aria-hidden="true" size={16} />} variant="secondary">
           Đánh dấu đã đọc

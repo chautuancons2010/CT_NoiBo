@@ -11,6 +11,7 @@ import { DataSurface, ListPageLayout } from "@/components/shared/PageLayouts";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 import type { TimesheetPeriod } from "../types/timesheetTypes";
+import { InlineForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 const statusLabel = { open: "Mở", reviewing: "Đang rà soát", locked: "Đã khóa", reopened: "Đã mở lại" };
 
@@ -65,13 +66,10 @@ export function TimesheetPeriodList({ canCreate = false, initialItems, initialEr
 
   return <ListPageLayout>
     {canCreate ? <div className="timesheet-period-actions"><Button onClick={() => setShowForm((value) => !value)} variant="primary">Tạo kỳ công</Button></div> : null}
-    {showForm ? <Card><form className="form-grid" onSubmit={(event) => void submit(event)}>
-      <Input label="Mã kỳ" name="code" placeholder="2026-09" required />
-      <Input label="Tên kỳ" name="name" required />
-      <Input label="Từ ngày" name="startDate" required type="date" />
-      <Input label="Đến ngày" name="endDate" required type="date" />
-      <div className="form-actions"><Button type="submit" variant="primary">Lưu</Button></div>
-    </form></Card> : null}
+    {showForm ? <Card><InlineForm className="form-grid" onSubmit={(event) => void submit(event)}><FormFields><Input label="Mã kỳ" name="code" placeholder="2026-09" required />
+<Input label="Tên kỳ" name="name" required />
+<Input label="Từ ngày" name="startDate" required type="date" />
+<Input label="Đến ngày" name="endDate" required type="date" /></FormFields><FormActions><Button type="submit" variant="primary">Lưu</Button></FormActions></InlineForm></Card> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     <DataSurface><DataTable columns={periodColumns} data={items} emptyDescription="" emptyTitle="Chưa có kỳ công" getRowId={(item) => item.id} loading={loading} rowHrefPrefix="/timesheets/periods/" /></DataSurface>
   </ListPageLayout>;

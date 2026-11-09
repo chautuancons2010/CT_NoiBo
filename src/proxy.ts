@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { sessionCookieNames, stagingAuthorized } from "@/lib/testing/policy.mjs";
+import { lockedModuleForRequestPath, moduleForRequestPath } from "@/config/moduleAccess";
+import { moduleLabels } from "@/config/systemSettings";
+import { readModuleSettings } from "@/services/system-settings/systemSettingsService";
 
 const mutatingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const accessCookie = "ct_access_token";
-const refreshCookie = "ct_refresh_token";
+const accessCookie = sessionCookieNames().access;
+const refreshCookie = sessionCookieNames().refresh;
 const refreshWindowSeconds = 5 * 60;
 
 function accessTokenExpiresSoon(token: string): boolean {
@@ -36,12 +40,34 @@ async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: 
 }
 
 export async function proxy(request: NextRequest) {
+  if (!stagingAuthorized(request.headers.get("authorization"))) {
+    return new NextResponse("Staging access required", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="CT NoiBo Staging", charset="UTF-8"', "cache-control": "no-store" } });
+  }
   const requestId = request.headers.get("x-request-id")?.slice(0, 128) || randomUUID();
   if (request.nextUrl.pathname.startsWith("/api/") && mutatingMethods.has(request.method)) {
     const origin = request.headers.get("origin");
-    const allowedOrigin = new URL(process.env.APP_BASE_URL || request.nextUrl.origin).origin;
-    if (origin && origin !== request.nextUrl.origin && origin !== allowedOrigin) {
+    // The dev server can normalize nextUrl to localhost even when a phone
+    // connects through the machine's LAN address. Check the actual Host too.
+    const requestOrigin = new URL(`${request.nextUrl.protocol}//${request.headers.get("host") || request.nextUrl.host}`).origin;
+    const allowedOrigin = new URL(process.env.APP_BASE_URL || requestOrigin).origin;
+    if (origin && origin !== requestOrigin && origin !== allowedOrigin) {
       return NextResponse.json({ ok: false, error: { code: "PERMISSION_DENIED", message: "Nguồn yêu cầu không hợp lệ.", requestId } }, { status: 403, headers: { "cache-control": "no-store", "x-request-id": requestId } });
+    }
+  }
+  const moduleKey = moduleForRequestPath(request.nextUrl.pathname);
+  if (moduleKey) {
+    try {
+      const locked = lockedModuleForRequestPath(request.nextUrl.pathname, await readModuleSettings({ maxAgeMs: mutatingMethods.has(request.method) ? 2_000 : 5_000, allowStaleOnError: true }));
+      if (locked) {
+        if (request.nextUrl.pathname.startsWith("/api/")) {
+          return NextResponse.json({ ok: false, error: { code: "MODULE_LOCKED", message: `Module ${moduleLabels[locked]} đang tạm khóa.`, requestId } }, { status: 423, headers: { "cache-control": "no-store", "x-request-id": requestId } });
+        }
+        const destination = new URL("/module-locked", request.url);
+        destination.searchParams.set("module", locked);
+        return NextResponse.redirect(destination, { headers: { "cache-control": "no-store", "x-request-id": requestId } });
+      }
+    } catch {
+      return NextResponse.json({ ok: false, error: { code: "NETWORK_ERROR", message: "Không thể kiểm tra trạng thái module. Vui lòng thử lại.", requestId } }, { status: 503, headers: { "cache-control": "no-store", "x-request-id": requestId } });
     }
   }
   const accessToken = request.cookies.get(accessCookie)?.value;

@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils/cn";
+import { useLoadingActivity } from "@/lib/ui/useLoadingActivity";
 
 type ButtonVariant = "primary" | "secondary" | "soft" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
@@ -12,6 +13,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+  busy?: boolean;
 }
 
 export function Button({
@@ -20,10 +22,12 @@ export function Button({
   size = "md",
   leftIcon,
   rightIcon,
+  busy = false,
   children,
   type = "button",
   ...props
 }: ButtonProps) {
+  useLoadingActivity(busy);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const widestContent = useRef(0);
 
@@ -49,6 +53,8 @@ export function Button({
       className={cn("button", `button--${variant}`, `button--${size}`, className)}
       type={type}
       {...props}
+      aria-busy={busy || props["aria-busy"] || undefined}
+      disabled={props.disabled || busy}
     >
       {leftIcon ? <span className="button__icon">{leftIcon}</span> : null}
       <span>{children}</span>

@@ -1,5 +1,7 @@
 "use client";
 
+import { FileDownloadLink } from "@/components/shared/FileDownloadLink";
+
 import { Bell, CalendarDays, Camera, Clock3, Download, MoreHorizontal, Plus, Search, SlidersHorizontal } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -22,6 +24,7 @@ import { formatBusinessDate } from "@/lib/time/timezone";
 
 import attendanceStyles from "./PackageAttendanceWorkspace.module.css";
 import styles from "./PackageWorkspace.module.css";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 const roleLabels: Record<AssignmentRole, string> = {
   project_manager: "Quản lý dự án", engineer: "Kỹ sư", supervisor_main: "Giám sát chính",
@@ -82,9 +85,11 @@ export function PackageAttendanceWorkspace({ project, today, todayRoster, attend
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(initialLoadError ?? "");
   const pendingDate = useRef<string | undefined>(undefined);
+  const dateRequest = useRef(0);
 
   const loadDate = useCallback(async (date: string) => {
     if (pendingDate.current === date) return;
+    const requestId = ++dateRequest.current;
     pendingDate.current = date;
     setLoading(true); setLoadError("");
     try {
@@ -94,28 +99,24 @@ export function PackageAttendanceWorkspace({ project, today, todayRoster, attend
         readWorkerResponse<WorkerAttendanceSession[]>(await fetch(`/api/v1/worker-attendance/sessions?projectId=${project.id}&from=${range.from}&to=${range.to}`, { cache: "no-store" }))
       ]);
       const scopedSessions = weekSessions.filter((session) => !selectedWorksiteId || session.worksiteId === selectedWorksiteId);
+      if (requestId !== dateRequest.current) return;
       setRoster(nextRoster); setSessions(scopedSessions.filter((session) => session.date === date));
       setHistory((current) => [...scopedSessions, ...current.filter((item) => item.date < range.from || item.date > range.to)]);
     } catch (reason) {
-      setLoadError(reason instanceof Error ? reason.message : "Không thể tải dữ liệu chấm công.");
-    } finally { pendingDate.current = undefined; setLoading(false); }
+      if (requestId === dateRequest.current) setLoadError(reason instanceof Error ? reason.message : "Không thể tải dữ liệu chấm công.");
+    } finally { if (requestId === dateRequest.current) { pendingDate.current = undefined; setLoading(false); } }
   }, [project.id, selectedWorksiteId]);
 
   useDomainReconciliation("worker-attendance", () => loadDate(selectedDate));
 
   function selectDate(date: string) {
     setSelectedDate(date);
-    if (date === today) {
-      setRoster(todayRoster);
-      setSessions(attendanceSessions.filter((session) => session.date === today));
-      return;
-    }
     void loadDate(date);
   }
 
   const rows = useMemo<AttendanceRow[]>(() => roster.map((assignment) => {
     const session = sessions.find((item) => matchesAssignment(item, assignment) && item.entries.some((entry) => entry.workerId === assignment.employeeId));
-    const entry = session?.entries.find((item) => item.workerId === assignment.employeeId);
+    const entry = session?.entries.find((item) => item.workerId === assignment.employeeId && item.isSelected !== false);
     return { assignment, entry, session, status: entry?.status ?? "not_recorded" };
   }), [roster, sessions]);
   const roleOptions = useMemo(() => [...new Set(roster.map((item) => item.assignmentRole))], [roster]);
@@ -149,7 +150,7 @@ export function PackageAttendanceWorkspace({ project, today, todayRoster, attend
   }
 
   if (!canViewAttendance) return <PermissionDeniedState title="Không có quyền xem chấm công" />;
-  const startButton = selectedDate === today && (canOpenAttendance || canAdjustAttendance) ? <Link className="button button--primary button--md" href={`/worker-attendance/today?projectId=${project.id}${selectedWorksiteId ? `&worksiteId=${selectedWorksiteId}` : ""}`}><Camera aria-hidden="true" size={17} /><span>Điểm danh nhanh</span></Link> : null;
+  const startButton = selectedDate === today && canOpenAttendance ? <Link aria-label="Điểm danh công nhân" className="button button--primary button--md" href={`/worker-attendance/today?projectId=${project.id}${selectedWorksiteId ? `&worksiteId=${selectedWorksiteId}` : ""}`}><Camera aria-hidden="true" size={17} /><span className={attendanceStyles.fullActionLabel}>Điểm danh công nhân</span><span aria-hidden="true" className={attendanceStyles.compactActionLabel}>Điểm danh</span></Link> : null;
 
   return <section className={attendanceStyles.workspace}>
     <header className={attendanceStyles.workspaceHeader}><div><h2>Chấm công tại công trường</h2><p><CalendarDays aria-hidden="true" size={16} />{weekdayDate(selectedDate)}</p></div><div className={attendanceStyles.dateActions}><Button disabled={selectedDate === today} onClick={() => selectDate(today)} variant={selectedDate === today ? "primary" : "secondary"}>Hôm nay</Button><Input aria-label="Chọn ngày chấm công" label="Ngày chấm công" labelHidden max={today} onChange={(event) => selectDate(event.target.value)} type="date" value={selectedDate} /></div></header>
@@ -169,30 +170,30 @@ export function PackageAttendanceWorkspace({ project, today, todayRoster, attend
               <FilterChoices label="Trạng thái" onChange={setStatusFilter} options={Object.entries(attendanceStatus).map(([value, item]) => ({ value, label: item.label }))} value={statusFilter} />
             </div>
           </details>
-          <div className={attendanceStyles.toolbarActions}>{canExportAttendance ? <a className="button button--secondary button--md" href={`/api/v1/worker-attendance/export?projectId=${project.id}&month=${selectedDate.slice(0, 7)}`}><Download aria-hidden="true" size={17} />Xuất Excel</a> : null}{startButton}</div>
+          <div className={attendanceStyles.toolbarActions}>{canExportAttendance ? <FileDownloadLink format="xlsx" className="button button--secondary button--md" href={`/api/v1/worker-attendance/export?projectId=${project.id}&month=${selectedDate.slice(0, 7)}`}><Download aria-hidden="true" size={17} />Xuất Excel</FileDownloadLink> : null}{startButton}</div>
         </div>
-        <div className={attendanceStyles.listHeader}><strong>Danh sách nhân sự</strong><span aria-label={`${filteredRows.length} trên ${rows.length}`}>{filteredRows.length}/{rows.length}</span>{canManageTeam ? <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => setAssignOpen(true)} size="sm">Phân công</Button> : null}</div>
-        <div aria-busy={loading} className={attendanceStyles.tableWrap}><table className={attendanceStyles.table}><thead><tr><th>Nhân sự</th><th>Chức danh</th><th>Ca / Công trường</th><th>Bắt đầu phiên</th><th>Hoàn tất</th><th>Trạng thái</th><th>Ảnh phiên</th><th><span className="sr-only">Thao tác</span></th></tr></thead><tbody>{loading ? Array.from({ length: 5 }).map((_, index) => <tr className={attendanceStyles.skeletonRow} key={index}><td colSpan={8}><span /></td></tr>) : filteredRows.map((row) => <AttendanceTableRow canAdjustAttendance={canAdjustAttendance} key={row.assignment.id} row={row} />)}</tbody></table>{!loading && !filteredRows.length ? <EmptyState title={rows.length ? "Không tìm thấy nhân sự" : "Chưa có nhân sự trong ngày này"} /> : null}</div>
-        <div aria-busy={loading} className={attendanceStyles.mobileList}>{loading ? Array.from({ length: 4 }).map((_, index) => <span className={attendanceStyles.mobileSkeleton} key={index} />) : filteredRows.map((row) => <AttendanceCard canAdjustAttendance={canAdjustAttendance} key={row.assignment.id} row={row} />)}{!loading && !filteredRows.length ? <EmptyState title={rows.length ? "Không tìm thấy nhân sự" : "Chưa có nhân sự trong ngày này"} /> : null}</div>
+        <div className={attendanceStyles.listHeader}><strong>Danh sách nhân sự</strong><span aria-label={`${filteredRows.length} trên ${rows.length}`}>{filteredRows.length}/{rows.length}</span>{canManageTeam ? <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => setAssignOpen(true)} size="sm">Quản lý công nhân</Button> : null}</div>
+        <div aria-busy={loading} className={attendanceStyles.tableWrap}><table className={attendanceStyles.table}><thead><tr><th>Nhân sự</th><th>Chức danh</th><th>Ca / Công trường</th><th>Bắt đầu phiên</th><th>Hoàn tất</th><th>Trạng thái</th><th>Ảnh phiên</th><th><span className="sr-only">Thao tác</span></th></tr></thead><tbody>{loading ? Array.from({ length: 5 }).map((_, index) => <tr className={attendanceStyles.skeletonRow} key={index}><td colSpan={8}><span /></td></tr>) : filteredRows.map((row) => <AttendanceTableRow canAdjustAttendance={canAdjustAttendance} canOpenAttendance={canOpenAttendance && selectedDate === today} key={row.assignment.id} row={row} />)}</tbody></table>{!loading && !filteredRows.length ? <EmptyState title={rows.length ? "Không tìm thấy nhân sự" : "Chưa có nhân sự trong ngày này"} /> : null}</div>
+        <div aria-busy={loading} className={attendanceStyles.mobileList}>{loading ? Array.from({ length: 4 }).map((_, index) => <span className={attendanceStyles.mobileSkeleton} key={index} />) : filteredRows.map((row) => <AttendanceCard canAdjustAttendance={canAdjustAttendance} canOpenAttendance={canOpenAttendance && selectedDate === today} key={row.assignment.id} row={row} />)}{!loading && !filteredRows.length ? <EmptyState title={rows.length ? "Không tìm thấy nhân sự" : "Chưa có nhân sự trong ngày này"} /> : null}</div>
       </div>
       <aside className={attendanceStyles.summaryColumn}>
         <section className={attendanceStyles.summaryCard}><h3>Tình hình chấm công</h3><div className={attendanceStyles.donutBlock}><div aria-label={`${counts.completed} trên ${counts.total} nhân sự đã chấm`} className={attendanceStyles.donut} style={{ "--attendance-angle": `${counts.total ? counts.completed / counts.total * 360 : 0}deg` } as React.CSSProperties}><strong>{counts.completed}<small>/{counts.total}</small></strong><span>{completion}%</span></div><dl className={attendanceStyles.legend}><div data-tone="success"><dt>Đã chấm</dt><dd>{counts.completed}</dd></div><div data-tone="warning"><dt>Chưa xử lý</dt><dd>{counts.pending}</dd></div><div data-tone="danger"><dt>Chưa chấm</dt><dd>{counts.notRecorded}</dd></div><div data-tone="neutral"><dt>Khác</dt><dd>{counts.other}</dd></div></dl></div></section>
-        {(counts.pending + counts.notRecorded) > 0 && canAdjustAttendance ? <section className={`${attendanceStyles.summaryCard} ${attendanceStyles.reminderCard}`}><div><Bell aria-hidden="true" size={20} /><span><strong>Điểm danh nhanh</strong><small>{counts.pending + counts.notRecorded} người cần xử lý</small></span></div><Button disabled={reminding} onClick={() => void remindSupervisor()} variant="primary">{reminding ? "Đang gửi" : "Nhắc chấm công"}</Button></section> : null}
+        {(counts.pending + counts.notRecorded) > 0 && canAdjustAttendance ? <section className={`${attendanceStyles.summaryCard} ${attendanceStyles.reminderCard}`}><div><Bell aria-hidden="true" size={20} /><span><strong>Điểm danh nhanh</strong><small>{counts.pending + counts.notRecorded} người cần xử lý</small></span></div><Button disabled={reminding} onClick={() => void remindSupervisor()} variant="primary" busy={reminding}>{"Nhắc chấm công"}</Button></section> : null}
         <section className={`${attendanceStyles.summaryCard} ${attendanceStyles.desktopSummary}`}><h3>Thống kê tuần này</h3><dl className={attendanceStyles.weekStats}><div><dt>Nhân sự</dt><dd>{new Set(weekEntries.map((entry) => entry.workerId)).size}</dd></div><div><dt>Đã chấm</dt><dd>{weekEntries.filter((entry) => entry.status === "present" || entry.status === "late").length}</dd></div><div><dt>Chưa xử lý</dt><dd>{weekEntries.filter((entry) => entry.status === "unconfirmed").length}</dd></div><div><dt>Vắng / nghỉ</dt><dd>{weekEntries.filter((entry) => entry.status === "absent" || entry.status === "leave").length}</dd></div></dl></section>
       </aside>
     </div>
-    <AssignMembersDrawer canManageTeam={canManageTeam} onAssigned={(created, nextMessage) => { setMembers((current) => [...created, ...current]); setRoster((current) => [...created, ...current]); setMessage(nextMessage); }} onClose={() => setAssignOpen(false)} open={assignOpen} project={{ ...project, assignments: members }} today={today} />
+    <AssignMembersDrawer canManageTeam={canManageTeam} onAssigned={(created, nextMessage) => { const changedIds = new Set(created.map(item => item.id)); setMembers((current) => [...created, ...current.filter(item => !changedIds.has(item.id))]); setMessage(nextMessage); void loadDate(selectedDate); }} onClose={() => setAssignOpen(false)} open={assignOpen} project={{ ...project, assignments: members }} today={today} />
   </section>;
 }
 
-function AttendanceTableRow({ row, canAdjustAttendance }: { row: AttendanceRow; canAdjustAttendance: boolean }) {
+function AttendanceTableRow({ row, canAdjustAttendance, canOpenAttendance }: { row: AttendanceRow; canAdjustAttendance: boolean; canOpenAttendance: boolean }) {
   const { assignment, session, status } = row; const presentation = attendanceStatus[status];
-  return <tr><td><div className={attendanceStyles.person}><Avatar name={assignment.employeeName} /><strong>{assignment.employeeName}</strong></div></td><td>{roleLabels[assignment.assignmentRole]}</td><td><span className={attendanceStyles.stack}><strong>{assignment.shiftName}</strong><small>{assignment.worksiteName ?? "Toàn dự án"}</small></span></td><td>{session ? timeOnly(session.startedAt) : "—"}</td><td>{session ? timeOnly(session.submittedAt ?? session.dayClosedAt) : "—"}</td><td><StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge></td><td>{session?.photos[0] ? <AttendancePhoto alt={`Ảnh phiên ${session.shiftName}`} height={36} photoId={session.photos[0].id} width={50} /> : "—"}</td><td><RowActions assignment={assignment} canAdjustAttendance={canAdjustAttendance} session={session} /></td></tr>;
+  return <tr><td><div className={attendanceStyles.person}><Avatar name={assignment.employeeName} /><strong>{assignment.employeeName}</strong></div></td><td>{roleLabels[assignment.assignmentRole]}</td><td><span className={attendanceStyles.stack}><strong>{assignment.shiftName}</strong><small>{assignment.worksiteName ?? "Toàn dự án"}</small></span></td><td>{session ? timeOnly(session.startedAt) : "—"}</td><td>{session ? timeOnly(session.submittedAt ?? session.dayClosedAt) : "—"}</td><td><StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge></td><td>{session?.photos[0] ? <AttendancePhoto alt={`Ảnh phiên ${session.shiftName}`} height={36} photoId={session.photos[0].id} width={50} /> : "—"}</td><td><RowActions assignment={assignment} canAdjustAttendance={canAdjustAttendance} canOpenAttendance={canOpenAttendance} session={session} /></td></tr>;
 }
 
-function AttendanceCard({ row, canAdjustAttendance }: { row: AttendanceRow; canAdjustAttendance: boolean }) {
+function AttendanceCard({ row, canAdjustAttendance, canOpenAttendance }: { row: AttendanceRow; canAdjustAttendance: boolean; canOpenAttendance: boolean }) {
   const { assignment, session, status } = row; const presentation = attendanceStatus[status];
-  return <article className={attendanceStyles.attendanceCard}><header><Avatar name={assignment.employeeName} /><span><strong>{assignment.employeeName}</strong><span className={attendanceStyles.personMeta}><small>{roleLabels[assignment.assignmentRole]}</small><StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge></span></span><RowActions assignment={assignment} canAdjustAttendance={canAdjustAttendance} session={session} /></header><div className={attendanceStyles.cardFacts}><span><strong>{assignment.shiftName}</strong><em>{assignment.worksiteName ?? "Toàn dự án"}</em></span>{session ? <span className={attendanceStyles.sessionTime}><Clock3 aria-hidden="true" size={15} /><strong>{timeOnly(session.startedAt)} – {timeOnly(session.submittedAt ?? session.dayClosedAt)}</strong></span> : null}{session?.photos[0] ? <AttendancePhoto alt={`Ảnh phiên ${session.shiftName}`} height={32} photoId={session.photos[0].id} width={46} /> : null}</div></article>;
+  return <article className={attendanceStyles.attendanceCard}><header><Avatar name={assignment.employeeName} /><span><strong>{assignment.employeeName}</strong><span className={attendanceStyles.personMeta}><small>{roleLabels[assignment.assignmentRole]}</small><StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge></span></span><RowActions assignment={assignment} canAdjustAttendance={canAdjustAttendance} canOpenAttendance={canOpenAttendance} session={session} /></header><div className={attendanceStyles.cardFacts}><span><strong>{assignment.shiftName}</strong><em>{assignment.worksiteName ?? "Toàn dự án"}</em></span>{session ? <span className={attendanceStyles.sessionTime}><Clock3 aria-hidden="true" size={15} /><strong>{timeOnly(session.startedAt)} – {timeOnly(session.submittedAt ?? session.dayClosedAt)}</strong></span> : null}{session?.photos[0] ? <AttendancePhoto alt={`Ảnh phiên ${session.shiftName}`} height={32} photoId={session.photos[0].id} width={46} /> : null}</div></article>;
 }
 
 function FilterChoices({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
@@ -205,18 +206,56 @@ function AttendancePhoto({ photoId, alt, width, height }: { photoId: string; alt
   return <Image alt={alt} className={attendanceStyles.sessionPhoto} height={height} onError={() => setFailed(true)} src={`/api/v1/worker-attendance/photos/${photoId}?size=thumbnail`} unoptimized width={width} />;
 }
 
-function RowActions({ assignment, session, canAdjustAttendance }: { assignment: ProjectAssignment; session?: WorkerAttendanceSession; canAdjustAttendance: boolean }) {
-  return <DropdownMenu label={`Thao tác ${assignment.employeeName}`} trigger={<span className={attendanceStyles.rowMenu}><MoreHorizontal aria-hidden="true" size={18} /></span>}><Link href={`/employees/${assignment.employeeId}/profile`}>Xem hồ sơ</Link>{session ? <Link href={`/worker-attendance/sessions/${session.id}`}>{canAdjustAttendance ? "Xem / điều chỉnh phiên" : "Xem phiên chấm công"}</Link> : null}</DropdownMenu>;
+function RowActions({ assignment, session, canAdjustAttendance, canOpenAttendance }: { assignment: ProjectAssignment; session?: WorkerAttendanceSession; canAdjustAttendance: boolean; canOpenAttendance: boolean }) {
+  const canContinue = canOpenAttendance && session && !session.submittedAt && session.status !== "locked";
+  return <DropdownMenu label={`Thao tác ${assignment.employeeName}`} trigger={<span className={attendanceStyles.rowMenu}><MoreHorizontal aria-hidden="true" size={18} /></span>}>{canContinue ? <Link href={`/worker-attendance/sessions/${session.id}/roster`}>Tiếp tục điểm danh</Link> : !session && canOpenAttendance ? <Link href={`/worker-attendance/today?projectId=${assignment.projectId}${assignment.worksiteId ? `&worksiteId=${assignment.worksiteId}` : ""}`}>Điểm danh công nhân</Link> : null}{session ? <Link href={`/worker-attendance/sessions/${session.id}`}>{canAdjustAttendance ? "Xem / điều chỉnh điểm danh" : "Xem điểm danh"}</Link> : null}<Link href={`/employees/${assignment.employeeId}/profile`}>Xem hồ sơ</Link></DropdownMenu>;
 }
 
 function AssignMembersDrawer({ project, today, open, onClose, onAssigned, canManageTeam }: { project: ProjectDetail; today: string; open: boolean; onClose: () => void; onAssigned: (created: ProjectAssignment[], message: string) => void; canManageTeam: boolean }) {
   const [employees, setEmployees] = useState<EmployeeSummary[]>([]); const [loading, setLoading] = useState(false); const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set()); const [query, setQuery] = useState(""); const [category, setCategory] = useState<WorkerCategory | "all">("all");
   const [submitting, setSubmitting] = useState(false); const [submitError, setSubmitError] = useState("");
-  useEffect(() => { if (!open || employees.length || !canManageTeam) return; const controller = new AbortController(); async function loadEmployees() { setLoading(true); setLoadError(""); try { const response = await fetch("/api/v1/employees?status=active&pageSize=100", { signal: controller.signal }); const body = await response.json() as { data?: { employees?: { items?: EmployeeSummary[] } }; error?: { message?: string } }; if (!response.ok) throw new Error(body.error?.message ?? "Không thể tải danh sách nhân sự."); setEmployees(body.data?.employees?.items ?? []); } catch (reason) { if (!(reason instanceof DOMException && reason.name === "AbortError")) setLoadError(reason instanceof Error ? reason.message : "Không thể tải danh sách nhân sự."); } finally { if (!controller.signal.aborted) setLoading(false); } } void loadEmployees(); return () => controller.abort(); }, [canManageTeam, employees.length, open]);
+  const [endingId, setEndingId] = useState("");
+  const [employeeReload, setEmployeeReload] = useState(0);
+  async function stopAssignment(assignment: ProjectAssignment) {
+    if (endingId || submitting) return;
+    setEndingId(assignment.id); setSubmitError("");
+    try {
+      const updated = await readWorkerResponse<ProjectAssignment>(await fetch(`/api/v1/projects/${project.id}/assignments/${assignment.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rowVersion: assignment.rowVersion }) }));
+      onAssigned([updated], `Đã ngừng phân công ${assignment.employeeName}.`);
+    } catch (error) { setSubmitError(error instanceof Error ? error.message : "Không thể ngừng phân công."); }
+    finally { setEndingId(""); }
+  }
+  useEffect(() => {
+    if (!open || employees.length || !canManageTeam) return;
+    const controller = new AbortController();
+    async function loadEmployees() {
+      setLoading(true); setLoadError("");
+      try {
+        const all: EmployeeSummary[] = [];
+        let page = 1;
+        let pageCount = 1;
+        do {
+          const response = await fetch(`/api/v1/employees?status=active&pageSize=100&page=${page}`, { signal: controller.signal });
+          const body = await response.json() as { data?: { employees?: { items?: EmployeeSummary[]; pageCount?: number } }; error?: { message?: string } };
+          if (!response.ok || !body.data?.employees) throw new Error(body.error?.message ?? "Không thể tải danh sách nhân sự.");
+          all.push(...body.data.employees.items ?? []);
+          pageCount = body.data.employees.pageCount ?? 1;
+          page += 1;
+        } while (page <= pageCount);
+        if (!controller.signal.aborted) setEmployees(all);
+      } catch (reason) {
+        if (!controller.signal.aborted) setLoadError(reason instanceof Error ? reason.message : "Không thể tải danh sách nhân sự.");
+      } finally { if (!controller.signal.aborted) setLoading(false); }
+    }
+    void loadEmployees();
+    return () => controller.abort();
+  }, [canManageTeam, employees.length, open, employeeReload]);
   const visible = useMemo(() => { const normalized = query.trim().toLocaleLowerCase("vi-VN"); return employees.filter((employee) => (category === "all" || employee.workerCategory === category) && (!normalized || `${employee.employeeCode} ${employee.displayName} ${employee.departmentName}`.toLocaleLowerCase("vi-VN").includes(normalized))); }, [category, employees, query]);
   function toggle(id: string, checked: boolean) { setSelected((current) => { const next = new Set(current); if (checked) next.add(id); else next.delete(id); return next; }); }
-  function close() { if (submitting) return; setSelected(new Set()); setSubmitError(""); onClose(); }
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!selected.size) return; const form = new FormData(event.currentTarget); const payload = { worksiteId: form.get("worksiteId") || undefined, assignmentRole: form.get("assignmentRole"), startDate: form.get("startDate"), endDate: form.get("endDate") || undefined, shiftCode: form.get("shiftCode"), shiftName: form.get("shiftName"), shiftStart: form.get("shiftStart"), shiftEnd: form.get("shiftEnd") }; setSubmitting(true); setSubmitError(""); const results = await Promise.allSettled([...selected].map(async (employeeId) => { const response = await fetch(`/api/v1/projects/${project.id}/assignments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, employeeId }) }); const body = await response.json() as { data?: ProjectAssignment; error?: { message?: string } }; if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể phân công nhân sự."); return body.data; })); setSubmitting(false); const created = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []); const failed = results.filter((result) => result.status === "rejected"); if (created.length) onAssigned(created, `Đã phân công ${created.length} nhân sự.`); if (failed.length) setSubmitError(failed[0]?.reason instanceof Error ? failed[0].reason.message : "Một số nhân sự chưa được phân công."); else close(); }
-  return <Drawer onClose={close} open={open} title="Phân công nhân sự"><form className={styles.assignDrawer} onSubmit={submit}><Input label="Tìm nhân sự" onChange={(event) => setQuery(event.target.value)} placeholder="Tên hoặc phòng ban" value={query} /><Select label="Loại nhân sự" onChange={(event) => setCategory(event.target.value as WorkerCategory | "all")} options={[{ value: "all", label: "Tất cả loại" }, ...Object.entries(workerCategoryLabels).map(([value, label]) => ({ value, label }))]} value={category} />{loadError ? <ErrorState action={<Button onClick={() => { setEmployees([]); setLoadError(""); }}>Tải lại</Button>} description={loadError} /> : <div aria-busy={loading} className={styles.employeePicker}>{loading ? Array.from({ length: 5 }).map((_, index) => <span className={styles.employeeSkeleton} key={index} />) : visible.map((employee) => <label key={employee.id}><Checkbox checked={selected.has(employee.id)} label="" onChange={(event) => toggle(employee.id, event.target.checked)} /><Avatar name={employee.displayName} /><span><strong>{employee.displayName}</strong><small>{employee.departmentName}</small></span></label>)}</div>}<div className={styles.assignGrid}><Select label="Vai trò dự án" name="assignmentRole" options={Object.entries(roleLabels).map(([value, label]) => ({ value, label }))} required /><Select label="Công trường" name="worksiteId" options={project.worksites.filter((site) => site.status === "active").map((site) => ({ value: site.id, label: site.name }))} placeholder="Toàn dự án" /><Input defaultValue={today} label="Từ ngày" name="startDate" required type="date" /><Input label="Đến ngày" name="endDate" type="date" /><Input defaultValue="DAY" label="Mã ca" name="shiftCode" required /><Input defaultValue="Ca ngày" label="Tên ca" name="shiftName" required /><Input defaultValue="07:00" label="Bắt đầu" name="shiftStart" required type="time" /><Input defaultValue="17:00" label="Kết thúc" name="shiftEnd" required type="time" /></div>{submitError ? <p className={styles.inlineError} role="alert">{submitError}</p> : null}<footer className={styles.drawerFooter}><span>{selected.size} người đã chọn</span><div><Button disabled={submitting} onClick={close}>Hủy</Button><Button disabled={!selected.size || submitting} type="submit" variant="primary">{submitting ? "Đang phân công" : "Phân công"}</Button></div></footer></form></Drawer>;
+  function close() { if (submitting || endingId) return; setSelected(new Set()); setSubmitError(""); onClose(); }
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!selected.size || submitting || endingId) return; const form = new FormData(event.currentTarget); const payload = { worksiteId: form.get("worksiteId") || undefined, assignmentRole: form.get("assignmentRole"), startDate: form.get("startDate"), endDate: form.get("endDate") || undefined, shiftCode: form.get("shiftCode"), shiftName: form.get("shiftName"), shiftStart: form.get("shiftStart"), shiftEnd: form.get("shiftEnd") }; setSubmitting(true); setSubmitError(""); const results = await Promise.allSettled([...selected].map(async (employeeId) => { const response = await fetch(`/api/v1/projects/${project.id}/assignments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, employeeId }) }); const body = await response.json() as { data?: ProjectAssignment; error?: { message?: string } }; if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể phân công nhân sự."); return body.data; })); setSubmitting(false); const created = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []); const failed = results.filter((result) => result.status === "rejected"); if (created.length) onAssigned(created, `Đã phân công ${created.length} nhân sự.`); if (failed.length) setSubmitError(failed[0]?.reason instanceof Error ? failed[0].reason.message : "Một số nhân sự chưa được phân công."); else close(); }
+  return <Drawer onClose={close} open={open} title="Công nhân trong gói"><SectionedForm className={styles.assignDrawer} onSubmit={submit}>
+<FormFields><section className={attendanceStyles.rosterManagement}><h3>Công nhân đã thêm</h3>{project.assignments.filter(item => item.assignmentRole === "worker" && item.status === "active").map(item => <div key={item.id}><span><Link href={`/employees/${item.employeeId}/profile`}>{item.employeeName}</Link><small>{item.worksiteName ?? "Toàn gói"} · {item.shiftName}</small></span><Button busy={endingId === item.id} disabled={submitting || Boolean(endingId)} onClick={() => void stopAssignment(item)} size="sm">Ngừng phân công</Button></div>)}</section><Input label="Tìm nhân sự" onChange={(event) => setQuery(event.target.value)} placeholder="Tên hoặc phòng ban" value={query} /><Select label="Loại nhân sự" onChange={(event) => setCategory(event.target.value as WorkerCategory | "all")} options={[{ value: "all", label: "Tất cả loại" }, ...Object.entries(workerCategoryLabels).map(([value, label]) => ({ value, label }))]} value={category} />{loadError ? <ErrorState action={<Button onClick={() => { setEmployeeReload(value => value + 1); }}>Tải lại</Button>} description={loadError} /> : <div aria-busy={loading} className={styles.employeePicker}>{loading ? Array.from({ length: 5 }).map((_, index) => <span className={styles.employeeSkeleton} key={index} />) : visible.map((employee) => <label key={employee.id}><Checkbox checked={selected.has(employee.id)} label="" onChange={(event) => toggle(employee.id, event.target.checked)} /><Avatar name={employee.displayName} /><span><strong>{employee.displayName}</strong><small>{employee.departmentName}</small></span></label>)}</div>}<div className={styles.assignGrid}><Select defaultValue="worker" label="Vai trò dự án" name="assignmentRole" options={Object.entries(roleLabels).map(([value, label]) => ({ value, label }))} required /><Select label="Công trường" name="worksiteId" options={project.worksites.filter((site) => site.status === "active").map((site) => ({ value: site.id, label: site.name }))} placeholder="Toàn dự án" /><Input defaultValue={today} label="Từ ngày" name="startDate" required type="date" /><Input label="Đến ngày" name="endDate" type="date" /><Input defaultValue="DAY" label="Mã ca" name="shiftCode" required /><Input defaultValue="Ca ngày" label="Tên ca" name="shiftName" required /><Input defaultValue="07:00" label="Bắt đầu" name="shiftStart" required type="time" /><Input defaultValue="17:00" label="Kết thúc" name="shiftEnd" required type="time" /></div>{submitError ? <p className={styles.inlineError} role="alert">{submitError}</p> : null}</FormFields>
+<FormActions className={styles.drawerFooter}><span>{selected.size} người đã chọn</span><div><Button disabled={submitting} onClick={close}>Hủy</Button><Button disabled={!selected.size || submitting || Boolean(endingId)} type="submit" variant="primary" busy={submitting}>{"Phân công"}</Button></div></FormActions></SectionedForm></Drawer>;
 }

@@ -8,19 +8,25 @@ function user(permissions: Permission[]): AuthenticatedUser {
 }
 
 describe("personal mobile navigation", () => {
-  it.each(["/personal", "/attendance/quick", "/messages/one", "/accounting/payslips"])("keeps personal actions without a module switcher on %s", (path) => {
-    const model = resolveMobileNavigation(path, user(["attendance.self.create", "chat.access", "payslip.self.view"]));
+  it("restores personal home on phones while keeping professional navigation", () => {
+    const hr = user(["dashboard.view", "employee.view", "attendance.view_all"]);
+    const model = resolveMobileNavigation("/attendance/today", hr);
+    expect(model.direct[0]).toMatchObject({ href: "/personal", label: "Cá nhân" });
+    expect(activeMobileDestination("/personal", model)?.href).toBe("/personal");
+  });
+  it.each(["/personal", "/attendance/quick", "/messages/one", "/accounting/payslips"])("keeps personal actions with an application menu on %s", (path) => {
+    const model = resolveMobileNavigation(path, user(["attendance.self.view", "attendance.self.create", "chat.access", "payslip.self.view"]));
     expect(model.mode).toBe("personal");
-    expect(model.direct.map((item) => item.href)).toEqual(["/personal", "/attendance/history", "/attendance/quick", "/messages", "/profile"]);
+    expect(model.direct.map((item) => item.href)).toEqual(["/personal", "/attendance/history", "/attendance/quick", "/messages", "/applications"]);
     expect(model.direct[2]).toMatchObject({ label: "Chấm công", slot: 3, quick: true });
     expect(model.secondary).toEqual([]);
   });
 
-  it("replaces the calendar shortcut with worker attendance only for a permitted supervisor", () => {
-    const supervisor = resolveMobileNavigation("/worker-attendance/today", user(["worker_attendance.create", "attendance.self.create", "chat.access"]));
+  it("exposes project work and worker attendance for a permitted supervisor", () => {
+    const supervisor = resolveMobileNavigation("/worker-attendance/today", user(["project.view", "worker_attendance.view", "worker_attendance.create", "attendance.self.create", "chat.access"]));
     expect(supervisor.mode).toBe("supervisor");
-    expect(supervisor.direct[1]).toMatchObject({ href: "/worker-attendance/today", label: "Công nhân" });
-    expect(supervisor.direct[2]).toMatchObject({ href: "/attendance/quick", label: "Chấm công" });
+    expect(supervisor.direct[1]).toMatchObject({ href: "/worker-attendance/today", label: "Điểm danh" });
+    expect(supervisor.direct[2]).toMatchObject({ href: "/attendance/quick", label: "Chấm công", quick: true });
     expect(canUseWorkerAttendance(user(["worker_attendance.create"]))).toBe(true);
     expect(canUseWorkerAttendance(user(["project.view"]))).toBe(false);
   });
@@ -31,19 +37,19 @@ describe("personal mobile navigation", () => {
   });
 
   it.each([
-    ["/profile/security", "/profile"],
+    ["/profile/security", "/personal"],
     ["/messages/one", "/messages"],
     ["/attendance/quick", "/attendance/quick"],
     ["/attendance/history/2026-10-03", "/attendance/history"],
     ["/attendance/requests", "/attendance/history"],
     ["/leave/new", "/personal"]
   ])("selects one contextual mobile destination on %s", (path, expected) => {
-    const model = resolveMobileNavigation(path, user(["attendance.self.create", "chat.access"]));
+    const model = resolveMobileNavigation(path, user(["attendance.self.view", "attendance.self.create", "chat.access"]));
     expect(activeMobileDestination(path, model)?.href).toBe(expected);
   });
 
   it("uses the supervisor destination for worker session details", () => {
-    const model = resolveMobileNavigation("/worker-attendance/sessions/one", user(["worker_attendance.create"]));
+    const model = resolveMobileNavigation("/worker-attendance/sessions/one", user(["worker_attendance.view", "worker_attendance.create"]));
     expect(activeMobileDestination("/worker-attendance/sessions/one", model)?.href).toBe("/worker-attendance/today");
   });
 

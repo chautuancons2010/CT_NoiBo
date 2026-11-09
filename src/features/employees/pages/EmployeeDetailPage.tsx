@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { BadgeCheck, BriefcaseBusiness, FileText, ShieldCheck } from "lucide-react";
+import { FileText, Pencil } from "lucide-react";
 
 import { employeeDetailSections } from "@/config/routeRegistry";
 import { Avatar } from "@/components/shared/Avatar";
 import { BackLink } from "@/components/shared/BackLink";
 import { Card } from "@/components/shared/Card";
 import { EmptyState, PermissionDeniedState } from "@/components/shared/States";
-import { PageHeader } from "@/components/shared/PageHeader";
-import { DetailPageLayout } from "@/components/shared/PageLayouts";
+import { RecordHeader } from "@/components/shared/PageHeader";
+import { DetailPageLayout, RecordFields, RecordSheet, RecordSection } from "@/components/shared/PageLayouts";
 import { StatusBadge, type StatusBadgeTone } from "@/components/shared/StatusBadge";
 import { Tabs } from "@/components/shared/Tabs";
 import { can, type AccountStatus, type Permission } from "@/lib/auth/permissions";
@@ -36,6 +36,9 @@ import { attendanceRecordHref } from "@/features/attendance/attendanceNavigation
 import { listEmployeeSalaries } from "@/features/accounting/service";
 import { listAttendanceRecords } from "@/features/attendance/services/attendanceRepository";
 import { listEmployeeProjects } from "@/features/projects/services/projectRepository";
+import { EmployeeSalaryPanel } from "@/features/employees/components/EmployeeSalaryPanel";
+import { formatBusinessDate } from "@/lib/time/timezone";
+import styles from "@/features/employees/components/EmployeeDetailWorkspace.module.css";
 
 export interface EmployeeDetailPageProps {
   employeeId: string;
@@ -71,7 +74,7 @@ function formatDate(value?: string): string {
     return "Chưa có";
   }
 
-  return new Intl.DateTimeFormat("vi-VN").format(new Date(`${value}T00:00:00.000Z`));
+  return formatBusinessDate(value);
 }
 
 function FieldList({
@@ -79,28 +82,15 @@ function FieldList({
 }: {
   items: Array<{ label: string; value?: string | number; sensitive?: boolean }>;
 }) {
-  return (
-    <dl className="detail-field-list">
-      {items.map((item) => (
-        <div key={item.label}>
-          <dt>{item.label}</dt>
-          <dd>
-            {valueOrEmpty(item.value)}
-            {item.sensitive ? <span className="sensitive-dot">Nhạy cảm</span> : null}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
+  return <RecordFields items={items} />;
 }
 
 function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: EmployeeDetail; permissions: readonly Permission[]; identityFiles?: { front?: string; back?: string } }) {
   const sensitive = detail.sensitive;
 
   return (
-    <div className="content-grid content-grid--two">
-      <Card>
-        <h2 className="section-title">Thông tin cơ bản</h2>
+    <RecordSheet>
+      <RecordSection title="Thông tin cơ bản">
         <FieldList
           items={[
             { label: "Họ và tên", value: detail.profile.fullName },
@@ -108,26 +98,15 @@ function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: Em
             { label: "Ngày sinh", value: formatDate(detail.profile.dateOfBirth) }
           ]}
         />
-      </Card>
+      </RecordSection>
 
-      <Card className="employee-profile-assessment">
-        <h2 className="section-title">Đánh giá hồ sơ</h2>
-        <FieldList items={[
-          { label: "Tình trạng hồ sơ", value: employeeProfileStatusLabels[detail.profile.profileStatus] },
-          { label: "Mức độ hoàn thành", value: `${detail.profile.profileCompleteness}%` }
-        ]} />
-        <div className="profile-completeness" aria-label={`Mức độ hoàn thiện hồ sơ ${detail.profile.profileCompleteness}%`}>
-          <span style={{ width: `${detail.profile.profileCompleteness}%` }} />
-        </div>
-      </Card>
 
-      {can(permissions, "employee.identity_document.view") ? <Card>
-        <h2 className="section-title">Căn cước công dân</h2>
+
+      {can(permissions, "employee.identity_document.view") ? <RecordSection title="Căn cước công dân">
         <IdentityDocumentPanel backAssetId={identityFiles?.back} canEdit={can(permissions, "employee.identity_document.edit")} employeeId={detail.profile.id} frontAssetId={identityFiles?.front}/>
-      </Card> : null}
+      </RecordSection> : null}
 
-      <Card>
-        <h2 className="section-title">Liên hệ</h2>
+      <RecordSection title="Liên hệ">
         <FieldList
           items={[
             { label: "Số điện thoại", value: detail.profile.personalPhone },
@@ -139,21 +118,9 @@ function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: Em
             { label: "Quốc gia", value: detail.profile.country }
           ]}
         />
-      </Card>
+      </RecordSection>
 
-      <Card>
-        <header className="panel-header">
-          <div>
-            <h2>CCCD, ngân hàng, thuế/BHXH</h2>
-          </div>
-          <StatusBadge tone={sensitive.allowed ? "success" : "warning"}>
-            <ShieldCheck aria-hidden="true" size={14} />
-            {sensitive.allowed ? "Có quyền" : "Bị giới hạn"}
-          </StatusBadge>
-          {sensitive.allowed && can(permissions, "employee.edit_sensitive") ? (
-            <EmployeeSensitiveEdit employeeId={detail.profile.id} profile={sensitive} />
-          ) : null}
-        </header>
+      <RecordSection title="Định danh, ngân hàng và bảo hiểm" action={sensitive.allowed && can(permissions, "employee.edit_sensitive") ? <EmployeeSensitiveEdit employeeId={detail.profile.id} profile={sensitive} /> : undefined}>
         {sensitive.allowed ? (
           <FieldList
             items={[
@@ -171,10 +138,9 @@ function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: Em
         ) : (
           <PermissionDeniedState />
         )}
-      </Card>
+      </RecordSection>
 
-      <Card>
-        <h2 className="section-title">Người liên hệ khẩn cấp</h2>
+      <RecordSection title="Người liên hệ khẩn cấp">
         {detail.emergencyContacts.length === 0 ? (
           <EmptyState
             title="Chưa có liên hệ khẩn cấp"
@@ -194,16 +160,24 @@ function EmployeeProfileTab({ detail, permissions, identityFiles }: { detail: Em
             ))}
           </ul>
         )}
-      </Card>
-    </div>
+      </RecordSection>
+      <RecordSection title="Đánh giá hồ sơ">
+        <FieldList items={[
+          { label: "Tình trạng hồ sơ", value: employeeProfileStatusLabels[detail.profile.profileStatus] },
+          { label: "Mức độ hoàn thành", value: `${detail.profile.profileCompleteness}%` }
+        ]} />
+        <div className="profile-completeness" aria-label={`Mức độ hoàn thiện hồ sơ ${detail.profile.profileCompleteness}%`}>
+          <span style={{ width: `${detail.profile.profileCompleteness}%` }} />
+        </div>
+      </RecordSection>
+    </RecordSheet>
   );
 }
 
 function EmployeeEmploymentTab({ detail }: { detail: EmployeeDetail }) {
   return (
-    <div className="content-grid content-grid--two">
-      <Card>
-        <h2 className="section-title">Thông tin công việc</h2>
+    <RecordSheet>
+      <RecordSection title="Thông tin công việc">
         <FieldList
           items={[
             { label: "Phòng ban", value: detail.department.name },
@@ -217,9 +191,8 @@ function EmployeeEmploymentTab({ detail }: { detail: EmployeeDetail }) {
             { label: "Ngày nghỉ việc", value: formatDate(detail.profile.terminationDate) }
           ]}
         />
-      </Card>
-      <Card>
-        <h2 className="section-title">Quản lý trực tiếp</h2>
+      </RecordSection>
+      <RecordSection title="Quản lý trực tiếp">
         {detail.manager ? (
           <article className="employee-manager-card">
             <Avatar name={detail.manager.fullName} />
@@ -233,8 +206,8 @@ function EmployeeEmploymentTab({ detail }: { detail: EmployeeDetail }) {
         ) : (
           <EmptyState title="Chưa có quản lý" />
         )}
-      </Card>
-    </div>
+      </RecordSection>
+    </RecordSheet>
   );
 }
 
@@ -245,30 +218,7 @@ function EmployeeContractsTab({ employeeId, dataSet, permissions }: { employeeId
 
 async function EmployeeSalaryTab({ employeeId, user }: { employeeId: string; user: NonNullable<Awaited<ReturnType<typeof getRequestUser>>> }) {
   const history = await listEmployeeSalaries(user, employeeId);
-  if (!history.length) return <EmptyState title="Chưa có dữ liệu lương" />;
-  const current = history[0];
-  const money = (value: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(value);
-  return (
-    <div className="content-grid content-grid--two">
-      <Card>
-        <h2 className="section-title">Mức lương hiện tại</h2>
-        <FieldList items={[
-          { label: "Lương cơ bản", value: money(current.baseSalary), sensitive: true },
-          { label: "Phụ cấp", value: money(current.allowance), sensitive: true },
-          { label: "Thưởng", value: money(current.bonus), sensitive: true },
-          { label: "Khấu trừ", value: money(current.deduction), sensitive: true },
-          { label: "Ngày áp dụng", value: formatDate(current.effectiveDate) },
-          { label: "Ghi chú", value: current.note }
-        ]} />
-      </Card>
-      {can(user.permissions, "salary.history.view") ? <Card className="employee-history-panel">
-        <h2 className="section-title">Lịch sử lương</h2>
-        <ol className="employee-history">
-          {history.map((entry, index) => <li key={entry.id}><span className="employee-history__marker"><BadgeCheck aria-hidden="true" size={16} /></span><article><header><h3>{index + 1 < history.length ? `${money(history[index + 1].baseSalary)} → ${money(entry.baseSalary)}` : money(entry.baseSalary)}</h3><StatusBadge>{formatDate(entry.effectiveDate)}</StatusBadge></header><p>{entry.reason}</p><small>Người thực hiện: {entry.changedByName ?? "Tài khoản hệ thống"}</small></article></li>)}
-        </ol>
-      </Card> : null}
-    </div>
-  );
+  return <EmployeeSalaryPanel canViewHistory={can(user.permissions, "salary.history.view")} history={history} />;
 }
 
 export function EmployeeDocumentsTab({
@@ -513,38 +463,23 @@ export async function EmployeeDetailPage({ employeeId, section }: EmployeeDetail
     : [];
 
   return (
-    <DetailPageLayout>
-      <BackLink href="/employees" label="Trở lại danh sách nhân viên" />
-      <PageHeader
-        action={
-          can(user.permissions, "employee.edit") ? (
-            <Link className="button button--secondary button--md" href={`/employees/${employeeId}/edit`}>
-              <span className="button__icon"><BriefcaseBusiness aria-hidden="true" size={16} /></span>
-              <span>Chỉnh sửa</span>
-            </Link>
-          ) : null
-        }
-        title={detail.summary.fullName}
-      />
-
-      <section className="employee-detail-header">
-        <Avatar className="employee-detail-header__avatar" imageUrl={detail.profile.avatarAssetId ? `/api/v1/employees/${employeeId}/avatar` : undefined} name={detail.summary.fullName} />
-        <div>
-          <h2>{detail.summary.displayName}</h2>
-          <p>
-            {detail.summary.employmentTypeName}
-          </p>
-        </div>
-        <StatusBadge tone={detail.summary.employmentStatusTone}>{detail.summary.employmentStatusLabel}</StatusBadge>
-      </section>
-
-      <Tabs
+    <DetailPageLayout className={styles.page}>
+      <BackLink className="back-link record-back-link" href="/employees" label="Trở lại danh sách nhân viên" />
+      <RecordHeader
+        action={can(user.permissions, "employee.edit") ? <Link className="button button--secondary button--md" href={`/employees/${employeeId}/edit`}><span className="button__icon"><Pencil aria-hidden="true" size={16} /></span><span>Chỉnh sửa hồ sơ</span></Link> : null}
+        avatar={<Avatar imageUrl={detail.profile.avatarAssetId ? `/api/v1/employees/${employeeId}/avatar` : undefined} name={detail.summary.fullName} />}
+        code={detail.summary.employeeCode}
+        meta={[{ label: "Phòng ban", value: detail.summary.departmentName }, { label: "Chức vụ", value: detail.summary.positionName }, { label: "Nhóm", value: detail.summary.employmentTypeName }].filter((field,index,all) => field.value && all.findIndex(other => other.value === field.value) === index).map(field => <span aria-label={`${field.label}: ${field.value}`} key={field.label} title={`${field.label}: ${field.value}`}>{field.value}</span>)}
+        navigation={<Tabs
         items={employeeDetailSections.filter((item) => item.value !== "salary" || can(user.permissions, "salary.view") || can(user.permissions, "salary.history.view")).filter((item) => item.value !== "contracts" || can(user.permissions, "contract.view")).filter((item) => item.value !== "attendance" || canViewEmployeeAttendance).map((item) => ({
           label: item.label,
           href: `/employees/${employeeId}/${item.value}`,
           active: item.value === section
         }))}
         label="Tab hồ sơ nhân viên"
+      />}
+        status={<StatusBadge tone={detail.summary.employmentStatusTone}>{detail.summary.employmentStatusLabel}</StatusBadge>}
+        title={detail.summary.fullName}
       />
 
       {section === "profile" ? <EmployeeProfileTab detail={detail} identityFiles={{ front: identityProfile?.nationalIdFrontFileId, back: identityProfile?.nationalIdBackFileId }} permissions={user.permissions} /> : null}

@@ -1,0 +1,14 @@
+.selector { display: flex; min-width: 0; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.selector > nav { min-width: 0; flex: 1; }
+.selector > :last-child { width: 180px; }
+.canvas { min-width: 0; border-top: 1px solid var(--border-subtle); padding-top: 20px; }
+.form { display: grid; max-width: 920px; gap: 16px; }
+.detail { padding: 20px; }
+.detail h2, .sectionTitle { margin: 0 0 16px; font-size: 14px; font-weight: 600; }
+.detail dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; margin: 0; }
+.detail dl > div, .dayFacts > div { display: grid; min-width: 0; gap: 4px; }
+.detail dt, .dayFacts dt { color: var(--text-secondary); font-size: 12px; }
+.detail dd, .dayFacts dd { margin: 0; font-size: 14px; }
+.calendarLayout { display: grid; max-width: 1120px; grid-template-columns: minmax(0, 1fr) 288px; align-items: start; gap: 16px; }
+.dayFacts { display: grid; gap: 16px; margin: 0; }
+@media (max-width: 767px) { .detail dl, .calendarLayout { grid-template-columns: minmax(0, 1fr); } .selector { align-items: stretch; } .selector > nav { width: 100%; flex-basis: 100%; } }

@@ -30,5 +30,5 @@ export function LoginForm() {
       setSubmitting(false);
     } finally { clearTimeout(timeout); }
   }
-  return <form aria-busy={submitting} method="post" onSubmit={submit}><Input autoCapitalize="none" autoComplete="username" label="Tên tài khoản" name="username" pattern={usernameHtmlPattern} required /><PasswordInput autoComplete="current-password" label="Mật khẩu" minLength={ACCOUNT_PASSWORD_MIN_LENGTH} name="password" pattern={ACCOUNT_PASSWORD_HTML_PATTERN} required />{error ? <p className="form-error" ref={errorRef} role="alert" tabIndex={-1}>{error}</p> : null}<Button disabled={submitting} type="submit" variant="primary">{submitting ? "Đang đăng nhập…" : "Đăng nhập"}</Button></form>;
+  return <form aria-busy={submitting} method="post" onSubmit={submit}><Input autoCapitalize="none" autoComplete="username" label="Tên tài khoản" name="username" pattern={usernameHtmlPattern} required /><PasswordInput autoComplete="current-password" label="Mật khẩu" minLength={ACCOUNT_PASSWORD_MIN_LENGTH} name="password" pattern={ACCOUNT_PASSWORD_HTML_PATTERN} required />{error ? <p className="form-error" ref={errorRef} role="alert" tabIndex={-1}>{error}</p> : null}<Button disabled={submitting} type="submit" variant="primary" busy={submitting}>{"Đăng nhập"}</Button></form>;
 }

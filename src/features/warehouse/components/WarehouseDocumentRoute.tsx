@@ -32,9 +32,11 @@ export async function WarehouseDocumentRoute({ type, id, title }: { type: Docume
       <BackLink href={`/warehouse/${type === "receipt" ? "receipts" : type === "issue" ? "issues" : type === "transfer" ? "transfers" : "adjustments"}`} />
       <PageHeader title={title} />
       <InventoryDocumentEditor
+        key={`${type}:${id ?? "new"}`}
         canCreate={can(user.permissions, permissions.create)}
         canPost={can(user.permissions, permissions.post)}
         canReverse={Boolean(permissions.reverse && can(user.permissions, permissions.reverse))}
+        canViewProjects={can(user.permissions, "project.view")}
         id={id}
         type={type}
       />

@@ -30,6 +30,7 @@ export async function POST(request:Request){
     const employeeId=parseWithSchema(employeeIdSchema,form.get("employeeId"));
     const input=parseWithSchema(employeeContractInputSchema,fields(form));
     const templateCandidate=String(form.get("templateId")??"").trim(),templateId=templateCandidate?parseWithSchema(z.string().uuid(),templateCandidate):undefined;
-    return successResponse(await createContract(user,employeeId,input,undefined,templateId),{status:201});
+    const candidate=form.get("file"),file=candidate instanceof File&&candidate.size?candidate:undefined;
+    return successResponse(await createContract(user,employeeId,input,file,templateId),{status:201});
   }catch(error){return errorResponse(error);}
 }

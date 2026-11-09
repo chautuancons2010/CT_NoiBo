@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -6,7 +7,7 @@ import { chromium } from "playwright-core";
 
 nextEnv.loadEnvConfig(process.cwd());
 const baseUrl = process.env.UI_QA_BASE_URL || "http://localhost:3200";
-const password = process.env.SEED_TEST_PASSWORD || "12345678";
+const password = getTestPassword();
 const label = process.env.UI_PERFORMANCE_LABEL || "before";
 assert(["before", "after"].includes(label), "Use UI_PERFORMANCE_LABEL=before or after");
 const environment = process.env.UI_PERFORMANCE_ENV || "production";

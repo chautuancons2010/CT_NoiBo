@@ -29,7 +29,7 @@ export const moduleIconRegistry: Record<ApplicationId, ModuleIconDefinition> = {
   projects: { icon: "BriefcaseBusiness", tone: "purple", accentColor: "var(--accent-violet)", accentSoft: "var(--pastel-lavender)" },
   warehouse: { icon: "Boxes", tone: "amber", accentColor: "var(--accent-orange)", accentSoft: "var(--pastel-cream)" },
   "import-export": { icon: "Ship", tone: "teal", accentColor: "var(--accent-cyan)", accentSoft: "var(--pastel-cyan)" },
-  accounting: { icon: "WalletCards", tone: "green", accentColor: "var(--accent-green)", accentSoft: "var(--pastel-mint)" },
+  accounting: { icon: "WalletCards", tone: "purple", accentColor: "var(--accent-violet)", accentSoft: "var(--pastel-lavender)" },
   messaging: { icon: "MessageCircle", tone: "blue", accentColor: "var(--accent-blue)", accentSoft: "var(--pastel-blue)" },
   operations: { icon: "CheckSquare", tone: "red", accentColor: "var(--accent-red)", accentSoft: "var(--pastel-rose)" },
   system: { icon: "Settings", tone: "slate", accentColor: "var(--text-secondary)", accentSoft: "var(--pastel-neutral)" }

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { getServerEnv } from "@/lib/env";
+import { fetchWithJwtClockRetry } from "@/lib/supabase/fetchWithJwtClockRetry";
 
 export function getSupabaseServiceClient(): SupabaseClient | null {
   const env = getServerEnv();
@@ -10,6 +11,7 @@ export function getSupabaseServiceClient(): SupabaseClient | null {
   }
 
   return createClient(env.NEXT_PUBLIC_SUPABASE_URL, supabaseSecretKey, {
+    global: { fetch: fetchWithJwtClockRetry },
     auth: {
       persistSession: false,
       autoRefreshToken: false

@@ -28,6 +28,30 @@ export function PageHeader(props: PageHeaderProps) {
   return <ResponsivePageHeader {...props} />;
 }
 
+export interface RecordHeaderProps {
+  title: string;
+  avatar?: ReactNode;
+  code?: string;
+  meta?: ReactNode;
+  status?: ReactNode;
+  action?: ReactNode;
+  navigation?: ReactNode;
+}
+
+export function RecordHeader({ title, avatar, code, meta, status, action, navigation }: RecordHeaderProps) {
+  return <section className="record-context">
+    <header className="page-header record-header" data-has-action={action ? "true" : "false"} data-has-avatar={Boolean(avatar)} data-ui="page-header">
+      {avatar ? <div className="record-header__avatar">{avatar}</div> : null}
+      <div className="page-header__copy record-header__copy">
+        <div className="record-header__title"><h1>{title}</h1>{status}</div>
+        {code || meta ? <div className="page-header__meta record-header__meta">{code ? <span className="record-header__code">{code}</span> : null}{meta}</div> : null}
+      </div>
+      {action ? <div className="record-header__actions"><PageActionBar>{action}</PageActionBar></div> : null}
+    </header>
+    {navigation}
+  </section>;
+}
+
 export interface EntityContextHeaderProps {
   title: ReactNode;
   code?: ReactNode;

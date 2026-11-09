@@ -1,4 +1,8 @@
 import "server-only";
+import { getBusinessDateKey } from "@/lib/time/timezone";
+import { readSharedShiftCatalog } from "@/services/attendanceShiftService";
+import { workerSafetyReportSchema } from "../schemas/workerAttendanceSchemas";
+import { createWorkerSafetyReport } from "./workerSafetyReport";
 
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -69,13 +73,15 @@ function nested(row: Row, key: string): Row | undefined {
   return value && typeof value === "object" ? value as Row : undefined;
 }
 
-const sessionSelect = "*,worker_attendance_entries(*),worker_attendance_photos(id,session_id,captured_at,sort_order),worker_attendance_adjustments(id,entry_id,reason,before_data,after_data,created_at)";
+const sessionSelect = "*,worksites(address,latitude,longitude,radius_meters),worker_attendance_entries(*),worker_attendance_photos(id,session_id,captured_at,sort_order,metadata),worker_attendance_adjustments(id,entry_id,reason,before_data,after_data,created_at)";
 
 function mapEntry(row: Row): WorkerAttendanceEntry {
   return {
     id: required(row, "id"), sessionId: required(row, "session_id"), workerId: required(row, "worker_id"),
     employeeCode: required(row, "employee_code_snapshot"), workerName: required(row, "worker_name_snapshot"),
     assignmentRole: required(row, "assignment_role_snapshot"), status: required(row, "status") as WorkerAttendanceEntry["status"],
+    isSelected: row.is_selected !== false,
+    checkedInAt: optional(row, "checked_in_at"), checkedOutAt: optional(row, "checked_out_at"),
     exceptionReason: optional(row, "exception_reason") as WorkerAttendanceEntry["exceptionReason"],
     dayException: required(row, "day_exception") as WorkerAttendanceEntry["dayException"], exceptionTime: optional(row, "exception_time")?.slice(0, 5),
     isUnplanned: Boolean(row.is_unplanned), unplannedReason: optional(row, "unplanned_reason"), note: optional(row, "note")
@@ -83,7 +89,8 @@ function mapEntry(row: Row): WorkerAttendanceEntry {
 }
 
 function mapPhoto(row: Row): WorkerAttendancePhoto {
-  return { id: required(row, "id"), sessionId: required(row, "session_id"), capturedAt: required(row, "captured_at"), sortOrder: Number(row.sort_order) };
+  const meta = (row.metadata ?? {}) as Row;
+  return { id: required(row, "id"), sessionId: required(row, "session_id"), capturedAt: required(row, "captured_at"), sortOrder: Number(row.sort_order), address: optional(meta, "address"), latitude: typeof meta.latitude === "number" ? meta.latitude : undefined, longitude: typeof meta.longitude === "number" ? meta.longitude : undefined };
 }
 
 function mapAdjustment(row: Row): WorkerAttendanceAdjustment {
@@ -120,10 +127,18 @@ async function activeChecklist(client: SupabaseClient): Promise<WorkerAttendance
 }
 
 function mapSession(row: Row): WorkerAttendanceSession {
+  const safetyReport = workerSafetyReportSchema.safeParse(row.safety_report);
+  const site = nested(row, "worksites");
+  const radius = Number(site?.radius_meters);
+  const coordinates = [row.latitude, row.longitude, site?.latitude, site?.longitude];
+  const verifiedWorksiteAddress = site && coordinates.every((value) => typeof value === "number" && Number.isFinite(value)) && radius > 0 && Number.isFinite(radius)
+    && distanceMeters(row.latitude as number, row.longitude as number, site.latitude as number, site.longitude as number) <= radius ? optional(site, "address")?.trim() : undefined;
   return {
     id: required(row, "id"), clientSessionId: required(row, "client_session_id"), projectId: required(row, "project_id"),
     projectName: required(row, "project_name_snapshot"), worksiteId: required(row, "worksite_id"), worksiteName: required(row, "worksite_name_snapshot"),
+    worksiteAddress: verifiedWorksiteAddress || undefined,
     date: required(row, "attendance_date"), shiftCode: required(row, "shift_code"), shiftName: required(row, "shift_name_snapshot"),
+    shiftStart: optional(row, "shift_start_snapshot")?.slice(0,5), shiftEnd: optional(row, "shift_end_snapshot")?.slice(0,5), shiftBreakMinutes: Number(row.shift_break_minutes_snapshot ?? 0),
     sessionType: required(row, "session_type") as WorkerAttendanceSession["sessionType"], supervisorEmployeeId: required(row, "supervisor_employee_id"),
     supervisorName: required(row, "supervisor_name_snapshot"), startedAt: required(row, "started_at"), submittedAt: optional(row, "submitted_at"),
     dayClosedAt: optional(row, "day_closed_at"),
@@ -134,7 +149,8 @@ function mapSession(row: Row): WorkerAttendanceSession {
     accuracyMeters: typeof row.accuracy_meters === "number" ? row.accuracy_meters : undefined,
     workNote: optional(row, "work_note"), note: optional(row, "note"), status: required(row, "status") as WorkerAttendanceSession["status"],
     syncStatus: required(row, "sync_status") as WorkerAttendanceSession["syncStatus"], photoStatus: required(row, "photo_status") as WorkerAttendanceSession["photoStatus"],
-    version: Number(row.version), entries: ((row.worker_attendance_entries ?? []) as Row[]).map(mapEntry),
+    version: Number(row.version), selectionMode: row.selection_mode === true, safetyConfirmed: row.safety_confirmed === true, safetyReport: safetyReport.success ? safetyReport.data : undefined, minimumPhotos: Number(row.minimum_photos_snapshot ?? 0),
+    entries: ((row.worker_attendance_entries ?? []) as Row[]).filter((entry) => !row.submitted_at || entry.is_selected !== false).map(mapEntry).sort((first, second) => first.employeeCode.localeCompare(second.employeeCode, "vi", { numeric: true }) || first.id.localeCompare(second.id)),
     photos: ((row.worker_attendance_photos ?? []) as Row[]).map(mapPhoto).sort((a, b) => a.sortOrder - b.sortOrder),
     adjustments: ((row.worker_attendance_adjustments ?? []) as Row[]).map(mapAdjustment),
     checklist: mapChecklist(row.checklist_snapshot), checklistResponses: mapChecklistResponses(row.checklist_responses)
@@ -164,39 +180,71 @@ function distanceMeters(latitude: number, longitude: number, targetLatitude: num
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
+function workerCommandError(error: { message: string; code?: string }, fallback: string): AppError {
+  if (error.message.includes("SAFETY_REPORT_REQUIRED")) return new AppError("VALIDATION_ERROR", "Hoàn tất báo cáo phổ biến an toàn, công việc, sức khỏe và khu vực làm việc.");
+  if (error.message.includes("WORKER_ALREADY_RECORDED")) return new AppError("CONFLICT", "Có công nhân đã được chấm công ở gói khác trong cùng ca. Hãy kiểm tra lại danh sách.");
+  if (error.message.includes("CLOCK_ORDER")) return new AppError("VALIDATION_ERROR", "Giờ ra không được trước giờ vào của công nhân.");
+  if (error.message.includes("SELECTION_REQUIRED")) return new AppError("VALIDATION_ERROR", "Chọn ít nhất một công nhân.");
+  if (error.message.includes("SELECTION_INVALID")) return new AppError("VALIDATION_ERROR", "Công nhân được chọn phải có mặt trong ca làm.");
+  if (error.message.includes("SAFETY_REQUIRED")) return new AppError("VALIDATION_ERROR", "Cần xác nhận an toàn lao động.");
+  if (error.message.includes("PHOTO_REQUIRED")) return new AppError("VALIDATION_ERROR", "Cần chụp ảnh điểm danh.");
+  if (error.message.includes("ACTOR_DENIED")) return new AppError("PERMISSION_DENIED");
+  if (error.message.includes("NOT_FOUND")) return new AppError("NOT_FOUND", "Không tìm thấy phiên điểm danh.");
+  if (error.message.includes("VERSION_CONFLICT")) return new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
+  if (error.message.includes("CLOSED_REPLAY_CONFLICT")) return new AppError("CONFLICT", "Ngày đã chốt với dữ liệu khác. Vui lòng tải lại.");
+  if (error.message.includes("NOT_SUBMITTED")) return new AppError("CONFLICT", "Cần gửi điểm danh buổi sáng trước khi chốt ngày.");
+  if (error.message.includes("NOT_EDITABLE")) return new AppError("CONFLICT", "Phiên đã gửi, không thể sửa bản nháp.");
+  if (error.message.includes("ENTRY_INVALID")) return new AppError("VALIDATION_ERROR", "Danh sách công nhân không thuộc phiên này hoặc bị trùng.");
+  if (error.message.includes("CHECKLIST_INVALID")) return new AppError("VALIDATION_ERROR", "Checklist không thuộc phiên điểm danh này.");
+  if (error.message.includes("INPUT_INVALID") || error.code?.startsWith("22")) return new AppError("VALIDATION_ERROR", "Dữ liệu điểm danh hoặc giờ ngoại lệ không hợp lệ.");
+  return new AppError("SERVER_ERROR", fallback);
+}
+
 async function assertProjectScope(client: SupabaseClient, user: AuthenticatedUser, employeeId: string, projectId: string, worksiteId: string, date: string) {
-  if (can(user.permissions, "worker_attendance.view_all")) return;
+  if (can(user.permissions, "worker_attendance.view_all") || can(user.permissions, "worker_attendance.create")) return;
   const { data, error } = await client.from("project_assignments").select("id").eq("project_id", projectId).eq("worksite_id", worksiteId).eq("employee_id", employeeId).in("assignment_role", ["supervisor_main", "supervisor_replacement", "project_manager"]).eq("status", "active").lte("start_date", date).or("end_date.is.null,end_date.gte." + date).limit(1);
   if (error) throw new AppError("SERVER_ERROR", "Không thể xác định phạm vi điểm danh công trường.");
   if (!data?.length) throw new AppError("PERMISSION_DENIED", "Bạn không được phân công điểm danh công trường này trong ngày đã chọn.");
 }
 
-export async function listTodayTasks(user: AuthenticatedUser, date: string): Promise<{ accountId: string; tasks: WorkerAttendanceTask[]; policy: WorkerAttendancePolicy }> {
+async function personalAttendanceReady(client: SupabaseClient, employeeId: string, date: string): Promise<boolean> {
+  const { data, error } = await client.from("attendance_events").select("event_type,photo_status,attendance_status").eq("employee_id", employeeId).eq("attendance_date", date).order("effective_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new AppError("SERVER_ERROR", "Không thể kiểm tra chấm công cá nhân.");
+  return data?.event_type === "check_in" && data.photo_status === "uploaded" && data.attendance_status !== "rejected";
+}
+
+export async function listTodayTasks(user: AuthenticatedUser, date: string): Promise<{ accountId: string; tasks: WorkerAttendanceTask[]; policy: WorkerAttendancePolicy; personalAttendanceReady: boolean }> {
   const client = db();
   const actor = await identity(client, user);
-  let query = client.from("project_assignments").select("project_id,worksite_id,shift_code,shift_name,projects(name,status),worksites(name,status,gps_required,allowed_accuracy_threshold_meters)").eq("status", "active").in("assignment_role", ["supervisor_main", "supervisor_replacement", "project_manager"]).lte("start_date", date).or("end_date.is.null,end_date.gte." + date);
-  if (!can(user.permissions, "worker_attendance.view_all")) query = query.eq("employee_id", actor.employeeId);
-  const [{ data, error }, workerPolicy, checklist] = await Promise.all([query, policy(client), activeChecklist(client)]);
+  if (!can(user.permissions, "worker_attendance.create") && !can(user.permissions, "worker_attendance.view_all")) throw new AppError("PERMISSION_DENIED");
+  const [{ data, error }, workerPolicy, checklist, shiftCatalog] = await Promise.all([
+    client.from("worksites").select("id,project_id,name,status,active_from,active_to,gps_required,allowed_accuracy_threshold_meters,projects!inner(name,status)").eq("status", "active").eq("projects.status", "active").order("name"),
+    policy(client), activeChecklist(client), readSharedShiftCatalog(client, date)
+  ]);
   if (error) throw new AppError("SERVER_ERROR", "Không thể tải lịch điểm danh hôm nay.");
   const tasks: WorkerAttendanceTask[] = [];
-  for (const row of data ?? []) {
+  await Promise.all((data ?? []).map(async row => {
     const project = nested(row as Row, "projects");
-    const worksite = nested(row as Row, "worksites");
-    if (!row.worksite_id || !project || !worksite || project.status === "closed" || worksite.status !== "active") continue;
-    const roster = await getProjectRoster(String(row.project_id), date, String(row.worksite_id));
-    const { data: session, error: sessionError } = await client.from("worker_attendance_sessions").select("id,status").eq("project_id", row.project_id).eq("worksite_id", row.worksite_id).eq("attendance_date", date).eq("shift_code", row.shift_code).eq("session_type", "morning").maybeSingle();
-    if (sessionError) throw new AppError("SERVER_ERROR", "Không thể đọc phiên điểm danh hiện có.");
-    const workers = roster.filter((item) => item.assignmentRole === "worker");
-    tasks.push({ projectId: String(row.project_id), projectName: required(project, "name"), worksiteId: String(row.worksite_id), worksiteName: required(worksite, "name"), date, shiftCode: String(row.shift_code), shiftName: String(row.shift_name), expectedWorkers: workers.length, gpsRequired: Boolean(worksite.gps_required), allowedAccuracyThresholdMeters: Number(worksite.allowed_accuracy_threshold_meters), existingSessionId: session?.id, existingStatus: session?.status, checklist, roster: workers.map((worker) => ({ workerId: worker.employeeId, employeeCode: worker.employeeCode, workerName: worker.employeeName, assignmentRole: worker.assignmentRole, approvedLeave: worker.approvedLeave })) });
-  }
-  return { accountId: actor.accountId, tasks, policy: workerPolicy };
+    if (!project || (row.active_from && String(row.active_from) > date) || (row.active_to && String(row.active_to) < date)) return;
+    const roster = (await getProjectRoster(String(row.project_id), date, String(row.id), undefined, shiftCatalog)).filter((item) => item.assignmentRole === "worker");
+    const shifts = new Map(roster.map((worker) => [worker.shiftCode, worker.shiftName]));
+    if (!shifts.size) shifts.set("DAY", "Ca ngày");
+    for (const [shiftCode, shiftName] of shifts) {
+      const { data: session, error: sessionError } = await client.from("worker_attendance_sessions").select("id,status").eq("project_id", row.project_id).eq("worksite_id", row.id).eq("attendance_date", date).eq("shift_code", shiftCode).eq("session_type", "morning").maybeSingle();
+      if (sessionError) throw new AppError("SERVER_ERROR", "Không thể đọc phiên điểm danh hiện có.");
+      const workers = [...new Map(roster.filter((item) => item.shiftCode === shiftCode).map((worker) => [worker.employeeId, worker])).values()];
+      tasks.push({ projectId: String(row.project_id), projectName: required(project, "name"), worksiteId: String(row.id), worksiteName: required(row as Row, "name"), date, shiftCode, shiftName, expectedWorkers: workers.length, gpsRequired: Boolean(row.gps_required), allowedAccuracyThresholdMeters: Number(row.allowed_accuracy_threshold_meters), existingSessionId: session?.id, existingStatus: session?.status, checklist, roster: workers.map((worker) => ({ workerId: worker.employeeId, employeeCode: worker.employeeCode, workerName: worker.employeeName, assignmentRole: worker.assignmentRole, approvedLeave: worker.approvedLeave })) });
+    }
+  }));
+  tasks.sort((a,b) => a.worksiteName.localeCompare(b.worksiteName, "vi") || a.projectName.localeCompare(b.projectName, "vi") || a.shiftCode.localeCompare(b.shiftCode));
+  return { accountId: actor.accountId, tasks, policy: workerPolicy, personalAttendanceReady: await personalAttendanceReady(client, actor.employeeId, date) };
 }
 
 export async function listWorkerSessions(user: AuthenticatedUser, filters: { from?: string; to?: string; projectId?: string; status?: string } = {}): Promise<WorkerAttendanceSession[]> {
   const client = db();
   const canViewAll = can(user.permissions, "worker_attendance.view_all");
   const actor = canViewAll ? undefined : await identity(client, user);
-  let query = client.from("worker_attendance_sessions").select(sessionSelect).order("attendance_date", { ascending: false }).limit(200);
+  let query = client.from("worker_attendance_sessions").select(sessionSelect).order("attendance_date", { ascending: false }).order("id").range(0, 999);
   if (actor) query = query.eq("supervisor_employee_id", actor.employeeId);
   if (filters.from) query = query.gte("attendance_date", filters.from);
   if (filters.to) query = query.lte("attendance_date", filters.to);
@@ -204,7 +252,14 @@ export async function listWorkerSessions(user: AuthenticatedUser, filters: { fro
   if (filters.status) query = query.eq("status", filters.status);
   const { data, error } = await query;
   if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách phiên điểm danh.");
-  return (data ?? []).map((row) => mapSession(row as Row));
+  const rows = [...(data ?? [])];
+  while (rows.length && rows.length % 1000 === 0) {
+    const page = await query.range(rows.length, rows.length + 999);
+    if (page.error) throw new AppError("SERVER_ERROR", "Không thể đọc đủ dữ liệu điểm danh.");
+    rows.push(...(page.data ?? []));
+    if ((page.data?.length ?? 0) < 1000) break;
+  }
+  return rows.map((row) => mapSession(row as Row));
 }
 
 export async function getWorkerSession(user: AuthenticatedUser, sessionId: string): Promise<WorkerAttendanceSession> {
@@ -221,14 +276,17 @@ export async function createWorkerSession(user: AuthenticatedUser, input: z.infe
   const client = db();
   const actor = await identity(client, user);
   const { data: replay } = await client.from("worker_attendance_sessions").select(sessionSelect).eq("client_session_id", input.clientSessionId).maybeSingle();
-  if (replay) return { session: mapSession(replay as Row), idempotentReplay: true };
+  if (replay) return { session: await getWorkerSession(user, String(replay.id)), idempotentReplay: true };
+  if (input.date !== getBusinessDateKey() || !await personalAttendanceReady(client, actor.employeeId, input.date)) throw new AppError("CONFLICT", "Chụp ảnh chấm công cá nhân trước khi điểm danh công nhân.");
   await assertProjectScope(client, user, actor.employeeId, input.projectId, input.worksiteId, input.date);
   const project = await getProject(input.projectId);
-  if (project.status === "closed") throw new AppError("CONFLICT", "Dự án đã đóng.");
+  if (project.status !== "active") throw new AppError("CONFLICT", "Gói không hoạt động.");
   const worksite = project.worksites.find((item) => item.id === input.worksiteId && item.status === "active");
   if (!worksite) throw new AppError("VALIDATION_ERROR", "Công trường không hoạt động.");
-  const roster = (await getProjectRoster(input.projectId, input.date, input.worksiteId)).filter((item) => item.assignmentRole === "worker");
+  if ((worksite.activeFrom && worksite.activeFrom > input.date) || (worksite.activeTo && worksite.activeTo < input.date)) throw new AppError("VALIDATION_ERROR", "Công trường không hoạt động trong ngày đã chọn.");
+  const roster = [...new Map((await getProjectRoster(input.projectId, input.date, input.worksiteId)).filter((item) => item.assignmentRole === "worker" && item.shiftCode === input.shiftCode).map((worker) => [worker.employeeId, worker])).values()];
   const checklist = await activeChecklist(client);
+  const workerPolicy = await policy(client);
   let geofenceStatus: WorkerAttendanceSession["geofenceStatus"] = worksite.gpsRequired ? "unavailable" : "not_required";
   let distance: number | undefined;
   if (input.location) {
@@ -240,10 +298,11 @@ export async function createWorkerSession(user: AuthenticatedUser, input: z.infe
     client_session_id: input.clientSessionId, project_id: project.id, project_name_snapshot: project.name,
     worksite_id: worksite.id, worksite_name_snapshot: worksite.name, attendance_date: input.date,
     shift_code: input.shiftCode, shift_name_snapshot: roster[0]?.shiftName ?? "Ca ngày", session_type: input.sessionType,
+    shift_start_snapshot: roster[0]?.shiftStart ?? null, shift_end_snapshot: roster[0]?.shiftEnd ?? null, shift_break_minutes_snapshot: roster[0]?.shiftBreakMinutes ?? 0,
     supervisor_employee_id: actor.employeeId, supervisor_name_snapshot: actor.employeeName,
     captured_at_client: input.capturedAtClient, latitude: input.location?.latitude ?? null, longitude: input.location?.longitude ?? null,
     accuracy_meters: input.location?.accuracy ?? null, distance_meters: distance ?? null, geofence_status: geofenceStatus,
-    status: "in_progress", sync_status: "syncing", checklist_snapshot: checklist, checklist_responses: [], created_by: actor.accountId
+    status: "in_progress", sync_status: "syncing", selection_mode: true, safety_confirmed: false, safety_report: createWorkerSafetyReport(), minimum_photos_snapshot: Math.max(1, workerPolicy.minimumPhotos), checklist_snapshot: checklist, checklist_responses: [], created_by: actor.accountId
   }).select("id").single();
   if (error || !data) {
     const { data: existing } = await client.from("worker_attendance_sessions").select(sessionSelect).eq("project_id", input.projectId).eq("worksite_id", input.worksiteId).eq("attendance_date", input.date).eq("shift_code", input.shiftCode).eq("session_type", input.sessionType).maybeSingle();
@@ -251,7 +310,7 @@ export async function createWorkerSession(user: AuthenticatedUser, input: z.infe
     throw new AppError("SERVER_ERROR", "Không thể tạo phiên điểm danh.");
   }
   if (roster.length) {
-    const { error: entryError } = await client.from("worker_attendance_entries").insert(roster.map((worker) => ({ session_id: data.id, worker_id: worker.employeeId, employee_code_snapshot: worker.employeeCode, worker_name_snapshot: worker.employeeName, assignment_role_snapshot: worker.assignmentRole, status: worker.approvedLeave ? "leave" : "unconfirmed", exception_reason: worker.approvedLeave ? "approved_leave" : null })));
+    const { error: entryError } = await client.from("worker_attendance_entries").insert(roster.map((worker) => ({ session_id: data.id, worker_id: worker.employeeId, employee_code_snapshot: worker.employeeCode, worker_name_snapshot: worker.employeeName, assignment_role_snapshot: worker.assignmentRole, is_selected: false, status: worker.approvedLeave ? "leave" : "unconfirmed", exception_reason: worker.approvedLeave ? "approved_leave" : null })));
     if (entryError) { await client.from("worker_attendance_sessions").delete().eq("id", data.id); throw new AppError("SERVER_ERROR", "Không thể tạo snapshot roster."); }
   }
   await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.session_created", entityType: "worker_attendance_session", entityId: data.id, metadata: { projectId: project.id, worksiteId: worksite.id, rosterCount: roster.length } });
@@ -263,7 +322,7 @@ export async function saveWorkerSessionDraft(user: AuthenticatedUser, sessionId:
   const client = db();
   const actor = await identity(client, user);
   const session = await getWorkerSession(user, sessionId);
-  if (session.status === "submitted" || session.status === "locked") throw new AppError("CONFLICT", "Phiên đã gửi, không thể sửa bản nháp.");
+  if (session.submittedAt || session.status === "submitted" || session.status === "locked") throw new AppError("CONFLICT", "Phiên đã gửi, không thể sửa bản nháp.");
   if (session.version !== input.version) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
   const knownIds = new Set(session.entries.map((entry) => entry.id));
   if (input.entries.some((entry) => !knownIds.has(entry.id))) throw new AppError("VALIDATION_ERROR", "Danh sách công nhân không thuộc phiên này.");
@@ -281,12 +340,9 @@ export async function saveWorkerSessionDraft(user: AuthenticatedUser, sessionId:
       distance_meters: worksite.latitude != null && worksite.longitude != null ? distanceMeters(input.location.latitude, input.location.longitude, worksite.latitude, worksite.longitude) : null
     };
   }
-  const { data, error } = await client.from("worker_attendance_sessions").update({ work_note: input.workNote ?? null, note: input.note ?? null, checklist_responses: input.checklistResponses, status: "in_progress", sync_status: "synced", ...gpsPatch }).eq("id", sessionId).eq("version", input.version).select("id").maybeSingle();
-  if (error || !data) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
-  for (const entry of input.entries) {
-    const { error } = await client.from("worker_attendance_entries").update({ status: entry.status, exception_reason: entry.exceptionReason ?? null, day_exception: entry.dayException, exception_time: entry.exceptionTime ?? null, note: entry.note ?? null }).eq("id", entry.id).eq("session_id", sessionId);
-    if (error) throw new AppError("SERVER_ERROR", "Không thể lưu trạng thái công nhân.");
-  }
+  const { data, error } = await client.rpc("save_worker_session_draft_command", { p_session_id: sessionId, p_expected_version: input.version, p_actor_id: actor.accountId, p_header: { work_note: input.workNote ?? null, note: input.note ?? null, checklist_responses: input.checklistResponses, ...(input.safetyConfirmed !== undefined ? { safety_confirmed: input.safetyConfirmed } : {}), ...(input.safetyReport ? { safety_report: input.safetyReport } : {}), ...gpsPatch }, p_entries: input.entries });
+  if (error) throw workerCommandError(error, "Không thể lưu bản nháp điểm danh.");
+  if (!data) throw new AppError("SERVER_ERROR", "Không thể xác nhận bản nháp điểm danh đã lưu.");
   await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.draft_saved", entityType: "worker_attendance_session", entityId: sessionId });
   return getWorkerSession(user, sessionId);
 }
@@ -297,7 +353,7 @@ async function validatePhoto(file: File) {
   if (file.type !== "image/jpeg" || !isJpeg(new Uint8Array(await file.slice(0, 4).arrayBuffer()))) throw new AppError("PHOTO_UPLOAD", "Ảnh phải là JPEG hợp lệ.");
 }
 
-export async function uploadWorkerPhoto(user: AuthenticatedUser, sessionId: string, input: { photoId: string; photo: File; thumbnail: File; width: number; height: number; capturedAt: string }): Promise<WorkerAttendanceSession> {
+export async function uploadWorkerPhoto(user: AuthenticatedUser, sessionId: string, input: { photoId: string; photo: File; thumbnail: File; width: number; height: number; capturedAt: string; address?: string; latitude?: number; longitude?: number; accuracy?: number }): Promise<WorkerAttendanceSession> {
   if (!can(user.permissions, "worker_attendance.create")) throw new AppError("PERMISSION_DENIED");
   const client = db();
   const actor = await identity(client, user);
@@ -324,7 +380,7 @@ export async function uploadWorkerPhoto(user: AuthenticatedUser, sessionId: stri
       { id: thumbId, bucket: "worker-attendance-photos", object_path: paths[1], owner_entity_type: "worker_attendance_session", owner_entity_id: sessionId, mime_type: "image/jpeg", byte_size: input.thumbnail.size, visibility: "private", created_by: actor.accountId, metadata: { derivative: "thumbnail" } }
     ], { onConflict: "bucket,object_path" });
     if (assetError) throw new AppError("PHOTO_UPLOAD", "Không thể lưu thông tin ảnh.");
-    const { error: photoError } = await client.from("worker_attendance_photos").upsert({ id: photoId, session_id: sessionId, file_id: fullId, thumbnail_file_id: thumbId, captured_at: input.capturedAt, sort_order: session.photos.length, width: input.width, height: input.height, metadata: { normalizedOrientation: true } }, { onConflict: "id" });
+    const { error: photoError } = await client.from("worker_attendance_photos").upsert({ id: photoId, session_id: sessionId, file_id: fullId, thumbnail_file_id: thumbId, captured_at: input.capturedAt, sort_order: session.photos.length, width: input.width, height: input.height, metadata: { normalizedOrientation: true, address: input.address, latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy, stamped: Boolean(input.address) } }, { onConflict: "id" });
     if (photoError) throw new AppError("PHOTO_UPLOAD", "Không thể liên kết ảnh với phiên.");
     await client.from("worker_attendance_sessions").update({ photo_status: "uploaded" }).eq("id", sessionId);
     await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.photo_linked", entityType: "worker_attendance_session", entityId: sessionId, metadata: { photoId } });
@@ -341,10 +397,12 @@ export async function submitWorkerSession(user: AuthenticatedUser, sessionId: st
   const client = db(); const actor = await identity(client, user); const session = await getWorkerSession(user, sessionId);
   if (session.status === "submitted" || session.status === "locked") return session;
   if (session.version !== version) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
-  const errors = validateSessionForSubmit({ entries: session.entries, photoCount: session.photos.length, workNote: session.workNote, geofenceStatus: session.geofenceStatus, latitude: session.latitude, longitude: session.longitude, checklist: session.checklist, checklistResponses: session.checklistResponses }, await policy(client));
+  if (session.selectionMode && !await personalAttendanceReady(client, actor.employeeId, session.date)) throw new AppError("CONFLICT", "Cần hoàn tất chấm công cá nhân có ảnh trước khi gửi điểm danh.");
+  const errors = validateSessionForSubmit({ ...session, photoCount: session.photos.length }, await policy(client));
   if (errors.length) throw new AppError("VALIDATION_ERROR", errors.join(" "));
-  const { data, error } = await client.from("worker_attendance_sessions").update({ status: "submitted", submitted_at: new Date().toISOString(), sync_status: "synced" }).eq("id", sessionId).eq("version", version).select("id").maybeSingle();
-  if (error || !data) throw new AppError("CONFLICT", "Phiên vừa được cập nhật từ thiết bị khác.");
+  const { data, error } = await client.from("worker_attendance_sessions").update({ status: "submitted", submitted_at: new Date().toISOString(), sync_status: "synced", ...(session.selectionMode ? { supervisor_employee_id: actor.employeeId, supervisor_name_snapshot: actor.employeeName } : {}) }).eq("id", sessionId).eq("version", version).select("id").maybeSingle();
+  if (error) throw workerCommandError(error, "Không thể gửi chấm công.");
+  if (!data) throw new AppError("CONFLICT", "Phiên vừa được cập nhật từ thiết bị khác.");
   await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.submitted", entityType: "worker_attendance_session", entityId: sessionId, after: { ...countWorkerAttendance(session.entries) } });
   return getWorkerSession(user, sessionId);
 }
@@ -352,6 +410,7 @@ export async function submitWorkerSession(user: AuthenticatedUser, sessionId: st
 export async function addTemporaryWorker(user: AuthenticatedUser, sessionId: string, input: z.infer<typeof temporaryWorkerSchema>): Promise<WorkerAttendanceSession> {
   if (!can(user.permissions, "worker_attendance.create")) throw new AppError("PERMISSION_DENIED");
   const client = db(); const actor = await identity(client, user); const session = await getWorkerSession(user, sessionId);
+  if (session.selectionMode) throw new AppError("PERMISSION_DENIED", "Danh sách công nhân trong gói do nhân sự quản lý.");
   if (session.status === "submitted" || session.status === "locked") throw new AppError("CONFLICT", "Phiên đã gửi.");
   if (input.phone) {
     const normalized = input.phone.replace(/\D/g, "").replace(/^0/, "84");
@@ -394,39 +453,28 @@ export async function closeWorkerSessionDay(user: AuthenticatedUser, sessionId: 
   const actor = await identity(client, user);
   const session = await getWorkerSession(user, sessionId);
   if (!session.submittedAt) throw new AppError("CONFLICT", "Cần gửi điểm danh buổi sáng trước khi chốt ngày.");
-  if (session.dayClosedAt) return session;
-  if (session.version !== input.version) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
+  if (!session.dayClosedAt && session.version !== input.version) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
   const knownEntries = new Map(session.entries.map((entry) => [entry.id, entry]));
   if (input.entries.some((entry) => !knownEntries.has(entry.id))) throw new AppError("VALIDATION_ERROR", "Danh sách công nhân không thuộc phiên này.");
-  const { data: claimed, error: claimError } = await client.from("worker_attendance_sessions").update({ day_closed_at: new Date().toISOString(), day_closed_by: actor.accountId }).eq("id", sessionId).eq("version", input.version).select("id").maybeSingle();
-  if (claimError || !claimed) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
-  const adjustments: Row[] = [];
-  for (const change of input.entries) {
-    const before = knownEntries.get(change.id)!;
-    if (before.dayException === change.dayException && (before.exceptionTime ?? null) === (change.exceptionTime ?? null)) continue;
-    const { error } = await client.from("worker_attendance_entries").update({ day_exception: change.dayException, exception_time: change.exceptionTime ?? null }).eq("id", change.id).eq("session_id", sessionId);
-    if (error) throw new AppError("SERVER_ERROR", "Không thể lưu ngoại lệ cuối ngày.");
-    adjustments.push({ session_id: sessionId, entry_id: change.id, actor_account_id: actor.accountId, reason: input.reason, before_data: { dayException: before.dayException, exceptionTime: before.exceptionTime ?? null }, after_data: { dayException: change.dayException, exceptionTime: change.exceptionTime ?? null } });
-  }
-  if (adjustments.length) {
-    const { error } = await client.from("worker_attendance_adjustments").insert(adjustments);
-    if (error) throw new AppError("SERVER_ERROR", "Không thể lưu lịch sử chốt ngày.");
-  }
-  await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.day_closed", entityType: "worker_attendance_session", entityId: sessionId, reason: input.reason, metadata: { exceptionCount: adjustments.length } });
+  const exceptionCount = input.entries.filter(change => { const before = knownEntries.get(change.id)!; return before.dayException !== change.dayException || (before.exceptionTime ?? null) !== (change.exceptionTime ?? null); }).length;
+  const { data, error } = await client.rpc("close_worker_session_day_command", { p_session_id: sessionId, p_expected_version: input.version, p_actor_id: actor.accountId, p_entries: input.entries, p_reason: input.reason });
+  if (error) throw workerCommandError(error, "Không thể chốt ngày điểm danh.");
+  if (!data) throw new AppError("SERVER_ERROR", "Không thể xác nhận ngày điểm danh đã chốt.");
+  if (!session.dayClosedAt) await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.day_closed", entityType: "worker_attendance_session", entityId: sessionId, reason: input.reason, metadata: { exceptionCount } });
   return getWorkerSession(user, sessionId);
 }
 
 export async function adjustWorkerEntry(user: AuthenticatedUser, sessionId: string, input: z.infer<typeof workerAdjustmentSchema>): Promise<WorkerAttendanceSession> {
   if (!can(user.permissions, "worker_attendance.adjust")) throw new AppError("PERMISSION_DENIED");
   const client = db(); const actor = await identity(client, user); const session = await getWorkerSession(user, sessionId);
+  if (session.selectionMode) throw new AppError("PERMISSION_DENIED", "Danh sách công nhân trong gói do nhân sự quản lý.");
   if (session.version !== input.version) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
   const entry = session.entries.find((item) => item.id === input.entryId);
   if (!entry) throw new AppError("NOT_FOUND", "Không tìm thấy công nhân trong phiên.");
   const before = { status: entry.status }; const after = { status: input.status };
-  const { data: claimed } = await client.from("worker_attendance_sessions").update({ status: "needs_review" }).eq("id", sessionId).eq("version", input.version).select("id").maybeSingle();
-  if (!claimed) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
-  await client.from("worker_attendance_entries").update({ status: input.status }).eq("id", entry.id).eq("session_id", sessionId);
-  await client.from("worker_attendance_adjustments").insert({ session_id: sessionId, entry_id: entry.id, actor_account_id: actor.accountId, reason: input.reason, before_data: before, after_data: after });
+  const { data, error } = await client.rpc("adjust_worker_entry_command", { p_session_id: sessionId, p_expected_version: input.version, p_actor_id: actor.accountId, p_entry_id: entry.id, p_status: input.status, p_reason: input.reason });
+  if (error) throw workerCommandError(error, "Không thể điều chỉnh điểm danh công nhân.");
+  if (!data) throw new AppError("SERVER_ERROR", "Không thể xác nhận điều chỉnh điểm danh.");
   await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.adjusted", entityType: "worker_attendance_session", entityId: sessionId, before, after, reason: input.reason });
   return getWorkerSession(user, sessionId);
 }

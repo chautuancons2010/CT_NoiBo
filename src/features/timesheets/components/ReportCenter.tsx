@@ -1,9 +1,12 @@
 "use client";
 
+import { downloadFile } from "@/lib/files/downloadFile";
+
 import { useEffect, useState } from "react";
 import { Select } from "@/components/shared/FormControls";
 import { Card } from "@/components/shared/Card";
 import type { ReportTemplate } from "../types/timesheetTypes";
+import { InlineForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 export function ReportCenter() {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
@@ -37,17 +40,14 @@ export function ReportCenter() {
       const response = await fetch("/api/v1/report-exports", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ templateId, employeeId: selected?.reportType === "employee_profile" ? employeeId : undefined }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message || "Không thể xuất báo cáo.");
-      window.open(`/api/v1/report-exports/${body.data.id}/download`, "_self");
+      await downloadFile(`/api/v1/report-exports/${body.data.id}/download`, { format: "xlsx" });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể xuất báo cáo.");
     } finally {
       setBusy(false);
     }
   }
-  return <Card><form className="leave-form" onSubmit={submit}>
-    <Select label="Mẫu báo cáo" className="select" value={templateId} onChange={(event) => setTemplateId(event.target.value)} options={templates.map((item) => ({ label: item.name, value: item.id }))} />
-    {selected?.reportType === "employee_profile" ? <label>ID nhân viên<input className="input" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required /></label> : null}
-    <div className="form-actions"><button className="button button--primary" disabled={busy || !templateId}>{busy ? "Đang xuất…" : "Xuất Excel"}</button></div>
-    {message ? <p className="form-error" role="alert">{message}</p> : null}
-  </form></Card>;
+  return <Card><InlineForm className="leave-form" onSubmit={submit}><FormFields><Select label="Mẫu báo cáo" className="select" value={templateId} onChange={(event) => setTemplateId(event.target.value)} options={templates.map((item) => ({ label: item.name, value: item.id }))} />
+{selected?.reportType === "employee_profile" ? <label>ID nhân viên<input className="input" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required /></label> : null}
+{message ? <p className="form-error" role="alert">{message}</p> : null}</FormFields><FormActions><button className="button button--primary" disabled={busy || !templateId}>{busy ? "Đang xuất…" : "Xuất Excel"}</button></FormActions></InlineForm></Card>;
 }

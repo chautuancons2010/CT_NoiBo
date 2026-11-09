@@ -1,5 +1,6 @@
 import type { Permission } from "@/lib/auth/permissions";
 import { can, createPermissionSet } from "@/lib/auth/permissions";
+import { approvalInboxPermissions } from "@/lib/auth/approvalAccess";
 import { isPathEnabled, type ModuleSettings, type NavigationSettings } from "@/config/systemSettings";
 
 export type NavigationIcon =
@@ -67,12 +68,15 @@ export interface NavigationItem {
   requiredPermission: Permission;
   alternativePermission?: Permission;
   alternativePermissions?: readonly Permission[];
+  excludedPermissions?: readonly Permission[];
   exact?: boolean;
   mobilePriority?: number;
   mobileLabel?: string;
 }
 
 export interface NavigationGroup {
+  id?: string;
+  icon?: NavigationIcon;
   label: string;
   items: NavigationItem[];
 }
@@ -166,6 +170,14 @@ export const desktopNavigation: NavigationGroup[] = [
         alternativePermission: "attendance.self_request"
       },
       {
+        label: "Phiếu lương của tôi",
+        href: "/personal/payslips",
+        icon: "ReceiptText",
+        requiredPermission: "payslip.self.view",
+        mobilePriority: 5,
+        excludedPermissions: ["accounting.access", "payroll.view", "payroll.create", "salary.view"]
+      },
+      {
         label: "Thông báo",
         href: "/attendance/notifications",
         icon: "Bell",
@@ -213,6 +225,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/leave/manage",
         icon: "CalendarCheck",
         requiredPermission: "leave.view_all",
+        alternativePermissions: ["leave.view_team", "leave.approve_all"],
         mobilePriority: 4,
         exact: true
       },
@@ -222,6 +235,13 @@ export const desktopNavigation: NavigationGroup[] = [
         icon: "ClipboardPenLine",
         requiredPermission: "timesheet.adjust",
         alternativePermissions: ["attendance.adjust", "attendance.manage", "attendance.view_all"]
+      },
+      {
+        label: "Cấu hình chấm công",
+        href: "/settings/attendance",
+        icon: "SlidersHorizontal",
+        requiredPermission: "attendance.config.view",
+        alternativePermission: "attendance.config.manage"
       },
     ]
   },
@@ -257,6 +277,13 @@ export const desktopNavigation: NavigationGroup[] = [
   {
     label: "Kho",
     items: [
+      {
+        label: "Tổng quan kho",
+        href: "/warehouse",
+        exact: true,
+        icon: "LayoutDashboard",
+        requiredPermission: "warehouse.view"
+      },
       {
         label: "Tồn kho",
         href: "/warehouse/inventory",
@@ -366,7 +393,7 @@ export const desktopNavigation: NavigationGroup[] = [
     items: [
       { label: "Kỳ lương", href: "/accounting/payroll", icon: "Calculator", requiredPermission: "payroll.view", alternativePermission: "payroll.create", mobilePriority: 1 },
       { label: "Hồ sơ lương", href: "/accounting/salaries", icon: "WalletCards", requiredPermission: "salary.view", mobilePriority: 2 },
-      { label: "Phiếu lương", href: "/accounting/payslips", icon: "ReceiptText", requiredPermission: "payslip.self.view", mobilePriority: 3 }
+      { label: "Phiếu lương", href: "/accounting/payslips", icon: "ReceiptText", requiredPermission: "payroll.view", mobilePriority: 3 }
     ]
   },
   {
@@ -377,7 +404,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/approvals",
         icon: "CheckSquare",
         requiredPermission: "approval.inbox.view",
-        alternativePermissions: ["approval.view", "approval.view_assigned", "approval.view_all", "leave.approve"]
+        alternativePermissions: approvalInboxPermissions
       },
       {
         label: "Tài liệu",
@@ -492,7 +519,8 @@ export function filterNavigationByPermissions<T extends NavigationItem>(
   const permissionSet = createPermissionSet(permissions);
   return items.filter((item) => can(permissionSet, item.requiredPermission)
     || Boolean(item.alternativePermission && can(permissionSet, item.alternativePermission))
-    || Boolean(item.alternativePermissions?.some((permission) => can(permissionSet, permission))));
+    || Boolean(item.alternativePermissions?.some((permission) => can(permissionSet, permission))))
+    .filter((item) => !item.excludedPermissions?.some((permission) => can(permissionSet, permission)));
 }
 
 export function filterGroupsByPermissions(

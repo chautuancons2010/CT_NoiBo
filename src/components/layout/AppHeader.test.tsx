@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppHeader } from "@/components/layout/AppHeader";
+vi.mock("@/components/layout/ApplicationChrome.module.css", () => ({ default: { header: "chrome-header" } }));
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 
 vi.mock("@/components/providers/SystemSettingsProvider", () => ({
@@ -27,9 +28,9 @@ vi.mock("@/components/shared/UserMenu", () => ({
 const user: AuthenticatedUser = { id: "account-1", displayName: "Nguyễn Thị Thúy Hằng", username: "thuyhang", email: "hang@example.com", status: "active", permissions: [] };
 
 describe("AppHeader", () => {
-  it("renders the current route title in the shared mobile leading area", () => {
+  it("renders the brand and launcher on a mobile root screen", () => {
     render(<AppHeader connectionState="connected" pathname="/dashboard" user={user} />);
-    expect(screen.getByText("Tổng quan")).toBeInTheDocument();
+    expect(screen.getByText("Châu Tuấn")).toBeInTheDocument();
     expect(screen.queryByText("Đồng bộ tức thời")).not.toBeInTheDocument();
     expect(screen.getByText("Tìm kiếm")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
@@ -37,6 +38,7 @@ describe("AppHeader", () => {
 
   it("keeps the module launcher on non-dashboard screens", () => {
     render(<AppHeader connectionState="connected" pathname="/employees" user={user} />);
+    expect(screen.getByRole("navigation", { name: "Vị trí hiện tại" })).toHaveTextContent("Nhân viên");
     expect(screen.getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
   });
 

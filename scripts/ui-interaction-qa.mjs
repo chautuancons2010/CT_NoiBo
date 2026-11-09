@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -6,7 +7,7 @@ import { chromium } from "playwright-core";
 
 nextEnv.loadEnvConfig(process.cwd());
 const baseUrl = process.env.UI_QA_BASE_URL || "http://localhost:3200";
-const password = process.env.SEED_TEST_PASSWORD || "12345678";
+const password = getTestPassword();
 const output = path.resolve("docs/ui-evidence/erp-redesign");
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.UI_QA_BROWSER || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", headless: true });

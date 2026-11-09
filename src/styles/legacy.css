@@ -1,0 +1,19 @@
+/* Compatibility only. New ERP components and CSS Modules own the unlayered
+   cascade, so historical page skins cannot override their layout. */
+@import "../app/globals.css";
+@import "../app/theme.css";
+@import "../app/mobile.css";
+@import "./enterprise.css";
+@import "./mobile-design.css";
+@import "./mobile-shell.css";
+@import "./mobile-components.css";
+@import "./mobile-workspaces.css";
+@import "./mobile-home.css";
+@import "./brand-logo.css";
+@import "./mobile-polish.css";
+@import "./workspace-fit.css";
+@import "./interaction-finish.css";
+@import "./mobile-launcher.css";
+@import "./mobile-motion.css";
+@import "./header-toolbar.css";
+@import "./ui-dna.css";

@@ -37,8 +37,10 @@ async function syncAttendanceItemUnlocked(item: PendingAttendanceItem): Promise<
       const response = await fetch("/api/v1/attendance/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(25_000),
         body: JSON.stringify({
           clientEventId: syncing.clientEventId,
+          intendedType: syncing.intendedType,
           capturedAtClient: syncing.capturedAtClient,
           capturedOffline: syncing.capturedOffline,
           location: syncing.location,
@@ -78,7 +80,8 @@ async function syncAttendanceItemUnlocked(item: PendingAttendanceItem): Promise<
     formData.set("capturedAt", syncing.capturedAtClient);
     const photoResponse = await fetch(`/api/v1/attendance/events/${eventId}/photo`, {
       method: "POST",
-      body: formData
+      body: formData,
+      signal: AbortSignal.timeout(25_000)
     });
     const uploaded = await readResponse<AttendanceRecordResult>(photoResponse);
     await removePendingAttendance(syncing.clientEventId);
@@ -88,6 +91,9 @@ async function syncAttendanceItemUnlocked(item: PendingAttendanceItem): Promise<
     const category = error instanceof AttendanceSyncError ? error.category : "NETWORK";
     await savePendingAttendance({
       ...syncing,
+      // navigator.onLine can be true with an unreachable mobile data connection.
+      // Preserve the capture's offline provenance for a later retry.
+      capturedOffline: syncing.capturedOffline || category === "NETWORK",
       serverEventId,
       retryCount,
       syncState: "sync_failed",

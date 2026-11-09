@@ -1,1 +1,4 @@
-import { ShipmentDetailView } from "@/features/import-export/components/ImportExportViews";export default async function Page({params}:{params:Promise<{id:string}>}){return <ShipmentDetailView id={(await params).id} section="overview"/>;}
+// The persistent shipment layout owns the workspace and the active section.
+export default function Page() {
+  return null;
+}

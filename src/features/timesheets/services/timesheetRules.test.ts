@@ -6,6 +6,28 @@ const shift: Shift = { id:"1", code:"OFFICE", name:"Hành chính", startTime:"08
 const base = { periodId:"p", employee:{id:"e",code:"NV01",name:"An",departmentName:"HC",positionName:"NV",employmentTypeName:"Chính thức"}, date:"2026-09-10", shift, adjustments:[] };
 
 describe("timesheet rules", () => {
+  it("không tăng giờ công hoặc mất giờ nghỉ khi chấm lặp cùng loại", () => {
+    const result = computeDailyTimesheet({ ...base, events: [
+      { id: "in", eventType: "check_in", effectiveAt: "2026-09-10T01:00:00Z", geofenceStatus: "inside", photoStatus: "uploaded", syncStatus: "synced" },
+      { id: "repeat-in", eventType: "check_in", effectiveAt: "2026-09-10T01:01:00Z", geofenceStatus: "inside", photoStatus: "uploaded", syncStatus: "synced" },
+      { id: "out", eventType: "check_out", effectiveAt: "2026-09-10T10:00:00Z", geofenceStatus: "inside", photoStatus: "uploaded", syncStatus: "synced" },
+      { id: "repeat-out", eventType: "check_out", effectiveAt: "2026-09-10T10:01:00Z", geofenceStatus: "inside", photoStatus: "uploaded", syncStatus: "synced" }
+    ] });
+    expect(result.workMinutes).toBe(480);
+    expect(result.rawSource.events).toHaveLength(4);
+  });
+  it("tính lại số phút khi nhân sự bổ sung lượt ra còn thiếu", () => {
+    const result=computeDailyTimesheet({...base,events:[{id:"in",eventType:"check_in",effectiveAt:"2026-09-10T01:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"}],adjustments:[{id:"a",periodId:"p",employeeId:"e",workDate:base.date,adjustmentType:"add_missing_check_out",effectiveTime:"2026-09-10T10:00:00Z",reason:"Bổ sung từ nhật ký ca",createdAt:"2026-09-10T11:00Z",before:{},after:{}}]});
+    expect(result.workMinutes).toBe(480);expect(result.workFraction).toBe(1);expect(result.status).toBe("full_work");expect(result.exceptions).toEqual([]);expect(result.rawSource.events).toHaveLength(1);
+  });
+  it("sửa thời gian hiệu lực vẫn giữ nguồn chấm công gốc",()=>{
+    const result=computeDailyTimesheet({...base,events:[{id:"in",eventType:"check_in",effectiveAt:"2026-09-10T02:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"},{id:"out",eventType:"check_out",effectiveAt:"2026-09-10T10:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"}],adjustments:[{id:"a",periodId:"p",employeeId:"e",workDate:base.date,adjustmentType:"adjust_effective_time",effectiveTime:"2026-09-10T01:00:00Z",reason:"Đối chiếu giờ ca",createdAt:"2026-09-10T11:00Z",before:{},after:{timeTarget:"check_in"}}]});
+    expect(result.workMinutes).toBe(480);expect(result.lateMinutes).toBe(0);expect((result.rawSource.events as Array<{effectiveAt:string}>)[0].effectiveAt).toBe("2026-09-10T02:00:00Z");
+  });
+  it("nghỉ nửa ngày và làm nửa ngày không bị coi là trùng đơn nghỉ toàn ngày",()=>{
+    const result=computeDailyTimesheet({...base,events:[{id:"in",eventType:"check_in",effectiveAt:"2026-09-10T01:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"},{id:"out",eventType:"check_out",effectiveAt:"2026-09-10T05:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"}],leave:{requestId:"l",requestNumber:"NP1",typeCode:"AL",typeName:"Phép năm",deductsBalance:true,fraction:.5}});
+    expect(result.leaveFraction).toBe(.5);expect(result.workFraction).toBeLessThanOrEqual(.5);expect(result.exceptions.some(item=>item.type==="attendance_leave_conflict")).toBe(false);
+  });
   it("tính ca thường và ca qua đêm", () => { expect(scheduledMinutes(shift)).toBe(480); expect(scheduledMinutes({...shift,startTime:"22:00",endTime:"06:00",crossMidnight:true})).toBe(420); });
   it("áp dụng độ trễ cho phép", () => { const result=computeDailyTimesheet({...base,events:[{id:"in",eventType:"check_in",effectiveAt:"2026-09-10T01:05:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"},{id:"out",eventType:"check_out",effectiveAt:"2026-09-10T10:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"}]});expect(result.status).toBe("full_work");expect(result.lateMinutes).toBe(0);expect(result.workMinutes).toBe(475); });
   it("giữ nhiều lượt vào/ra và phát hiện thiếu lượt ra", () => { const result=computeDailyTimesheet({...base,events:[{id:"1",eventType:"check_in",effectiveAt:"2026-09-10T01:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"},{id:"2",eventType:"check_out",effectiveAt:"2026-09-10T05:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"},{id:"3",eventType:"check_in",effectiveAt:"2026-09-10T06:00:00Z",geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"}]});expect(result.workMinutes).toBe(240);expect(result.status).toBe("missing_check_out");expect(result.rawSource.events).toHaveLength(3); });

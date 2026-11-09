@@ -1,16 +1,17 @@
 export const dataVisualizationPalette = [
-  "var(--accent-orange)",
-  "var(--accent-violet)",
-  "var(--accent-cyan)",
-  "var(--accent-green)",
-  "var(--accent-blue)",
-  "var(--accent-red)"
+  "var(--primary)",
+  "var(--chart-teal)",
+  "var(--chart-purple)",
+  "var(--chart-green)",
+  "var(--chart-amber)",
+  "var(--chart-coral)",
+  "var(--chart-blue)"
 ] as const;
 
 export const semanticChartColors = {
-  success: "var(--success)",
-  info: "var(--info)",
-  warning: "var(--warning)",
-  error: "var(--danger)",
-  neutral: "var(--text-muted)"
+  success: "var(--chart-green)",
+  info: "var(--chart-blue)",
+  warning: "var(--chart-orange)",
+  error: "var(--chart-coral)",
+  neutral: "var(--chart-purple)"
 } as const;

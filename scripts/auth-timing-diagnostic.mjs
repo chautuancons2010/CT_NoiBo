@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import nextEnv from "@next/env";
@@ -33,7 +34,7 @@ async function timed(name, task) {
 const loginStart = performance.now();
 const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
   method: "POST", headers: { "content-type": "application/json" },
-  body: JSON.stringify({ username: "test.supervisor", password: process.env.SEED_TEST_PASSWORD || "12345678" })
+  body: JSON.stringify({ username: "test.supervisor", password: getTestPassword() })
 });
 const cookiePairs = login.headers.getSetCookie().map((cookie) => cookie.split(";")[0]);
 await login.arrayBuffer();

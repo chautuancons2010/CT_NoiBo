@@ -1,3 +1,5 @@
+/* Compatibility layer. Shared ERP contracts live outside this layer. */
+@layer legacy {
 /* Canonical ERP components. Geometry, color and elevation live in tokens.css;
    feature modules own their domain layout, never the shared component skin. */
 .app-shell { background: var(--shell-canvas); }
@@ -7,7 +9,7 @@
   height: var(--topbar-height);
   min-height: var(--topbar-height);
   border-bottom: 0;
-  background: transparent;
+  background: var(--surface-1);
   box-shadow: none;
 }
 .app-header__search .header-search {
@@ -338,3 +340,4 @@
 .personal-workspace-cards .dashboard-personal-todos__list li strong { white-space: normal; overflow-wrap: anywhere; font-weight: var(--font-weight-medium); }
 @media (max-width: 1023px) { .personal-workspace-cards { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 767px) { .personal-workspace-cards .dashboard-personal-todos__list li > button { width: 44px; height: 44px; } }
+}

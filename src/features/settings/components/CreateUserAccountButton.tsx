@@ -14,6 +14,7 @@ import { toggleEmployeeRole } from "@/services/authorization/employeeAccessPolic
 import type { RoleDefinition } from "@/services/authorization/rbacService";
 
 import styles from "./AccessManagement.module.css";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 interface EmployeeChoice {
   id: string;
@@ -105,7 +106,8 @@ export function CreateUserAccountButton({ employees, roles }: { employees: Emplo
           <footer><Button onClick={close} variant="primary">Hoàn tất</Button></footer>
         </div>
       ) : (
-        <form className={styles.accessForm} onSubmit={submit}>
+        <SectionedForm className={styles.accessForm} onSubmit={submit}>
+<FormFields>
           <section className={styles.formSection}>
             <h3><UserRound aria-hidden="true" size={18} /> Nhân sự</h3>
             <Select label="Nhân viên" name="employeeId" onChange={(event) => setEmployeeId(event.target.value)} options={employees.map((item) => ({ value: item.id, label: item.name }))} placeholder="Chọn nhân viên" required value={employeeId} />
@@ -114,7 +116,7 @@ export function CreateUserAccountButton({ employees, roles }: { employees: Emplo
             <h3><KeyRound aria-hidden="true" size={18} /> Đăng nhập</h3>
             <div className={styles.twoColumns}>
               <Input autoCapitalize="none" autoComplete="username" defaultValue={suggestedUsername(employee?.employeeCode)} key={`username-${employeeId}`} label="Tên tài khoản" maxLength={32} minLength={3} name="username" pattern={usernameHtmlPattern} required />
-              <PasswordInput autoComplete="new-password" helperText="Để trống để hệ thống tạo mật khẩu tạm thời." label="Mật khẩu ban đầu (không bắt buộc)" minLength={ACCOUNT_PASSWORD_MIN_LENGTH} name="password" pattern={ACCOUNT_PASSWORD_HTML_PATTERN} />
+              <PasswordInput autoComplete="new-password" label="Mật khẩu ban đầu" minLength={ACCOUNT_PASSWORD_MIN_LENGTH} name="password" pattern={ACCOUNT_PASSWORD_HTML_PATTERN} placeholder="Để trống để tự tạo" />
             </div>
           </section>
           <section className={styles.formSection}>
@@ -122,8 +124,9 @@ export function CreateUserAccountButton({ employees, roles }: { employees: Emplo
             <RoleAccessSelector onToggle={toggleRole} roles={roles} selectedRoleIds={selectedRoleIds} />
           </section>
           {error ? <p className={styles.formError} role="alert">{error}</p> : null}
-          <footer className={styles.formFooter}><Button onClick={close}>Hủy</Button><Button disabled={submitting || !employeeId || !selectedRoleIds.length} type="submit" variant="primary">{submitting ? "Đang tạo…" : "Tạo tài khoản"}</Button></footer>
-        </form>
+          </FormFields>
+<FormActions className={styles.formFooter}><Button onClick={close}>Hủy</Button><Button disabled={submitting || !employeeId || !selectedRoleIds.length} type="submit" variant="primary" busy={submitting}>{"Tạo tài khoản"}</Button></FormActions>
+        </SectionedForm>
       )}
     </Modal>
   </>;

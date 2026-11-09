@@ -3,6 +3,10 @@ import { globSync } from "node:fs";
 
 const required = [
   "src/styles/tokens.css",
+  "src/styles/legacy.css",
+  "src/styles/erp-components.css",
+  "src/components/layout/ApplicationChrome.module.css",
+  "src/components/shared/WorkCalendar.tsx",
   "src/styles/enterprise.css",
   "src/components/shared/FloatingPanel.tsx",
   "src/components/shared/SelectControl.tsx",
@@ -21,6 +25,24 @@ const required = [
 for (const file of required) {
   if (!existsSync(file)) throw new Error(`Missing centralized UI building block: ${file}`);
 }
+
+const rootLayout = readFileSync("src/app/layout.tsx", "utf8");
+const interWeights = new Set([...rootLayout.matchAll(/@fontsource\/inter\/(\d+)\.css/g)].map((match) => Number(match[1])));
+if (interWeights.size) {
+  for (const weight of [400, 500, 600, 700]) {
+    if (!interWeights.has(weight)) throw new Error(`Inter ${weight} is missing its full character set. Subset-only bold faces can fall back to a serif font.`);
+  }
+}
+const globalImports = [...rootLayout.matchAll(/import\s+["'](@\/[^"']+\.css)["']/g)].map((match) => match[1]);
+const globalOwners = new Set(["@/styles/inter-vietnamese.css", "@/styles/tokens.css", "@/styles/legacy.css", "@/styles/erp-components.css"]);
+const unownedImports = globalImports.filter((file) => !globalOwners.has(file));
+if (unownedImports.length) throw new Error(`Global CSS bypasses ERP ownership: ${unownedImports.join(", ")}`);
+const legacyEntry = readFileSync("src/styles/legacy.css", "utf8");
+for (const match of legacyEntry.matchAll(/@import\s+"([^"]+)";/g)) {
+  const source = readFileSync(new URL(`../src/styles/${match[1]}`, import.meta.url), "utf8");
+  if (!source.includes("@layer legacy {")) throw new Error(`Compatibility stylesheet escapes its layer: ${match[1]}`);
+}
+if (/!important/.test(readFileSync("src/styles/erp-components.css", "utf8"))) throw new Error("ERP components must not escalate specificity with important.");
 
 const uiCoreContracts = [
   ["src/components/shared/PageHeader.tsx", ["ResponsivePageHeader", "EntityContextHeader"]],
@@ -50,7 +72,7 @@ for (const [file, marker] of realConsumers) {
 }
 
 const mobileBottomNav = readFileSync("src/components/layout/MobileBottomNav.tsx", "utf8");
-if (!mobileBottomNav.includes("resolveMobileNavigation(pathname, user)") || !mobileBottomNav.includes("activeMobileDestination(pathname, model)")) {
+if (!mobileBottomNav.includes("resolveMobileNavigation(pathname, user, settings)") || !mobileBottomNav.includes("activeMobileDestination(pathname, model)")) {
   throw new Error("Mobile navigation must use the shared route and permission resolver.");
 }
 
@@ -65,7 +87,7 @@ for (const file of ["src/app/globals.css", "src/app/theme.css"]) {
   }
 }
 
-const uiFiles = globSync("src/**/*.{tsx,css}", { nodir: true });
+const uiFiles = globSync("src/**/*.{tsx,css}", { nodir: true }).filter((file) => !/\.(?:test|spec)\.tsx$/.test(file));
 const normalize = (file) => file.replaceAll("\\", "/");
 const inlineStyleFiles = uiFiles
   .filter((file) => file.endsWith(".tsx") && readFileSync(file, "utf8").includes("style={{"))
@@ -86,7 +108,8 @@ const inlineStyleAllowlist = new Set([
   "src/features/projects/components/package-workspace/PackageConstructionWorkspace.tsx",
   "src/features/projects/pages/ProjectMonitoringPage.tsx",
   "src/features/system-admin/pages/AppearancePage.tsx",
-  "src/features/system-admin/pages/PayslipTemplatePage.tsx"
+  "src/features/system-admin/pages/PayslipTemplatePage.tsx",
+  "src/features/import-export/components/ShipmentWorkspace.tsx" // Data-driven receiving progress, clamped to 0–100.
 ]);
 const unexpectedInlineStyles = inlineStyleFiles.filter((file) => !inlineStyleAllowlist.has(file));
 if (unexpectedInlineStyles.length) throw new Error(`Unexpected inline presentation styles: ${unexpectedInlineStyles.join(", ")}`);
@@ -100,9 +123,8 @@ if (manualPageHeaders.length) throw new Error(`Manual PageHeader duplicates: ${m
 const nativeTableAllowlist = new Set([
   "src/features/dashboard/components/ModuleChart.tsx",
   "src/features/projects/components/package-workspace/PackageAttendanceWorkspace.tsx",
-  "src/features/timesheets/components/CalendarSettings.tsx",
   "src/features/timesheets/components/TimesheetMatrix.tsx",
-  "src/features/warehouse/components/StockCountEditor.tsx"
+  "src/features/testing/TestAccountPicker.tsx" // Developer-only switcher, with separate interaction coverage.
 ]);
 const nativeFeatureTables = uiFiles
   .filter((file) => file.endsWith(".tsx") && readFileSync(file, "utf8").includes("<table"))
@@ -117,7 +139,7 @@ const rawColorFiles = uiFiles
   .filter((file) => file !== "src/features/system-admin/pages/AppearancePage.tsx");
 if (rawColorFiles.length) throw new Error(`Raw colors in feature JSX: ${rawColorFiles.join(", ")}`);
 
-const nativeFeatureSelects = uiFiles.filter((file) => file.endsWith(".tsx") && normalize(file).startsWith("src/features/") && /<select\b|<datalist\b/.test(readFileSync(file, "utf8")));
+const nativeFeatureSelects = uiFiles.filter((file) => file.endsWith(".tsx") && normalize(file).startsWith("src/features/") && normalize(file) !== "src/features/testing/TestAccountPicker.tsx" && /<select\b|<datalist\b/.test(readFileSync(file, "utf8")));
 if (nativeFeatureSelects.length) throw new Error(`Feature choices must use the shared Select/Combobox: ${nativeFeatureSelects.join(", ")}`);
 const shell = readFileSync("src/components/layout/AppShell.tsx", "utf8");
 if (/app-content--mobile-blocked|isMobilePersonalRoute/.test(shell)) throw new Error("Business screens must remain available on mobile within the same RBAC.");

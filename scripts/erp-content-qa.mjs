@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright-core";
 import nextEnv from "@next/env";
@@ -22,7 +23,7 @@ try {
       page.on("pageerror", (error) => errors.push(error.message));
       await page.goto(`${baseUrl}/login`);
       await page.locator('[name="username"]').fill(username);
-      await page.locator('[name="password"]').fill(process.env.SEED_TEST_PASSWORD || "12345678");
+      await page.locator('[name="password"]').fill(getTestPassword());
       await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
       await page.waitForURL((url) => url.pathname !== "/login");
       await page.goto(`${baseUrl}${route}`);

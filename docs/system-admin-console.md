@@ -36,6 +36,17 @@ API:
 
 Tất cả schema dùng Zod strict. Unknown key, route ngoài whitelist và giá trị không hợp lệ bị từ chối ở server.
 
+## Khóa module
+
+- Admin vào **Quản trị → Khóa module** (`/system-admin/modules`), chọn **Khóa** hoặc **Mở khóa**. Mỗi thao tác được lưu ngay, tạo phiên bản cấu hình và audit theo tài khoản thực hiện.
+- Cần đồng thời `system_admin.access` và `module.manage`. Các module có thể khóa: Nhân sự, Cá nhân, Gói / Công trường, Kho, Xuất nhập khẩu, Kế toán, Đơn từ & Điều hành và Báo cáo. Dashboard, trang quản trị, hồ sơ, tin nhắn và thông báo chung vẫn dùng được. Khóa Đơn từ & Điều hành cũng khóa trang Báo cáo thuộc phân hệ này.
+- Module khóa được gỡ khỏi menu/launcher; truy cập trang trực tiếp chuyển đến trạng thái tạm khóa. Proxy chặn mọi phương thức API thuộc module với HTTP `423`, mã `MODULE_LOCKED`, trước khi chạy handler. Quyền truy cập hiện có vẫn được kiểm tra tại từng handler khi module mở.
+- Kiểm tra phía server đọc cấu hình module hiện hành, không dùng cache cũ. Khi database không trả được cấu hình hợp lệ, yêu cầu vào module nhận HTTP `503`; trang quản trị vẫn truy cập được để xử lý.
+- Phiên đang mở đồng bộ trạng thái khi chuyển trang, quay lại tab và mỗi 30 giây. Server chặn yêu cầu mới ngay sau khi lưu khóa. Yêu cầu đã bắt đầu trước khi khóa có thể hoàn tất.
+- Khóa không xóa dữ liệu, không đổi quyền và không hoàn tác giao dịch. Mở khóa khôi phục truy cập theo quyền đã cấp. Cấu hình JSON cũ được bổ sung mặc định cho Kế toán/Điều hành mà vẫn giữ các khóa đã lưu; không cần migration mới.
+- Các API tích hợp có đường dẫn module cụ thể cũng tuân theo khóa. Phiếu lương cá nhân phụ thuộc thêm Kế toán; tạo phiếu nhập từ lô hàng phụ thuộc thêm Kho.
+- `GET /api/v1/modules`: trạng thái module cho tài khoản đang hoạt động. `PATCH /api/v1/modules/[module]` nhận `{ "enabled": false }` để khóa hoặc `true` để mở khóa, chỉ thay đổi module được chọn trên cấu hình hiện hành.
+
 ## Database
 
 Migration `202609100001_system_admin_console.sql` tạo:

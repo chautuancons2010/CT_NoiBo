@@ -1,8 +1,13 @@
 .next/
+.next-e2e/
+.next-review/
+.next-review-next/
+.next-review-payroll/
 next-env.d.ts
 node_modules/
 dist/
 coverage/
+test-results/
 .env
 .env*.local
 artifacts/migration/
@@ -18,3 +23,7 @@ supabase/.temp/
 
 .vercel
 .env*
+!.env.e2e.example
+.tmp/
+*.private.json
+docs/ui-evidence/

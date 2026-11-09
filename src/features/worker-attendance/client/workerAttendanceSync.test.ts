@@ -6,6 +6,7 @@ import type { WorkerLocalDraft } from "./workerDraftStore";
 vi.mock("./workerDraftStore", () => ({
   deleteWorkerDraft: vi.fn(),
   saveWorkerDraft: vi.fn(),
+  getWorkerDraft: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { deleteWorkerDraft, saveWorkerDraft } from "./workerDraftStore";
@@ -97,5 +98,18 @@ describe("worker attendance offline synchronization", () => {
     expect((uploadCalls[0]?.[1]?.body as FormData).get("photoId")).toBe(photoId);
     expect((uploadCalls[1]?.[1]?.body as FormData).get("photoId")).toBe(photoId);
     expect(deleteWorkerDraft).toHaveBeenCalledWith(localSessionId);
+  });
+
+  it("keeps worker selections and safety confirmation when the first draft synchronization fails", async () => {
+    const local = draft();
+    const worker = { id: "local-entry", sessionId: localSessionId, workerId: "worker-1", employeeCode: "CN01", workerName: "Công nhân", assignmentRole: "worker", status: "present" as const, isSelected: true, dayException: "none" as const, isUnplanned: false };
+    local.session = { ...local.session, selectionMode: true, safetyConfirmed: true, entries: [worker] };
+    const server = { ...session(serverSessionId, 1), selectionMode: true, safetyConfirmed: false, entries: [{ ...worker, id: "server-entry", sessionId: serverSessionId, status: "unconfirmed", isSelected: false }] };
+    const fetchMock = vi.fn().mockResolvedValueOnce(apiResponse({ session: server })).mockRejectedValueOnce(new TypeError("lost draft response"));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(syncWorkerDraft(local)).rejects.toThrow("lost draft response");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ safetyConfirmed: true, entries: [expect.objectContaining({ id: "server-entry", isSelected: true, status: "present" })] });
+    const saved = vi.mocked(saveWorkerDraft).mock.calls.at(-1)?.[0];
+    expect(saved?.session).toMatchObject({ safetyConfirmed: true, entries: [expect.objectContaining({ id: "server-entry", isSelected: true, status: "present" })] });
   });
 });

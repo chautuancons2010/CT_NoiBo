@@ -18,6 +18,7 @@ import type { ProjectIssueSeverity, ProjectProgressNode } from "@/features/proje
 
 import styles from "./PackageWorkspace.module.css";
 import progressStyles from "./FieldProgressForm.module.css";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 const statusLabels: Record<ProjectProgressNode["status"], string> = {
   not_started: "Chưa triển khai",
@@ -170,7 +171,8 @@ export function FieldOperationSheets({ accountId, projectId, selectedWorksiteId,
 
   return <>
     <Drawer className={progressStyles.dialog} onClose={() => { if (!saving) onClose(); }} open={mode === "field-update"} title="Cập nhật tiến độ">
-      <form className={progressStyles.form} onSubmit={saveProgress}>
+      <SectionedForm className={progressStyles.form} onSubmit={saveProgress}>
+<FormFields>
         <div className={progressStyles.body}>
           {initialNodeId && selectedNode ? <div className={progressStyles.workSummary}><span>Công việc</span><strong>{selectedNode.name}</strong><div><span>{statusLabels[selectedNode.status]}</span><span>Hiện tại {selectedNode.completionPercent}%</span>{selectedNode.completionPercent === 100 && selectedNode.status !== "completed" ? <span>Chưa xác nhận hoàn tất</span> : null}</div></div> : nodeSelect}
           <fieldset className={progressStyles.statusGroup}><legend>Trạng thái công việc</legend><div>{(["not_started", "in_progress", "blocked", "completed"] as const).map((value) => <button aria-pressed={status === value} key={value} onClick={() => chooseStatus(value)} type="button">{status === value ? <Check aria-hidden="true" size={15} /> : null}{statusLabels[value]}</button>)}</div></fieldset>
@@ -178,18 +180,21 @@ export function FieldOperationSheets({ accountId, projectId, selectedWorksiteId,
           <div className={progressStyles.evidence}><PhotoPicker onChange={setPhotos} onError={setError} photos={photos} /><Textarea label="Ghi chú cập nhật" maxLength={500} onChange={(event) => setNote(event.target.value)} required={status === "blocked"} rows={3} value={note} /></div>
         </div>
         {error ? <p className={styles.inlineError} role="alert"><CircleAlert size={17} />{error}</p> : null}
-        <footer className={progressStyles.footer}><span>{typeof navigator === "undefined" || navigator.onLine ? "Sẽ đồng bộ ngay" : "Sẽ gửi khi có mạng"}</span><div><Button disabled={saving} onClick={onClose} type="button">Hủy</Button><Button disabled={saving || !selectedNode} leftIcon={<Save size={17} />} type="submit" variant="primary">{saving ? "Đang lưu" : "Lưu cập nhật"}</Button></div></footer>
-      </form>
+        </FormFields>
+<FormActions className={progressStyles.footer}><span>{typeof navigator === "undefined" || navigator.onLine ? "Sẽ đồng bộ ngay" : "Sẽ gửi khi có mạng"}</span><div><Button disabled={saving} onClick={onClose} type="button">Hủy</Button><Button disabled={saving || !selectedNode} leftIcon={<Save size={17} />} type="submit" variant="primary" busy={saving}>{"Lưu cập nhật"}</Button></div></FormActions>
+      </SectionedForm>
     </Drawer>
     <Drawer className={styles.fieldSheet} onClose={() => { if (!saving) onClose(); }} open={mode === "report-issue"} title="Báo vướng hiện trường">
-      <form className={styles.fieldSheetForm} onSubmit={saveIssue}>
+      <SectionedForm className={styles.fieldSheetForm} onSubmit={saveIssue}>
+<FormFields>
         {nodeSelect}
         <fieldset className={styles.issueSeverity}><legend>Mức độ</legend>{([['low', 'Theo dõi'], ['medium', 'Cảnh báo sớm'], ['critical', 'Dừng thi công']] as const).map(([value, label]) => <button aria-pressed={severity === value} key={value} onClick={() => setSeverity(value)} type="button"><ShieldAlert size={18} />{label}</button>)}</fieldset>
         <Textarea label="Nội dung vướng mắc" maxLength={1000} onChange={(event) => setNote(event.target.value)} required rows={4} value={note} />
         <PhotoPicker onChange={setPhotos} onError={setError} photos={photos} />
         {error ? <p className={styles.inlineError} role="alert"><CircleAlert size={17} />{error}</p> : null}
-        <footer className={styles.drawerFooter}><span>{typeof navigator === "undefined" || navigator.onLine ? "Sẽ đồng bộ ngay" : "Sẽ gửi khi có mạng"}</span><div><Button disabled={saving} onClick={onClose}>Hủy</Button><Button disabled={saving || !selectedNode || !note.trim()} leftIcon={<ShieldAlert size={17} />} type="submit" variant="primary">{saving ? "Đang lưu" : "Gửi báo vướng"}</Button></div></footer>
-      </form>
+        </FormFields>
+<FormActions className={styles.drawerFooter}><span>{typeof navigator === "undefined" || navigator.onLine ? "Sẽ đồng bộ ngay" : "Sẽ gửi khi có mạng"}</span><div><Button disabled={saving} onClick={onClose}>Hủy</Button><Button disabled={saving || !selectedNode || !note.trim()} leftIcon={<ShieldAlert size={17} />} type="submit" variant="primary" busy={saving}>{"Gửi báo vướng"}</Button></div></FormActions>
+      </SectionedForm>
     </Drawer>
   </>;
 }

@@ -21,7 +21,7 @@ async function collectTsxFiles(directory) {
   for (const entry of entries) {
     const target = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...await collectTsxFiles(target));
-    if (entry.isFile() && entry.name.endsWith(".tsx")) files.push(target);
+    if (entry.isFile() && entry.name.endsWith(".tsx") && !/\.(?:test|spec)\.tsx$/.test(entry.name)) files.push(target);
   }
   return files;
 }
@@ -43,6 +43,7 @@ for (const file of pages) {
   const route = routeFor(file);
   if (/\bredirect\s*\(/.test(source)) classifications.redirect.push(route);
   else if (/<(?:PageHeader|h1)\b/.test(source)) classifications.direct.push(route);
+  else if (/^\/import-export\/shipments\/\[id\]\//.test(route) && /\breturn null\s*;/.test(source)) classifications.delegated.push(route);
   else if (/from\s*["']@\/(?:features|components)\//.test(source) || /export\s*\{\s*default\s*\}\s*from\s*["']\.\.\/page["']/.test(source)) classifications.delegated.push(route);
   else throw new Error(`Route ${route} không có title owner trực tiếp, redirect hoặc component được ủy quyền.`);
 }
@@ -115,15 +116,16 @@ assert(/<ModuleLauncher/.test(dashboardView), "Dashboard thiếu ô ứng dụng
 assert(/model\?\.attention/.test(dashboardView), "Dashboard chưa hiển thị việc cần xử lý theo vai trò.");
 assert(/visibleApplications/.test(moduleLauncher) && /application\.id\s*!==\s*["']overview["']/.test(moduleLauncher), "Ứng dụng của tôi chưa lọc theo quyền hoặc vẫn tự liên kết Dashboard.");
 assert(/moduleIconRegistry/.test(moduleIconRegistry) && /ModuleIconDefinition/.test(moduleIconRegistry), "Thiếu ModuleIconRegistry tập trung.");
-assert(/\.module-icon-card:hover/.test(themeCss) && /translateY\(-2px\)/.test(themeCss), "Module card thiếu phản hồi hover ổn định.");
+assert(/\.module-icon-card:hover/.test(themeCss) && /\.module-icon-card:hover/.test(await readFile(path.join(root, "src/styles/ui-dna.css"), "utf8")), "Module card thiếu trạng thái hover ổn định theo theme chung.");
 assert(!/WarehouseDashboardView/.test(warehouseViews) && !/ImportExportDashboardView/.test(importExportViews), "Dashboard module cũ chưa được loại bỏ.");
 assert(/operational-section__body/.test(workbench), "Panel nghiệp vụ chưa tách header và body.");
-assert(/--app-bg:\s*#f0fdfa/.test(tokenCss), "App background chưa dùng trust-teal enterprise token.");
-assert(/--radius-card:\s*12px/.test(tokenCss) && /--radius-card-large:\s*16px/.test(tokenCss), "Card radius chưa được khóa ở token enterprise 12/16px.");
-assert(/--radius-control:\s*9px/.test(tokenCss) && /--control-height-md:\s*44px/.test(tokenCss), "Control geometry chưa đi qua token chung.");
+assert(/--workspace-canvas:\s*var\(--app-canvas-mid\)/.test(tokenCss), "Workspace phải dùng canvas nhận diện hiện hành.");
+assert(/--radius-button:\s*var\(--radius-control\)/.test(tokenCss) && /--radius-search:\s*var\(--radius-control\)/.test(tokenCss), "Button/search phải dùng cùng token control.");
+assert(/--ui-radius-card:\s*8px/.test(tokenCss) && /--radius-control:\s*var\(--ui-radius-control\)/.test(tokenCss), "Card/control geometry chưa dùng hệ quy chiếu chung.");
+assert(/--ui-radius-control:\s*6px/.test(tokenCss) && /--control-height-md:\s*44px/.test(tokenCss), "Control geometry chưa đi qua token chung.");
 assert(/--sidebar-width:\s*232px/.test(tokenCss) && /--sidebar-collapsed-width:\s*84px/.test(tokenCss), "Sidebar mở rộng và rail icon mẫu chưa đi qua token chung.");
 assert(/--reference-surface:/.test(tokenCss) && /--reference-shadow:/.test(tokenCss) && /--reference-orange:/.test(tokenCss), "Thiếu hệ vật liệu mềm và màu điểm nhấn theo mẫu.");
-assert(/--erp-primary:\s*#0f766e/.test(tokenCss) && /--erp-data-blue:\s*#2563eb/.test(tokenCss) && /--erp-attention:\s*#ea580c/.test(tokenCss), "Thiếu trust teal/blue/orange palette theo design system.");
+assert(/--erp-primary:\s*var\(--color-primary\)/.test(tokenCss) && /deriveBrandColorTokens/.test(layout), "Màu nhận diện phải tiếp tục dùng cấu hình thương hiệu.");
 assert(/\.page-main \.page-header/.test(themeCss) && /font-weight:\s*600/.test(themeCss), "Thiếu theme chung nhẹ cho tiêu đề trang.");
 assert(/onDoubleClick/.test(dataTable) && /event\.key\s*===\s*["']Enter["']/.test(dataTable), "Bảng dữ liệu chưa hỗ trợ mở bản ghi bằng double-click và Enter.");
 assert(/actionLabel\s*=\s*["']Thao tác["']/.test(dataTable), "Cột thao tác chưa có nhãn nhất quán.");
@@ -149,9 +151,8 @@ const nativeTableAllowlist = new Set([
   // Accessible chart data fallback; not an interactive business listing.
   "src/features/dashboard/components/ModuleChart.tsx",
   "src/features/projects/components/package-workspace/PackageAttendanceWorkspace.tsx",
-  "src/features/timesheets/components/CalendarSettings.tsx",
   "src/features/timesheets/components/TimesheetMatrix.tsx",
-  "src/features/warehouse/components/StockCountEditor.tsx"
+  "src/features/testing/TestAccountPicker.tsx" // Isolated developer account switcher, unavailable in production.
 ]);
 const nativeTables = [];
 for (const file of featureFiles) {

@@ -1,8 +1,10 @@
+import { assertSeedTarget } from "./testing/guard.mjs";
 import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
+await assertSeedTarget();
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL và Supabase secret/service-role key là bắt buộc.");
@@ -14,8 +16,8 @@ if (!isLocalTarget && !process.argv.includes("--allow-remote")) {
 }
 
 const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-const testPassword = process.env.SEED_TEST_PASSWORD || "12345678";
-if (testPassword.length < 8) throw new Error("SEED_TEST_PASSWORD phải có tối thiểu 8 ký tự.");
+const testPassword = process.env.TEST_ACCOUNT_PASSWORD || process.env.SEED_TEST_PASSWORD;
+if (!testPassword || testPassword.length < 12) throw new Error("Mật khẩu test phải có tối thiểu 12 ký tự.");
 const testUsers = [
   { accountId: "91000000-0000-4000-8000-000000000001", email: "supervisor.test@chautuan.local", name: "Nguyễn Minh Giám Sát" },
   { accountId: "91000000-0000-4000-8000-000000000002", email: "employee.test@chautuan.local", name: "Trần Thu Nhân Viên" },
@@ -54,6 +56,7 @@ for (const user of testUsers) {
     if (error || !data.user) throw error ?? new Error(`Không thể tạo auth user ${user.email}`);
     authUser = data.user;
   } else {
+    if (authUser.user_metadata?.testData !== true) throw new Error(`Từ chối ghi đè Auth user ngoài phạm vi test: ${user.email}`);
     const { error } = await client.auth.admin.updateUserById(authUser.id, { password: testPassword, email_confirm: true, user_metadata: { displayName: user.name, testData: true } });
     if (error) throw error;
   }

@@ -17,6 +17,7 @@ import { useId, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { SelectControl } from "@/components/shared/SelectControl";
 import { ComboboxControl } from "@/components/shared/ComboboxControl";
+import { useIsPhone } from "@/lib/ui/useIsPhone";
 
 export interface FormFieldProps {
   id?: string;
@@ -104,14 +105,14 @@ export function Input({ label, labelHidden, helperText, error, required, classNa
     <FormField disabled={disabled} error={error} helperText={helperText} id={id} label={label} labelHidden={labelHidden} readOnly={readOnly} required={required}>
       {(fieldId, describedBy) => (
         <input
-          aria-describedby={describedBy}
-          aria-invalid={error ? true : undefined}
           className={cn("input", className)}
           disabled={disabled}
           id={fieldId}
           readOnly={readOnly}
           required={required}
           {...props}
+          aria-describedby={[props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined}
+          aria-invalid={error ? true : props["aria-invalid"]}
         />
       )}
     </FormField>
@@ -128,8 +129,6 @@ export function PasswordInput({ label, labelHidden, helperText, error, required,
       {(fieldId, describedBy) => (
         <span className="password-input">
           <input
-            aria-describedby={describedBy}
-            aria-invalid={error ? true : undefined}
             className={cn("input", className)}
             disabled={disabled}
             id={fieldId}
@@ -137,9 +136,13 @@ export function PasswordInput({ label, labelHidden, helperText, error, required,
             required={required}
             type={visible ? "text" : "password"}
             {...props}
+            aria-describedby={[props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined}
+            aria-invalid={error ? true : props["aria-invalid"]}
           />
           <button
+            aria-controls={fieldId}
             aria-label={actionLabel}
+            aria-pressed={visible}
             className="password-input__toggle"
             disabled={disabled}
             onClick={() => setVisible((current) => !current)}
@@ -178,14 +181,14 @@ export function Textarea({
     <FormField disabled={disabled} error={error} helperText={helperText} id={id} label={label} labelHidden={labelHidden} readOnly={readOnly} required={required}>
       {(fieldId, describedBy) => (
         <textarea
-          aria-describedby={describedBy}
-          aria-invalid={error ? true : undefined}
           className={cn("textarea", className)}
           disabled={disabled}
           id={fieldId}
           readOnly={readOnly}
           required={required}
           {...props}
+          aria-describedby={[props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined}
+          aria-invalid={error ? true : props["aria-invalid"]}
         />
       )}
     </FormField>
@@ -223,8 +226,6 @@ export function Select({
     <FormField disabled={disabled} error={error} helperText={helperText} id={id} label={label} labelHidden={labelHidden} required={required}>
       {(fieldId, describedBy) => (
         <SelectControl
-          aria-describedby={describedBy}
-          aria-invalid={error ? true : undefined}
           className={cn("select", className)}
           disabled={disabled}
           id={fieldId}
@@ -232,6 +233,8 @@ export function Select({
           options={options}
           placeholder={placeholder}
           {...props}
+          aria-describedby={[props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined}
+          aria-invalid={error ? true : props["aria-invalid"]}
         />
       )}
     </FormField>
@@ -247,8 +250,6 @@ export function Combobox({ options, label, labelHidden, helperText, error, requi
     <FormField disabled={disabled} error={error} helperText={helperText} id={id} label={label} labelHidden={labelHidden} readOnly={readOnly} required={required}>
       {(fieldId, describedBy) => (
           <ComboboxControl
-            aria-describedby={describedBy}
-            aria-invalid={error ? true : undefined}
             className={cn("input", className)}
             disabled={disabled}
             id={fieldId}
@@ -256,6 +257,8 @@ export function Combobox({ options, label, labelHidden, helperText, error, requi
             readOnly={readOnly}
             required={required}
             {...props}
+            aria-describedby={[props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined}
+            aria-invalid={error ? true : props["aria-invalid"]}
           />
       )}
     </FormField>
@@ -274,7 +277,7 @@ export function Checkbox({ label, helperText, className, id, disabled, "aria-des
   const describedBy = [ariaDescribedBy, helperId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="choice-field" data-disabled={disabled || undefined}>
+    <div className="choice-field" data-disabled={disabled || undefined} data-label-empty={!label || undefined}>
       <input aria-describedby={describedBy} className={cn("checkbox", className)} disabled={disabled} id={fieldId} type="checkbox" {...props} />
       <div className="choice-field__content">
         <label htmlFor={fieldId}>{label}</label>
@@ -296,7 +299,7 @@ export function Radio({ label, helperText, className, id, disabled, "aria-descri
   const describedBy = [ariaDescribedBy, helperId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="choice-field" data-disabled={disabled || undefined}>
+    <div className="choice-field" data-disabled={disabled || undefined} data-label-empty={!label || undefined}>
       <input aria-describedby={describedBy} className={cn("radio", className)} disabled={disabled} id={fieldId} type="radio" {...props} />
       <div className="choice-field__content">
         <label htmlFor={fieldId}>{label}</label>
@@ -326,6 +329,7 @@ export function Switch({ label, checked, helperText, disabled, onCheckedChange }
         aria-labelledby={`${id}-label`}
         className={cn("switch", checked && "switch--checked")}
         disabled={disabled}
+        id={id}
         onClick={() => onCheckedChange?.(!checked)}
         role="switch"
         type="button"
@@ -333,9 +337,9 @@ export function Switch({ label, checked, helperText, disabled, onCheckedChange }
         <span />
       </button>
       <div>
-        <span className="switch-field__label" id={`${id}-label`}>
+        <label className="switch-field__label" htmlFor={id} id={`${id}-label`}>
           {label}
-        </span>
+        </label>
         {helperText ? <small id={helperId}>{helperText}</small> : null}
       </div>
     </div>
@@ -371,18 +375,22 @@ export function DateRangePicker({
 export interface SearchInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   icon?: LucideIcon;
+  mobilePlaceholder?: string;
 }
 
 export function SearchInput({
   label = "Tìm kiếm",
   icon: Icon = Search,
   className,
+  placeholder,
+  mobilePlaceholder = "Tìm kiếm",
   ...props
 }: SearchInputProps) {
+  const phone = useIsPhone();
   return (
-    <div className="search-input">
+    <div className="search-input" data-ui="search-input">
       <Icon aria-hidden="true" size={18} />
-      <input aria-label={label} className={cn("input", className)} type="search" {...props} />
+        <input aria-label={label} className={cn("input", className)} type="search" {...props} placeholder={phone ? mobilePlaceholder : placeholder ?? "Tìm kiếm"} />
     </div>
   );
 }

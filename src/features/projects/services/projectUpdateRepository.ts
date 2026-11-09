@@ -279,17 +279,22 @@ export async function listProjectIssues(user: AuthenticatedUser, filters: { proj
   if (!can(user.permissions, "project_issue.view")) throw new AppError("PERMISSION_DENIED");
   const client = db();
   if (filters.projectId) await assertProjectAccess(client, user, filters.projectId);
-  let query = client.from("project_issues").select(issueSelect).order("severity", { ascending: false }).order("created_at");
   const scope = filters.projectId ? undefined : await scopedProjectIds(client, user);
   if (scope && !scope.length) return [];
-  if (scope) query = query.in("project_id", scope);
-  if (filters.projectId) query = query.eq("project_id", filters.projectId);
-  if (filters.status) query = query.eq("status", filters.status);
-  if (filters.severity) query = query.eq("severity", filters.severity);
-  if (filters.ownerId) query = query.eq("owner_employee_id", filters.ownerId);
-  const { data, error } = await query;
-  if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách vấn đề.");
-  return sortIssuesByPriority((data ?? []).map((row) => mapIssue(row as Row)));
+  const rows: Row[] = [];
+  for (let offset = 0; offset < 100_000; offset += 500) {
+    let query = client.from("project_issues").select(issueSelect).order("id").range(offset, offset + 499);
+    if (scope) query = query.in("project_id", scope);
+    if (filters.projectId) query = query.eq("project_id", filters.projectId);
+    if (filters.status) query = query.eq("status", filters.status);
+    if (filters.severity) query = query.eq("severity", filters.severity);
+    if (filters.ownerId) query = query.eq("owner_employee_id", filters.ownerId);
+    const { data, error } = await query;
+    if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách vấn đề.");
+    rows.push(...(data ?? []) as Row[]);
+    if ((data?.length ?? 0) < 500) return sortIssuesByPriority(rows.map(mapIssue));
+  }
+  throw new AppError("SERVER_ERROR", "Danh sách vấn đề vượt giới hạn tải. Hãy lọc theo dự án.");
 }
 
 async function transitionIssue(user: AuthenticatedUser, issueId: string, status: "resolved" | "open", note: string) {

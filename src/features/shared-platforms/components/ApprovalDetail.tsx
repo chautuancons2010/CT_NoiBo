@@ -24,37 +24,52 @@ export function ApprovalDetail({ id }: { id: string }) {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/v1/approvals/${id}`, { cache: "no-store" });
-    const body = await response.json() as { data?: ApprovalCase; error?: { message: string } };
-    setItem(body.data);
-    setError(response.ok ? "" : body.error?.message ?? "Không thể tải yêu cầu.");
+    try {
+      const response = await fetch(`/api/v1/approvals/${id}`, { cache: "no-store" });
+      const body = await response.json() as { data?: ApprovalCase; error?: { message: string } };
+      if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể tải yêu cầu.");
+      setItem(body.data);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể tải yêu cầu.");
+    }
   }, [id]);
   useEffect(() => { void load(); }, [load]);
   useDomainReconciliation("approvals", load);
 
   async function act(action: "approve" | "reject") {
     setBusy(true);
-    const response = await fetch(`/api/v1/approvals/${id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ comment: comment || undefined }) });
-    const body = await response.json() as { error?: { message: string } };
-    setError(response.ok ? "" : body.error?.message ?? "Không thể xử lý.");
-    if (response.ok) await load();
-    setBusy(false);
+    try {
+      const response = await fetch(`/api/v1/approvals/${id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ comment: comment || undefined }) });
+      const body = await response.json() as { error?: { message: string } };
+      if (!response.ok) throw new Error(body.error?.message ?? "Không thể xử lý.");
+      setComment("");
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể xử lý.");
+    } finally { setBusy(false); }
   }
 
   async function reassign() {
     setBusy(true);
-    const response = await fetch(`/api/v1/approvals/${id}/reassign`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ toAccountId: target, reason }) });
-    const body = await response.json() as { error?: { message: string } };
-    setError(response.ok ? "" : body.error?.message ?? "Không thể chuyển người duyệt.");
-    if (response.ok) { setTarget(""); setReason(""); await load(); }
-    setBusy(false);
+    try {
+      const response = await fetch(`/api/v1/approvals/${id}/reassign`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ toAccountId: target, reason }) });
+      const body = await response.json() as { error?: { message: string } };
+      if (!response.ok) throw new Error(body.error?.message ?? "Không thể chuyển người duyệt.");
+      setTarget(""); setReason(""); await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể chuyển người duyệt.");
+    } finally { setBusy(false); }
   }
 
   if (!item && !error) return <LoadingState title="Đang tải yêu cầu" description="" />;
   if (!item) return <ErrorState description={error} />;
+  const canDecide = Boolean(item.availableActions?.approve || item.availableActions?.reject);
+  const canReassign = Boolean(item.availableActions?.reassign);
+  const hasActions = canDecide || canReassign;
 
   return (
-    <WorkbenchLayout className={item.status === "pending" ? "approval-decision" : "approval-decision workbench-layout--solo"}>
+    <WorkbenchLayout className={hasActions ? "approval-decision" : "approval-decision workbench-layout--solo"}>
       <WorkCanvas className="approval-decision__canvas">
         <header className="approval-decision__heading">
           <div><span>{domainLabels[item.domainType] ?? item.domainType}</span><h1 className="operational-code">{item.referenceNumber}</h1></div>
@@ -70,11 +85,11 @@ export function ApprovalDetail({ id }: { id: string }) {
           <ol className="approval-timeline">{item.steps.map((step) => <li className={`is-${step.status}`} key={step.id}><span>{step.stepOrder}</span><div><strong>{step.stepName}</strong><p>{step.approverName ?? "Chưa xác định người duyệt"}</p>{step.actedAt ? <time dateTime={step.actedAt}>{new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(step.actedAt))}</time> : null}{step.comment ? <blockquote>{step.comment}</blockquote> : null}</div><StatusBadge tone={step.status === "approved" ? "success" : step.status === "rejected" ? "error" : "warning"}>{statusLabels[step.status] ?? step.status}</StatusBadge></li>)}</ol>
         </section>
       </WorkCanvas>
-      {item.status === "pending" ? <Inspector className="approval-decision__inspector" title="Quyết định">
+      {hasActions ? <Inspector className="approval-decision__inspector" title="Quyết định">
         {error ? <p className="form-error" role="alert">{error}</p> : null}
-        <Textarea label="Ý kiến" value={comment} onChange={(event) => setComment(event.target.value)} />
-        <div className="approval-decision__actions"><Button disabled={busy} onClick={() => void act("approve")} variant="primary">Duyệt yêu cầu</Button><Button disabled={busy} onClick={() => void act("reject")} variant="danger">Từ chối</Button></div>
-        <details className="reassign-panel"><summary>Chuyển người duyệt</summary><div className="form-grid"><Input label="Mã tài khoản nhận" value={target} onChange={(event) => setTarget(event.target.value)} /><Input label="Lý do" value={reason} onChange={(event) => setReason(event.target.value)} /></div><Button disabled={busy || !target || reason.length < 3} onClick={() => void reassign()}>Xác nhận chuyển</Button></details>
+        {canDecide ? <><Textarea label="Ý kiến" value={comment} onChange={(event) => setComment(event.target.value)} />
+        <div className="approval-decision__actions">{item.availableActions?.approve ? <Button disabled={busy} onClick={() => void act("approve")} variant="primary">Duyệt yêu cầu</Button> : null}{item.availableActions?.reject ? <Button disabled={busy || comment.trim().length < 3} onClick={() => void act("reject")} variant="danger">Từ chối</Button> : null}</div></> : null}
+        {canReassign ? <details className="reassign-panel"><summary>Chuyển người duyệt</summary><div className="form-grid"><Input label="Mã tài khoản nhận" value={target} onChange={(event) => setTarget(event.target.value)} /><Input label="Lý do" value={reason} onChange={(event) => setReason(event.target.value)} /></div><Button disabled={busy || !target || reason.length < 3} onClick={() => void reassign()}>Xác nhận chuyển</Button></details> : null}
       </Inspector> : null}
     </WorkbenchLayout>
   );

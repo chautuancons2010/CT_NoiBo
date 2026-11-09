@@ -1,13 +1,14 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ImageOff, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { Lightbox } from "@/components/shared/Overlays";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { AttendanceEvent } from "@/features/attendance/types/attendanceTypes";
-import styles from "./AttendanceAdminDashboard.module.css";
+import { AttendanceLocationAddress } from "./AttendanceLocationAddress";
+import styles from "./AttendanceEvidence.module.css";
 
 const time = (value: string) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value));
 const photoLabels = { not_required: "Không có ảnh", pending_upload: "Chờ tải ảnh", uploading: "Đang tải ảnh", uploaded: "Đã có ảnh", upload_failed: "Tải ảnh lỗi" } as const;
@@ -20,9 +21,7 @@ function EvidenceImage({ event, employeeName, thumbnail = false, imageUrl, onLoa
 }
 
 function GpsEvidence({ event }: { event: AttendanceEvent }) {
-  const hasCoordinates = Number.isFinite(event.latitude) && Number.isFinite(event.longitude);
-  if (!hasCoordinates) return <span className={styles.noGps}>Chưa có GPS</span>;
-  return <a className={styles.gps} href={`https://www.google.com/maps?q=${event.latitude},${event.longitude}`} rel="noopener noreferrer" target="_blank"><MapPin aria-hidden="true" size={14} /><span>{event.latitude!.toFixed(5)}, {event.longitude!.toFixed(5)}{event.accuracyMeters !== undefined ? ` · ±${Math.round(event.accuracyMeters)} m` : ""}</span></a>;
+  return <AttendanceLocationAddress accuracyMeters={event.accuracyMeters} latitude={event.latitude} longitude={event.longitude} referenceName={event.locationName} />;
 }
 
 export function AttendanceEvidence({ event, employeeName, canViewPhotos, onOpen }: { event: AttendanceEvent; employeeName: string; canViewPhotos: boolean; onOpen: () => void }) {

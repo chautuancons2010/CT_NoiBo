@@ -1,38 +1,64 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type {} from "react/canary";
+import { ViewTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
-import { AppHeader } from "@/components/layout/AppHeader";
+import { AppHeader, isMobileHeaderRootScreen } from "@/components/layout/AppHeader";
 import { AppRail } from "@/components/layout/AppRail";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { MobileNavigationProvider } from "@/components/layout/MobileNavigationContext";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { BackLink } from "@/components/shared/BackLink";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
-import { isPathEnabled } from "@/config/systemSettings";
+import { lockedModuleForRequestPath } from "@/config/moduleAccess";
+import { ModuleLockedState } from "@/components/shared/ModuleLockedState";
+import { useModuleAvailability } from "@/components/layout/useModuleAvailability";
 import { SystemNoticeBanner } from "@/features/shared-platforms/components/SystemNoticeBanner";
-import { resolveLandingPage } from "@/features/dashboard/registry";
+import { resolveLandingPage, resolveMobileLandingPage } from "@/features/dashboard/registry";
 import { getBackHref } from "@/config/routeRegistry";
 import { RealtimeProvider, useRealtimeConnectionState } from "@/components/providers/RealtimeProvider";
-import { ChatDockLauncher } from "@/features/messaging/ChatDockLauncher";
 import { can } from "@/lib/auth/permissions";
 import { CurrentUserProvider } from "@/components/providers/CurrentUserProvider";
-import { visibleApplications } from "@/config/moduleRegistry";
 import { installBackHistory } from "@/lib/navigation/backHistory";
 import { readWorkspacePreferences, type WorkspacePreferences } from "@/lib/ui/workspacePreferencesRequest";
+import { animatePageEntry, supportsPageViewTransitions } from "@/lib/ui/pageEntryMotion";
+import chrome from "./ApplicationChrome.module.css";
 
 const INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
-function AppShellContent({ children, user }: { children: ReactNode; user: AuthenticatedUser }) {
+/** This boundary adds no DOM and never keys or remounts the current page. */
+function WorkspacePageMotion({ children, instant = false }: { children: ReactNode; instant?: boolean }) {
+  // Next's App Router supplies React canary. Keep plain React consumers usable.
+  if (!ViewTransition) return children;
+  return <ViewTransition default="none" name="workspace-content" update={instant ? "none" : "workspace-page-motion"}>{children}</ViewTransition>;
+}
+
+function AppShellContent({ children, user, testEnvironment }: { children: ReactNode; user: AuthenticatedUser; testEnvironment?: string }) {
   const pathname = usePathname();
+  useModuleAvailability(pathname);
+  const isShipmentWorkspace = /^\/import-export\/shipments\/[^/]+\/(overview|lines|containers|documents|customs|receiving|history)$/.test(pathname);
   const router = useRouter();
   useLayoutEffect(() => installBackHistory(user.id), [user.id]);
   const { settings } = useSystemSettings();
   const [collapsed, setCollapsed] = useState(false);
   const railPreferenceKey = `ct:sidebar-layout:v2:${user.id}`;
   const [localBackHref, setLocalBackHref] = useState<string>();
+  const [pageTitles, setPageTitles] = useState<{ pathname: string; pageTitle?: string; documentTitle?: string }>();
+  const shellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => { mainRef.current?.scrollTo?.({ top: 0, left: 0, behavior: "auto" }); }, [pathname]);
+  useLayoutEffect(() => {
+    const main = mainRef.current;
+    // Native snapshots animate both screens after React commits navigation;
+    // running an entry animation too would produce two competing movements.
+    if (!main || isShipmentWorkspace || supportsPageViewTransitions()) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const animation = animatePageEntry(main, reduced.matches);
+    const stop = () => { if (reduced.matches) animation?.cancel(); };
+    reduced.addEventListener("change", stop);
+    return () => { animation?.cancel(); reduced.removeEventListener("change", stop); };
+  }, [pathname, isShipmentWorkspace]);
   const preferencesRef = useRef<WorkspacePreferences | undefined>(undefined);
   const connectionState = useRealtimeConnectionState();
   const isPackageRoute = /^\/projects\/[^/]+\/(?:today|progress|team|profile|documents|updates)$/.test(pathname);
@@ -53,12 +79,47 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
   ].filter(Boolean).join(" ");
 
   useEffect(() => {
-    if (!isPathEnabled(pathname, settings.modules)) {
-      const contextualLanding = resolveLandingPage(user, settings.dashboard);
-      const enabledLanding = visibleApplications(user, settings.modules)[0]?.defaultRoute ?? "/profile";
-      router.replace(isPathEnabled(contextualLanding, settings.modules) ? contextualLanding : enabledLanding);
-    }
-  }, [pathname, router, settings.dashboard, settings.modules, user]);
+    const shell = shellRef.current;
+    const viewport = window.visualViewport;
+    if (!shell || !viewport) return;
+    const phone = window.matchMedia("(max-width: 767px)");
+    let fullHeight = viewport.height;
+    let frame = 0;
+    const updateViewport = () => {
+      const active = document.activeElement;
+      const editing = active instanceof HTMLTextAreaElement
+        || active instanceof HTMLInputElement && !active.readOnly && ["text", "search", "email", "password", "url", "tel", "number"].includes(active.type)
+        || active instanceof HTMLElement && active.isContentEditable;
+      if (!editing) fullHeight = Math.max(fullHeight, viewport.height);
+      const keyboardOpen = phone.matches && editing && viewport.scale === 1
+        && Math.max(fullHeight - viewport.height, window.innerHeight - viewport.height) > 120;
+      shell.dataset.keyboardOpen = String(keyboardOpen);
+      shell.style.setProperty("--app-viewport-height", `${viewport.height}px`);
+    };
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(updateViewport);
+    };
+    const resetViewport = () => { fullHeight = viewport.height; scheduleUpdate(); };
+    updateViewport();
+    viewport.addEventListener("resize", scheduleUpdate);
+    viewport.addEventListener("scroll", scheduleUpdate);
+    document.addEventListener("focusin", scheduleUpdate);
+    document.addEventListener("focusout", scheduleUpdate);
+    window.addEventListener("orientationchange", resetViewport);
+    phone.addEventListener("change", resetViewport);
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport.removeEventListener("resize", scheduleUpdate);
+      viewport.removeEventListener("scroll", scheduleUpdate);
+      document.removeEventListener("focusin", scheduleUpdate);
+      document.removeEventListener("focusout", scheduleUpdate);
+      window.removeEventListener("orientationchange", resetViewport);
+      phone.removeEventListener("change", resetViewport);
+    };
+  }, []);
+
+  const unavailableModule = lockedModuleForRequestPath(pathname, settings.modules);
 
   useEffect(() => {
     let active = true;
@@ -153,41 +214,45 @@ function AppShellContent({ children, user }: { children: ReactNode; user: Authen
     const main = mainRef.current;
     if (!main) return;
     const findLocalBackLink = () => {
-      const link = main.querySelector<HTMLAnchorElement>(":scope > :not(.page-context-navigation) .back-link");
+      const link = main.querySelector<HTMLAnchorElement>(":scope > :not(.page-context-navigation) [data-ui='back-control'], :scope > :not(.page-context-navigation) .back-link");
       setLocalBackHref(link?.getAttribute("href") ?? undefined);
+      const pageHeader = main.querySelector<HTMLElement>('.page-header[data-ui="page-header"]');
+      const pageTitle = pageHeader?.querySelector("h1")?.textContent?.trim() || undefined;
+      const documentTitle = main.querySelector("h1")?.textContent?.trim() || undefined;
+      setPageTitles((current) => current?.pathname === pathname && current.pageTitle === pageTitle && current.documentTitle === documentTitle ? current : { pathname, pageTitle, documentTitle });
     };
     findLocalBackLink();
     const observer = new MutationObserver(findLocalBackLink);
-    observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ["href"] });
+    observer.observe(main, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["href"] });
     return () => observer.disconnect();
   }, [pathname]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${chrome.shell}`} data-navigation-collapsed={collapsed} ref={shellRef}>
+      <a className="app-shell__skip-link" href="#main-content">Đến nội dung chính</a>
       <AppRail
         collapsed={collapsed}
         onCollapsedChange={changeSidebarState}
         pathname={pathname}
         user={user}
       />
-      <div className={contentClassName}>
-        <AppHeader backHrefOverride={localBackHref} connectionState={connectionState} pathname={pathname} user={user} />
+      <div className={`${contentClassName} ${chrome.content}`} data-mobile-title-in-bar={Boolean(pageTitles?.pathname === pathname && pageTitles.pageTitle && !isMobileHeaderRootScreen(pathname))}>
+        <AppHeader backHrefOverride={localBackHref} connectionState={connectionState} documentTitleOverride={pageTitles?.pathname === pathname ? pageTitles.documentTitle : undefined} homeHref={resolveLandingPage(user, settings.dashboard)} mobileHomeHref={resolveMobileLandingPage(user, settings.dashboard)} onSidebarToggle={() => changeSidebarState(!collapsed)} pageTitleOverride={pageTitles?.pathname === pathname ? pageTitles.pageTitle : undefined} pathname={pathname} sidebarCollapsed={collapsed} testEnvironment={testEnvironment} user={user} />
         <SystemNoticeBanner />
-        <main className="page-main" id="main-content" ref={mainRef} tabIndex={-1}>
+        <WorkspacePageMotion instant={isShipmentWorkspace}><main className={`page-main ${chrome.main}`} id="main-content" ref={mainRef} tabIndex={-1}>
           {backHref && !localBackHref ? <nav aria-label="Điều hướng quay lại" className="page-context-navigation"><BackLink href={backHref} label={backHref === "/projects" ? "Danh sách gói" : "Trở lại"} /></nav> : null}
-          {children}
-        </main>
-        <MobileBottomNav pathname={pathname} user={user} />
-        {hasChatAccess ? <ChatDockLauncher /> : null}
+          {unavailableModule ? <ModuleLockedState module={unavailableModule} canManage={can(user.permissions, "system_admin.access") && can(user.permissions, "module.manage")} /> : children}
+        </main></WorkspacePageMotion>
       </div>
+      <MobileBottomNav pathname={pathname} user={user} />
     </div>
   );
 }
 
-export function AppShell({ children, user }: { children: ReactNode; user: AuthenticatedUser }) {
+export function AppShell({ children, user, testEnvironment }: { children: ReactNode; user: AuthenticatedUser; testEnvironment?: string }) {
   return (
     <CurrentUserProvider user={user}>
-      <RealtimeProvider accountId={user.id}><MobileNavigationProvider><AppShellContent user={user}>{children}</AppShellContent></MobileNavigationProvider></RealtimeProvider>
+      <RealtimeProvider accountId={user.id}><MobileNavigationProvider><AppShellContent user={user} testEnvironment={testEnvironment}>{children}</AppShellContent></MobileNavigationProvider></RealtimeProvider>
     </CurrentUserProvider>
   );
 }

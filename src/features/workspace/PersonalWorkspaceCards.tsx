@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Save, StickyNote, Trash2 } from "lucide-react";
+import { ChevronDown, ListTodo, Pencil, Plus, Save, StickyNote, Trash2, X } from "lucide-react";
 import { Button } from "@/components/shared/Button";
 import { Input, Select, Textarea } from "@/components/shared/FormControls";
+import { useIsPhone } from "@/lib/ui/useIsPhone";
 
 type PersonalTodo = { id: string; title: string; dueDate?: string; priority: "low" | "medium" | "high"; completed: boolean };
 
@@ -12,6 +13,7 @@ function PersonalNoteWidget() {
   const [saved, setSaved] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [editorOpen, setEditorOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -39,9 +41,10 @@ function PersonalNoteWidget() {
   }
 
   return (
-    <section className="dashboard-note">
-      <header><span><StickyNote aria-hidden="true" size={17} /><h2>Ghi chú nhanh</h2></span><Button disabled={saved || saving} leftIcon={<Save aria-hidden="true" size={15} />} onClick={() => void saveNote()} size="sm" variant="ghost">Lưu</Button></header>
-      <Textarea label="Ghi chú cá nhân" onChange={(event) => { setNote(event.target.value); setSaved(false); }} value={note} />
+    <section className="dashboard-note" data-editor-open={editorOpen}>
+      <header><span><StickyNote aria-hidden="true" size={17} /><h2>Ghi chú nhanh</h2></span><div className="dashboard-note__actions"><Button className="dashboard-note__save" disabled={saved || saving} leftIcon={<Save aria-hidden="true" size={15} />} onClick={() => void saveNote()} size="sm" variant="ghost" busy={saving}>{"Lưu"}</Button><Button aria-expanded={editorOpen} className="workspace-mobile-toggle" leftIcon={editorOpen ? <X aria-hidden="true" size={16} /> : <Pencil aria-hidden="true" size={16} />} onClick={() => setEditorOpen((current) => !current)} size="sm" variant="ghost">{editorOpen ? "Đóng" : "Sửa"}</Button></div></header>
+      <p className="dashboard-note__preview">{note || "Chưa có ghi chú"}</p>
+      <div className="dashboard-note__editor"><Textarea label="Ghi chú cá nhân" onChange={(event) => { setNote(event.target.value); setSaved(false); }} value={note} /></div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
     </section>
   );
@@ -51,6 +54,7 @@ function PersonalTodoWidget() {
   const [todos, setTodos] = useState<PersonalTodo[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const loadTodos = useCallback(async (signal?: AbortSignal) => {
     const response = await fetch("/api/v1/workspace/todos", { cache: "no-store", signal });
@@ -77,6 +81,7 @@ function PersonalTodoWidget() {
       if (!response.ok) throw new Error(body.error?.message);
       setTodos((current) => [body.data, ...current]);
       formElement.reset();
+      setComposerOpen(false);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể tạo việc cá nhân."); }
     finally { setBusy(false); }
   }
@@ -104,8 +109,8 @@ function PersonalTodoWidget() {
   }
 
   return (
-    <section className="dashboard-personal-todos"><header><h2>Việc cá nhân</h2></header>
-      <form className="dashboard-personal-todos__form" onSubmit={createTodo}>
+    <section className="dashboard-personal-todos"><header><span><ListTodo aria-hidden="true" className="workspace-mobile-icon" size={18} /><h2>Việc cá nhân</h2><span className="dashboard-personal-todos__count">{todos.filter((todo) => !todo.completed).length}</span></span><Button aria-expanded={composerOpen} className="workspace-mobile-toggle" leftIcon={composerOpen ? <X aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} onClick={() => setComposerOpen((current) => !current)} size="sm" variant="ghost">{composerOpen ? "Đóng" : "Thêm"}</Button></header>
+      <form className="dashboard-personal-todos__form" data-open={composerOpen} onSubmit={createTodo}>
         <Input label="Tên việc" maxLength={240} name="title" required />
         <Input label="Hạn hoàn thành" name="dueDate" type="date" />
         <Select defaultValue="medium" label="Mức ưu tiên" name="priority" options={[{ value: "low", label: "Thấp" }, { value: "medium", label: "Vừa" }, { value: "high", label: "Cao" }]} />
@@ -121,4 +126,10 @@ function PersonalTodoWidget() {
 }
 
 
-export function PersonalWorkspaceCards() { return <div className="personal-workspace-cards"><PersonalTodoWidget /><PersonalNoteWidget /></div>; }
+export function PersonalWorkspaceCards() {
+  const mobile = useIsPhone();
+  return <details className="personal-workspace-tools" open={!mobile}>
+    <summary><StickyNote aria-hidden="true" size={18} /><span>Ghi chú & Việc cá nhân</span><ChevronDown aria-hidden="true" size={17} /></summary>
+    <div className="personal-workspace-cards"><PersonalTodoWidget /><PersonalNoteWidget /></div>
+  </details>;
+}

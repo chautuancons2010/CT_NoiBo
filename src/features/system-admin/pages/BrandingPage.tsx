@@ -11,6 +11,7 @@ import { useSystemSettings } from "@/components/providers/SystemSettingsProvider
 import type { BrandAssetType } from "@/services/system-settings/brandAssetService";
 import { defaultSystemSettings } from "@/config/systemSettings";
 import { AdminPage } from "@/features/system-admin/components/AdminPage";
+import { useLoadingActivity } from "@/lib/ui/useLoadingActivity";
 
 type AssetField = "logoMainUrl" | "logoCompactUrl" | "logoDarkUrl" | "faviconUrl";
 
@@ -44,6 +45,7 @@ export function BrandingPage() {
   const [organization, setOrganization] = useState(() => structuredClone(settings.organization));
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<AssetField | null>(null);
+  useLoadingActivity(uploading !== null);
   const [message, setMessage] = useState("");
   const dirty = JSON.stringify(branding) !== JSON.stringify(settings.branding) || JSON.stringify(organization) !== JSON.stringify(settings.organization);
 
@@ -140,7 +142,7 @@ export function BrandingPage() {
                 <div className="brand-asset-actions">
                   <label className="button button--secondary button--sm">
                     <Upload aria-hidden="true" size={15} />
-                    <span>{uploading === asset.field ? "Đang tải" : branding[asset.field] ? "Thay thế" : "Tải lên"}</span>
+                    <span>{branding[asset.field] ? "Thay thế" : "Tải lên"}</span>
                     <input accept="image/png,image/jpeg,image/webp" disabled={uploading !== null} hidden onChange={(event) => void upload(event, asset.field, asset.type, asset.ratio)} type="file" />
                   </label>
                   {branding[asset.field] ? <Button onClick={() => setBranding({ ...branding, [asset.field]: null, assetVersion: branding.assetVersion + 1 })} size="sm" variant="ghost">Xóa</Button> : null}
@@ -153,7 +155,7 @@ export function BrandingPage() {
         <StickyActionBar>
           <Button onClick={restoreDefaults} variant="ghost">Khôi phục mặc định</Button>
           <Button disabled={!dirty || saving} leftIcon={<RotateCcw aria-hidden="true" size={16} />} onClick={reset}>Hoàn tác</Button>
-          <Button disabled={!dirty || saving || uploading !== null} onClick={() => void publish()} variant="primary">{saving ? "Đang lưu" : "Xuất bản"}</Button>
+          <Button disabled={!dirty || saving || uploading !== null} onClick={() => void publish()} variant="primary" busy={saving}>{"Xuất bản"}</Button>
         </StickyActionBar>
       </section>
     </AdminPage>

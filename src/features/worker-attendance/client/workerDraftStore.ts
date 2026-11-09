@@ -3,6 +3,10 @@
 import type { WorkerAttendancePolicy, WorkerAttendanceSession, WorkerAttendanceTask } from "@/features/worker-attendance/types/workerAttendanceTypes";
 
 export interface LocalWorkerPhoto {
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
   id: string;
   photo: Blob;
   thumbnail: Blob;
@@ -25,6 +29,7 @@ export interface WorkerLocalDraft {
 }
 
 export interface CachedWorkerTasks {
+  personalAttendanceReady?: boolean;
   key: string;
   accountId: string;
   date: string;

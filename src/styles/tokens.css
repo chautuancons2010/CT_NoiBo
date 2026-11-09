@@ -17,10 +17,10 @@
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.65;
   --font-meta: 13px;
-  --font-body: 16px;
-  --font-card: 17px;
-  --font-section: 21px;
-  --font-page: clamp(24px, 1.85vw, 30px);
+  --font-body: 14px;
+  --font-card: 16px;
+  --font-section: 18px;
+  --font-page: 26px;
 
   /* Spacing and sizing */
   --space-1: 4px;
@@ -40,29 +40,40 @@
   --section-gap: 20px;
   --grid-gap: 16px;
   --card-padding: 20px;
+  --state-panel-min-height: 184px;
   --container-max-width: 100%;
   --inspector-width: clamp(270px, 22vw, 340px);
   --control-height-sm: 36px;
   --control-height-md: 44px;
   --control-height-lg: 50px;
+  --toolbar-control-height: 36px;
+  --toolbar-font-size: 13px;
+  --toolbar-search-width: 280px;
+  --toolbar-filter-width: 184px;
+  --toolbar-gap: 8px;
   --table-header-height: 44px;
   --table-row-height: 52px;
+  --table-cell-padding-y: 8px;
+  --table-open-column-width: 44px;
   --table-cell-padding-x: var(--card-padding);
   --table-primary-column-width: 30%;
-  --table-compact-column-width: 144px;
+  --table-compact-column-width: 112px;
   --table-standard-column-width: 160px;
   --table-action-column-width: 76px;
   --table-selection-column-width: 48px;
-  --table-readable-min-width: 1000px;
+  --table-readable-min-width: 100%;
   --workspace-gap: 12px;
   --workspace-section-padding-x: 16px;
   --workspace-section-padding-y: 12px;
   --workspace-toolbar-min-height: 60px;
-  --sidebar-width: 232px;
-  --sidebar-collapsed-width: 84px;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 80px;
+  --sidebar-row-height: 40px;
+  --sidebar-child-row-height: 36px;
+  --sidebar-child-indent: 21px;
   --app-navigation-width: var(--sidebar-width);
   --app-rail-width: var(--sidebar-collapsed-width);
-  --topbar-height: 56px;
+  --topbar-height: 64px;
   --header-height: var(--topbar-height);
   --breakpoint-mobile: 768px;
   --breakpoint-desktop: 1024px;
@@ -72,29 +83,53 @@
   --context-rail-width: clamp(300px, 28vw, 390px);
   --worklist-detail-width: clamp(320px, 30vw, 410px);
   --form-workspace-max-width: 920px;
+  --drawer-form-width: 720px;
+  --profile-form-width: 1200px;
+  --form-aside-width: 300px;
+  --record-avatar-size: 56px;
+  --record-identity-max-width: 40ch;
+  --record-field-label-width: minmax(104px, .45fr);
+  --font-financial-value: clamp(24px, 2.6vw, 36px);
+  --line-index-width: 28px;
+  --line-action-width: 36px;
   --golden-canvas-max-width: 1720px;
+  --workspace-safe-inline: 24px;
+  --workspace-safe-block: 20px;
+  --workspace-max-width: 1720px;
+  --desktop-shell-inset: 0px;
 
   /* Shape and elevation */
   --radius-sm: 7px;
   --radius-md: 9px;
   --radius-lg: 12px;
   --radius-xl: 16px;
-  --radius-control: 9px;
+  --ui-radius-control: 10px;
+  --ui-radius-card: 16px;
+  --ui-radius-inset: 8px;
+  --ui-radius-overlay: 20px;
+  --radius-control: var(--ui-radius-control);
   --radius-input: var(--radius-control);
-  --radius-button: 9px;
-  --radius-nav: 9px;
-  --radius-card: 12px;
-  --radius-card-large: 16px;
-  --radius-panel: 16px;
+  --radius-button: var(--radius-control);
+  --radius-search: var(--radius-control);
+  --radius-nav: var(--radius-control);
+  --radius-card: var(--ui-radius-card);
+  --radius-card-large: var(--radius-card);
+  --radius-panel: var(--ui-radius-overlay);
   --radius-modal: var(--radius-panel);
   --radius-pill: 999px;
-  --shadow-sm: var(--reference-control-shadow);
-  --shadow-md: 5px 6px 12px rgb(103 94 129 / 12%), -4px -4px 10px rgb(255 255 255 / 90%);
-  --shadow-card: var(--reference-shadow);
-  --shadow-card-hover: 10px 16px 30px rgb(94 83 119 / 14%), -6px -6px 16px rgb(255 255 255 / 90%);
-  --shadow-floating: 0 20px 50px rgb(15 23 42 / 18%), 0 6px 16px rgb(15 23 42 / 9%);
+  --shadow-sm: 0 1px 3px rgb(15 23 42 / 5%);
+  --shadow-md: 0 3px 8px rgb(15 23 42 / 7%);
+  --shadow-card: 0 1px 2px rgb(29 52 39 / 3%), 0 6px 20px rgb(29 52 39 / 2%);
+  --shadow-card-hover: 0 4px 16px rgb(29 52 39 / 7%);
+  --shadow-floating: 0 14px 40px rgb(29 52 39 / 12%), 0 3px 8px rgb(29 52 39 / 4%);
+  --shadow-docked: 0 -4px 16px rgb(29 52 39 / 3%);
 
   /* Semantic color */
+  --action-primary: var(--color-primary);
+  --action-primary-hover: var(--color-primary-hover);
+  --action-primary-active: var(--color-primary-active);
+  --action-border: var(--color-primary-border);
+  --action-hover: var(--color-primary-soft);
   --color-primary: #268558;
   --color-primary-hover: #21734d;
   --color-primary-active: #1c6241;
@@ -103,80 +138,97 @@
   --color-primary-foreground: #ffffff;
   /* Sidebar primitives and semantic navigation aliases. Keep navigation
      independent from module accents so all areas share one calm shell. */
-  --color-slate-700: #334155;
-  --color-slate-500: #70808c;
+  --color-slate-700: #424c47;
+  --color-slate-500: #6c7770;
   --color-sky-50: #eaf4f8;
   --color-sky-100: #ddeef4;
   --color-sky-700: #1f5e73;
   --color-sky-600: #2e8aa6;
-  --sidebar-bg: #fdfdfd;
-  --sidebar-hover: var(--color-primary-soft);
-  --sidebar-active: var(--color-primary-soft);
-  --sidebar-text: var(--color-slate-700);
-  --sidebar-muted: var(--color-slate-500);
-  --sidebar-text-active: var(--color-primary-active);
-  --sidebar-icon: #64748b;
-  --sidebar-icon-active: var(--color-primary);
-  --page-bg: #f4f7f8;
-  --border-soft: #dde6ea;
-  --erp-primary: #0f766e;
+  --sidebar-bg: #fcfdfb;
+  --sidebar-hover: #f0f5ef;
+  --sidebar-active: #e8f2e9;
+  --sidebar-text: #52645a;
+  --sidebar-muted: #66766a;
+  --sidebar-text-active: #235c42;
+  --sidebar-icon: #7a9083;
+  --sidebar-icon-active: #2c7753;
+  --sidebar-divider: #e6ede4;
+  --page-bg: var(--app-canvas-mid);
+  --border-soft: #e5e9e5;
+  --erp-primary: var(--color-primary);
   --erp-secondary: #14b8a6;
   --erp-accent: #0369a1;
   --erp-data-blue: #2563eb;
   --erp-attention: #ea580c;
-  --shell-dark: #0f766e;
-  --shell-dark-soft: #0b5a54;
-  --surface-navigation: #0f766e;
-  --surface-navigation-strong: #0b5a54;
-  --shell-canvas: #f3f0f6;
-  --app-bg: #f8f6fa;
-  --app-bg-soft: #f5f2f8;
-  --workspace-canvas: radial-gradient(ellipse at 14% 8%, rgb(249 205 222 / 78%), transparent 44%), radial-gradient(ellipse at 90% 27%, rgb(255 218 193 / 74%), transparent 46%), radial-gradient(ellipse at 42% 100%, rgb(220 207 245 / 76%), transparent 51%), var(--shell-canvas);
+  --shell-dark: var(--color-primary-active);
+  --shell-dark-soft: var(--color-primary-hover);
+  --surface-navigation: var(--color-primary);
+  --surface-navigation-strong: var(--color-primary-active);
+  /* ERP working canvas, kept independent from the preserved login scene. */
+  --app-canvas-start: #f7f9f5;
+  --app-canvas-mid: #f6f8f4;
+  --app-canvas-end: #f6f8f4;
+  --app-bg: var(--app-canvas-end);
+  --app-bg-soft: var(--app-canvas-mid);
+  --shell-canvas: var(--app-canvas-end);
+  --workspace-canvas: var(--app-canvas-mid);
+  --metric-featured-surface: #eef6eb;
+  --metric-featured-border: #dcebd5;
+  --loading-base: #e9eee5;
+  --loading-highlight: #f9fbf7;
+  --navigation-active-shadow: inset 0 0 0 1px #dce9d9;
   --surface-border: var(--reference-border);
-  --shadow-control: var(--reference-control-shadow);
-  /* Reference dashboard material: pearl surfaces and two-direction soft depth. */
-  --reference-surface: rgb(250 250 252 / 72%);
-  --reference-border: rgb(255 255 255 / 90%);
-  --reference-shadow: 8px 14px 24px rgb(94 83 119 / 11%), -5px -5px 14px rgb(255 255 255 / 85%), inset 0 1px 0 rgb(255 255 255 / 90%);
-  --reference-control-shadow: 5px 6px 13px rgb(94 83 119 / 9%), -3px -3px 8px rgb(255 255 255 / 90%);
-  --reference-panel-radius: 14px;
+  --shadow-control: 0 1px 2px rgb(15 23 42 / 5%);
+  /* Legacy feature surfaces share the same solid ERP material. */
+  --reference-surface: var(--surface);
+  --reference-border: var(--border-subtle);
+  --reference-shadow: var(--shadow-card);
+  --reference-control-shadow: var(--shadow-sm);
+  --reference-panel-radius: var(--radius-card);
   --reference-orange: #e88c58;
   --reference-cyan: #69bccb;
   --reference-yellow: #e6b33f;
   --reference-green: #91c96d;
   --reference-violet: #a475ce;
-  --reference-text: #394158;
-  --reference-muted: #60677b;
-  --reference-ring-track: #e5e6ec;
+  --reference-text: #263a30;
+  --reference-muted: #647368;
+  --reference-ring-track: #edf1e9;
   --metric-icon-size: 44px;
   --metric-value-size: clamp(24px, 2.2vw, 32px);
   --floating-layer: 1200;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
   --surface-1: var(--surface);
-  --surface-2: var(--app-bg-soft);
+  --surface-2: #f7f9f5;
   --surface-toolbar: #ffffff;
-  --surface-toolbar-hover: #fbfdff;
-  --surface-hover: #ededf4;
-  --surface-selected: #e0f2fe;
+  --surface-toolbar-hover: var(--surface-2);
+  --surface-hover: #f1f6ee;
+  --surface-selected: var(--color-primary-soft);
   --text-primary: var(--reference-text);
-  --text-secondary: #535d72;
+  --text-secondary: #5a6d60;
   --text-muted: var(--reference-muted);
-  --text-disabled: #94a3b8;
-  --border-subtle: #e0e0e9;
-  --border-default: #d3d4df;
+  --text-disabled: #a0ada3;
+  --mobile-canvas: var(--workspace-canvas);
+  --mobile-surface: var(--surface);
+  --mobile-ink: var(--text-primary);
+  --mobile-muted: var(--text-muted);
+  --mobile-line: var(--border-subtle);
+  --mobile-soft: var(--color-primary-soft);
+  --mobile-surface-inset: var(--surface-2);
+  --border-subtle: #e5ebe2;
+  --border-default: #d4dfd3;
   --border-focus: var(--color-primary);
   --primary: var(--color-primary);
   --primary-hover: var(--color-primary-hover);
   --primary-soft: var(--color-primary-soft);
-  --success: #0f766e;
-  --success-soft: #dcf7f1;
-  --warning: #c2410c;
-  --warning-soft: #fff9e8;
-  --danger: #b91c1c;
-  --danger-soft: #fee2e2;
-  --info: #1d4ed8;
-  --info-soft: #e8f0ff;
+  --success: #287453;
+  --success-soft: #eaf5ed;
+  --warning: #966321;
+  --warning-soft: #fff7e8;
+  --danger: #b04752;
+  --danger-soft: #fff0f1;
+  --info: #3c67aa;
+  --info-soft: #eef3fd;
   --blue-50: #f4f8ff;
   --blue-100: #e8f0ff;
   --blue-200: #bfdbfe;
@@ -222,7 +274,7 @@
   --pastel-blue: #eaf4ff;
   --pastel-peach: #fff2e6;
   --pastel-rose: #fff0f2;
-  --pastel-neutral: #eef3f8;
+  --pastel-neutral: #f0f4ed;
   --accent-violet: var(--lavender-500);
   --accent-cyan: var(--erp-secondary);
   --accent-green: var(--erp-primary);
@@ -264,13 +316,14 @@
   --color-danger-text: var(--rose-600);
   --color-teal: var(--cyan-500);
   --color-teal-soft: var(--cyan-100);
-  --chart-green: var(--mint-500);
-  --chart-blue: var(--blue-500);
-  --chart-purple: var(--lavender-500);
-  --chart-amber: var(--orange-500);
-  --chart-coral: var(--rose-500);
-  --chart-red: var(--rose-500);
-  --chart-teal: var(--cyan-500);
+  --chart-green: var(--reference-green);
+  --chart-blue: #79a5ee;
+  --chart-purple: var(--reference-violet);
+  --chart-amber: var(--reference-yellow);
+  --chart-orange: var(--reference-orange);
+  --chart-coral: #ed8da0;
+  --chart-red: var(--chart-coral);
+  --chart-teal: var(--reference-cyan);
   --chart-track: var(--surface-2);
   --color-nav-hover: var(--surface-hover);
   --ct-green: var(--color-primary);
@@ -306,11 +359,28 @@
   --motion-panel: 210ms;
   --ease-standard: cubic-bezier(.2, .8, .2, 1);
   --ease-exit: cubic-bezier(.4, 0, 1, 1);
+  --ui-motion-fast: 120ms;
+  --ui-motion-enter: 180ms;
+  --ui-motion-page: 210ms;
+  --ui-motion-ease: cubic-bezier(.2,.7,.2,1);
 }
 
 html[data-table-density="compact"] { --table-row-height: 48px; }
-html[data-density="compact"] { --section-gap: 20px; --grid-gap: 16px; --card-padding: 20px; --workspace-gap: 8px; --workspace-section-padding-y: 10px; }
-html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card-padding: 28px; --workspace-gap: 16px; --workspace-section-padding-y: 16px; }
+html[data-density="compact"] { --section-gap: 12px; --grid-gap: 12px; --card-padding: 12px; --workspace-gap: 8px; --workspace-section-padding-y: 10px; }
+html[data-density="comfortable"] { --section-gap: 24px; --grid-gap: 20px; --card-padding: 24px; --workspace-gap: 16px; --workspace-section-padding-y: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-normal: 0ms;
+    --motion-slow: 0ms;
+    --motion-control: 0ms;
+    --motion-panel: 0ms;
+    --ui-motion-fast: 0ms;
+    --ui-motion-enter: 0ms;
+    --ui-motion-page: 0ms;
+  }
+}
 
 @media (max-width: 700px) {
   :root {
@@ -321,9 +391,13 @@ html[data-density="comfortable"] { --section-gap: 32px; --grid-gap: 24px; --card
     --grid-gap: 16px;
     --card-padding: 18px;
     --workspace-section-padding-x: 12px;
-    --font-body: 16px;
+    --font-body: 14px;
     --font-meta: 13px;
-    --font-page: clamp(30px, 9vw, 36px);
-    --font-section: 19px;
+    --font-page: 20px;
+    --font-section: 17px;
+    --workspace-safe-inline: 16px;
+    --workspace-safe-block: 16px;
   }
 }
+
+@media (max-width: 767px) { :root { --topbar-height: 56px; } }

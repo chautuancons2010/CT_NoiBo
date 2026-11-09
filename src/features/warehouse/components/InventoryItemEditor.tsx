@@ -9,6 +9,8 @@ import { Card } from "@/components/shared/Card";
 import { Checkbox, Input, Select, Textarea } from "@/components/shared/FormControls";
 import { ItemImagePreview } from "@/features/warehouse/components/ItemImagePreview";
 import type { InventoryItem, ItemCategory, UnitOfMeasure } from "@/features/warehouse/types/warehouseTypes";
+import { FieldGroup, FormWorkspace } from "@/components/shared/FormLayout";
+import { DocumentActions } from "@/components/shared/Workbench";
 
 type ApiBody<T> = { ok: boolean; data?: T; error?: { message?: string } };
 
@@ -133,9 +135,7 @@ export function InventoryItemEditor({ id }: { id?: string }) {
 
   return (
     <form className="warehouse-form page-stack" onSubmit={submit}>
-      <Card className="item-editor-card">
-        <div className="item-editor-layout">
-          <div className="item-editor-image">
+      <FormWorkspace aside={<Card><div className="item-editor-image">
             {imagePreview ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img alt="Ảnh hàng hóa mới" src={imagePreview} />
@@ -147,18 +147,22 @@ export function InventoryItemEditor({ id }: { id?: string }) {
               />
             )}
             <input
+              aria-label="Chọn ảnh hàng hóa"
               accept="image/jpeg,image/png,image/webp"
               className="sr-only"
+              disabled={saving}
               onChange={chooseImage}
               ref={fileInput}
+              tabIndex={-1}
               type="file"
             />
             <div className="item-editor-image__actions">
-              <Button leftIcon={<ImageUp size={16} />} onClick={() => fileInput.current?.click()} size="sm">
+              <Button disabled={saving} leftIcon={<ImageUp size={16} />} onClick={() => fileInput.current?.click()} size="sm">
                 Chọn ảnh
               </Button>
               {(imageFile || (!removeExistingImage && item.imageAssetId)) ? (
                 <Button
+                  disabled={saving}
                   leftIcon={<Trash2 size={16} />}
                   onClick={() => {
                     setImageFile(undefined);
@@ -173,28 +177,20 @@ export function InventoryItemEditor({ id }: { id?: string }) {
                 </Button>
               ) : null}
             </div>
-          </div>
-          <div className="form-grid">
-            <Input label="Mã hàng" required value={item.itemCode ?? ""} onChange={(event) => setItem({ ...item, itemCode: event.target.value })} />
-            <Input label="Tên hàng" required value={item.name ?? ""} onChange={(event) => setItem({ ...item, name: event.target.value })} />
-            <Input label="Tên ngắn" value={item.shortName ?? ""} onChange={(event) => setItem({ ...item, shortName: event.target.value })} />
-            <Select label="Nhóm hàng" options={categories.map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }))} placeholder="Chưa phân nhóm" value={item.categoryId ?? ""} onChange={(event) => setItem({ ...item, categoryId: event.target.value })} />
-            <Select label="Đơn vị cơ sở" required options={units.filter((row) => row.active).map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }))} placeholder="Chọn đơn vị" value={item.baseUomId ?? ""} onChange={(event) => setItem({ ...item, baseUomId: event.target.value })} />
-            <Input label="Quy cách" value={item.specification ?? ""} onChange={(event) => setItem({ ...item, specification: event.target.value })} />
-            <Input label="Nhãn hiệu" value={item.brand ?? ""} onChange={(event) => setItem({ ...item, brand: event.target.value })} />
-            <Input label="Nhà sản xuất" value={item.manufacturer ?? ""} onChange={(event) => setItem({ ...item, manufacturer: event.target.value })} />
-            <Input label="Xuất xứ" value={item.countryOfOrigin ?? ""} onChange={(event) => setItem({ ...item, countryOfOrigin: event.target.value })} />
-            <Select label="Trạng thái" options={[{ value: "active", label: "Hoạt động" }, { value: "inactive", label: "Ngừng dùng" }]} value={item.status ?? "active"} onChange={(event) => setItem({ ...item, status: event.target.value as InventoryItem["status"] })} />
-          </div>
-        </div>
-        <Checkbox checked={item.trackedInventory ?? true} label="Theo dõi tồn kho" onChange={(event) => setItem({ ...item, trackedInventory: event.target.checked })} />
-        <Textarea label="Ghi chú" rows={3} value={item.note ?? ""} onChange={(event) => setItem({ ...item, note: event.target.value })} />
-      </Card>
+          </div></Card>}><FieldGroup title="Thông tin hàng hóa"><Input label="Mã hàng" required value={item.itemCode ?? ""} onChange={(event) => setItem({ ...item, itemCode: event.target.value })} />
+<Input label="Tên hàng" required value={item.name ?? ""} onChange={(event) => setItem({ ...item, name: event.target.value })} />
+<Input label="Tên ngắn" value={item.shortName ?? ""} onChange={(event) => setItem({ ...item, shortName: event.target.value })} />
+<Select label="Nhóm hàng" options={categories.map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }))} placeholder="Chưa phân nhóm" value={item.categoryId ?? ""} onChange={(event) => setItem({ ...item, categoryId: event.target.value })} /></FieldGroup><FieldGroup title="Đơn vị & quản lý tồn"><Select label="Đơn vị cơ sở" required options={units.filter((row) => row.active).map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }))} placeholder="Chọn đơn vị" value={item.baseUomId ?? ""} onChange={(event) => setItem({ ...item, baseUomId: event.target.value })} />
+<Select label="Trạng thái" options={[{ value: "active", label: "Hoạt động" }, { value: "inactive", label: "Ngừng dùng" }]} value={item.status ?? "active"} onChange={(event) => setItem({ ...item, status: event.target.value as InventoryItem["status"] })} /></FieldGroup><FieldGroup title="Quy cách & xuất xứ"><Input label="Quy cách" value={item.specification ?? ""} onChange={(event) => setItem({ ...item, specification: event.target.value })} />
+<Input label="Nhãn hiệu" value={item.brand ?? ""} onChange={(event) => setItem({ ...item, brand: event.target.value })} />
+<Input label="Nhà sản xuất" value={item.manufacturer ?? ""} onChange={(event) => setItem({ ...item, manufacturer: event.target.value })} />
+<Input label="Xuất xứ" value={item.countryOfOrigin ?? ""} onChange={(event) => setItem({ ...item, countryOfOrigin: event.target.value })} /></FieldGroup><FieldGroup title="Theo dõi & ghi chú" columns={1}><Checkbox checked={item.trackedInventory ?? true} label="Theo dõi tồn kho" onChange={(event) => setItem({ ...item, trackedInventory: event.target.checked })} />
+<Textarea label="Ghi chú" rows={3} value={item.note ?? ""} onChange={(event) => setItem({ ...item, note: event.target.value })} /></FieldGroup></FormWorkspace>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <div className="warehouse-sticky-actions">
-        <Button onClick={() => router.back()}>Quay lại</Button>
-        <Button disabled={saving} type="submit" variant="primary">{saving ? "Đang lưu…" : "Lưu"}</Button>
-      </div>
+      <DocumentActions>
+        <Button data-ui="back-control" onClick={() => router.back()}>Quay lại</Button>
+        <Button disabled={saving} type="submit" variant="primary" busy={saving}>{"Lưu"}</Button>
+      </DocumentActions>
     </form>
   );
 }

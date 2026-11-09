@@ -2,7 +2,9 @@ import "server-only";
 
 import { getAttendanceAdminToday, getAttendanceDashboard } from "@/features/attendance/services/attendanceRepository";
 import { normalizeAttention } from "@/features/dashboard/attention";
+import { approvalDashboardItem } from "@/features/dashboard/approvalPresentation";
 import { analyticsDefinitionsFor } from "@/features/dashboard/moduleAnalytics";
+import { dashboardShortcutsFor } from "@/features/dashboard/dashboardShortcuts";
 import { getDashboardProjectSummary, listDashboardActivity } from "@/features/dashboard/services/dashboardRepository";
 import {
   canUseDashboardProfile,
@@ -12,7 +14,6 @@ import {
   visibleQuickActions
 } from "@/features/dashboard/registry";
 import type {
-  AttentionPriority,
   DashboardItem,
   DashboardProfileKey,
   DashboardReadModel,
@@ -27,6 +28,7 @@ import { resolvePlatformIdentity } from "@/features/shared-platforms/services/pl
 import { listExceptions } from "@/features/timesheets/services/timesheetRepository";
 import { getWarehouseDashboard } from "@/features/warehouse/services/warehouseRepository";
 import { accountingSummary } from "@/features/accounting/service";
+import { accountingDashboardData } from "@/features/dashboard/accountingPresentation";
 import { AppError } from "@/lib/api/errors";
 import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
@@ -40,12 +42,6 @@ function formatAge(iso: string): string {
   return `${Math.floor(hours / 24)} ngày`;
 }
 
-function approvalPriority(hours: number): AttentionPriority {
-  if (hours >= 72) return "HIGH";
-  if (hours >= 24) return "MEDIUM";
-  return "LOW";
-}
-
 async function loadApprovals(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const cases = await listApprovalCases(user, "pending");
   return {
@@ -55,16 +51,7 @@ async function loadApprovals(user: AuthenticatedUser): Promise<DashboardWidgetDa
       { label: "24–72 giờ", value: cases.filter((item) => item.waitingHours >= 24 && item.waitingHours < 72).length },
       { label: "Từ 72 giờ", value: cases.filter((item) => item.waitingHours >= 72).length }
     ] }],
-    items: cases.slice(0, 8).map((item) => ({
-      id: item.id,
-      type: "approval",
-      title: item.summary || item.referenceNumber,
-      context: item.requesterName,
-      priority: approvalPriority(item.waitingHours),
-      dueOrAge: formatAge(item.submittedAt),
-      href: `/approvals/${item.id}`,
-      status: "Chờ duyệt"
-    }))
+    items: [...cases].sort((left, right) => right.waitingHours - left.waitingHours).slice(0, 8).map(item => approvalDashboardItem(item, formatAge(item.submittedAt)))
   };
 }
 
@@ -174,7 +161,7 @@ async function loadProjectAttention(user: AuthenticatedUser): Promise<DashboardW
       { label: "Vấn đề mức cao", value: summary.attention.filter((item) => item.severity === "critical" || item.severity === "high").length, href: "/project-monitoring/issues", tone: "error" }
     ],
     items: summary.attention.slice(0, 8).map((item) => ({ id: item.id, type: "project_issue", title: item.title, context: item.projectName, priority: item.severity === "critical" ? "CRITICAL" : item.severity === "high" ? "HIGH" : item.severity === "medium" ? "MEDIUM" : "LOW", dueOrAge: formatAge(item.createdAt), href: `/projects/${item.projectId}/updates/${item.sourceUpdateId}`, status: item.status })),
-    charts: [{ key: "project-progress", title: "Tiến độ công trường", kind: "bar", unit: "%", maxValue: 100, series: [...summary.projects].sort((first, second) => second.completionPercent - first.completionPercent).slice(0, 6).map((project) => ({ label: project.name, value: project.completionPercent })) }, { key: "project-health", title: "Tình trạng dự án", kind: "donut", unit: "dự án", series: [
+    charts: [{ key: "project-progress", title: "Tiến độ công trường", kind: "bar", unit: "%", maxValue: 100, series: [...summary.projects].sort((first, second) => second.completionPercent - first.completionPercent).slice(0, 6).map((project) => ({ label: project.name, value: project.completionPercent, href: can(user.permissions, "project.view") ? `/projects/${project.id}/progress` : undefined })) }, { key: "project-health", title: "Tình trạng dự án", kind: "donut", unit: "dự án", series: [
       { label: "Đúng tiến độ", value: summary.projects.filter((project) => project.status !== "paused" && project.health === "on_track").length },
       { label: "Có rủi ro", value: summary.projects.filter((project) => project.status !== "paused" && project.health === "at_risk").length },
       { label: "Chậm tiến độ", value: summary.projects.filter((project) => project.status !== "paused" && project.health === "delayed").length },
@@ -243,28 +230,52 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình.");
   const contractCutoff = getBusinessDateKey(new Date(Date.now() + 30 * 86_400_000));
-  const [total, active, probation, incomplete, departmentRows, pendingHr, expiringContracts] = await Promise.all([
-    client.from("employees").select("id", { count: "exact", head: true }).in("employment_status", ["active", "probation", "pending_onboarding"]),
-    client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "active"),
-    client.from("employees").select("id", { count: "exact", head: true }).eq("employment_status", "probation"),
-    client.from("employees").select("id", { count: "exact", head: true }).lt("profile_completeness", 100).in("employment_status", ["active", "probation", "pending_onboarding"]),
-    client.from("employees").select("department_id,departments!employees_department_id_fkey(name)").in("employment_status", ["active", "probation"]),
+  const departmentPageSize = 1000;
+  const employmentStatuses = ["active", "probation", "pending_onboarding"];
+  const employeeFields = "department_id,employment_status,profile_completeness,departments!employees_department_id_fkey(name)";
+  const [departmentRows, pendingHr, expiringContracts] = await Promise.all([
+    client.from("employees").select(employeeFields, { count: "exact" }).in("employment_status", employmentStatuses).order("id").range(0, departmentPageSize - 1),
     client.from("employees").select("id", { count: "exact", head: true }).eq("profile_status", "pending_hr_completion"),
     can(user.permissions, "contract.view") ? client.from("employee_contracts").select("id", { count: "exact", head: true }).eq("status", "active").is("archived_at", null).gte("end_date", getBusinessDateKey()).lte("end_date", contractCutoff) : Promise.resolve({ count: 0, error: null })
   ]);
-  if ([total, active, probation, incomplete, pendingHr, departmentRows, expiringContracts].some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
+  if ([pendingHr, departmentRows, expiringContracts].some((result) => result.error)) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
+  const allDepartmentRows = [...(departmentRows.data ?? [])];
+  // Supabase limits each result page; include every employee in the aggregate.
+  for (let offset = allDepartmentRows.length; offset < (departmentRows.count ?? 0); offset = allDepartmentRows.length) {
+    const page = await client.from("employees").select(employeeFields).in("employment_status", employmentStatuses).order("id").range(offset, offset + departmentPageSize - 1);
+    if (page.error) throw new AppError("SERVER_ERROR", "Không thể tải tổng quan nhân sự.");
+    if (!page.data?.length) throw new AppError("SERVER_ERROR", "Dữ liệu nhân sự đã thay đổi. Vui lòng tải lại.");
+    allDepartmentRows.push(...page.data);
+  }
+  // Reuse the rows already needed by the chart instead of four more counts.
+  // Cards and charts now describe the same set of current employees.
+  const total = allDepartmentRows.length;
+  const active = allDepartmentRows.filter((row) => row.employment_status === "active").length;
+  const probation = allDepartmentRows.filter((row) => row.employment_status === "probation").length;
+  const incomplete = allDepartmentRows.filter((row) => row.profile_completeness != null && Number(row.profile_completeness) < 100).length;
   const byDepartment = new Map<string, number>();
-  for (const row of departmentRows.data ?? []) {
+  const departmentIds = new Map<string, Set<string>>();
+  for (const row of allDepartmentRows) {
     const relation = Array.isArray(row.departments) ? row.departments[0] : row.departments;
     const label = relation?.name ? String(relation.name) : "Chưa phân phòng";
     byDepartment.set(label, (byDepartment.get(label) ?? 0) + 1);
+    if (row.department_id) departmentIds.set(label, new Set([...(departmentIds.get(label) ?? []), String(row.department_id)]));
   }
+  const departmentSeries = [...byDepartment.entries()]
+    .map(([label, value]) => ({ label, value, href: departmentIds.get(label)?.size === 1 ? `/employees?departmentId=${encodeURIComponent([...departmentIds.get(label)!][0])}` : undefined }))
+    .sort((first, second) => second.value - first.value);
+  const unassigned = departmentSeries.find((point) => point.label === "Chưa phân phòng");
+  const namedDepartments = departmentSeries.filter((point) => point !== unassigned);
+  const namedLimit = unassigned ? 6 : 7;
+  const visibleDepartments = departmentSeries.length > 8
+    ? [...namedDepartments.slice(0, namedLimit), ...(unassigned ? [unassigned] : []), { label: "Các phòng ban khác", value: namedDepartments.slice(namedLimit).reduce((sum, point) => sum + point.value, 0) }]
+    : departmentSeries;
   return {
     metrics: [
-      { label: "Tổng nhân viên", value: total.count ?? 0, href: "/employees" },
-      { label: "Đang làm việc", value: active.count ?? 0, href: "/employees?status=active" },
-      { label: "Thử việc", value: probation.count ?? 0, href: "/employees?status=probation" },
-      { label: "Hồ sơ chưa hoàn thiện", value: incomplete.count ?? 0, href: "/employees?profile=incomplete", tone: incomplete.count ? "warning" : "success" },
+      { label: "Nhân sự hiện tại", value: total, href: "/employees" },
+      { label: "Đang làm việc", value: active, href: "/employees?status=active" },
+      { label: "Thử việc", value: probation, href: "/employees?status=probation" },
+      { label: "Hồ sơ chưa hoàn thiện", value: incomplete, href: "/employees?profile=incomplete", tone: incomplete ? "warning" : "success" },
       ...(can(user.permissions, "contract.view") ? [{ label: "Hợp đồng sắp hết hạn", value: expiringContracts.count ?? 0, href: "/employees/contracts", tone: expiringContracts.count ? "warning" as const : "success" as const }] : [])
     ],
     items: pendingHr.count ? [{ id: "pending-hr", type: "hr_task", title: `${pendingHr.count} hồ sơ chờ hoàn thiện`, href: "/employees?profile=pending_hr_completion", priority: "MEDIUM" }] : [],
@@ -272,15 +283,14 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
       ...(byDepartment.size ? [{
         key: "hr-by-department",
         title: "Nhân sự theo phòng ban",
-        series: [...byDepartment.entries()]
-          .map(([label, value]) => ({ label, value }))
-          .sort((first, second) => second.value - first.value)
-          .slice(0, 8)
+        layout: "horizontal" as const,
+        unit: "nhân viên",
+        series: visibleDepartments
       }] : []),
       { key: "hr-employment", title: "Cơ cấu nhân sự", kind: "donut", unit: "nhân viên", series: [
-        { label: "Đang làm", value: active.count ?? 0 },
-        { label: "Thử việc", value: probation.count ?? 0 },
-        { label: "Chờ nhận việc", value: Math.max(0, (total.count ?? 0) - (active.count ?? 0) - (probation.count ?? 0)) }
+        { label: "Đang làm", value: active },
+        { label: "Thử việc", value: probation },
+        { label: "Chờ nhận việc", value: total - active - probation }
       ] }
     ]
   };
@@ -289,44 +299,11 @@ async function loadHrSummary(user: AuthenticatedUser): Promise<DashboardWidgetDa
 async function loadAccountingSummary(user: AuthenticatedUser): Promise<DashboardWidgetData> {
   const summary = await accountingSummary(user);
   const payrollAccess = can(user.permissions, "payroll.view");
-  const pendingPayrolls = payrollAccess ? summary.recentPayrolls.filter((period) => !["locked", "published"].includes(period.status)) : [];
-  const salaryAccess = can(user.permissions, "salary.view");
-  const payslipAccess = payrollAccess || can(user.permissions, "payslip.self.view");
-  return {
-    metrics: [
-      ...(salaryAccess ? [{ label: "Hồ sơ lương", value: summary.salaryProfiles, href: "/accounting/salaries" }] : []),
-      ...(payrollAccess ? [
-        { label: "Kỳ đang xử lý", value: summary.openPayrolls, href: "/accounting/payroll" },
-        { label: "Kỳ đã khóa", value: summary.lockedPayrolls, href: "/accounting/payroll" }
-      ] : []),
-      ...(payslipAccess ? [{ label: "Phiếu lương chưa xem", value: summary.unseenPayslips, href: "/accounting/payslips" }] : [])
-    ],
-    charts: [
-      ...(payrollAccess ? [
-        { key: "payroll-fund", title: "Quỹ lương theo kỳ", kind: "line" as const, unit: "VNĐ", series: [...summary.recentPayrolls].reverse().map((period) => ({ label: `${period.periodMonth.slice(5, 7)}/${period.periodMonth.slice(0, 4)}`, value: period.netTotal })) },
-        { key: "payroll-status", title: "Tình trạng kỳ lương", kind: "donut" as const, unit: "kỳ lương", series: [
-          { label: "Đang xử lý", value: summary.openPayrolls, tone: "warning" as const },
-          { label: "Đã khóa / phát hành", value: summary.lockedPayrolls, tone: "success" as const }
-        ] }
-      ] : payslipAccess ? [
-        { key: "payslip-status", title: "Phiếu lương của tôi", kind: "donut" as const, unit: "phiếu", series: [
-          { label: "Đã xem", value: summary.viewedPayslips },
-          { label: "Chưa xem", value: summary.unseenPayslips, tone: "warning" as const }
-        ] }
-      ] : salaryAccess ? [
-        { key: "salary-profiles", title: "Hồ sơ lương hiện có", kind: "bar" as const, unit: "nhân viên", series: [{ label: "Đã thiết lập lương", value: summary.salaryProfiles }] }
-      ] : [])
-    ],
-    items: pendingPayrolls.map((period) => ({
-      id: period.id,
-      type: "payroll",
-      title: `Kỳ lương ${period.periodMonth.slice(0, 7)}`,
-      context: `${period.lineCount} nhân sự`,
-      priority: period.status === "draft" ? "HIGH" as const : "MEDIUM" as const,
-      href: `/accounting/payroll/${period.id}`,
-      status: period.status
-    }))
-  };
+  return accountingDashboardData(summary, {
+    payroll: payrollAccess,
+    salary: can(user.permissions, "salary.view"),
+    payslip: payrollAccess || can(user.permissions, "payslip.self.view")
+  });
 }
 
 async function loadRecentActivity(user: AuthenticatedUser): Promise<DashboardWidgetData> {
@@ -359,11 +336,11 @@ const loaders: Record<DashboardWidgetKey, (user: AuthenticatedUser) => Promise<D
 };
 
 export async function getDashboardReadModel(user: AuthenticatedUser, requestedProfile?: DashboardProfileKey, requestedWidget?: DashboardWidgetKey, scope?: "global"): Promise<DashboardReadModel> {
-  const settings = await readSettingsGroup("dashboard");
+  const [settings, modules] = await Promise.all([readSettingsGroup("dashboard"), readSettingsGroup("modules")]);
   const contextual = resolveDashboardProfile(user, settings);
   const profile = requestedProfile && canUseDashboardProfile(user, requestedProfile) ? requestedProfile : contextual;
   const enabled = scope === "global"
-    ? analyticsDefinitionsFor(user, await readSettingsGroup("modules"))
+    ? analyticsDefinitionsFor(user, modules)
     : enabledWidgetsFor(user, profile, settings);
   const definitions = requestedWidget ? enabled.filter((definition) => definition.key === requestedWidget) : enabled;
   const settled = await Promise.allSettled(definitions.map((definition) => loaders[definition.key](user)));
@@ -381,6 +358,7 @@ export async function getDashboardReadModel(user: AuthenticatedUser, requestedPr
   }));
   const attention = normalizeAttention(widgets.flatMap((widget) => widget.status === "ready" ? widget.data?.items?.filter((item) => item.priority && item.priority !== "INFO") ?? [] : []));
   return {
+    shortcuts: dashboardShortcutsFor(user, profile, modules),
     profile,
     profileLabel: scope === "global" ? "Toàn hệ thống" : dashboardProfiles.find((item) => item.key === profile)?.label ?? "Tổng quan",
     generatedAt: new Date().toISOString(),

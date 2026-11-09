@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -29,22 +29,30 @@ export function UserMenu({ user }: { user: AuthenticatedUser }) {
 
   return (
     <DropdownMenu
-      label="Mở menu người dùng"
+      label="Tài khoản"
       trigger={
         <span className="user-menu__trigger">
           <Avatar imageUrl="/api/v1/workspace/avatar" name={user.displayName} />
-          <span>{user.displayName}</span>
+          <span className="user-menu__name">{user.displayName}</span>
+          <ChevronDown aria-hidden="true" className="user-menu__chevron" size={14} />
         </span>
       }
     >
       <div className="user-menu__content">
-        <p>
-          <strong>{user.displayName}</strong>
-          <span>@{user.username}</span>
+        <p className="user-menu__identity">
+          <Avatar imageUrl="/api/v1/workspace/avatar" name={user.displayName} />
+          <span className="user-menu__identity-copy">
+            <strong>{user.displayName}</strong>
+            <span>@{user.username}</span>
+          </span>
         </p>
         <Link href="/profile">
           <UserRound aria-hidden="true" size={16} />
           Hồ sơ cá nhân
+        </Link>
+        <Link href="/profile/password">
+          <KeyRound aria-hidden="true" size={16} />
+          Đổi mật khẩu
         </Link>
         {can(user.permissions, "user.view") ? <Link href="/settings/users">
           <Settings aria-hidden="true" size={16} />

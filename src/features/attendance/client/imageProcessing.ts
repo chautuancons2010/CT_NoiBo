@@ -8,6 +8,40 @@ export interface ProcessedAttendancePhoto {
   previewUrl: string;
 }
 
+export interface AttendancePhotoStamp {
+  capturedAt: string;
+  address: string;
+  latitude?: number;
+  longitude?: number;
+  label?: string;
+}
+
+function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
+  if (!stamp) return;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Không thể ghi thông tin lên ảnh.");
+  const scale = canvas.width / 1000;
+  const size = Math.max(10, Math.round(23 * scale));
+  const padding = Math.max(10, 22 * scale);
+  context.font = `600 ${size}px sans-serif`;
+  const words = stamp.address.split(/\s+/);
+  const lines: string[] = []; let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (context.measureText(next).width > canvas.width - padding * 2 && current) { lines.push(current); current = word; } else current = next;
+  }
+  if (current) lines.push(current);
+  const time = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "medium" }).format(new Date(stamp.capturedAt));
+  const content = [stamp.label || "CHÂU TUẤN · ĐIỂM DANH", time, ...lines];
+  if (stamp.latitude !== undefined && stamp.longitude !== undefined) content.push(`GPS ${stamp.latitude.toFixed(6)}, ${stamp.longitude.toFixed(6)}`);
+  const lineHeight = size * 1.5;
+  const height = Math.min(canvas.height, content.length * lineHeight + padding * 2);
+  context.fillStyle = "rgba(0,0,0,.72)";
+  context.fillRect(0, canvas.height - height, canvas.width, height);
+  context.fillStyle = "#fff"; context.textBaseline = "top";
+  content.forEach((line, index) => context.fillText(line, padding, canvas.height - height + padding + index * lineHeight, canvas.width - padding * 2));
+}
+
 function targetDimensions(width: number, height: number, longestEdge: number) {
   const ratio = Math.min(1, longestEdge / Math.max(width, height));
   return {
@@ -56,7 +90,7 @@ export async function captureAttendancePhoto(video: HTMLVideoElement): Promise<P
   };
 }
 
-export async function processAttendanceImage(file: File): Promise<ProcessedAttendancePhoto> {
+export async function processAttendanceImage(file: File, stamp?: AttendancePhotoStamp): Promise<ProcessedAttendancePhoto> {
   const image = new Image();
   const sourceUrl = URL.createObjectURL(file);
   try {
@@ -72,6 +106,7 @@ export async function processAttendanceImage(file: File): Promise<ProcessedAtten
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Thiết bị không thể xử lý ảnh.");
       context.drawImage(image, 0, 0, size.width, size.height);
+      stampCanvas(canvas, stamp);
       return canvas;
     };
     const fullCanvas = draw(1600);

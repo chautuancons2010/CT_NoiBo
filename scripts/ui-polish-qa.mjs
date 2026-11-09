@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -23,7 +24,7 @@ const reports = [];
 try {
   const context = await browser.newContext({ locale: "vi-VN", reducedMotion: "reduce" });
   const login = await context.request.post(`${baseUrl}/api/v1/auth/login`, {
-    data: { username: "test.supervisor", password: process.env.SEED_TEST_PASSWORD || "12345678" }
+    data: { username: "test.supervisor", password: getTestPassword() }
   });
   assert(login.ok(), `QA login failed: ${login.status()}`);
   const authenticatedPage = await context.newPage();

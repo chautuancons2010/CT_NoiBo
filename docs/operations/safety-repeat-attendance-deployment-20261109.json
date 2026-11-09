@@ -1,0 +1,94 @@
+{
+  "createdAt": "2026-11-09T09:07:43.823Z",
+  "projectId": "prj_eVAMgL2HJS9ncEB13RLeJ8XRURWP",
+  "target": "preview",
+  "alias": "ct-noi-bo-test-chau-tuan.vercel.app",
+  "sourceSha": "03052443646776e4e52d3ab4f6bed7297885d8c1c174dec39e9bab6f854ff2cb",
+  "previousDeployment": "dpl_ErScgrtcjxfsdcCK4C3C5tSHcp2y",
+  "productionDeployment": "dpl_Hz1TzXrL9sR9yEzXUeMiFZRBUbDK",
+  "id": "dpl_2p3JKiNGE1N9qrgWPSibMdfMqdwB",
+  "url": "ct-noi-7msfj0nmm-chau-tuan.vercel.app",
+  "readyState": "READY",
+  "uploadedFiles": 1675,
+  "uploadBytes": 9298135,
+  "buildCommand": "npm run build:wasm",
+  "generatedBuildConfiguration": true,
+  "checkedAt": "2026-11-09T09:10:15.721Z",
+  "productionUnchanged": true,
+  "verifiedAt": "2026-11-09T09:15:18.929Z",
+  "publicUrl": "https://ct-noi-bo-test-chau-tuan.vercel.app",
+  "schema": {
+    "projectId": "lgmlkagcytfjazulgfbz",
+    "filename": "202611090002_worker_safety_reports.sql",
+    "sha256": "c04415d85043c4370650c9fa10e0df4a06fa9d3bb1c157849f1d49a3b55c9d05",
+    "rollbackPreflight": true,
+    "checks": [
+      "unchecked briefing submission rejected",
+      "confirmed safety report persisted"
+    ],
+    "before": {
+      "sessions": 16,
+      "entries": 44,
+      "attendance": 2111
+    },
+    "after": {
+      "sessions": 16,
+      "entries": 44,
+      "attendance": 2111
+    },
+    "appliedAt": "2026-11-09T09:04:03.381Z"
+  },
+  "health": [
+    {
+      "endpoint": "live",
+      "status": 200,
+      "bodyStatus": "alive"
+    },
+    {
+      "endpoint": "ready",
+      "status": 200,
+      "bodyStatus": "ready"
+    }
+  ],
+  "checks": {
+    "focusedAttendanceCases": 34,
+    "focusedSafetyCases": 26,
+    "typecheck": "passed",
+    "eslintChangedFiles": "passed",
+    "migrationsValidated": 57,
+    "build": "passed",
+    "live": [
+      "Camera opens with dashboard request held; controls fit six portrait, landscape and tablet viewports",
+      "Simulated camera capture uploads a stamped JPEG and opens the evidence viewer",
+      "Worker selection, safety, native photo input and background draft promotion complete despite 1.8s API delays"
+    ]
+  },
+  "timings": [
+    {
+      "name": "real attendance dashboard",
+      "ms": 592,
+      "region": "sin1:"
+    },
+    {
+      "name": "quick route and camera ready while dashboard is held",
+      "ms": 1726
+    },
+    {
+      "name": "worker to safety with slow API",
+      "ms": 109
+    },
+    {
+      "name": "safety to photo with slow API",
+      "ms": 115
+    },
+    {
+      "name": "bottom toolbar tap to camera ready on warm app",
+      "ms": 1414
+    }
+  ],
+  "cameraGps": "simulated",
+  "physicalPhoneTested": false,
+  "businessMutationsDuringQa": false,
+  "productionCleanup": "not executed; SQL access returns 403",
+  "uiEvidence": "test-results/mobile-lag-20261109/report.json"
+}

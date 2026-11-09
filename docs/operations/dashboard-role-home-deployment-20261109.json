@@ -1,0 +1,384 @@
+{
+  "createdAt": "2026-11-09T04:25:57.749Z",
+  "projectId": "prj_eVAMgL2HJS9ncEB13RLeJ8XRURWP",
+  "target": "preview",
+  "alias": "ct-noi-bo-test-chau-tuan.vercel.app",
+  "sourceSha": "e5ea205d7c4181444f124e8dfacc69a23ffa383a57292e4412016bb6dc466291",
+  "previousDeployment": "dpl_Fmsfp3sz6ZnuDe3ND3KXydbc5Jxc",
+  "productionDeployment": "dpl_Hz1TzXrL9sR9yEzXUeMiFZRBUbDK",
+  "id": "dpl_AtBrnGqH3Ue8qEtn8LCBkiUkufJu",
+  "url": "ct-noi-luns74i9k-chau-tuan.vercel.app",
+  "readyState": "READY",
+  "uploadedFiles": 1655,
+  "uploadBytes": 9191670,
+  "buildCommand": "npm run build:wasm",
+  "generatedBuildConfiguration": true,
+  "checkedAt": "2026-11-09T04:29:35.786Z",
+  "productionUnchanged": true,
+  "verifiedAt": "2026-11-09T04:33:37.082Z",
+  "publicUrl": "https://ct-noi-bo-test-chau-tuan.vercel.app",
+  "schema": {
+    "projectId": "lgmlkagcytfjazulgfbz",
+    "filename": "202611070001_worker_attendance_selection.sql",
+    "sha256": "bb935b52bb9fa3d01d03878baacf64a3cc1627da23006e1345256b7c3f7de88d",
+    "appliedAt": "2026-11-09T04:10:39.357Z",
+    "rollbackPreflight": true,
+    "beforeCounts": {
+      "sessions": 15,
+      "entries": 43
+    },
+    "afterCounts": {
+      "sessions": 15,
+      "entries": 43
+    },
+    "productionLinkUnchanged": true
+  },
+  "health": [
+    {
+      "endpoint": "live",
+      "httpStatus": 200,
+      "status": "alive"
+    },
+    {
+      "endpoint": "ready",
+      "httpStatus": 200,
+      "status": "ready"
+    }
+  ],
+  "checks": {
+    "testsPassed": 1256,
+    "testsSkipped": 37,
+    "typecheck": "passed",
+    "eslint": "passed",
+    "migrations": 55,
+    "build": "passed",
+    "liveAccounts": 10,
+    "liveViewports": 20,
+    "hrPhotoReview": "passed",
+    "adminModuleControls": "passed",
+    "businessMutationsDuringQa": false
+  },
+  "roles": [
+    {
+      "username": "admin.test",
+      "profile": "management",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "projects.monitoring",
+          "label": "Theo dõi công trường",
+          "href": "/project-monitoring",
+          "icon": "ChartNoAxesCombined"
+        },
+        {
+          "key": "approvals",
+          "label": "Phê duyệt đơn từ",
+          "href": "/approvals",
+          "icon": "CheckSquare"
+        },
+        {
+          "key": "attendance.photos",
+          "label": "Kiểm tra ảnh chấm công",
+          "href": "/attendance/today",
+          "icon": "Camera"
+        },
+        {
+          "key": "warehouse.inventory",
+          "label": "Kiểm tra tồn kho",
+          "href": "/warehouse/inventory",
+          "icon": "Boxes"
+        },
+        {
+          "key": "shipments",
+          "label": "Theo dõi lô hàng",
+          "href": "/import-export/shipments",
+          "icon": "Ship"
+        },
+        {
+          "key": "reports",
+          "label": "Báo cáo",
+          "href": "/reports",
+          "icon": "ChartSpline"
+        }
+      ]
+    },
+    {
+      "username": "director.test",
+      "profile": "management",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "projects.monitoring",
+          "label": "Theo dõi công trường",
+          "href": "/project-monitoring",
+          "icon": "ChartNoAxesCombined"
+        },
+        {
+          "key": "reports",
+          "label": "Báo cáo",
+          "href": "/reports",
+          "icon": "ChartSpline"
+        }
+      ]
+    },
+    {
+      "username": "manager.test",
+      "profile": "management",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "projects.monitoring",
+          "label": "Theo dõi công trường",
+          "href": "/project-monitoring",
+          "icon": "ChartNoAxesCombined"
+        },
+        {
+          "key": "reports",
+          "label": "Báo cáo",
+          "href": "/reports",
+          "icon": "ChartSpline"
+        }
+      ]
+    },
+    {
+      "username": "engineer.test",
+      "profile": "supervisor",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "worker.today",
+          "label": "Điểm danh công trường",
+          "href": "/worker-attendance/today",
+          "icon": "ClipboardCheck"
+        },
+        {
+          "key": "projects",
+          "label": "Gói / Công trường",
+          "href": "/projects",
+          "icon": "HardHat"
+        },
+        {
+          "key": "projects.updates",
+          "label": "Nhật ký công trường",
+          "href": "/projects/updates",
+          "icon": "Newspaper"
+        },
+        {
+          "key": "projects.monitoring",
+          "label": "Theo dõi công trường",
+          "href": "/project-monitoring",
+          "icon": "ChartNoAxesCombined"
+        }
+      ]
+    },
+    {
+      "username": "engineer02.test",
+      "profile": "supervisor",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "worker.today",
+          "label": "Điểm danh công trường",
+          "href": "/worker-attendance/today",
+          "icon": "ClipboardCheck"
+        },
+        {
+          "key": "projects",
+          "label": "Gói / Công trường",
+          "href": "/projects",
+          "icon": "HardHat"
+        },
+        {
+          "key": "projects.updates",
+          "label": "Nhật ký công trường",
+          "href": "/projects/updates",
+          "icon": "Newspaper"
+        },
+        {
+          "key": "projects.monitoring",
+          "label": "Theo dõi công trường",
+          "href": "/project-monitoring",
+          "icon": "ChartNoAxesCombined"
+        }
+      ]
+    },
+    {
+      "username": "accountant.test",
+      "profile": "accounting",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "payroll",
+          "label": "Bảng lương",
+          "href": "/accounting/payroll",
+          "icon": "Calculator"
+        },
+        {
+          "key": "salaries",
+          "label": "Hồ sơ lương",
+          "href": "/accounting/salaries",
+          "icon": "WalletCards"
+        },
+        {
+          "key": "payslips",
+          "label": "Phiếu lương",
+          "href": "/accounting/payslips",
+          "icon": "ReceiptText"
+        },
+        {
+          "key": "salaries.history",
+          "label": "Lịch sử lương",
+          "href": "/accounting/salary-history",
+          "icon": "History"
+        }
+      ]
+    },
+    {
+      "username": "hr.test",
+      "profile": "hr",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "attendance.photos",
+          "label": "Kiểm tra ảnh chấm công",
+          "href": "/attendance/today",
+          "icon": "Camera"
+        },
+        {
+          "key": "timesheets",
+          "label": "Kiểm tra bảng công",
+          "href": "/timesheets/matrix",
+          "icon": "TableProperties"
+        },
+        {
+          "key": "leave.manage",
+          "label": "Quản lý nghỉ phép",
+          "href": "/leave/manage",
+          "icon": "CalendarOff"
+        },
+        {
+          "key": "employees",
+          "label": "Hồ sơ nhân sự",
+          "href": "/employees",
+          "icon": "UsersRound"
+        },
+        {
+          "key": "attendance.adjustments",
+          "label": "Điều chỉnh công",
+          "href": "/timesheets/adjustments",
+          "icon": "ClipboardPenLine"
+        },
+        {
+          "key": "approvals",
+          "label": "Phê duyệt đơn từ",
+          "href": "/approvals",
+          "icon": "CheckSquare"
+        }
+      ]
+    },
+    {
+      "username": "warehouse.test",
+      "profile": "warehouse",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "warehouse.inventory",
+          "label": "Kiểm tra tồn kho",
+          "href": "/warehouse/inventory",
+          "icon": "Boxes"
+        },
+        {
+          "key": "warehouse.receipts",
+          "label": "Phiếu nhập kho",
+          "href": "/warehouse/receipts",
+          "icon": "PackagePlus"
+        },
+        {
+          "key": "warehouse.issues",
+          "label": "Phiếu xuất kho",
+          "href": "/warehouse/issues",
+          "icon": "PackageMinus"
+        },
+        {
+          "key": "warehouse.stock-counts",
+          "label": "Kiểm kê kho",
+          "href": "/warehouse/stock-counts",
+          "icon": "ScanLine"
+        }
+      ]
+    },
+    {
+      "username": "import.test",
+      "profile": "import_export",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "shipments",
+          "label": "Theo dõi lô hàng",
+          "href": "/import-export/shipments",
+          "icon": "Ship"
+        },
+        {
+          "key": "shipments.new",
+          "label": "Tạo lô hàng",
+          "href": "/import-export/shipments/new",
+          "icon": "PackagePlus"
+        },
+        {
+          "key": "shipments.documents",
+          "label": "Chứng từ xuất nhập khẩu",
+          "href": "/import-export/documents",
+          "icon": "FolderArchive"
+        },
+        {
+          "key": "shipments.customs",
+          "label": "Theo dõi hải quan",
+          "href": "/import-export/customs",
+          "icon": "ShieldCheck"
+        }
+      ]
+    },
+    {
+      "username": "employee.test",
+      "profile": "employee",
+      "passed": true,
+      "widgetErrors": [],
+      "shortcuts": [
+        {
+          "key": "attendance.self",
+          "label": "Chấm công hôm nay",
+          "href": "/attendance/me",
+          "icon": "Camera"
+        },
+        {
+          "key": "leave.new",
+          "label": "Tạo đơn nghỉ phép",
+          "href": "/leave/new",
+          "icon": "CalendarOff"
+        },
+        {
+          "key": "attendance.history",
+          "label": "Lịch sử chấm công",
+          "href": "/attendance/history",
+          "icon": "History"
+        },
+        {
+          "key": "payslips.self",
+          "label": "Phiếu lương của tôi",
+          "href": "/personal/payslips",
+          "icon": "ReceiptText"
+        }
+      ]
+    }
+  ],
+  "uiEvidence": "test-results/dashboard-role-live-20261109/report.json"
+}

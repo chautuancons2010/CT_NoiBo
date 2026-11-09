@@ -1,16 +1,17 @@
 "use client";
 
-import { Building2, CalendarDays, FileText, MapPin, Plus, UserRound } from "lucide-react";
+import { Building2, CalendarDays, FileText, MapPin, Pencil, Plus, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import { Button } from "@/components/shared/Button";
+import { Button, IconButton } from "@/components/shared/Button";
 import { Input } from "@/components/shared/FormControls";
 import { Modal } from "@/components/shared/Overlays";
 import { EmptyState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { WorksiteEditor } from "../WorksiteEditor";
 import { ProjectHealthControl } from "@/features/projects/components/ProjectHealthControl";
-import type { ProjectDetail, ProjectHealth, ProjectUpdate } from "@/features/projects/types/projectTypes";
+import type { ProjectDetail, ProjectHealth, ProjectUpdate, Worksite } from "@/features/projects/types/projectTypes";
 import { formatBusinessDate } from "@/lib/time/timezone";
 
 import styles from "./PackageWorkspace.module.css";
@@ -24,65 +25,43 @@ const healthDisplay: Record<ProjectHealth, { label: string; tone: "success" | "w
   completed: { label: "Hoàn thành", tone: "success" }
 };
 
-async function postJson(url: string, payload: unknown) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const body = await response.json() as { error?: { message?: string } };
-  if (!response.ok) throw new Error(body.error?.message ?? "Không thể lưu dữ liệu.");
-}
-
 export function PackageRecordWorkspace({
   project,
   updates,
   canManageWorksites,
+  canEditProject = false,
   canUpdateHealth,
+  canViewDocuments,
   onNavigate
 }: {
   project: ProjectDetail;
   updates: ProjectUpdate[];
   canManageWorksites: boolean;
+  canEditProject?: boolean;
   canUpdateHealth: boolean;
+  canViewDocuments: boolean;
   onNavigate: (section: PackageWorkspaceSection) => void;
 }) {
   const router = useRouter();
   const [addingWorksite, setAddingWorksite] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [worksiteBusy, setWorksiteBusy] = useState(false);
+  const [editingWorksite, setEditingWorksite] = useState<Worksite>();
+  const [editingName, setEditingName] = useState(false);
+  const [projectName, setProjectName] = useState(project.name);
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameError, setNameError] = useState("");
   const documents = useMemo(() => updates.flatMap((update) => update.attachments
     .filter((attachment) => attachment.attachmentType !== "image")
     .map((attachment) => ({ ...attachment, updateTitle: update.title, updatedAt: update.updatedAt }))), [updates]);
 
-  async function createWorksite(form: FormData) {
-    setSaving(true);
-    setError("");
-    try {
-      await postJson(`/api/v1/projects/${project.id}/worksites`, {
-        name: form.get("name"),
-        address: form.get("address") || undefined,
-        latitude: form.get("latitude") ? Number(form.get("latitude")) : undefined,
-        longitude: form.get("longitude") ? Number(form.get("longitude")) : undefined,
-        radiusMeters: Number(form.get("radiusMeters")),
-        gpsRequired: true,
-        allowedAccuracyThresholdMeters: 100
-      });
-      setAddingWorksite(false);
-      router.refresh();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không thể thêm công trường.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <section className={styles.recordsWorkspace}>
       <header className={styles.workspaceHeading}>
         <div><h2>Thông tin gói</h2></div>
-        {canManageWorksites ? (
-          <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => setAddingWorksite(true)} variant="secondary">
+        {canEditProject ? <Button leftIcon={<Pencil aria-hidden="true" size={16} />} onClick={() => { setProjectName(project.name); setNameError(""); setEditingName(true); }}>Đổi tên gói</Button> : null}
+        {canManageWorksites && project.status !== "closed" ? (
+          <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => { setEditingWorksite(undefined); setAddingWorksite(true); }} variant="secondary">
             Thêm công trường
           </Button>
         ) : null}
@@ -111,7 +90,7 @@ export function PackageRecordWorkspace({
                 <div key={site.id}>
                   <MapPin aria-hidden="true" size={17} />
                   <span><strong>{site.name}</strong>{site.address ? <small>{site.address}</small> : null}</span>
-                  <StatusBadge tone={site.status === "active" ? "success" : "neutral"}>{site.status === "active" ? "Hoạt động" : "Ngừng"}</StatusBadge>
+                  <span className={styles.worksiteActions}><StatusBadge tone={site.status === "active" ? "success" : "neutral"}>{site.status === "active" ? "Hoạt động" : site.status === "closed" ? "Đã đóng" : "Tạm ngừng"}</StatusBadge>{canManageWorksites && site.updatedAt ? <IconButton label={`Chỉnh sửa ${site.name}`} onClick={() => { setEditingWorksite(site); setAddingWorksite(true); }}><Pencil size={16}/></IconButton> : null}</span>
                 </div>
               ))}
               {!project.worksites.length ? <EmptyState title="Chưa có công trường" /> : null}
@@ -124,7 +103,7 @@ export function PackageRecordWorkspace({
             <h3>Tình trạng gói</h3>
             {canUpdateHealth ? <ProjectHealthControl health={project.health} projectId={project.id} /> : <StatusBadge tone={healthDisplay[project.health].tone}>{healthDisplay[project.health].label}</StatusBadge>}
           </section>
-          <section className={styles.infoSection}>
+          {canViewDocuments ? <section className={styles.infoSection}>
             <div className={styles.infoSectionHeader}><h3>Tệp liên quan</h3><span>{documents.length}</span></div>
             <div className={styles.recordFiles}>
               {documents.slice(0, 6).map((document) => (
@@ -136,19 +115,28 @@ export function PackageRecordWorkspace({
               {!documents.length ? <EmptyState title="Chưa có tệp liên quan" /> : null}
             </div>
             <Button onClick={() => onNavigate("documents")} variant="secondary">Mở tài liệu</Button>
-          </section>
+          </section> : null}
         </aside>
       </div>
-      <Modal onClose={() => setAddingWorksite(false)} open={addingWorksite} title="Thêm công trường">
-        <form action={createWorksite} className={styles.worksiteForm}>
-          <Input label="Tên công trường" name="name" required />
-          <Input label="Địa chỉ" name="address" />
-          <Input label="Vĩ độ" name="latitude" step="any" type="number" />
-          <Input label="Kinh độ" name="longitude" step="any" type="number" />
-          <Input defaultValue="200" label="Bán kính (m)" min={10} name="radiusMeters" type="number" />
-          {error ? <p className={styles.inlineError} role="alert">{error}</p> : null}
-          <div className={styles.worksiteFormActions}><Button onClick={() => setAddingWorksite(false)}>Hủy</Button><Button disabled={saving} type="submit" variant="primary">{saving ? "Đang lưu…" : "Lưu công trường"}</Button></div>
+      <Modal onClose={() => { if (!nameBusy) setEditingName(false); }} open={editingName} title="Đổi tên gói">
+        <form className="drawer-form" onSubmit={async event => {
+          event.preventDefault(); if (nameBusy) return;
+          setNameBusy(true); setNameError("");
+          try {
+            const response = await fetch(`/api/v1/projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: projectName, rowVersion: project.rowVersion }) });
+            const body = await response.json() as { error?: { message?: string } };
+            if (!response.ok) throw new Error(body.error?.message ?? "Không thể đổi tên gói.");
+            setEditingName(false); router.refresh();
+          } catch (error) { setNameError(error instanceof Error ? error.message : "Không thể đổi tên gói."); }
+          finally { setNameBusy(false); }
+        }}>
+          <Input disabled={nameBusy} label="Tên gói" maxLength={180} minLength={3} onChange={event => setProjectName(event.target.value)} required value={projectName} />
+          {nameError ? <p className="form-error" role="alert">{nameError}</p> : null}
+          <div className="form-actions"><Button disabled={nameBusy} onClick={() => setEditingName(false)}>Hủy</Button><Button busy={nameBusy} disabled={nameBusy} type="submit" variant="primary">Lưu tên gói</Button></div>
         </form>
+      </Modal>
+      <Modal onClose={() => { if (!worksiteBusy) setAddingWorksite(false); }} open={addingWorksite} title={editingWorksite ? "Chỉnh sửa công trường" : "Thêm công trường"}>
+        <WorksiteEditor initial={editingWorksite} key={editingWorksite?.id ?? "new"} onBusyChange={setWorksiteBusy} onCancel={() => setAddingWorksite(false)} onSaved={() => { setAddingWorksite(false); router.refresh(); }} projectId={project.id}/>
       </Modal>
     </section>
   );

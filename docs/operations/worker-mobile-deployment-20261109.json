@@ -1,0 +1,84 @@
+{
+  "createdAt": "2026-11-09T05:15:27.218Z",
+  "projectId": "prj_eVAMgL2HJS9ncEB13RLeJ8XRURWP",
+  "target": "preview",
+  "alias": "ct-noi-bo-test-chau-tuan.vercel.app",
+  "sourceSha": "477f3728915cbd96ecdaf9c31a3870f136e4eaa352b549262a3b41bd3edfa70c",
+  "previousDeployment": "dpl_AQksNeN6vFASe1akPdjEoc8JBXBU",
+  "productionDeployment": "dpl_Hz1TzXrL9sR9yEzXUeMiFZRBUbDK",
+  "id": "dpl_C5TK1dXmpupaPo3VEiUpxP6zSn9x",
+  "url": "ct-noi-k11zxvo69-chau-tuan.vercel.app",
+  "readyState": "READY",
+  "uploadedFiles": 1663,
+  "uploadBytes": 9234494,
+  "buildCommand": "npm run build:wasm",
+  "generatedBuildConfiguration": true,
+  "checkedAt": "2026-11-09T06:06:52.983Z",
+  "productionUnchanged": true,
+  "verifiedAt": "2026-11-09T06:09:35.885Z",
+  "publicUrl": "https://ct-noi-bo-test-chau-tuan.vercel.app",
+  "schema": {
+    "projectId": "lgmlkagcytfjazulgfbz",
+    "filename": "202611090001_worker_attendance_clocks.sql",
+    "sha256": "6fde99d7fc365225c7e30764ca64ce01b715a16f718ed5034cd631b2a8050ab3",
+    "rollbackPreflight": true,
+    "checks": [
+      "selected worker clock-in",
+      "deselected worker clock cleared",
+      "clock-out persisted",
+      "actual duration 600 minutes"
+    ],
+    "before": {
+      "sessions": 15,
+      "entries": 43
+    },
+    "after": {
+      "sessions": 15,
+      "entries": 43
+    },
+    "appliedAt": "2026-11-09T05:02:06.639Z"
+  },
+  "health": [
+    {
+      "endpoint": "live",
+      "httpStatus": 200,
+      "status": "alive"
+    },
+    {
+      "endpoint": "ready",
+      "httpStatus": 200,
+      "status": "ready"
+    }
+  ],
+  "checks": {
+    "focusedTestsPassed": 24,
+    "typecheck": "passed",
+    "eslintChangedFiles": "passed",
+    "migrationsValidated": 56,
+    "build": "passed",
+    "live": [
+      {
+        "name": "Restored mobile home and five toolbar actions",
+        "passed": true
+      },
+      {
+        "name": "Supervisor personal photo prerequisite",
+        "passed": true
+      },
+      {
+        "name": "HR session access and shared shift",
+        "passed": true,
+        "sessions": 15,
+        "matchedShift": true
+      },
+      {
+        "name": "Real Excel download and per-worker clock columns",
+        "passed": true,
+        "rows": 1
+      }
+    ],
+    "businessMutationsDuringQa": false
+  },
+  "uiEvidence": "test-results/worker-mobile-20261109/report.json",
+  "physicalCameraGpsTested": false
+}

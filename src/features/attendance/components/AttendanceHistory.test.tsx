@@ -17,7 +17,18 @@ describe("personal attendance calendar", () => {
     fireEvent.click(day);
 
     expect(screen.getByText("Chưa có lượt chấm công.")).toBeInTheDocument();
-    expect(screen.getByText("Giờ vào")).toBeInTheDocument();
-    expect(screen.getByText("Giờ ra")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByText("Giờ vào")).not.toBeInTheDocument();
+    expect(screen.queryByText("Giờ ra")).not.toBeInTheDocument();
+  });
+
+  it("starts with only the calendar and reveals the monthly summary on request", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [] }) }));
+    render(<AttendanceHistory />);
+    await screen.findByText("Tổng kết tháng");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Đủ công")).not.toBeVisible();
+    fireEvent.click(screen.getByText("Tổng kết tháng"));
+    expect(screen.getByText("Đủ công")).toBeVisible();
   });
 });

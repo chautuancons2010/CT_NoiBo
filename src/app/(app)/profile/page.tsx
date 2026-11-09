@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { Avatar } from "@/components/shared/Avatar";
 import { Card } from "@/components/shared/Card";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -10,12 +8,13 @@ import { getRequestUser } from "@/services/auth/getRequestUser";
 import { LogoutButton } from "@/features/auth/components/LogoutButton";
 import { ChangePasswordForm } from "@/features/auth/components/ChangePasswordForm";
 import { PersonalUiSettings } from "@/features/workspace/PersonalUiSettings";
+import { canOpenPersonalAttendance } from "@/lib/auth/applicationAccess";
 
 export default async function Page() {
   const user = await getRequestUser();
-  const dataSet = await getEmployeeDataSetAsync();
-  const employee = user ? findEmployeeForAccount(user.id, dataSet) : undefined;
-  const detail = employee && user ? getEmployeeDetail(employee.id, user.permissions, dataSet) : undefined;
+  const dataSet = user && canOpenPersonalAttendance(user.permissions) ? await getEmployeeDataSetAsync() : undefined;
+  const employee = user && dataSet ? findEmployeeForAccount(user.id, dataSet) : undefined;
+  const detail = employee && user && dataSet ? getEmployeeDetail(employee.id, user.permissions, dataSet) : undefined;
 
   return (
     <div className="page-stack">
@@ -34,9 +33,8 @@ export default async function Page() {
         {detail ? <StatusBadge tone={detail.summary.employmentStatusTone}>{detail.summary.employmentStatusLabel}</StatusBadge> : null}
       </Card>
 
-      {detail ? (
-        <div className="content-grid content-grid--two">
-          <Card>
+      <div className="content-grid content-grid--two">
+          {detail ? <Card>
             <h2 className="section-title">Thông tin liên hệ</h2>
             <ul className="foundation-list">
               <li>
@@ -58,21 +56,20 @@ export default async function Page() {
                 </span>
               </li>
             </ul>
-          </Card>
+          </Card> : null}
           <Card>
             <h2 className="section-title">Tài khoản</h2>
             <ul className="foundation-list">
               <li>
                 <span>
                   <strong>Trạng thái</strong>
-                  <small>{user?.status}</small>
                 </span>
-                <StatusBadge tone={user?.status === "active" ? "success" : "warning"}>{user?.status}</StatusBadge>
+                <StatusBadge tone={user?.status === "active" ? "success" : "warning"}>{user?.status === "active" ? "Đang hoạt động" : "Tạm khóa"}</StatusBadge>
               </li>
               <li>
                 <span>
-                  <strong>Vai trò/quyền</strong>
-                  <small>{user?.permissions.length ?? 0} quyền hiệu lực</small>
+                  <strong>Tên đăng nhập</strong>
+                  <small>{user?.username}</small>
                 </span>
               </li>
             </ul>
@@ -82,14 +79,6 @@ export default async function Page() {
             </div>
           </Card>
         </div>
-      ) : (
-        <Card>
-          <p className="muted-text">Tài khoản chưa liên kết với hồ sơ nhân sự.</p>
-          <Link className="button button--secondary button--md" href="/employees">
-            Xem danh sách nhân sự
-          </Link>
-        </Card>
-      )}
       {user ? <PersonalUiSettings initialHasAvatar={Boolean(detail?.profile.avatarAssetId)} /> : null}
     </div>
   );

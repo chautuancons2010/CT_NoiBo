@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -8,7 +9,7 @@ nextEnv.loadEnvConfig(process.cwd());
 
 const baseUrl = process.env.UI_QA_BASE_URL || "http://localhost:3000";
 const browserPath = process.env.UI_QA_BROWSER || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const password = process.env.SEED_TEST_PASSWORD || "12345678";
+const password = getTestPassword();
 const projectId = process.env.UI_QA_PROJECT_ID || "b0000000-0000-4000-8000-000000000001";
 const output = path.join(process.cwd(), "docs", "ui-evidence");
 const viewports = [

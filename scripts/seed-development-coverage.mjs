@@ -1,8 +1,10 @@
+import { assertSeedTarget } from "./testing/guard.mjs";
 import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
+await assertSeedTarget();
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -139,7 +141,7 @@ await Promise.all([
     { id: ids.payrollLines[0], payroll_period_id: payrollPeriodId, employee_id: workerIds[0], work_days: 22, base_salary: 11200000, allowance: 650000, bonus: 250000, deduction: 100000, calculation_snapshot: { testData: true, scenario: "full-work" } },
     { id: ids.payrollLines[1], payroll_period_id: payrollPeriodId, employee_id: workerIds[1], work_days: 20.5, base_salary: 11800000, allowance: 700000, bonus: 0, deduction: 150000, calculation_snapshot: { testData: true, scenario: "leave-half-day" } },
     { id: ids.payrollLines[2], payroll_period_id: payrollPeriodId, employee_id: workerIds[2], work_days: 21, base_salary: 10500000, allowance: 500000, bonus: 400000, deduction: 0, calculation_snapshot: { testData: true, scenario: "safety-bonus" } }
-  ], { onConflict: "id" }), "Không thể seed dòng lương coverage"),
+  ], { onConflict: "id", ignoreDuplicates: true }), "Không thể seed dòng lương coverage"),
   run(client.from("project_progress_nodes").upsert([
     { id: ids.progress[0], project_id: projectId, parent_id: null, node_type: "phase", name: "[TEST DATA] Chuẩn bị vật tư", status: "completed", completion_percent: 100, deadline: day(-2), sort_order: 10, created_by: actorId },
     { id: ids.progress[1], project_id: projectId, parent_id: null, node_type: "phase", name: "[TEST DATA] Thi công QC03", status: "in_progress", completion_percent: 62, deadline: day(5), assignee_employee_id: workerIds[0], sort_order: 20, created_by: actorId },
@@ -153,15 +155,15 @@ await run(client.from("shipment_line_container_allocations").upsert({ shipment_l
 await run(client.from("inventory_documents").upsert([
   { id: ids.documents[0], client_request_id: "99110000-0000-4000-8000-000000000001", document_number: "TEST-PXK-0002", type: "issue", status: "submitted", document_date: day(-1), source_warehouse_id: mainWarehouseId, transaction_type_code: "PROJECT", project_id: projectId, worksite_id: worksiteId, recipient: "Đội QC03", note: "[TEST DATA] Xuất vật tư cho công trường", created_by: actorId, submitted_by: actorId, submitted_at: timestamp(-1, "09:00") },
   { id: ids.documents[1], client_request_id: "99110000-0000-4000-8000-000000000002", document_number: "TEST-CK-0001", type: "transfer", status: "draft", document_date: day(0), source_warehouse_id: mainWarehouseId, target_warehouse_id: worksiteWarehouseId, transaction_type_code: "WAREHOUSE_TRANSFER", project_id: projectId, worksite_id: worksiteId, note: "[TEST DATA] Chuyển kho chờ duyệt", created_by: actorId }
-], { onConflict: "id" }), "Không thể seed chứng từ kho coverage");
+], { onConflict: "id", ignoreDuplicates: true }), "Không thể seed chứng từ kho coverage");
 await run(client.from("inventory_document_lines").upsert([
   { id: ids.documentLines[0], document_id: ids.documents[0], line_number: 1, item_id: clampItemId, quantity: 24, uom_id: unitUomId, unit_price: 125000, purpose: "Thi công QC03", reference: "[TEST DATA]" },
   { id: ids.documentLines[1], document_id: ids.documents[1], line_number: 1, item_id: helmetItemId, quantity: 12, uom_id: unitUomId, unit_price: 180000, purpose: "Điều chuyển bảo hộ", reference: "[TEST DATA]" }
-], { onConflict: "id" }), "Không thể seed dòng chứng từ kho coverage");
-await run(client.from("stock_counts").upsert({ id: ids.stockCount, count_number: "TEST-KK-0001", warehouse_id: mainWarehouseId, count_date: day(-1), snapshot_at: timestamp(-1, "18:00"), scope: "selected", transaction_policy: "reconcile", status: "reviewed", note: "[TEST DATA] Kiểm kê có chênh lệch để review", created_by: actorId, reviewed_by: actorId, reviewed_at: timestamp(-1, "18:30") }, { onConflict: "id" }), "Không thể seed kiểm kê coverage");
+], { onConflict: "id", ignoreDuplicates: true }), "Không thể seed dòng chứng từ kho coverage");
+await run(client.from("stock_counts").upsert({ id: ids.stockCount, count_number: "TEST-KK-0001", warehouse_id: mainWarehouseId, count_date: day(-1), snapshot_at: timestamp(-1, "18:00"), scope: "selected", transaction_policy: "reconcile", status: "reviewed", note: "[TEST DATA] Kiểm kê có chênh lệch để review", created_by: actorId, reviewed_by: actorId, reviewed_at: timestamp(-1, "18:30") }, { onConflict: "id", ignoreDuplicates: true }), "Không thể seed kiểm kê coverage");
 await run(client.from("stock_count_lines").upsert([
   { id: ids.stockLines[0], stock_count_id: ids.stockCount, item_id: railItemId, uom_id: railUomId, expected_quantity: 8, counted_quantity: 7, note: "[TEST DATA] Thiếu một thanh ray" },
   { id: ids.stockLines[1], stock_count_id: ids.stockCount, item_id: clampItemId, uom_id: unitUomId, expected_quantity: 42, counted_quantity: 45, note: "[TEST DATA] Thừa ba kẹp ray" }
-], { onConflict: "id" }), "Không thể seed dòng kiểm kê coverage");
+], { onConflict: "id", ignoreDuplicates: true }), "Không thể seed dòng kiểm kê coverage");
 
 process.stdout.write("Seed coverage TEST đã hoàn tất.\n");

@@ -1,6 +1,6 @@
 -- Development-only linked dataset for local/staging workflow testing.
 -- Every business key is prefixed TEST- or uses the fixed 9xxxx UUID namespace.
--- Rerunnable by design. Remove with supabase/reset-test-data.sql.
+-- Apply only to an isolated test database. Posted stock/audit history is retained.
 begin;
 
 insert into public.employees(id,employee_code,full_name,display_name,personal_phone,normalized_phone,company_email,department_id,position_id,employment_type_id,manager_employee_id,join_date,employment_status,profile_status,profile_completeness,note)
@@ -64,7 +64,7 @@ cross join generate_series(1,24) as offsets(day_offset)
 cross join generate_series(0,1) as events(event_number)
 cross join lateral (select * from public.attendance_locations where active order by created_at limit 1) location
 where extract(isodow from current_date-day_offset)<=5 and not (day_offset=3 and event_number=1)
-on conflict(employee_id,attendance_date,event_type) do nothing;
+on conflict(id) do nothing;
 
 insert into public.worker_attendance_sessions(id,client_session_id,project_id,project_name_snapshot,worksite_id,worksite_name_snapshot,attendance_date,shift_code,shift_name_snapshot,supervisor_employee_id,supervisor_name_snapshot,captured_at_client,geofence_status,work_note,status,sync_status,photo_status,created_by,submitted_at)
 values('95000000-0000-4000-8000-000000000001','95100000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000001','Bảo trì hệ thống ray Cảng ABC','b1000000-0000-4000-8000-000000000001','Khu QC03',current_date,'DAY','Ca ngày','90000000-0000-4000-8000-000000000001','Nguyễn Minh Giám Sát',now(),'valid','[TEST DATA] Kiểm tra an toàn đầu ca','submitted','synced','uploaded','91000000-0000-4000-8000-000000000001',now())
@@ -77,13 +77,20 @@ insert into public.leave_requests(id,request_number,employee_id,leave_type_id,st
 select'96000000-0000-4000-8000-000000000001','TEST-LV-0001','90000000-0000-4000-8000-000000000002',lt.id,current_date+3,current_date+3,1,'[TEST DATA] Nghỉ phép cá nhân','pending_approval',now(),'{}'::jsonb,jsonb_build_object('code','TEST-NV01','name','Trần Thu Nhân Viên'),'91000000-0000-4000-8000-000000000002'
 from public.leave_types lt where lt.active order by lt.deducts_balance desc limit 1 on conflict(id)do update set start_date=excluded.start_date,end_date=excluded.end_date,status=excluded.status;
 
-insert into public.inventory_balances(warehouse_id,item_id,on_hand)values
-('e3000000-0000-4000-8000-000000000001','e2000000-0000-4000-8000-000000000001',8),('e3000000-0000-4000-8000-000000000001','e2000000-0000-4000-8000-000000000002',42),('e3000000-0000-4000-8000-000000000001','e2000000-0000-4000-8000-000000000003',16)
-on conflict(warehouse_id,item_id)do update set on_hand=excluded.on_hand,updated_at=now();
+-- Opening inventory must have matching immutable ledger entries.
+insert into public.inventory_documents(id,client_request_id,document_number,type,status,document_date,target_warehouse_id,transaction_type_code,note,created_by)
+values('97a00000-0000-4000-8000-000000000001','97a10000-0000-4000-8000-000000000001','TEST-PNK-OPENING','receipt','submitted',current_date-30,'e3000000-0000-4000-8000-000000000001','PURCHASE','[TEST DATA] Tồn kho đầu kỳ','91000000-0000-4000-8000-000000000001')
+on conflict(id) do nothing;
+insert into public.inventory_document_lines(id,document_id,line_number,item_id,quantity,uom_id,reference)
+select ('97a20000-0000-4000-8000-'||lpad(opening.line_number::text,12,'0'))::uuid,'97a00000-0000-4000-8000-000000000001',opening.line_number,item.id,opening.quantity,item.base_uom_id,'[TEST DATA] Opening inventory'
+from(values(1,'e2000000-0000-4000-8000-000000000001'::uuid,8),(2,'e2000000-0000-4000-8000-000000000002'::uuid,42),(3,'e2000000-0000-4000-8000-000000000003'::uuid,16))opening(line_number,item_id,quantity)
+join public.inventory_items item on item.id=opening.item_id
+on conflict(id) do nothing;
+select public.post_inventory_document('97a00000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001',current_date-30,'97a30000-0000-4000-8000-000000000001');
 insert into public.inventory_documents(id,client_request_id,document_number,type,status,document_date,target_warehouse_id,transaction_type_code,supplier_reference,note,created_by,submitted_by,submitted_at)
-values('97000000-0000-4000-8000-000000000001','97100000-0000-4000-8000-000000000001','TEST-PNK-0001','receipt','submitted',current_date,'e3000000-0000-4000-8000-000000000001','PURCHASE','TEST-PO-001','[TEST DATA] Phiếu chờ ghi sổ','91000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001',now())on conflict(id)do update set document_date=excluded.document_date,status='submitted';
+values('97000000-0000-4000-8000-000000000001','97100000-0000-4000-8000-000000000001','TEST-PNK-0001','receipt','submitted',current_date,'e3000000-0000-4000-8000-000000000001','PURCHASE','TEST-PO-001','[TEST DATA] Phiếu chờ ghi sổ','91000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001',now())on conflict(id)do nothing;
 insert into public.inventory_document_lines(id,document_id,line_number,item_id,quantity,uom_id,unit_price,reference)
-values('97200000-0000-4000-8000-000000000001','97000000-0000-4000-8000-000000000001',1,'e2000000-0000-4000-8000-000000000001',12,'e0000000-0000-4000-8000-000000000004',850000,'[TEST DATA]')on conflict(id)do update set quantity=excluded.quantity;
+values('97200000-0000-4000-8000-000000000001','97000000-0000-4000-8000-000000000001',1,'e2000000-0000-4000-8000-000000000001',12,'e0000000-0000-4000-8000-000000000004',850000,'[TEST DATA]')on conflict(id)do nothing;
 
 insert into public.business_partners(id,partner_code,name,partner_types,country,status,note,created_by)values
 ('98000000-0000-4000-8000-000000000001','TEST-SUPPLIER','Test Rail Supplier',array['supplier'],'CN','active','[TEST DATA]','91000000-0000-4000-8000-000000000001'),('98000000-0000-4000-8000-000000000002','TEST-CARRIER','Test Ocean Carrier',array['carrier'],'SG','active','[TEST DATA]','91000000-0000-4000-8000-000000000001')on conflict(id)do update set note='[TEST DATA]';

@@ -31,3 +31,7 @@ export function useMobileNavigation() {
   if (!context) throw new Error("MobileNavigationProvider is missing");
   return context;
 }
+
+export function useOptionalMobileNavigation() {
+  return useContext(MobileNavigationContext);
+}

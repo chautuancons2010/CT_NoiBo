@@ -226,6 +226,8 @@ export const employeeContractInputSchema = z.object({
   }
 });
 
+export const employeeContractUpdateSchema = employeeContractInputSchema.and(z.object({ rowVersion: z.coerce.number().int().positive() }));
+
 const organizationCode = z.string().trim().min(1).max(30).regex(/^[A-Za-z0-9_-]+$/, "Mã chỉ gồm chữ, số, gạch ngang hoặc gạch dưới.");
 const optionalUuid = z.preprocess(
   (value) => (value === "" || value === null ? undefined : value),

@@ -3,7 +3,22 @@ import { describe, expect, it } from "vitest";
 import { employeeDetailSections, getBackHref, getBreadcrumbs, getRouteMeta, projectDetailSections } from "@/config/routeRegistry";
 
 describe("route registry", () => {
+  it("keeps worker attendance steps and device drafts in their field workflow", () => {
+    for (const id of ["local-device-draft", "90500000-0000-4000-8000-000000000018"]) {
+      const base = `/worker-attendance/sessions/${id}`;
+      expect(getRouteMeta(base).title).toBe("Chi tiết điểm danh");
+      expect(getRouteMeta(`${base}/roster`).title).toBe("Điểm danh công nhân");
+      expect(getRouteMeta(`${base}/photos`).title).toBe("Ảnh điểm danh");
+      expect(getRouteMeta(`${base}/review`).title).toBe("Xác nhận điểm danh");
+      expect(getBackHref(base)).toBe("/worker-attendance");
+      expect(getBackHref(`${base}/roster`)).toBe("/worker-attendance/today");
+      expect(getBackHref(`${base}/photos`)).toBe(`${base}/roster`);
+      expect(getBackHref(`${base}/review`)).toBe(`${base}/photos`);
+    }
+  });
   it("returns metadata for exact routes", () => {
+    expect(getRouteMeta("/profile/password").title).toBe("Đổi mật khẩu");
+    expect(getBackHref("/profile/password")).toBe("/profile");
     expect(getRouteMeta("/warehouse/items")).toMatchObject({
       title: "Hàng hóa",
       module: "Kho"
@@ -35,6 +50,7 @@ describe("route registry", () => {
       { value: "today", label: "Hôm nay" },
       { value: "progress", label: "Thi công" },
       { value: "team", label: "Nhân lực" },
+      { value: "materials", label: "Vật tư" },
       { value: "profile", label: "Thông tin" },
       { value: "documents", label: "Tài liệu" }
     ]);
@@ -54,6 +70,13 @@ describe("route registry", () => {
       title: "Chỉnh sửa hàng hóa",
       module: "Kho"
     });
+  });
+
+  it("names an employee payroll detail in its accounting context", () => {
+    expect(getRouteMeta("/accounting/payroll/period-1/employees/employee-1")).toEqual({
+      title: "Phiếu lương nhân viên", description: "", module: "Kế toán"
+    });
+    expect(getBackHref("/accounting/payroll/period-1/employees/employee-1")).toBe("/accounting/payroll/period-1");
   });
 
   it("resolves a stable return route for every navigation depth", () => {

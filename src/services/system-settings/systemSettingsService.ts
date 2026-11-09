@@ -4,11 +4,13 @@ import { cache } from "react";
 import {
   defaultSystemSettings,
   isSystemSettingsGroup,
+  moduleSettingsSchema,
   normalizeStoredDashboardSettings,
   normalizeStoredNavigationSettings,
   parseSystemSettingsGroup,
   systemSettingsSchemas,
   type SystemSettingsDocument,
+  type ModuleSettings,
   type SystemSettingsGroup
 } from "@/config/systemSettings";
 import { AppError } from "@/lib/api/errors";
@@ -44,6 +46,8 @@ const SETTINGS_READ_TIMEOUT_MS = 2_000;
 let settingsSnapshot: { value: SystemSettingsDocument; expiresAt: number } | undefined;
 let settingsRead: Promise<SystemSettingsDocument> | undefined;
 let settingsGeneration = 0;
+let moduleSnapshot: { value: ModuleSettings; readAt: number } | undefined;
+let moduleRead: Promise<ModuleSettings> | undefined;
 
 function safeDefault<TGroup extends SystemSettingsGroup>(group: TGroup): SystemSettingsDocument[TGroup] {
   return structuredClone(defaultSystemSettings[group]);
@@ -126,8 +130,49 @@ export const readSystemSettings = cache(async (): Promise<SystemSettingsDocument
 export async function readSettingsGroup<TGroup extends SystemSettingsGroup>(
   group: TGroup
 ): Promise<SystemSettingsDocument[TGroup]> {
+  if (group === "modules") return await readModuleSettings() as SystemSettingsDocument[TGroup];
   const settings = await readSystemSettings();
   return settings[group];
+}
+
+// Availability checks must observe a published lock across server workers.
+// Do not use the stale settings snapshot or fall back to enabled defaults on
+// a database failure: the administration routes remain available for recovery.
+export async function readModuleSettings(options: { maxAgeMs?: number; allowStaleOnError?: boolean } = {}): Promise<ModuleSettings> {
+  if (moduleSnapshot && Date.now() - moduleSnapshot.readAt < (options.maxAgeMs ?? 0)) return structuredClone(moduleSnapshot.value);
+  if (moduleRead) return structuredClone(await moduleRead);
+  const generation = settingsGeneration;
+  const pending = loadModuleSettings().then(value => {
+    if (generation === settingsGeneration) moduleSnapshot = { value, readAt: Date.now() };
+    return value;
+  }).catch(error => {
+    // A brief network interruption must not interrupt an in-progress capture.
+    // Never invent enabled defaults, or keep a snapshot indefinitely.
+    if (options.allowStaleOnError && moduleSnapshot && Date.now() - moduleSnapshot.readAt < 30_000) return moduleSnapshot.value;
+    throw error;
+  });
+  moduleRead = pending;
+  try { return structuredClone(await pending); }
+  finally { if (moduleRead === pending) moduleRead = undefined; }
+}
+
+async function loadModuleSettings(): Promise<ModuleSettings> {
+  const client = getSupabaseServiceClient();
+  if (!client) return moduleSettingsSchema.parse(localSettings.get("modules")?.value);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6_000);
+  try {
+    const { data, error } = await client.from("system_settings")
+      .select("value").eq("group_key", "modules").abortSignal(controller.signal).maybeSingle();
+    if (error || !data) throw new Error("Module settings unavailable");
+    const parsed = moduleSettingsSchema.safeParse(data.value);
+    if (!parsed.success) throw new Error("Invalid module settings");
+    return parsed.data;
+  } catch {
+    throw new AppError("NETWORK_ERROR", "Không thể kiểm tra trạng thái module. Vui lòng thử lại.");
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function publishSettingsGroup<TGroup extends SystemSettingsGroup>(input: {
@@ -174,6 +219,7 @@ export async function publishSettingsGroup<TGroup extends SystemSettingsGroup>(i
   }
 
   localSettings.set(input.group, { value: structuredClone(value), version });
+  if (input.group === "modules") moduleSnapshot = { value: structuredClone(value) as ModuleSettings, readAt: Date.now() };
   settingsGeneration += 1;
   if (settingsSnapshot) {
     settingsSnapshot = {
@@ -248,6 +294,8 @@ export async function restoreSettingsVersion(versionId: string, actorId: string)
 }
 
 export function resetLocalSystemSettingsForTests(): void {
+  moduleSnapshot = undefined;
+  moduleRead = undefined;
   settingsGeneration += 1;
   settingsSnapshot = undefined;
   settingsRead = undefined;

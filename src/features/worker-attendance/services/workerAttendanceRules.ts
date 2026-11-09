@@ -1,8 +1,10 @@
-import type { WorkerAttendanceChecklistItem, WorkerAttendanceChecklistResponse, WorkerAttendanceCounts, WorkerAttendanceEntry, WorkerAttendancePolicy } from "@/features/worker-attendance/types/workerAttendanceTypes";
+import type { WorkerAttendanceChecklistItem, WorkerAttendanceChecklistResponse, WorkerAttendanceCounts, WorkerAttendanceEntry, WorkerAttendancePolicy, WorkerSafetyReport } from "@/features/worker-attendance/types/workerAttendanceTypes";
+import { validateWorkerSafetyReport } from "./workerSafetyReport";
 
 export function countWorkerAttendance(entries: readonly WorkerAttendanceEntry[]): WorkerAttendanceCounts {
-  const counts: WorkerAttendanceCounts = { total: entries.length, present: 0, absent: 0, leave: 0, late: 0, transferred: 0, unconfirmed: 0, unplanned: 0 };
-  for (const entry of entries) {
+  const selected = entries.filter((entry) => entry.isSelected !== false);
+  const counts: WorkerAttendanceCounts = { total: selected.length, present: 0, absent: 0, leave: 0, late: 0, transferred: 0, unconfirmed: 0, unplanned: 0 };
+  for (const entry of selected) {
     counts[entry.status] += 1;
     if (entry.isUnplanned) counts.unplanned += 1;
   }
@@ -18,11 +20,16 @@ export function workerLocationLabel(input: { latitude?: number; longitude?: numb
   return `${input.latitude!.toFixed(5)}, ${input.longitude!.toFixed(5)}${input.accuracyMeters !== undefined ? ` · ±${Math.round(input.accuracyMeters)} m` : ""}${input.geofenceStatus === "accuracy_low" ? " · Cần kiểm tra" : ""}`;
 }
 
-export function validateSessionForSubmit(input: { entries: readonly WorkerAttendanceEntry[]; photoCount: number; workNote?: string; geofenceStatus: string; latitude?: number; longitude?: number; checklist: readonly WorkerAttendanceChecklistItem[]; checklistResponses: readonly WorkerAttendanceChecklistResponse[] }, policy: WorkerAttendancePolicy): string[] {
+export function validateSessionForSubmit(input: { entries: readonly WorkerAttendanceEntry[]; photoCount: number; workNote?: string; geofenceStatus: string; latitude?: number; longitude?: number; checklist: readonly WorkerAttendanceChecklistItem[]; checklistResponses: readonly WorkerAttendanceChecklistResponse[]; selectionMode?: boolean; safetyConfirmed?: boolean; safetyReport?: WorkerSafetyReport; minimumPhotos?: number }, policy: WorkerAttendancePolicy): string[] {
   const errors: string[] = [];
-  if (input.entries.some((entry) => entry.status === "unconfirmed")) errors.push("Còn công nhân chưa xác nhận trạng thái.");
-  if (input.photoCount < policy.minimumPhotos) errors.push(`Cần ít nhất ${policy.minimumPhotos} ảnh điểm danh.`);
-  if (policy.workNoteRequired && !input.workNote?.trim()) errors.push("Cần nhập nội dung công việc.");
+  const selected = input.entries.filter((entry) => entry.isSelected !== false);
+  if (input.selectionMode && !selected.length) errors.push("Chọn ít nhất một công nhân.");
+  if (selected.some((entry) => entry.status === "unconfirmed")) errors.push("Còn công nhân chưa xác nhận trạng thái.");
+  const minimumPhotos = input.selectionMode ? Math.max(1, policy.minimumPhotos, input.minimumPhotos ?? 0) : policy.minimumPhotos;
+  if (input.photoCount < minimumPhotos) errors.push(`Cần ít nhất ${minimumPhotos} ảnh điểm danh.`);
+  if (!input.selectionMode && policy.workNoteRequired && !input.workNote?.trim()) errors.push("Cần nhập nội dung công việc.");
+  if (input.selectionMode && !input.safetyConfirmed) errors.push("Cần xác nhận an toàn lao động.");
+  if (input.selectionMode) errors.push(...validateWorkerSafetyReport(input.safetyReport, input.workNote));
   if (input.geofenceStatus !== "not_required" && !hasWorkerCoordinates(input)) errors.push("Chưa có tọa độ GPS. Hãy thử lại vị trí.");
   const checked = new Set(input.checklistResponses.filter((response) => response.checked).map((response) => response.itemId));
   if (input.checklist.some((item) => item.required && !checked.has(item.id))) errors.push("Cần hoàn thành các mục checklist bắt buộc.");

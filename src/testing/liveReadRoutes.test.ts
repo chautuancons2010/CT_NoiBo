@@ -52,7 +52,7 @@ describe.skipIf(process.env.RUN_LIVE_READ_AUDIT !== "1")("live Supabase GET rout
   afterAll(() => {
     const summary = { routes: results.length, failed: results.filter((result) => result.status >= 400), timings: results.map(({ path, durationMs }) => ({ path, durationMs })), queryFailures };
     console.log(JSON.stringify(summary));
-    writeFileSync("docs/live-read-audit-2026-10-05.json", JSON.stringify(summary, null, 2));
+    writeFileSync(process.env.LIVE_READ_AUDIT_OUTPUT || "docs/live-read-audit-2026-10-05.json", JSON.stringify(summary, null, 2));
     vi.restoreAllMocks();
   });
 

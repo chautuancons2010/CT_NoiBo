@@ -1,24 +1,26 @@
 "use client";
 
-import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Check, CheckCheck, ChevronLeft, ChevronRight, Flag, ImageOff, Images, ListFilter, MapPin, Maximize2, RefreshCcw, Undo2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Flag, ImageOff, List, ListFilter, Maximize2, RefreshCcw, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { Input, Select } from "@/components/shared/FormControls";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { LoadingState } from "@/components/shared/States";
+import { useLoadingActivity } from "@/lib/ui/useLoadingActivity";
 import { useAttendancePhotoReview } from "@/features/attendance/hooks/useAttendancePhotoReview";
 import { attendanceEvidenceFingerprint, attendanceReviewReasons, hasReviewablePhotos } from "@/features/attendance/lib/attendancePhotoReview";
 import type { AttendanceAdminToday, AttendanceAdminTodayRow, AttendanceEvent, AttendanceType } from "@/features/attendance/types/attendanceTypes";
 import styles from "./AttendancePhotoReview.module.css";
+import { AttendanceLocationAddress } from "./AttendanceLocationAddress";
 
 const EvidenceViewer = dynamic(() => import("./AttendanceEvidence").then((module) => module.AttendanceEvidenceViewer));
 const labels = { present: "Có mặt", late: "Đi muộn", leave: "Nghỉ", not_checked: "Chưa chấm", missing_check: "Thiếu lượt" } as const;
 const photoLabels = { not_required: "Không có ảnh", pending_upload: "Chờ đồng bộ ảnh", uploading: "Đang tải ảnh", uploaded: "Đã có ảnh", upload_failed: "Đồng bộ ảnh lỗi" } as const;
 const time = (value?: string) => value ? new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value)) : "—";
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-const duration = (minutes: number) => minutes ? `${Math.floor(minutes / 60)}g ${minutes % 60}p` : "—";
+const duration = (minutes: number) => minutes ? [Math.floor(minutes / 60) ? `${Math.floor(minutes / 60)} giờ` : "", minutes % 60 ? `${minutes % 60} phút` : ""].filter(Boolean).join(" ") : "—";
 const uploadedEvents = (row: AttendanceAdminTodayRow) => (row.events ?? []).filter((event) => event.photoId && event.photoStatus === "uploaded");
 const evidenceKey = (event: AttendanceEvent) => `${event.id}:${event.photoId}:${event.effectiveAt}`;
 const photoUrl = (event: AttendanceEvent, thumbnail = false) => `/api/v1/attendance/photos/${encodeURIComponent(event.photoId!)}${thumbnail ? "?size=thumbnail" : ""}`;
@@ -53,6 +55,7 @@ function PhotoCard({ row, eventType, canViewPhotos, onLoaded, onFailed, onOpen, 
 }) {
   const events = useMemo(() => (row.events ?? []).filter((event) => event.eventType === eventType).sort((a, b) => a.effectiveAt.localeCompare(b.effectiveAt)), [row.events, eventType]);
   const [selectedId, setSelectedId] = useState<string>();
+  const [showLocation, setShowLocation] = useState(false);
   const event = events.find((item) => item.id === selectedId) ?? events[0];
   const [imageState, setImageState] = useState<{ key: string; status: "loaded" | "failed" }>();
   const [attempt, setAttempt] = useState(0);
@@ -60,6 +63,7 @@ function PhotoCard({ row, eventType, canViewPhotos, onLoaded, onFailed, onOpen, 
   const currentKey = event ? `${evidenceKey(event)}:${attempt}` : "";
   const state = imageState?.key === currentKey ? imageState.status : undefined;
   const hasPhoto = Boolean(event?.photoId && event.photoStatus === "uploaded" && canViewPhotos);
+  useLoadingActivity(hasPhoto && !state);
   const heading = eventType === "check_in" ? "Chấm vào" : "Chấm ra";
   const stamp = event?.effectiveAt ?? (eventType === "check_in" ? row.checkIn : row.checkOut);
   const placeholder = event?.photoId && !canViewPhotos ? "Không có quyền xem ảnh" : event ? photoLabels[event.photoStatus] : "Chưa có lượt chấm";
@@ -75,22 +79,24 @@ function PhotoCard({ row, eventType, canViewPhotos, onLoaded, onFailed, onOpen, 
     return () => window.clearTimeout(timer);
   }, [currentKey, event, onLoaded, row]);
 
-  return <article className={styles.photoCard}>
-    <header className={styles.photoHeader}><h3 className={styles.photoLabel}>{heading}</h3><strong className={styles.photoTime}>{time(stamp)}</strong>{events.length > 1 ? <span className={styles.photoCounter}>{events.findIndex((item) => item.id === event?.id) + 1}/{events.length} lượt</span> : null}</header>
+  return <article className={styles.photoCard} data-event-type={eventType}>
+    <header className={styles.photoHeader}><h3 className={styles.photoLabel}><span className={styles.photoTypeIcon}>{eventType === "check_in" ? <ArrowDownLeft aria-hidden="true" size={18} /> : <ArrowUpRight aria-hidden="true" size={18} />}</span>{heading}</h3><strong className={styles.photoTime}>{time(stamp)}</strong>{events.length > 1 ? <span className={styles.photoCounter}>{events.findIndex((item) => item.id === event?.id) + 1}/{events.length} lượt</span> : null}</header>
     {hasPhoto && event ? state === "failed" ? <div className={styles.photoPlaceholder}><ImageOff aria-hidden="true" size={32} /><strong>Ảnh không khả dụng</strong><Button onClick={() => setAttempt((value) => value + 1)} size="sm">Tải lại ảnh</Button></div> : <button aria-label={`Xem ảnh ${eventType === "check_in" ? "chấm vào" : "chấm ra"} của ${row.employeeName} lúc ${time(stamp)}`} className={styles.photoButton} onClick={() => onOpen(event.id)} type="button">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img alt={`${row.employeeName} · ${heading} ${time(stamp)}`} className={styles.photoImage} decoding="async" fetchPriority="high" key={currentKey} loading="eager" onError={() => { setImageState({ key: currentKey, status: "failed" }); onFailed(row, event); }} onLoad={() => { setImageState({ key: currentKey, status: "loaded" }); onLoaded(row, event); }} ref={imageRef} src={`${resolvePhotoUrl(event)}${attempt ? `?retry=${attempt}` : ""}`} />
-      <span className={styles.photoStatus}>{state === "loaded" ? <><Maximize2 aria-hidden="true" size={14} />Phóng to</> : "Đang tải ảnh…"}</span>
+      {state === "loaded" ? <span className={styles.photoStatus}><Maximize2 aria-hidden="true" size={14} />Phóng to</span> : null}
     </button> : <div className={styles.photoPlaceholder}><ImageOff aria-hidden="true" size={32} /><strong>{placeholder}</strong>{row.status === "leave" ? <StatusBadge tone="info">Nghỉ</StatusBadge> : null}</div>}
     {events.length > 1 ? <div aria-label={`Các lượt ${heading.toLocaleLowerCase("vi")}`} className={styles.photoStrip}>{events.map((item, index) => <button aria-label={`${heading} lượt ${index + 1} lúc ${time(item.effectiveAt)}`} aria-pressed={item.id === event?.id} className={`${styles.photoStripButton} ${item.id === event?.id ? styles.photoStripActive : ""}`} key={item.id} onClick={() => setSelectedId(item.id)} type="button">{time(item.effectiveAt)}{item.photoStatus !== "uploaded" ? <ImageOff aria-hidden="true" size={14} /> : null}</button>)}</div> : null}
-    <footer className={styles.photoFooter}>
-      {event && Number.isFinite(event.latitude) && Number.isFinite(event.longitude) ? <a className={styles.photoGps} href={`https://www.google.com/maps?q=${event.latitude},${event.longitude}`} rel="noopener noreferrer" target="_blank"><MapPin aria-hidden="true" size={15} /><span>{event.locationName || "Vị trí chấm công"}{event.accuracyMeters !== undefined ? ` · ±${Math.round(event.accuracyMeters)} m` : ""}</span></a> : <span className={styles.photoGps}><MapPin aria-hidden="true" size={15} />Chưa có GPS</span>}
-      {event ? <StatusBadge tone={event.attendanceStatus === "rejected" ? "error" : event.attendanceStatus === "needs_review" ? "warning" : "success"}>{event.attendanceStatus === "rejected" ? "Đã từ chối" : event.attendanceStatus === "needs_review" ? "Cần xác minh" : "Đã ghi nhận"}</StatusBadge> : null}
-    </footer>
+    <details className={styles.photoFooter} onToggle={(event) => setShowLocation(event.currentTarget.open)}>
+      <summary>Vị trí<ChevronDown aria-hidden="true" size={14} /></summary>
+      {showLocation ? <AttendanceLocationAddress accuracyMeters={event?.accuracyMeters} latitude={event?.latitude} longitude={event?.longitude} referenceName={event?.locationName} /> : null}
+      {event && ["rejected", "needs_review"].includes(event.attendanceStatus) ? <StatusBadge tone={event.attendanceStatus === "rejected" ? "error" : "warning"}>{event.attendanceStatus === "rejected" ? "Đã từ chối" : "Cần xác minh"}</StatusBadge> : null}
+    </details>
   </article>;
 }
 
 export function AttendancePhotoReview({ date, data, error, refreshing, ownerAccountId, onDateChange, onRefresh, resolvePhotoUrl = photoUrl }: PhotoReviewProps) {
+  useLoadingActivity(refreshing);
   const [tab, setTab] = useState<QueueTab>("unseen");
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -149,8 +155,8 @@ export function AttendancePhotoReview({ date, data, error, refreshing, ownerAcco
   const photosTotal = allRows.reduce((sum, row) => sum + uploadedEvents(row).length, 0);
   const reviewableRows = allRows.filter(hasReviewablePhotos);
   const reviewedCount = reviewableRows.filter((row) => review.getReviewState(row) === "reviewed").length;
-  const flaggedCount = allRows.filter((row) => review.getReviewState(row) === "flagged").length;
   const hasFilters = Boolean(departmentId || shiftId || status || evidenceFilter);
+  const showQueueControls = photosTotal > 0 || tab !== "unseen" || Boolean(search) || hasFilters;
   const reasons = activeRow ? attendanceReviewReasons(activeRow) : [];
   const gallery = useMemo(() => canViewPhotos ? allRows.flatMap((row) => uploadedEvents(row).map((event) => ({ employeeName: row.employeeName, event, imageUrl: resolvePhotoUrl(event) }))) : [], [allRows, canViewPhotos, resolvePhotoUrl]);
   const openPhotoId = gallery.some((item) => item.event.id === activePhotoId) ? activePhotoId : undefined;
@@ -258,38 +264,40 @@ export function AttendancePhotoReview({ date, data, error, refreshing, ownerAcco
 
   return <div className={styles.workspace} ref={rootRef}>
     <header className={styles.toolbar}>
-      <div className={styles.toolbarMain}><div className={styles.dayNav}><Button aria-label="Ngày trước" onClick={() => stepDay(-1)} size="sm"><ChevronLeft aria-hidden="true" size={18} /></Button><Input className={styles.dateInput} label="Ngày" labelHidden onChange={(event) => changeDate(event.target.value)} type="date" value={date} /><Button aria-label="Ngày sau" onClick={() => stepDay(1)} size="sm"><ChevronRight aria-hidden="true" size={18} /></Button></div><Button disabled={date === today()} onClick={() => changeDate(today())} size="sm">Hôm nay</Button></div>
-      <div className={styles.toolbarActions}><Button aria-expanded={showFilters} aria-controls="attendance-photo-filters" leftIcon={<ListFilter aria-hidden="true" size={16} />} onClick={() => setShowFilters((value) => !value)} size="sm">Bộ lọc{hasFilters ? " •" : ""}</Button><Button disabled={refreshing} leftIcon={<RefreshCcw aria-hidden="true" size={16} />} onClick={() => void onRefresh()} size="sm">{refreshing ? "Đang tải" : "Làm mới"}</Button><Link className="button button--secondary button--sm" href="/attendance/logs">Nhật ký công</Link></div>
+      <div className={styles.toolbarMain} data-ui="filter-controls"><div className={styles.dayNav}><Button aria-label="Ngày trước" onClick={() => stepDay(-1)} size="sm" variant="ghost"><ChevronLeft aria-hidden="true" size={18} /></Button><Input className={styles.dateInput} label="Ngày" labelHidden onChange={(event) => changeDate(event.target.value)} type="date" value={date} /><Button aria-label="Ngày sau" onClick={() => stepDay(1)} size="sm" variant="ghost"><ChevronRight aria-hidden="true" size={18} /></Button></div>{date !== today() ? <Button onClick={() => changeDate(today())} size="sm" variant="ghost">Hôm nay</Button> : null}</div>
+      <div className={styles.toolbarActions} data-ui="actions">{reviewableRows.length ? <span aria-label="Tiến độ xem ảnh" aria-valuemax={reviewableRows.length} aria-valuemin={0} aria-valuenow={reviewedCount} aria-valuetext={`${reviewedCount}/${reviewableRows.length} đã xem`} className={styles.progress} role="progressbar">{reviewedCount}/{reviewableRows.length} đã xem</span> : null}<Button aria-label="Bộ lọc" aria-expanded={showFilters} aria-controls="attendance-photo-filters" className={styles.filterButton} data-active={hasFilters || undefined} leftIcon={<ListFilter aria-hidden="true" size={16} />} onClick={() => setShowFilters((value) => !value)} size="sm" title="Bộ lọc" variant="ghost">Lọc{hasFilters ? " •" : ""}</Button><Button aria-label="Làm mới ảnh chấm công" busy={refreshing} className={styles.refreshButton} onClick={() => void onRefresh()} size="sm" title="Làm mới" variant="ghost"><RefreshCcw aria-hidden="true" size={17} /></Button></div>
     </header>
-    <div className={styles.progress}><span><CheckCheck aria-hidden="true" size={18} /><strong>{reviewedCount}/{reviewableRows.length}</strong> đã xem</span><div aria-label="Tiến độ xem ảnh" aria-valuemax={reviewableRows.length || 1} aria-valuemin={0} aria-valuenow={reviewedCount} className={styles.progressTrack} role="progressbar"><span className={styles.progressFill} style={{ width: `${reviewableRows.length ? reviewedCount / reviewableRows.length * 100 : 0}%` }} /></div><span>{photosTotal} ảnh</span>{flaggedCount ? <span><Flag aria-hidden="true" size={14} />{flaggedCount} đánh dấu</span> : null}<span>{review.persistenceAvailable ? "Trên thiết bị này" : "Trong phiên này"}</span></div>
-    {showFilters ? <div aria-label="Bộ lọc chấm công" className={styles.filters} id="attendance-photo-filters"><Select label="Phòng ban" onChange={(event) => { setDepartmentId(event.target.value); setQueueLimit(40); }} options={[{ label: "Tất cả", value: "" }, ...departments.map(([id, name]) => ({ label: name, value: id }))]} value={departmentId} /><Select label="Ca" onChange={(event) => setShiftId(event.target.value)} options={[{ label: "Tất cả", value: "" }, ...shifts.map(([id, name]) => ({ label: name, value: id }))]} value={shiftId} /><Select label="Trạng thái" onChange={(event) => setStatus(event.target.value)} options={[{ label: "Tất cả", value: "" }, ...Object.entries(labels).map(([key, value]) => ({ label: value, value: key }))]} value={status} /><Select label="Minh chứng" onChange={(event) => { setEvidenceFilter(event.target.value); setTab("all"); }} options={[{ label: "Tất cả", value: "" }, { label: "Có ảnh", value: "uploaded" }, { label: "Ảnh chưa đồng bộ", value: "pending" }, { label: "Thiếu ảnh", value: "missing" }, { label: "Bất thường", value: "review" }]} value={evidenceFilter} />{hasFilters ? <Button onClick={() => { setDepartmentId(""); setShiftId(""); setStatus(""); setEvidenceFilter(""); }} size="sm">Xóa lọc</Button> : null}</div> : null}
+    {showFilters ? <div aria-label="Bộ lọc chấm công" className={styles.filters} data-ui="filter-controls" id="attendance-photo-filters"><Select label="Phòng ban" onChange={(event) => { setDepartmentId(event.target.value); setQueueLimit(40); }} options={[{ label: "Tất cả", value: "" }, ...departments.map(([id, name]) => ({ label: name, value: id }))]} value={departmentId} /><Select label="Ca" onChange={(event) => setShiftId(event.target.value)} options={[{ label: "Tất cả", value: "" }, ...shifts.map(([id, name]) => ({ label: name, value: id }))]} value={shiftId} /><Select label="Trạng thái" onChange={(event) => setStatus(event.target.value)} options={[{ label: "Tất cả", value: "" }, ...Object.entries(labels).map(([key, value]) => ({ label: value, value: key }))]} value={status} /><Select label="Minh chứng" onChange={(event) => { setEvidenceFilter(event.target.value); setTab("all"); }} options={[{ label: "Tất cả", value: "" }, { label: "Có ảnh", value: "uploaded" }, { label: "Ảnh chưa đồng bộ", value: "pending" }, { label: "Thiếu ảnh", value: "missing" }, { label: "Bất thường", value: "review" }]} value={evidenceFilter} />{hasFilters ? <Button onClick={() => { setDepartmentId(""); setShiftId(""); setStatus(""); setEvidenceFilter(""); }} size="sm">Xóa lọc</Button> : null}</div> : null}
     {error ? <div className={styles.error} role="alert"><span>{error}</span><Button onClick={() => void onRefresh()} size="sm">Thử lại</Button></div> : null}
-    {!data ? !error ? <div aria-busy="true" className={styles.loading}><Images aria-hidden="true" size={36} /><strong>Đang tải ảnh chấm công…</strong></div> : null : <>
+    {!data ? !error ? <LoadingState className={styles.loading} title="Đang mở ảnh chấm công" /> : null : <>
       {!canViewPhotos ? <div className={styles.error} role="status"><ImageOff aria-hidden="true" size={20} /><strong>Không có quyền xem ảnh chấm công</strong></div> : null}
-      <Button aria-controls="attendance-photo-queue" aria-expanded={showQueue} className={styles.mobileQueueToggle} onClick={() => setShowQueue((value) => !value)} size="sm">{showQueue ? "Đóng danh sách" : `Chọn nhân viên · ${queue.length}`}</Button>
-      <div className={styles.reviewLayout}>
-        <aside aria-label="Hàng đợi kiểm tra ảnh" className={`${styles.queuePanel} ${showQueue ? styles.mobileQueueOpen : ""}`} id="attendance-photo-queue">
-          <div className={styles.queueHeader}><h2>Ảnh theo nhân viên</h2><span>{filtered.length} người</span></div>
-          <div aria-label="Nhóm ảnh" className={styles.queueTabs}>{([["unseen", "Chưa xem"], ["flagged", "Đánh dấu"], ["waiting", "Chưa có ảnh"], ["all", "Tất cả"]] as const).map(([value, label]) => <button aria-pressed={tab === value} className={`${styles.queueTab} ${tab === value ? styles.queueTabActive : ""}`} key={value} onClick={() => { setTab(value); setSelectedEmployeeId(undefined); setQueueLimit(40); }} type="button">{label}<span>{counts[value]}</span></button>)}</div>
-          <div className={styles.queueSearch}><Input label="Nhân viên" labelHidden onChange={(event) => { setSearch(event.target.value); setTab(event.target.value ? "all" : "unseen"); setQueueLimit(40); }} placeholder="Tìm tên hoặc mã nhân viên" type="search" value={search} /></div>
+      {showQueueControls ? <div className={styles.queueControls}>
+        <div aria-label="Nhóm ảnh" className={styles.queueTabs}>{([["unseen", "Chưa xem"], ["flagged", "Đánh dấu"], ["waiting", "Thiếu ảnh"], ["all", "Tất cả"]] as const).map(([value, label]) => <button aria-pressed={tab === value} className={`${styles.queueTab} ${tab === value ? styles.queueTabActive : ""}`} data-tab={value} key={value} onClick={() => { setTab(value); setSelectedEmployeeId(undefined); setQueueLimit(40); }} type="button"><span>{label}</span>{counts[value] > 0 ? <strong>{counts[value]}</strong> : null}</button>)}</div>
+        <div className={styles.queueSearch}><Input label="Nhân viên" labelHidden onChange={(event) => { setSearch(event.target.value); setTab(event.target.value ? "all" : "unseen"); setQueueLimit(40); }} placeholder="Tìm nhân viên" type="search" value={search} /></div>
+        {queue.length ? <Button aria-label={showQueue ? "Đóng danh sách" : "Chọn nhân viên"} aria-controls="attendance-photo-queue" aria-expanded={showQueue} className={styles.mobileQueueToggle} onClick={() => setShowQueue((value) => !value)} size="sm" title={showQueue ? "Đóng danh sách" : "Chọn nhân viên"}><List aria-hidden="true" size={18} /><strong>{queue.length}</strong></Button> : null}
+      </div> : null}
+      <div className={`${styles.reviewLayout} ${!queue.length ? styles.emptyLayout : ""}`}>
+        {queue.length ? <aside aria-label="Hàng đợi kiểm tra ảnh" className={`${styles.queuePanel} ${showQueue ? styles.mobileQueueOpen : ""}`} id="attendance-photo-queue">
+          <div className={styles.queueHeader}><h2>Nhân viên</h2><span>{queue.length}</span></div>
           <div className={styles.queueList}>{queue.length ? queue.slice(0, queueLimit).map((row) => {
             const state = review.getReviewState(row);
             const rowReasons = attendanceReviewReasons(row);
             const photo = canViewPhotos ? uploadedEvents(row)[0] : undefined;
             return <button aria-label={`Kiểm tra ${row.employeeName}${state === "reviewed" ? " · Đã xem" : state === "flagged" ? " · Đánh dấu" : ""}`} aria-current={activeRow?.employeeId === row.employeeId ? "true" : undefined} className={`${styles.queueItem} ${activeRow?.employeeId === row.employeeId ? styles.queueItemActive : ""} ${state === "reviewed" ? styles.queueItemReviewed : ""}`} key={row.employeeId} onClick={() => chooseEmployee(row.employeeId)} type="button"><QueueThumbnail event={photo} key={photo?.photoId ?? "none"} name={row.employeeName} resolvePhotoUrl={resolvePhotoUrl} /><span className={styles.queueIdentity}><strong className={styles.queueName}>{row.employeeName}</strong><span className={styles.queueMeta}>{row.employeeCode} · {time(row.checkIn)} – {time(row.checkOut)}</span><span className={styles.queueBadges}>{state === "reviewed" ? <StatusBadge tone="success"><Check aria-hidden="true" size={12} /> Đã xem</StatusBadge> : state === "flagged" ? <StatusBadge tone="warning"><Flag aria-hidden="true" size={12} /> Đánh dấu</StatusBadge> : rowReasons.length ? <StatusBadge tone="warning">{rowReasons[0]}{rowReasons.length > 1 ? ` +${rowReasons.length - 1}` : ""}</StatusBadge> : <StatusBadge tone={photo ? "neutral" : "info"}>{photo ? `${uploadedEvents(row).length} ảnh` : labels[row.status]}</StatusBadge>}</span></span></button>;
           }) : <div className={styles.queueEmpty}>{tab === "unseen" ? "Không còn ảnh chưa xem" : "Không có nhân viên phù hợp"}</div>}{queue.length > queueLimit ? <Button className={styles.queueMore} onClick={() => setQueueLimit((value) => value + 40)} size="sm">Xem thêm {Math.min(queue.length - queueLimit, 40)} người</Button> : null}</div>
-        </aside>
+        </aside> : null}
         <section aria-label="Kiểm tra ảnh nhân viên" className={styles.inspector} ref={inspectorRef} tabIndex={-1}>
           {activeRow ? <>
-            <header className={styles.inspectorHeader}><div className={styles.identity}><h2 className={styles.personName}>{activeRow.employeeName}</h2><span className={styles.personMeta}>{activeRow.employeeCode} · {activeRow.departmentName} · {activeRow.shiftName}</span></div><div className={styles.position}><StatusBadge tone={activeRow.status === "late" || activeRow.status === "missing_check" ? "warning" : "neutral"}>{labels[activeRow.status]}</StatusBadge><span>{activeIndex + 1}/{queue.length} người · {duration(activeRow.totalMinutes)}</span></div></header>
+            <header className={styles.inspectorHeader}><div className={styles.identity}><h2 className={styles.personName}>{activeRow.employeeName}</h2><div className={styles.personMeta}><span className={styles.employeeCode}>{activeRow.employeeCode}</span><span>{activeRow.departmentName}</span></div></div><div className={styles.position}><StatusBadge tone={activeRow.status === "late" || activeRow.status === "missing_check" ? "warning" : activeRow.status === "present" ? "success" : "neutral"}>{labels[activeRow.status]}</StatusBadge>{queue.length > 1 ? <span>{activeIndex + 1}/{queue.length}</span> : null}</div></header>
             {reasons.length ? <div aria-label="Dấu hiệu cần kiểm tra" className={styles.reasonList}>{reasons.map((reason) => <span className={styles.reason} key={reason}><Flag aria-hidden="true" size={13} />{reason}</span>)}</div> : null}
             <div className={styles.photos}><PhotoCard canViewPhotos={canViewPhotos} eventType="check_in" key={`${activeRow.employeeId}:in:${attendanceEvidenceFingerprint(activeRow)}`} onFailed={onFailed} onLoaded={onLoaded} onOpen={setActivePhotoId} resolvePhotoUrl={resolvePhotoUrl} row={activeRow} /><PhotoCard canViewPhotos={canViewPhotos} eventType="check_out" key={`${activeRow.employeeId}:out:${attendanceEvidenceFingerprint(activeRow)}`} onFailed={onFailed} onLoaded={onLoaded} onOpen={setActivePhotoId} resolvePhotoUrl={resolvePhotoUrl} row={activeRow} /></div>
+            <details className={styles.attendanceDetails}><summary>Thông tin công<ChevronDown aria-hidden="true" size={16} /></summary><dl aria-label="Thời gian công" className={styles.personStats}><div><dt>Ca làm</dt><dd>{activeRow.shiftName || "—"}</dd></div>{activeRow.totalMinutes > 0 ? <div><dt>Thời gian làm</dt><dd>{duration(activeRow.totalMinutes)}</dd></div> : null}{activeRow.lateMinutes > 0 ? <div data-alert="true"><dt>Đi muộn</dt><dd>{activeRow.lateMinutes} phút</dd></div> : null}{activeRow.earlyLeaveMinutes > 0 ? <div data-alert="true"><dt>Về sớm</dt><dd>{activeRow.earlyLeaveMinutes} phút</dd></div> : null}</dl></details>
             <footer className={styles.actionBar}>
               <div className={styles.actionGroup}>
                 <Button aria-label="Nhân viên trước" disabled={activeIndex <= 0} onClick={() => moveEmployee(-1)} size="sm"><ChevronLeft aria-hidden="true" size={18} /></Button>
                 <Button aria-label="Nhân viên sau" disabled={activeIndex + 1 >= queue.length} onClick={() => moveEmployee(1)} size="sm"><ChevronRight aria-hidden="true" size={18} /></Button>
                 <span className={styles.shortcut}><kbd>←</kbd><kbd>→</kbd></span>
-                <Button disabled={!review.canUndo} leftIcon={<Undo2 aria-hidden="true" size={16} />} onClick={undo} size="sm">Hoàn tác</Button>
+                {review.canUndo ? <Button aria-label="Hoàn tác" className={styles.undoButton} leftIcon={<Undo2 aria-hidden="true" size={16} />} onClick={undo} size="sm" title="Hoàn tác">Hoàn tác</Button> : null}
               </div>
               <div className={styles.actionGroup}>
                 <Button disabled={!review.ready || !canViewPhotos} leftIcon={<Flag aria-hidden="true" size={16} />} onClick={() => markAndNext("flagged")} size="sm">{review.getReviewState(activeRow) === "flagged" ? "Bỏ đánh dấu" : "Đánh dấu"} <kbd className={styles.shortcut}>F</kbd></Button>
@@ -297,7 +305,7 @@ export function AttendancePhotoReview({ date, data, error, refreshing, ownerAcco
               </div>
             </footer>
             {canViewPhotos && (unseenPhotoCount > 0 || pendingPhotos) ? <div aria-live="polite" className={styles.photoCounter}>{pendingPhotos ? "Còn ảnh chưa đồng bộ" : `${unseenPhotoCount} ảnh chưa xem hoặc đang tải`}</div> : null}
-          </> : <div className={styles.complete}><CheckCheck aria-hidden="true" size={44} /><h2>{tab === "unseen" && reviewableRows.length && !search && !hasFilters ? "Đã xử lý hết ảnh trong ngày" : "Không có ảnh trong nhóm này"}</h2><div className={styles.actionGroup}>{counts.flagged ? <Button onClick={() => setTab("flagged")} size="sm">Xem {counts.flagged} người đánh dấu</Button> : null}{counts.waiting ? <Button onClick={() => setTab("waiting")} size="sm">{counts.waiting} người chưa có ảnh</Button> : null}<Button onClick={() => setTab("all")} size="sm">Xem tất cả</Button>{review.canUndo ? <Button onClick={undo} size="sm">Hoàn tác</Button> : null}</div></div>}
+          </> : <div className={styles.complete}>{tab === "unseen" && reviewableRows.length && !search && !hasFilters ? <CheckCheck aria-hidden="true" size={28} /> : <ImageOff aria-hidden="true" size={28} />}<h2>{tab === "unseen" && reviewableRows.length && !search && !hasFilters ? "Đã xem hết ảnh trong ngày" : photosTotal === 0 && !search && !hasFilters ? "Chưa có ảnh chấm công" : "Không có ảnh trong nhóm này"}</h2><div className={styles.emptyActions}>{counts.flagged ? <Button onClick={() => setTab("flagged")} size="sm">Xem {counts.flagged} người đánh dấu</Button> : counts.waiting && tab !== "waiting" ? <Button onClick={() => { setTab("waiting"); setShowQueue(true); }} size="sm">{counts.waiting} người thiếu ảnh</Button> : counts.all && tab !== "all" ? <Button onClick={() => { setTab("all"); setShowQueue(true); }} size="sm">Xem lại</Button> : null}{review.canUndo ? <Button onClick={undo} size="sm">Hoàn tác</Button> : null}</div></div>}
         </section>
       </div>
     </>}

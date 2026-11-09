@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 import { chromium } from "playwright-core";
@@ -60,7 +61,7 @@ try {
   }
 
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "vi-VN", permissions: ["camera", "geolocation"], geolocation: { latitude: 21.0278, longitude: 105.8342, accuracy: 20 } });
-  const login = await context.request.post(`${baseUrl}/api/v1/auth/login`, { data: { username: "test.employee", password: process.env.SEED_TEST_PASSWORD || "12345678" } });
+  const login = await context.request.post(`${baseUrl}/api/v1/auth/login`, { data: { username: "test.employee", password: getTestPassword() } });
   if (!login.ok()) throw new Error(`Disposable employee login failed: ${login.status()}`);
   const page = await context.newPage();
   await page.route("**/api/v1/attendance/dashboard", async (route) => {

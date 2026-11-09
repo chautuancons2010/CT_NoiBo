@@ -32,6 +32,20 @@ describe("application registry", () => {
     expect(applications.map((item) => item.id)).toEqual(["warehouse"]);
   });
 
+  it("removes locked business modules while preserving access to administration", () => {
+    const currentUser = user(["employee.view", "attendance.self", "project.view", "warehouse.view", "accounting.access", "approval.view", "system_admin.access"]);
+    const modules = { ...defaultSystemSettings.modules, human_resources: false, attendance: false, projects: false, warehouse: false, accounting: false, operations: false };
+    const ids = visibleApplications(currentUser, modules).map((application) => application.id);
+    expect(ids).toContain("system");
+    expect(ids).not.toContain("human-resources");
+    expect(ids).not.toContain("attendance");
+    expect(ids).not.toContain("projects");
+    expect(ids).not.toContain("warehouse");
+    expect(ids).not.toContain("accounting");
+    expect(ids).not.toContain("operations");
+    expect(contextualNavigationGroups("/warehouse", currentUser, modules, defaultSystemSettings.navigation).flatMap((group) => group.items).some((item) => item.href.startsWith("/warehouse"))).toBe(false);
+  });
+
   it("keeps chat global instead of presenting it as a business module", () => {
     expect(visibleApplications(user(["chat.access"]), defaultSystemSettings.modules).some((item) => item.id === "messaging")).toBe(false);
     expect(contextualNavigationGroups("/messages", user(["chat.access"]), defaultSystemSettings.modules, defaultSystemSettings.navigation).flatMap((group) => group.items)).toEqual([]);
@@ -71,7 +85,7 @@ describe("application registry", () => {
 
   it("keeps the sidebar contextual", () => {
     const groups = contextualNavigationGroups("/warehouse/inventory", user(["warehouse.view", "employee.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
-    expect(groups.map((group) => group.label)).toEqual(["VẬN HÀNH KHO", "DANH MỤC & CẤU HÌNH"]);
+    expect(groups.map((group) => group.label)).toEqual(["Vận hành kho", "Danh mục"]);
     expect(groups.flatMap((group) => group.items).every((item) => item.href.startsWith("/warehouse"))).toBe(true);
   });
 
@@ -88,7 +102,7 @@ describe("application registry", () => {
     expect(paths[0]).toBe("/warehouse/inventory");
     expect(paths.indexOf("/settings/warehouse")).toBeGreaterThan(paths.indexOf("/warehouse/items"));
     expect(paths.indexOf("/settings/warehouse")).toBeGreaterThan(paths.indexOf("/warehouse/warehouses"));
-    expect(visibleApplicationShortcuts(applicationForPath("/warehouse"), user(["warehouse.view"]), defaultSystemSettings.modules, { ...defaultSystemSettings.navigation, itemOrder: [...defaultSystemSettings.navigation.itemOrder].reverse() })[0].href).toBe("/warehouse/inventory");
+    expect(visibleApplicationShortcuts(applicationForPath("/warehouse"), user(["warehouse.view"]), defaultSystemSettings.modules, { ...defaultSystemSettings.navigation, itemOrder: [...defaultSystemSettings.navigation.itemOrder].reverse() })[0].href).toBe("/warehouse");
   });
 
   it("opens HR directly on its primary function", () => {
@@ -101,7 +115,7 @@ describe("application registry", () => {
 
   it("keeps HR administration and personal attendance separate", () => {
     const hr = contextualNavigationGroups("/attendance/today", user(["attendance.view_all", "timesheet.view", "shift.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
-    expect(hr.flatMap((group) => group.items).map((item) => item.href)).toEqual(["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/timesheets/adjustments"]);
+    expect(hr.flatMap((group) => group.items).map((item) => item.href)).toEqual(["/attendance/today", "/timesheets/matrix", "/timesheets", "/timesheets/adjustments", "/shifts"]);
     const personal = contextualNavigationGroups("/attendance/me", user(["attendance.self", "attendance.self.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
     expect(personal[0].items.map((item) => item.href)).toEqual(["/attendance/me", "/attendance/history", "/attendance/requests", "/attendance/notifications"]);
   });
@@ -115,9 +129,20 @@ describe("application registry", () => {
     expect(personal[0].defaultRoute).toBe("/attendance/history");
   });
 
+  it("groups every HR destination once while filtering unavailable functions", () => {
+    const groups = contextualNavigationGroups("/employees/departments", user(["employee.view", "contract.view", "insurance.view", "attendance.view_all", "shift.view", "leave.view_all", "attendance.config.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
+    expect(groups.map((group) => group.id)).toEqual(["hr-records", "hr-attendance", "hr-catalog", "hr-settings"]);
+    const paths = groups.flatMap((group) => group.items.map((item) => item.href));
+    expect(paths).toHaveLength(12);
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(groups.find((group) => group.id === "hr-catalog")?.items.map((item) => item.href)).toEqual(["/employees/departments", "/employees/positions", "/shifts"]);
+    expect(paths).not.toContain("/attendance/me");
+    expect(paths).not.toContain("/warehouse");
+  });
+
   it("opens every application on a function the user can access", () => {
     expect(visibleApplications(user(["warehouse.issue.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/warehouse/issues");
-    expect(visibleApplications(user(["payslip.self.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/accounting/payslips");
+    expect(visibleApplications(user(["payslip.self.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/personal/payslips");
     expect(visibleApplications(user(["approval.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/approvals");
     expect(visibleApplications(user(["role.view"]), defaultSystemSettings.modules)[0]?.defaultRoute).toBe("/settings/roles");
   });

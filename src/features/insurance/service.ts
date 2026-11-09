@@ -7,35 +7,109 @@ import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { safeUploadName, validateUploadedFile } from "@/lib/security/filePolicy";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { recordAuditLog } from "@/services/audit/auditLog";
-import type { insuranceInputSchema } from "./schema";
+import type { insuranceContributionInputSchema, insuranceInputSchema } from "./schema";
+import type { InsuranceContribution, InsurancePaymentStatus, InsuranceRecord } from "./sharedtypes";
 
 type Row = Record<string, unknown>;
 function db() { const client = getSupabaseServiceClient(); if (!client) throw new AppError("SERVER_ERROR", "Supabase chưa được cấu hình."); return client; }
 function requirePermission(user: AuthenticatedUser, permission: "insurance.view" | "insurance.edit" | "insurance.history.view" | "insurance.document.upload") { if (!can(user.permissions, permission)) throw new AppError("PERMISSION_DENIED"); }
-async function accountId(client: SupabaseClient, user: AuthenticatedUser) { let query = client.from("app_accounts").select("id").limit(1); query = /^[0-9a-f-]{36}$/i.test(user.id) ? query.eq("id", user.id) : query.eq("primary_email", user.email); const { data } = await query.maybeSingle(); if (!data?.id) throw new AppError("PERMISSION_DENIED"); return String(data.id); }
+async function accountId(client: SupabaseClient, user: AuthenticatedUser) { let query = client.from("app_accounts").select("id").limit(1); query = /^[0-9a-f-]{36}$/i.test(user.id) ? query.eq("id", user.id) : query.eq("primary_email", user.email); const { data, error } = await query.maybeSingle(); if (error) throw new AppError("SERVER_ERROR", "Không thể xác định tài khoản."); if (!data?.id) throw new AppError("PERMISSION_DENIED"); return String(data.id); }
 function nested(value: unknown): Row | undefined { return (Array.isArray(value) ? value[0] : value) as Row | undefined; }
+function isMissingRelation(error: unknown, table: string) {
+  const value = error as { code?: string; message?: unknown } | null;
+  return Boolean(value && ["PGRST205", "42P01"].includes(value.code ?? "") && typeof value.message === "string" && value.message.split(/[^a-zA-Z0-9_]+/).includes(table));
+}
+async function requireContributionStorage(client: SupabaseClient) {
+  for (const table of ["employee_insurance_contributions", "employee_insurance_contribution_commands"]) {
+    const { error } = await client.from(table).select("id").limit(0);
+    if (isMissingRelation(error, table)) throw new AppError("NETWORK_ERROR", "Chức năng cập nhật BHXH chưa sẵn sàng.");
+    if (error) throw new AppError("SERVER_ERROR", "Không thể kiểm tra dữ liệu bảo hiểm.");
+  }
+}
+async function allRows(query: (start: number, end: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>, message: string, optional?: { table: string; unavailable: () => void }): Promise<Row[]> {
+  const result: Row[] = [];
+  for (let start = 0; ; start += 500) {
+    const { data, error } = await query(start, start + 499);
+    if (error && optional && isMissingRelation(error, optional.table)) { optional.unavailable(); return []; }
+    if (error) throw new AppError("SERVER_ERROR", message);
+    result.push(...(data ?? []) as Row[]);
+    if (!data || data.length < 500) return result;
+  }
+}
 
-export async function listInsurance(user: AuthenticatedUser) {
+export async function listInsurance(user: AuthenticatedUser, employeeId?: string) {
   requirePermission(user, "insurance.view");
   const client = db();
-  const [{ data: profiles, error }, { data: employees }, historyResult] = await Promise.all([
-    client.from("employee_insurance_profiles").select("*,employees(employee_code,full_name)").order("updated_at", { ascending: false }),
-    client.from("employees").select("id,employee_code,full_name").in("employment_status", ["active", "probation", "pending_onboarding"]).order("employee_code"),
-    can(user.permissions, "insurance.history.view") ? client.from("employee_insurance_events").select("*,app_accounts(display_name),file_assets(id,metadata)").order("effective_date", { ascending: false }).order("changed_at", { ascending: false }) : Promise.resolve({ data: [] })
+  let contributionsAvailable = true;
+  const canViewHistory = can(user.permissions, "insurance.history.view"), canViewDocument = can(user.permissions, "insurance.document.view");
+  const [profiles, employees, events, contributionRows] = await Promise.all([
+    allRows((start, end) => { let query = client.from("employee_insurance_profiles").select("*,employees(employee_code,full_name)"); if (employeeId) query = query.eq("employee_id", employeeId); return query.order("updated_at", { ascending: false }).order("employee_id").range(start, end); }, "Không thể đọc hồ sơ bảo hiểm."),
+    employeeId ? Promise.resolve([]) : allRows((start, end) => client.from("employees").select("id,employee_code,full_name").in("employment_status", ["active", "probation", "pending_onboarding", "on_leave"]).order("employee_code").order("id").range(start, end), "Không thể đọc nhân viên."),
+    canViewHistory ? allRows((start, end) => { let query = client.from("employee_insurance_events").select("*,app_accounts(display_name),file_assets(id,metadata)"); if (employeeId) query = query.eq("employee_id", employeeId); return query.order("effective_date", { ascending: false }).order("changed_at", { ascending: false }).order("id").range(start, end); }, "Không thể đọc lịch sử bảo hiểm.") : Promise.resolve([]),
+    allRows((start, end) => { let query = client.from("employee_insurance_contributions").select("*"); if (employeeId) query = query.eq("employee_id", employeeId); return query.order("contribution_month", { ascending: false }).order("employee_id").range(start, end); }, "Không thể đọc quá trình đóng bảo hiểm.", { table: "employee_insurance_contributions", unavailable: () => { contributionsAvailable = false; } })
   ]);
-  if (error) throw new AppError("SERVER_ERROR", "Không thể đọc hồ sơ bảo hiểm.");
-  const history = (historyResult.data ?? []).map((event) => { const actor = nested(event.app_accounts), file = nested(event.file_assets), metadata = (file?.metadata ?? {}) as Row; return { id: String(event.id), employeeId: String(event.employee_id), changeType: String(event.change_type), effectiveDate: String(event.effective_date), reason: String(event.reason), changedAt: String(event.changed_at), changedByName: String(actor?.display_name ?? "Tài khoản hệ thống"), fileId: file?.id ? String(file.id) : undefined, fileName: file?.id ? String(metadata.originalName ?? "Tài liệu bảo hiểm") : undefined }; });
+  const contributions = contributionRows.map(mapContribution);
+  const history = events.map((event) => { const actor = nested(event.app_accounts), file = nested(event.file_assets), metadata = (file?.metadata ?? {}) as Row; return { id: String(event.id), employeeId: String(event.employee_id), changeType: String(event.change_type), effectiveDate: String(event.effective_date), reason: String(event.reason), changedAt: String(event.changed_at), changedByName: String(actor?.display_name ?? "Tài khoản hệ thống"), snapshot: event.snapshot as Row, fileId: canViewDocument && file?.id ? String(file.id) : undefined, fileName: canViewDocument && file?.id ? String(metadata.originalName ?? "Tài liệu bảo hiểm") : undefined }; });
   return {
-    records: (profiles ?? []).map((profile) => { const person = nested(profile.employees); return { employeeId: String(profile.employee_id), employeeCode: String(person?.employee_code ?? "—"), employeeName: String(person?.full_name ?? "—"), socialInsuranceNumber: String(profile.social_insurance_number), participationStatus: String(profile.participation_status), startDate: profile.start_date ? String(profile.start_date) : undefined, contributionBase: profile.contribution_base == null ? undefined : Number(profile.contribution_base), socialInsuranceEnabled: Boolean(profile.social_insurance_enabled), healthInsuranceEnabled: Boolean(profile.health_insurance_enabled), unemploymentInsuranceEnabled: Boolean(profile.unemployment_insurance_enabled), updatedAt: String(profile.updated_at), history: history.filter((event) => event.employeeId === profile.employee_id) }; }),
+    canViewHistory,
+    contributionsAvailable,
+    records: (profiles ?? []).map((profile): InsuranceRecord => { const person = nested(profile.employees); return { employeeId: String(profile.employee_id), employeeCode: String(person?.employee_code ?? "—"), employeeName: String(person?.full_name ?? "—"), socialInsuranceNumber: String(profile.social_insurance_number), participationStatus: String(profile.participation_status) as InsuranceRecord["participationStatus"], startDate: profile.start_date ? String(profile.start_date) : undefined, contributionBase: profile.contribution_base == null ? undefined : Number(profile.contribution_base), contributionRatePercent: profile.contribution_rate_percent == null ? undefined : Number(profile.contribution_rate_percent), contributionMonth: profile.contribution_month ? String(profile.contribution_month).slice(0, 7) : undefined, paymentStatus: String(profile.payment_status ?? "pending") as InsurancePaymentStatus, socialInsuranceEnabled: Boolean(profile.social_insurance_enabled), healthInsuranceEnabled: Boolean(profile.health_insurance_enabled), unemploymentInsuranceEnabled: Boolean(profile.unemployment_insurance_enabled), updatedAt: String(profile.updated_at), history: history.filter((event) => event.employeeId === profile.employee_id), contributions: contributions.filter((entry) => entry.employeeId === profile.employee_id), contributionsAvailable }; }),
     employees: (employees ?? []).map((employee) => ({ id: String(employee.id), code: String(employee.employee_code), name: String(employee.full_name) }))
   };
+}
+
+export async function getInsuranceDetail(user: AuthenticatedUser, employeeId: string) {
+  const result = await listInsurance(user, employeeId);
+  const record = result.records.find((entry) => entry.employeeId === employeeId);
+  if (!record) throw new AppError("NOT_FOUND", "Không tìm thấy hồ sơ bảo hiểm.");
+  return record;
+}
+
+function mapContribution(row: Row): InsuranceContribution {
+  return {
+    id: String(row.id), employeeId: String(row.employee_id), contributionMonth: String(row.contribution_month).slice(0, 7),
+    contributionBase: row.contribution_base == null ? undefined : Number(row.contribution_base),
+    contributionRatePercent: row.contribution_rate_percent == null ? undefined : Number(row.contribution_rate_percent),
+    expectedAmount: row.expected_amount == null ? undefined : Number(row.expected_amount),
+    paidAmount: row.paid_amount == null ? undefined : Number(row.paid_amount),
+    paymentStatus: String(row.payment_status) as InsurancePaymentStatus,
+    paidDate: row.paid_date ? String(row.paid_date) : undefined, note: row.note ? String(row.note) : undefined,
+    updatedAt: String(row.updated_at), source: row.source === "legacy_profile" ? "legacy_profile" : "recorded"
+  };
+}
+
+export async function saveInsuranceContribution(user: AuthenticatedUser, input: z.infer<typeof insuranceContributionInputSchema>) {
+  requirePermission(user, "insurance.edit");
+  const client = db();
+  await requireContributionStorage(client);
+  const actorId = await accountId(client, user), commandId = crypto.randomUUID();
+  const { data, error } = await client.rpc("save_insurance_contribution_command", {
+    p_command_id: commandId, p_employee_id: input.employeeId, p_actor_id: actorId,
+    p_values: input, p_expected_updated_at: input.expectedUpdatedAt ?? null
+  });
+  if (error) {
+    // The command and audit commit together. A lost transport response must not
+    // invite a second write after an already successful save.
+    const { data: committed } = await client.from("employee_insurance_contribution_commands").select("contribution_id").eq("id", commandId).eq("actor_id", actorId).maybeSingle();
+    if (committed?.contribution_id) return { contributionId: String(committed.contribution_id) };
+    if (error.message.includes("VERSION_CONFLICT")) throw new AppError("CONFLICT", "Kỳ đóng bảo hiểm đã thay đổi. Vui lòng tải lại.");
+    if (error.message.includes("ACTOR_DENIED")) throw new AppError("PERMISSION_DENIED");
+    if (error.message.includes("PROFILE_NOT_FOUND")) throw new AppError("NOT_FOUND", "Chưa có hồ sơ bảo hiểm của nhân viên.");
+    if (error.message.includes("INPUT_INVALID") || error.code === "22007" || error.code === "22008" || error.code === "23514") throw new AppError("VALIDATION_ERROR");
+    throw new AppError("SERVER_ERROR", "Không thể xác nhận đã lưu kỳ đóng bảo hiểm. Vui lòng tải lại.");
+  }
+  return { contributionId: String(data) };
 }
 
 export async function saveInsurance(user: AuthenticatedUser, input: z.infer<typeof insuranceInputSchema>, file?: File) {
   requirePermission(user, "insurance.edit");
   if (file) requirePermission(user, "insurance.document.upload");
-  const client = db(), actorId = await accountId(client, user), eventId = crypto.randomUUID();
-  const { data: before } = await client.from("employee_insurance_profiles").select("*").eq("employee_id", input.employeeId).maybeSingle();
+  const client = db();
+  await requireContributionStorage(client);
+  const actorId = await accountId(client, user), eventId = crypto.randomUUID();
+  const { data: before, error: beforeError } = await client.from("employee_insurance_profiles").select("*").eq("employee_id", input.employeeId).maybeSingle();
+  if (beforeError) throw new AppError("SERVER_ERROR", "Không thể đọc hồ sơ bảo hiểm hiện tại.");
+  if (before && (!input.expectedUpdatedAt || String(before.updated_at) !== input.expectedUpdatedAt)) throw new AppError("CONFLICT", "Hồ sơ bảo hiểm đã thay đổi. Vui lòng tải lại.");
   let asset: { id: string; path: string } | undefined;
   if (file && file.size > 0) {
     const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
@@ -47,10 +121,21 @@ export async function saveInsurance(user: AuthenticatedUser, input: z.infer<type
     if (assetError) { await client.storage.from("insurance-private").remove([path]); throw new AppError("SERVER_ERROR", "Không thể lưu tài liệu bảo hiểm."); }
     asset = { id, path };
   }
-  const snapshot = { socialInsuranceNumber: input.socialInsuranceNumber, participationStatus: input.participationStatus, startDate: input.startDate, contributionBase: input.contributionBase, socialInsuranceEnabled: input.socialInsuranceEnabled, healthInsuranceEnabled: input.healthInsuranceEnabled, unemploymentInsuranceEnabled: input.unemploymentInsuranceEnabled };
-  const { error: profileError } = await client.from("employee_insurance_profiles").upsert({ employee_id: input.employeeId, social_insurance_number: input.socialInsuranceNumber, participation_status: input.participationStatus, start_date: input.startDate ?? null, contribution_base: input.contributionBase ?? null, social_insurance_enabled: input.socialInsuranceEnabled, health_insurance_enabled: input.healthInsuranceEnabled, unemployment_insurance_enabled: input.unemploymentInsuranceEnabled, updated_by: actorId, updated_at: new Date().toISOString() }, { onConflict: "employee_id" });
-  const { error: historyError } = profileError ? { error: profileError } : await client.from("employee_insurance_events").insert({ id: eventId, employee_id: input.employeeId, change_type: input.changeType, effective_date: input.effectiveDate, snapshot, reason: input.reason, document_file_id: asset?.id ?? null, changed_by: actorId });
-  if (profileError || historyError) { if (asset) { await client.from("file_assets").delete().eq("id", asset.id); await client.storage.from("insurance-private").remove([asset.path]); } throw new AppError("SERVER_ERROR", "Không thể cập nhật hồ sơ bảo hiểm."); }
+  const snapshot = { socialInsuranceNumber: input.socialInsuranceNumber, participationStatus: input.participationStatus, startDate: input.startDate, contributionBase: input.contributionBase, contributionRatePercent: input.contributionRatePercent, contributionMonth: input.recordContribution === false ? (before?.contribution_month ? String(before.contribution_month).slice(0, 7) : undefined) : input.contributionMonth, paymentStatus: input.recordContribution === false ? String(before?.payment_status ?? "pending") : input.paymentStatus, socialInsuranceEnabled: input.socialInsuranceEnabled, healthInsuranceEnabled: input.healthInsuranceEnabled, unemploymentInsuranceEnabled: input.unemploymentInsuranceEnabled };
+  const { error } = await client.rpc("save_insurance_profile_command", { p_employee_id: input.employeeId, p_event_id: eventId, p_actor_id: actorId, p_values: input, p_document_file_id: asset?.id ?? null, p_expected_updated_at: input.expectedUpdatedAt ?? null });
+  if (error) {
+    // A transport failure can arrive after commit. Retain a referenced object
+    // and accept the recorded event rather than deleting a successful upload.
+    const { data: committed, error: verifyError } = await client.from("employee_insurance_events").select("id").eq("id", eventId).maybeSingle();
+    if (!committed) {
+      if (asset && !verifyError) { await client.from("file_assets").delete().eq("id", asset.id); await client.storage.from("insurance-private").remove([asset.path]); }
+      if (error.message.includes("VERSION_CONFLICT")) throw new AppError("CONFLICT", "Hồ sơ bảo hiểm đã thay đổi. Vui lòng tải lại.");
+      if (error.message.includes("PAYMENT_RECORD_CONFLICT")) throw new AppError("CONFLICT", "Kỳ này đã có thông tin thanh toán. Vui lòng cập nhật trong Quá trình đóng.");
+      if (error.message.includes("ACTOR_DENIED") || error.message.includes("FILE_DENIED")) throw new AppError("PERMISSION_DENIED");
+      if (error.code === "23505") throw new AppError("CONFLICT", "Mã số BHXH đã được sử dụng.");
+      throw new AppError("SERVER_ERROR", "Không thể xác nhận đã lưu hồ sơ và lịch sử bảo hiểm. Vui lòng tải lại.");
+    }
+  }
   await recordAuditLog({ actorId, action: "insurance.changed", entityType: "employee", entityId: input.employeeId, before: before ?? undefined, after: snapshot, reason: input.reason, metadata: { eventId, fileId: asset?.id } });
   return { eventId };
 }

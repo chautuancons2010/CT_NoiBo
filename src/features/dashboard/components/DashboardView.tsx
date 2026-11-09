@@ -1,19 +1,24 @@
 "use client";
 
-import { ArrowUpRight, CheckCircle2, ClipboardCheck, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Bell, CalendarClock, ChartNoAxesCombined, CheckCircle2, ClipboardCheck, RefreshCw, UsersRound, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/shared/Button";
 import { ModuleLauncher } from "@/components/shared/ModuleLauncher";
-import { PersonalWorkspaceCards } from "@/features/workspace/PersonalWorkspaceCards";
 import { DashboardPageTemplate } from "@/components/shared/PageLayouts";
+import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
+import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
+import { navigationIconMap } from "@/components/layout/icons";
+import { isPathEnabled } from "@/config/systemSettings";
 import { LoadingState } from "@/components/shared/States";
 import { PageHeader } from "@/components/shared/PageHeader";
-import type { DashboardChart, DashboardReadModel } from "@/features/dashboard/types";
+import type { DashboardChart, DashboardProfileKey, DashboardReadModel, DashboardWidgetKey } from "@/features/dashboard/types";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+import { useMobileViewport } from "@/lib/ui/useMobileViewport";
 
 import { ModuleChart } from "./ModuleChart";
+import { sortAttention } from "@/features/dashboard/attention";
 import styles from "./DashboardView.module.css";
 
 const attentionCategories: Record<string, string> = {
@@ -23,10 +28,40 @@ const attentionCategories: Record<string, string> = {
   hr_task: "Nhân sự", payroll: "Bảng lương"
 };
 
+const dashboardPresentation: Record<DashboardProfileKey, {
+  pageTitle: string;
+  overviewTitle: string;
+  attentionTitle: string;
+  chartTitle: string;
+  focusWidget: DashboardWidgetKey;
+  chartOrder: readonly string[];
+}> = {
+  management: { pageTitle: "Điều hành", overviewTitle: "Vận hành hôm nay", attentionTitle: "Cần chú ý", chartTitle: "Sức khỏe vận hành", focusWidget: "attendance_overview", chartOrder: ["attendance-today", "hr-by-department", "project-progress", "project-health"] },
+  hr: { pageTitle: "Nhân sự", overviewTitle: "Quy mô đội ngũ", attentionTitle: "Việc nhân sự", chartTitle: "Cơ cấu nhân sự", focusWidget: "hr_summary", chartOrder: ["hr-by-department", "hr-employment", "attendance-today", "timesheet-exceptions"] },
+  warehouse: { pageTitle: "Kho", overviewTitle: "Kho hôm nay", attentionTitle: "Ưu tiên trong kho", chartTitle: "Tồn kho và chứng từ", focusWidget: "warehouse_low_stock", chartOrder: ["warehouse-stock-alerts", "warehouse-pending"] },
+  accounting: { pageTitle: "Kế toán", overviewTitle: "Lương và kỳ chốt", attentionTitle: "Kỳ lương cần xử lý", chartTitle: "Lương và phiếu lương", focusWidget: "accounting_summary", chartOrder: ["payroll-fund", "payslip-status", "salary-profiles"] },
+  import_export: { pageTitle: "Xuất nhập khẩu", overviewTitle: "Luồng lô hàng", attentionTitle: "Lô hàng cần xử lý", chartTitle: "Tiến độ lô hàng", focusWidget: "shipment_attention", chartOrder: ["shipment-status", "shipment-flags"] },
+  supervisor: { pageTitle: "Công trường", overviewTitle: "Công trường hôm nay", attentionTitle: "Phiên cần theo dõi", chartTitle: "Điểm danh công trường", focusWidget: "supervisor_today", chartOrder: ["supervisor-sessions", "project-progress", "project-health"] },
+  employee: { pageTitle: "Cá nhân", overviewTitle: "Ca làm hôm nay", attentionTitle: "Việc của tôi", chartTitle: "Chấm công cá nhân", focusWidget: "employee_today", chartOrder: ["personal-attendance", "payslip-status"] }
+};
+
+function metricIcon(label: string) {
+  if (/chưa đọc|thông báo/i.test(label)) return Bell;
+  if (/lương|thu nhập|khấu trừ|thực nhận/i.test(label)) return WalletCards;
+  if (/nhân sự|nhân viên|thử việc|đang làm/i.test(label)) return UsersRound;
+  if (/ca làm|ngày công|kỳ|chấm/i.test(label)) return CalendarClock;
+  return ClipboardCheck;
+}
+
 export function DashboardView({ initialModel }: { initialModel?: DashboardReadModel }) {
+  const user = useCurrentUser();
+  const { settings } = useSystemSettings();
   const [model, setModel] = useState(initialModel);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [moreWork, setMoreWork] = useState(false);
+  const [workCategory, setWorkCategory] = useState("");
+  const mobile = useMobileViewport();
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const response = await fetch("/api/v1/dashboard", { cache: "no-store", signal });
@@ -52,30 +87,39 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
     finally { setRefreshing(false); }
   }
 
+  const applications = <div data-dashboard-applications><ModuleLauncher layout="bar" /></div>;
   if (!model && !error) return <LoadingState description="" title="Đang tải Dashboard" />;
   const widgets = model?.widgets ?? [];
-  const firstMetrics = widgets.flatMap((widget) => widget.data?.metrics?.[0] ?? []);
-  const metrics = [...firstMetrics, ...widgets.flatMap((widget) => widget.data?.metrics?.slice(1) ?? [])].slice(0, 5);
-  const availableCharts = widgets.flatMap((widget) => widget.data?.charts ?? []).filter((chart) => chart.series.some((entry) => Number.isFinite(entry.value) && entry.value !== 0));
-  const meaningfulCharts = availableCharts.filter((chart) => chart.series.reduce((sum, entry) => sum + Math.abs(entry.value), 0) > 1).length
-    ? availableCharts.filter((chart) => chart.series.reduce((sum, entry) => sum + Math.abs(entry.value), 0) > 1)
+  const profile = model?.profile ?? "employee";
+  const presentation = dashboardPresentation[profile];
+  const shortcuts = (model?.shortcuts ?? []).filter((shortcut) => isPathEnabled(shortcut.href, settings.modules));
+  const focusWidgetIndex = widgets.findIndex((widget) => widget.key === presentation.focusWidget);
+  const orderedWidgets = focusWidgetIndex > 0 ? [widgets[focusWidgetIndex], ...widgets.slice(0, focusWidgetIndex), ...widgets.slice(focusWidgetIndex + 1)] : widgets;
+  const focusWidget = orderedWidgets.find((widget) => widget.key === presentation.focusWidget);
+  const metrics = orderedWidgets.flatMap((widget) => widget.status === "ready" ? widget.data?.metrics ?? [] : []).slice(0, 5);
+  const availableCharts = orderedWidgets.flatMap((widget) => widget.data?.charts ?? []).filter((chart) => chart.emptyLabel || chart.series.some((entry) => Number.isFinite(entry.value)));
+  const meaningfulCharts = profile !== "accounting" && availableCharts.some((chart) => chart.series.some((entry) => Number.isFinite(entry.value) && entry.value !== 0))
+    ? availableCharts.filter((chart) => chart.series.some((entry) => Number.isFinite(entry.value) && entry.value !== 0))
     : availableCharts;
-  const overviewChart = meaningfulCharts.find((chart) => chart.kind === "line")
+  const overviewChart = presentation.chartOrder.map((key) => meaningfulCharts.find((chart) => chart.key === key)).find((chart) => chart !== undefined)
+    ?? meaningfulCharts.find((chart) => chart.kind === "line")
     ?? meaningfulCharts.find((chart) => chart.kind !== "donut" && !(chart.unit === "%" && chart.series.length === 1))
     ?? meaningfulCharts[0];
-  const secondaryChart = meaningfulCharts.find((chart) => chart.key !== overviewChart?.key && chart.unit === "%" && chart.series.length === 1)
+  const secondaryChart = presentation.chartOrder.map((key) => meaningfulCharts.find((chart) => chart.key === key && chart.key !== overviewChart?.key)).find((chart) => chart !== undefined)
+    ?? meaningfulCharts.find((chart) => chart.key !== overviewChart?.key && chart.unit === "%" && chart.series.length === 1)
     ?? meaningfulCharts.find((chart) => chart.key !== overviewChart?.key && chart.kind === "donut")
     ?? meaningfulCharts.find((chart) => chart.key !== overviewChart?.key);
   const attention = model?.attention ?? [];
-  const activity = widgets.filter((widget) => widget.key === "recent_activity" || widget.key === "recent_notifications").flatMap((widget) => widget.data?.items ?? []).slice(0, 5);
   const seen = new Set<string>();
-  const allWorkItems = [...attention, ...widgets.filter((widget) => widget.key !== "recent_activity" && widget.key !== "recent_notifications").flatMap((widget) => widget.data?.items ?? [])].filter((item) => {
+  const allWorkItems = sortAttention([...attention, ...orderedWidgets.filter((widget) => widget.key !== "recent_activity" && widget.key !== "recent_notifications").flatMap((widget) => widget.data?.items ?? [])].filter((item) => {
     const key = `${item.type}-${item.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
-  const workItems = allWorkItems.slice(0, 6);
+  }));
+  const workItems = workCategory ? allWorkItems.filter((item) => (attentionCategories[item.type] ?? "Khác") === workCategory) : allWorkItems;
+  const workLimit = mobile ? 3 : 6;
+  const visibleWorkItems = moreWork ? workItems : workItems.slice(0, workLimit);
   const workCategories = new Map<string, number>();
   allWorkItems.forEach((item) => {
     const label = attentionCategories[item.type] ?? "Khác";
@@ -85,28 +129,54 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
   const charts = overviewChart?.unit === "%" && overviewChart.series.length === 1 && !secondaryChart && workCategories.size
     ? [workChart, overviewChart]
     : [overviewChart, secondaryChart].filter((chart) => chart !== undefined);
+  if (!charts.length && workCategories.size) charts.push(workChart);
   const failed = widgets.some((widget) => widget.status === "error");
   const failedLabels = widgets.filter((widget) => widget.status === "error").map((widget) => widget.label);
-  const title = "Tổng quan";
+  const focusState = focusWidget?.data?.state ?? {};
+  const primaryAction = typeof focusState.primaryAction === "string" ? focusState.primaryAction : undefined;
+  const primaryHref = typeof focusState.primaryHref === "string" ? focusState.primaryHref : undefined;
 
   return <>
-    <PageHeader action={<div className={styles.headingActions}>{model?.generatedAt ? <time dateTime={model.generatedAt}>{new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(model.generatedAt))}</time> : null}<Button disabled={refreshing} leftIcon={<RefreshCw aria-hidden="true" className={refreshing ? styles.spinning : undefined} size={16} />} onClick={() => void refresh()} size="sm">{refreshing ? "Đang cập nhật" : "Cập nhật"}</Button></div>} title={title} />
+    <PageHeader
+      title={presentation.pageTitle}
+      meta={<span className={styles.headerMeta}><span>{user.displayName}</span>{model?.generatedAt ? <time dateTime={model.generatedAt}>{new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(model.generatedAt))}</time> : null}</span>}
+      action={<>{(profile === "employee" || profile === "supervisor") && primaryAction && primaryHref && !shortcuts.some((shortcut) => shortcut.href === primaryHref) ? <Link className="button button--primary button--md" href={primaryHref} prefetch={false}>{primaryAction}<ArrowUpRight aria-hidden="true" size={16} /></Link> : null}<Button aria-label="Cập nhật dashboard" busy={refreshing} leftIcon={<RefreshCw aria-hidden="true" size={18} />} onClick={() => void refresh()} size="sm"><span className={styles.refreshLabel}>Cập nhật</span></Button></>}
+    />
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    <section aria-label={title} className={styles.analytics}>
-      {metrics.length ? <div className={styles.metrics}>{metrics.map((metric, index) => {
-        const content = <><span aria-hidden="true" className={styles.metricIcon}><svg className={styles.metricRing} viewBox="0 0 64 64"><circle className={styles.metricRingTrack} cx="32" cy="32" fill="none" r="25" strokeWidth="6" /><circle cx="32" cy="32" fill="none" pathLength="100" r="25" stroke="currentColor" strokeDasharray="74 26" strokeLinecap="round" strokeWidth="6" transform="rotate(-75 32 32)" /></svg><ArrowUpRight className={styles.metricGlyph} size={23} strokeWidth={1.7} /></span><span className={styles.metricContent}><strong>{typeof metric.value === "number" ? new Intl.NumberFormat("vi-VN").format(metric.value) : metric.value}</strong><span>{metric.label}</span></span></>;
+    {shortcuts.length ? <section aria-labelledby="dashboard-shortcuts-title" className={styles.shortcutsSection} data-dashboard-shortcuts data-dashboard-profile={profile}>
+      <header className={styles.sectionHeading}><h2 id="dashboard-shortcuts-title">Thao tác nhanh</h2><span className={styles.roleBadge}>{model?.profileLabel}</span></header>
+      <div className={styles.shortcuts}>{shortcuts.map((shortcut, index) => {
+        const Icon = navigationIconMap[shortcut.icon];
+        return <Link className={styles.shortcut} data-primary={index === 0} href={shortcut.href} key={shortcut.key} prefetch={false}>
+          <span className={styles.shortcutIcon}><Icon aria-hidden="true" size={22} strokeWidth={1.7} /></span>
+          <strong>{shortcut.label}</strong><ArrowUpRight aria-hidden="true" className={styles.shortcutArrow} size={17} />
+        </Link>;
+      })}</div>
+    </section> : null}
+    {metrics.length ? <section aria-labelledby="dashboard-overview-title" className={styles.roleOverview}>
+      <header className={styles.sectionHeading}><h2 id="dashboard-overview-title">{presentation.overviewTitle}</h2></header>
+      <div className={styles.metrics} data-dashboard-metrics data-dashboard-profile={profile}>{metrics.map((metric, index) => {
+        const Icon = metricIcon(metric.label);
+        const content = <><span aria-hidden="true" className={styles.metricIcon}><Icon className={styles.metricGlyph} size={20} strokeWidth={1.7} /></span><span className={styles.metricContent}><span>{metric.label}</span><strong>{typeof metric.value === "number" ? new Intl.NumberFormat("vi-VN").format(metric.value) : metric.value}</strong></span>{metric.href ? <ArrowUpRight aria-hidden="true" className={styles.metricArrow} size={15} /> : null}</>;
         return metric.href ? <Link className={styles.metric} data-accent={index % 5} data-dashboard-metric data-metric-label={metric.label} data-metric-value={metric.value} data-tone={metric.tone ?? "neutral"} data-value-kind={typeof metric.value} href={metric.href} key={`${metric.label}-${index}`} prefetch={false}>{content}</Link> : <div className={styles.metric} data-accent={index % 5} data-dashboard-metric data-metric-label={metric.label} data-metric-value={metric.value} data-tone={metric.tone ?? "neutral"} data-value-kind={typeof metric.value} key={`${metric.label}-${index}`}>{content}</div>;
-      })}</div> : null}
-      {charts.length ? <div className={styles.chartGrid}>{charts.map((chart) => <ModuleChart chart={chart} key={chart.key} />)}</div> : null}
-      <div className={styles.workspace} data-has-activity={Boolean(activity.length)}>
-      <section aria-labelledby="dashboard-attention-title" className={styles.attention} data-dashboard-panel>
-        <header className={styles.chartHeader}><h2 id="dashboard-attention-title">Cần xử lý</h2><span>{seen.size} việc</span></header>
-        {workItems.length ? <div className={styles.attentionList}>{workItems.map((item) => <Link className={styles.attentionItem} data-priority={item.priority ?? "LOW"} href={item.href} key={`${item.type}-${item.id}`} prefetch={false}>
+      })}</div>
+    </section> : null}
+    <section aria-label={presentation.pageTitle} className={styles.analytics} data-dashboard-profile={profile}>
+      <div className={styles.workspace}>
+      <section aria-labelledby="dashboard-attention-title" className={styles.attention} data-dashboard-panel data-dashboard-profile={profile}>
+        <header className={styles.chartHeader}><h2 id="dashboard-attention-title">{presentation.attentionTitle}</h2><span className={styles.workCount}>{seen.size} việc</span></header>
+        {workCategories.size > 1 ? <div aria-label="Nhóm công việc" className={styles.workFilters} role="group">
+          <button aria-pressed={!workCategory} onClick={() => { setWorkCategory(""); setMoreWork(false); }} type="button">Tất cả <span>{allWorkItems.length}</span></button>
+          {[...workCategories].map(([label, count]) => <button aria-pressed={workCategory === label} key={label} onClick={() => { setWorkCategory(label); setMoreWork(false); }} type="button">{label} <span>{count}</span></button>)}
+        </div> : null}
+        {workItems.length ? <div className={styles.attentionList}>{visibleWorkItems.map((item) => <Link className={styles.attentionItem} data-priority={item.priority ?? "LOW"} href={item.href} key={`${item.type}-${item.id}`} prefetch={false}>
           <span aria-hidden="true" className={styles.workIcon}><ClipboardCheck size={18} /></span>
           <span className={styles.workIdentity}>
-          <span className={styles.attentionCategory}>{attentionCategories[item.type] ?? "Cần xử lý"}</span>
-          <strong>{item.title}</strong>
-          {item.context && item.context !== "—" ? <span className={styles.attentionContext}>{item.context}</span> : null}
+          <span className={styles.attentionCategory}>{attentionCategories[item.type] ?? "Cần xử lý"}{item.reference ? <span>{item.reference}</span> : null}</span>
+          <strong>{item.type === "shipment" && item.context && item.context !== "—" ? item.context : item.title}</strong>
+          {item.type === "shipment" && item.context && item.context !== "—"
+            ? <span className={styles.attentionContext}>Mã lô: {item.title}</span>
+            : item.context && item.context !== "—" ? <span className={styles.attentionContext}>{item.context}</span> : null}
           </span>
           <span className={styles.workMeta}>
             {item.dueOrAge ? <small className={styles.workDate}>{item.dueOrAge}</small> : null}
@@ -114,19 +184,20 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
           </span>
           <ArrowUpRight aria-hidden="true" size={16} />
         </Link>)}</div> : <div className={styles.empty}><CheckCircle2 aria-hidden="true" size={28} /><span>Không có việc cần xử lý</span></div>}
+        {workItems.length > workLimit ? <footer className={styles.workFooter}><span>{visibleWorkItems.length}/{workItems.length} việc</span><Button aria-expanded={moreWork} className={styles.workMore} onClick={() => setMoreWork((current) => !current)} size="sm" variant="ghost">{moreWork ? "Thu gọn" : `Xem thêm (${workItems.length - workLimit})`}</Button></footer> : null}
+        {profile === "accounting" && allWorkItems.filter(item => item.type === "payroll").length > 6 ? <Link className={styles.workAll} href="/accounting/payroll?status=pending" prefetch={false}>Xem tất cả kỳ cần xử lý<ArrowUpRight aria-hidden="true" size={16} /></Link> : null}
       </section>
-      {activity.length ? <section className={styles.attention} data-dashboard-panel><header className={styles.chartHeader}><h2>{widgets.some((widget) => widget.key === "recent_activity" && widget.data?.items?.length) ? "Hoạt động gần đây" : "Thông báo gần đây"}</h2></header><div className={styles.attentionList}>{activity.map((item) => <Link className={styles.activityItem} href={item.href} key={`${item.type}-${item.id}`} prefetch={false}><span aria-hidden="true" className={styles.activityDot} /><strong>{item.title}</strong>{item.dueOrAge ? <time>{item.dueOrAge}</time> : null}<ArrowUpRight aria-hidden="true" size={16} /></Link>)}</div></section> : null}
       </div>
+      {charts.length ? <section aria-label={presentation.chartTitle} className={styles.chartDisclosure} data-dashboard-profile={profile}><header className={styles.sectionHeading}><h2><ChartNoAxesCombined aria-hidden="true" size={18} />{presentation.chartTitle}</h2></header><div className={styles.chartGrid}>{charts.map((chart) => <ModuleChart chart={chart} key={chart.key} />)}</div></section> : null}
       {failed ? <div className={styles.error} role="alert"><span>Chưa tải được: {failedLabels.join(", ")}.</span><Button disabled={refreshing} onClick={() => void refresh()} size="sm">Thử lại</Button></div> : null}
     </section>
+    {applications}
   </>;
 }
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   return <DashboardPageTemplate className={styles.page}>
-    <div className={styles.launcher} data-dashboard-applications><ModuleLauncher /></div>
     {children}
-    <PersonalWorkspaceCards />
   </DashboardPageTemplate>;
 }
 

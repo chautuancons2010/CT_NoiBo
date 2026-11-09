@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { PermissionDefinition, PermissionGroup, RoleDefinition } from "@/services/authorization/rbacService";
 
 import styles from "./AccessManagement.module.css";
+import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 type PermissionGroupView = { group: PermissionGroup; permissions: PermissionDefinition[] };
 
@@ -102,7 +103,8 @@ export function RoleTable({ roles, permissionGroups, canManage }: { roles: RoleD
       </DataSurface>
 
       <Modal className={styles.roleModal} open={editingRole !== null} title={editingRole === "new" ? "Thêm nhóm quyền" : "Chỉnh sửa nhóm quyền"} onClose={closeEditor}>
-        <form className={styles.accessForm} key={currentRole?.id ?? "new"} onSubmit={handleSubmit}>
+        <SectionedForm className={styles.accessForm} key={currentRole?.id ?? "new"} onSubmit={handleSubmit}>
+<FormFields>
           <section className={styles.formSection}>
             <h3><ShieldCheck aria-hidden="true" size={18} /> Thông tin nhóm quyền</h3>
             <Input defaultValue={currentRole?.name} label="Tên nhóm quyền" maxLength={120} minLength={2} name="name" required />
@@ -133,8 +135,9 @@ export function RoleTable({ roles, permissionGroups, canManage }: { roles: RoleD
             </div>
           </section>
           {error ? <p className={styles.formError} role="alert">{error}</p> : null}
-          <footer className={styles.formFooter}><Button onClick={closeEditor}>Hủy</Button><Button disabled={submitting || selectedPermissions.length === 0} type="submit" variant="primary">{submitting ? "Đang lưu…" : "Lưu nhóm quyền"}</Button></footer>
-        </form>
+          </FormFields>
+<FormActions className={styles.formFooter}><Button onClick={closeEditor}>Hủy</Button><Button disabled={submitting || selectedPermissions.length === 0} type="submit" variant="primary" busy={submitting}>{"Lưu nhóm quyền"}</Button></FormActions>
+        </SectionedForm>
       </Modal>
     </ListPageLayout>
   );

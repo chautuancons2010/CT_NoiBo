@@ -1,3 +1,4 @@
+import { getTestPassword } from "./testing/password.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright-core";
 import nextEnv from "@next/env";
@@ -5,7 +6,7 @@ import nextEnv from "@next/env";
 nextEnv.loadEnvConfig(process.cwd());
 
 const baseUrl = process.env.UI_QA_BASE_URL || "http://localhost:3000";
-const password = process.env.SEED_TEST_PASSWORD || "12345678";
+const password = getTestPassword();
 const projectId = process.env.UI_QA_PROJECT_ID || "b0000000-0000-4000-8000-000000000001";
 const browser = await chromium.launch({ executablePath: process.env.UI_QA_BROWSER || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", headless: true });
 

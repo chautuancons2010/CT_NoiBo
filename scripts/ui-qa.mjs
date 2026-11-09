@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { chromium } from "playwright-core";
 
-const baseUrl = process.env.UI_QA_BASE_URL || "http://127.0.0.1:3100";
+const baseUrl = process.env.UI_QA_BASE_URL || "http://localhost:3100";
 const edgePath = process.env.UI_QA_BROWSER || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const output = path.join(process.cwd(), "docs", "ui-evidence");
 const viewports = [
@@ -68,6 +68,7 @@ try {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: "vi-VN" });
     const page = await context.newPage();
     await page.goto(`${baseUrl}/ui-preview`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(300);
     const visual = await page.evaluate(() => {
       const root = getComputedStyle(document.documentElement);
       return {
@@ -89,7 +90,7 @@ try {
       };
     });
     if (visual.content > visual.viewport) throw new Error(`UI preview tràn ngang tại ${viewport.width}px: ${visual.content}px > ${visual.viewport}px`);
-    if (visual.appBackground !== "#f0fdfa" || visual.cardRadius !== "12px" || visual.controlHeight !== "44px") throw new Error(`UI preview không nhận đúng token: ${JSON.stringify(visual)}`);
+    if (visual.appBackground.toLowerCase() !== "#fafcfa" || visual.cardRadius !== "14px" || visual.controlHeight !== "44px") throw new Error(`UI preview không nhận đúng token: ${JSON.stringify(visual)}`);
     const validWorklist = viewport.width < 768
       ? visual.dataTables === 0 && visual.mobileLists === 1 && visual.mobileRecords === 2
       : visual.dataTables === 1 && visual.mobileLists === 0;

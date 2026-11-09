@@ -116,6 +116,9 @@ export interface Worksite {
   projectId: string;
   name: string;
   address?: string;
+  latitude?: number;
+  longitude?: number;
+  updatedAt?: string;
   radiusMeters: number;
   gpsRequired: boolean;
   allowedAccuracyThresholdMeters: number;
@@ -139,6 +142,7 @@ export interface ProjectAssignment {
   shiftName: string;
   shiftStart: string;
   shiftEnd: string;
+  shiftBreakMinutes?: number;
   status: "active" | "inactive" | "cancelled";
   rowVersion: number;
   approvedLeave?: { requestId: string; requestNumber: string; leaveTypeName: string; dayPart: string };

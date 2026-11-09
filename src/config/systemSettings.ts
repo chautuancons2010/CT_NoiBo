@@ -54,10 +54,23 @@ export const moduleKeys = [
   "projects",
   "warehouse",
   "import_export",
+  "accounting",
+  "operations",
   "reports"
 ] as const;
 
 export type ModuleKey = (typeof moduleKeys)[number];
+
+export const moduleLabels: Record<ModuleKey, string> = {
+  human_resources: "Nhân sự",
+  attendance: "Cá nhân",
+  projects: "Gói / Công trường",
+  warehouse: "Kho",
+  import_export: "Xuất nhập khẩu",
+  accounting: "Kế toán",
+  operations: "Đơn từ & Điều hành",
+  reports: "Báo cáo"
+};
 
 const localAssetPath = z.string().regex(/^\/[A-Za-z0-9/_-]+\.(png|jpe?g|webp|ico)$/i, "Đường dẫn tài sản không hợp lệ.");
 const nullableAssetUrl = z.union([z.string().url().max(2_000), localAssetPath]).nullable();
@@ -240,6 +253,8 @@ export const moduleSettingsSchema = z
     projects: z.boolean(),
     warehouse: z.boolean(),
     import_export: z.boolean(),
+    accounting: z.boolean().default(true),
+    operations: z.boolean().default(true),
     reports: z.boolean()
   })
   .strict();
@@ -346,6 +361,8 @@ export const defaultSystemSettings: SystemSettingsDocument = {
     projects: true,
     warehouse: true,
     import_export: true,
+    accounting: true,
+    operations: true,
     reports: true
   },
   payslip: {
@@ -412,7 +429,8 @@ export interface BrandColorTokens {
 
 export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
   const configuredPrimary = hexColorSchema.parse(primaryColor).toUpperCase();
-  const primary = ["#0F766E", "#19A94A", "#46A36D", "#2E9B67"].includes(configuredPrimary)
+  // Normalize the former ERP blue and legacy greens to the DTech company green.
+  const primary = ["#006894", "#0F766E", "#19A94A", "#46A36D", "#2E9B67"].includes(configuredPrimary)
     ? "#268558"
     : configuredPrimary;
   const whiteContrast = contrastRatio(primary, "#FFFFFF");
@@ -445,16 +463,26 @@ export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
 }
 
 export function moduleForPath(pathname: string): ModuleKey | null {
-  if (pathname.startsWith("/employees")) return "human_resources";
-  if (pathname.startsWith("/attendance") || pathname.startsWith("/timesheets") || pathname.startsWith("/leave") || pathname.startsWith("/shifts")) return "attendance";
-  if (pathname.startsWith("/projects") || pathname.startsWith("/worker-attendance")) return "projects";
-  if (pathname.startsWith("/warehouse") || pathname.startsWith("/settings/warehouse")) return "warehouse";
-  if (pathname.startsWith("/import-export") || pathname.startsWith("/settings/import-export")) return "import_export";
-  if (pathname.startsWith("/reports")) return "reports";
+  const matches = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
+  if (["/employees", "/dashboard/hr", "/attendance/today", "/attendance/logs", "/timesheets", "/shifts", "/leave/manage", "/leave/adjustments", "/leave/balances", "/leave/settlements", "/settings/attendance", "/settings/leave", "/settings/export-templates"].some(matches)) return "human_resources";
+  if (["/personal", "/attendance", "/leave"].some(matches)) return "attendance";
+  if (["/projects", "/project-monitoring", "/worker-attendance"].some(matches)) return "projects";
+  if (["/warehouse", "/dashboard/warehouse", "/settings/warehouse"].some(matches)) return "warehouse";
+  if (["/import-export", "/dashboard/import-export", "/settings/import-export"].some(matches)) return "import_export";
+  if (matches("/accounting")) return "accounting";
+  if (matches("/reports")) return "reports";
+  if (["/approvals", "/documents", "/dashboard/management", "/settings/approval-workflows", "/settings/approval-delegations"].some(matches)) return "operations";
   return null;
 }
 
-export function isPathEnabled(pathname: string, modules: ModuleSettings): boolean {
+export function modulesForPath(pathname: string): ModuleKey[] {
   const moduleKey = moduleForPath(pathname);
-  return moduleKey ? modules[moduleKey] : true;
+  if (!moduleKey) return [];
+  if (moduleKey === "reports") return [moduleKey, "operations"];
+  if (pathname === "/personal/payslips" || pathname.startsWith("/personal/payslips/")) return [moduleKey, "accounting"];
+  return [moduleKey];
+}
+
+export function isPathEnabled(pathname: string, modules: ModuleSettings): boolean {
+  return modulesForPath(pathname).every((key) => modules[key]);
 }

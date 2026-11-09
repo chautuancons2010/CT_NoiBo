@@ -1,10 +1,12 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AttendanceAdminDashboard } from "./AttendanceAdminDashboard";
 import type { AttendanceAdminToday, AttendanceAdminTodayRow, AttendanceEvent } from "@/features/attendance/types/attendanceTypes";
 
 vi.mock("@/lib/realtime/useDomainReconciliation", () => ({ useDomainReconciliation: vi.fn() }));
+// Address lookup has its own API/client tests; do not let it consume this workstation's staged attendance fetches.
+vi.mock("@/features/attendance/client/attendanceAddressClient", () => ({ lookupAttendanceAddress: vi.fn().mockResolvedValue({ status: "unavailable" }) }));
 
 const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const event = (employeeId: string, suffix: string, eventType: "check_in" | "check_out", clock: string, day = date): AttendanceEvent => {
@@ -45,7 +47,9 @@ describe("HR daily attendance photo workstation", () => {
     expect(queuePhoto).toHaveAttribute("loading", "lazy");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: row.employeeName })).not.toBeInTheDocument();
-    expect(within(inspector()).getAllByRole("link", { name: /Vị trí chấm công/ })[0]).toHaveAttribute("href", "https://www.google.com/maps?q=10.7769,106.7009");
+    expect(within(inspector()).queryByRole("link", { name: /Vị trí chấm công/ })).not.toBeInTheDocument();
+    fireEvent.click(within(inspector()).getAllByText("Vị trí", { selector: "summary" })[0]);
+    expect(await within(inspector()).findByRole("link", { name: /Vị trí chấm công/ })).toHaveAttribute("href", "https://www.google.com/maps?q=10.7769,106.7009");
     openPhoto.focus();
     fireEvent.click(openPhoto);
     let viewer = await screen.findByRole("dialog", { name: "Nguyễn Văn An · Chấm vào" });
@@ -89,6 +93,18 @@ describe("HR daily attendance photo workstation", () => {
     expect(markReviewed()).toBeDisabled();
   });
 
+  it("keeps search available when its result is empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(data)));
+    render(<AttendanceAdminDashboard />);
+    await screen.findByRole("heading", { name: row.employeeName });
+    const search = screen.getByLabelText("Nhân viên");
+    fireEvent.change(search, { target: { value: "không tìm thấy" } });
+    expect(screen.queryByRole("complementary", { name: "Hàng đợi kiểm tra ảnh" })).not.toBeInTheDocument();
+    expect(search).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "" } });
+    expect(within(inspector()).getByRole("heading", { name: row.employeeName })).toBeInTheDocument();
+  });
+
   it("keeps photo requests and both inspection decisions disabled without photo permission", async () => {
     const preloadImage = vi.fn(function () { return document.createElement("img"); });
     vi.stubGlobal("Image", preloadImage);
@@ -99,7 +115,7 @@ describe("HR daily attendance photo workstation", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getAllByText("Không có quyền xem ảnh")).toHaveLength(2);
     expect(markReviewed()).toBeDisabled();
-    expect(screen.getByRole("button", { name: /^Đánh dấu F/ })).toBeDisabled();
+    expect(within(inspector()).getByRole("button", { name: /^Đánh dấu$/ })).toBeDisabled();
     expect(preloadImage).not.toHaveBeenCalled();
     expect(fetch.mock.calls.every(([url]) => typeof url === "string" && url.startsWith("/api/v1/attendance/admin/today"))).toBe(true);
   });
@@ -117,7 +133,13 @@ describe("HR daily attendance photo workstation", () => {
     const rows = Array.from({ length: 41 }, (_, index) => employee("employee-" + index, "Nhân viên " + String(index).padStart(2, "0"), "NV" + index, { events: [], status: "not_checked", checkIn: undefined, checkOut: undefined, totalMinutes: 0 }));
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ ...data, totalEmployees: rows.length, rows })));
     render(<AttendanceAdminDashboard />);
-    fireEvent.click(await screen.findByRole("button", { name: /^Tất cả/ }));
+    await screen.findByRole("heading", { name: "Chưa có ảnh chấm công" });
+    expect(screen.queryByRole("complementary", { name: "Hàng đợi kiểm tra ảnh" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Tổng quan chấm công")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "41 người thiếu ảnh" }));
+    expect(screen.getByRole("heading", { name: "Nhân viên" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Tất cả\s+41$/ }));
     const queue = screen.getByRole("complementary", { name: "Hàng đợi kiểm tra ảnh" });
     expect(within(queue).getAllByRole("button", { name: /^Kiểm tra Nhân viên/ })).toHaveLength(40);
     expect(screen.queryByRole("button", { name: "Kiểm tra Nhân viên 40" })).not.toBeInTheDocument();
@@ -146,7 +168,7 @@ describe("HR daily attendance photo workstation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
     expect(within(inspector()).getByRole("heading", { name: row.employeeName })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Tiến độ xem ảnh" })).toHaveAttribute("aria-valuenow", "0");
-    expect(screen.getByRole("button", { name: "Hoàn tác" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Hoàn tác" })).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -186,8 +208,8 @@ describe("HR daily attendance photo workstation", () => {
     loadFocusedPhotos();
     await waitFor(() => expect(markReviewed()).toBeEnabled());
     fireEvent.click(markReviewed());
-    expect(screen.getByRole("heading", { name: "Đã xử lý hết ảnh trong ngày" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Làm mới" }));
+    expect(screen.getByRole("heading", { name: "Đã xem hết ảnh trong ngày" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Làm mới ảnh chấm công" }));
     expect(await screen.findByRole("heading", { name: row.employeeName })).toBeInTheDocument();
     expect(within(inspector()).getByRole("img", { name: "Nguyễn Văn An · Chấm ra 17:00" })).toHaveAttribute("src", "/api/v1/attendance/photos/photo-updated-out");
     expect(markReviewed()).toBeDisabled();
@@ -198,6 +220,9 @@ describe("HR daily attendance photo workstation", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ ...data, rows: [row, secondRow] })));
     render(<AttendanceAdminDashboard />);
     await screen.findByRole("heading", { name: row.employeeName });
+    // The heading commits before the asynchronous review initialization and document shortcut effect finish.
+    await waitFor(() => expect(within(inspector()).getByRole("button", { name: /^Đánh dấu/ })).toBeEnabled());
+    await act(async () => {});
     const search = screen.getByLabelText("Nhân viên");
     search.focus();
     fireEvent.keyDown(search, { key: "ArrowRight" });
@@ -206,17 +231,17 @@ describe("HR daily attendance photo workstation", () => {
     expect(within(inspector()).getByRole("heading", { name: row.employeeName })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Tiến độ xem ảnh" })).toHaveAttribute("aria-valuenow", "0");
     inspector().focus();
-    fireEvent.keyDown(inspector(), { key: "ArrowRight" });
-    expect(within(inspector()).getByRole("heading", { name: secondRow.employeeName })).toBeInTheDocument();
-    fireEvent.keyDown(inspector(), { key: "ArrowLeft" });
-    expect(within(inspector()).getByRole("heading", { name: row.employeeName })).toBeInTheDocument();
+    await act(async () => { fireEvent.keyDown(inspector(), { key: "ArrowRight" }); });
+    expect(await within(inspector()).findByRole("heading", { name: secondRow.employeeName })).toBeInTheDocument();
+    await act(async () => { fireEvent.keyDown(inspector(), { key: "ArrowLeft" }); });
+    expect(await within(inspector()).findByRole("heading", { name: row.employeeName })).toBeInTheDocument();
     loadFocusedPhotos();
     await waitFor(() => expect(markReviewed()).toBeEnabled());
-    fireEvent.keyDown(inspector(), { key: "Enter" });
-    expect(within(inspector()).getByRole("heading", { name: secondRow.employeeName })).toBeInTheDocument();
-    fireEvent.keyDown(inspector(), { key: "f" });
-    await screen.findByRole("heading", { name: "Đã xử lý hết ảnh trong ngày" });
-    fireEvent.click(screen.getByRole("button", { name: /^Đánh dấu/ }));
+    await act(async () => { fireEvent.keyDown(inspector(), { key: "Enter" }); });
+    expect(await within(inspector()).findByRole("heading", { name: secondRow.employeeName })).toBeInTheDocument();
+    await act(async () => { fireEvent.keyDown(inspector(), { key: "f" }); });
+    await screen.findByRole("heading", { name: "Đã xem hết ảnh trong ngày" });
+    fireEvent.click(screen.getByRole("button", { name: /^Đánh dấu \d+$/ }));
     expect(within(inspector()).getByRole("heading", { name: secondRow.employeeName })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kiểm tra " + secondRow.employeeName + " · Đánh dấu" })).toBeInTheDocument();
   });
@@ -231,7 +256,7 @@ describe("HR daily attendance photo workstation", () => {
     await waitFor(() => expect(markReviewed()).toBeEnabled());
     fireEvent.click(markReviewed());
     expect(screen.getByRole("progressbar", { name: "Tiến độ xem ảnh" })).toHaveAttribute("aria-valuenow", "1");
-    expect(screen.getByText("Trong phiên này")).toBeInTheDocument();
+    expect(screen.queryByText("Trong phiên này")).not.toBeInTheDocument();
     first.unmount();
     render(<AttendanceAdminDashboard />);
     await screen.findByRole("heading", { name: row.employeeName });

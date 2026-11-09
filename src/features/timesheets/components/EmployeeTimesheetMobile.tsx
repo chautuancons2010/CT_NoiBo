@@ -1,68 +1,92 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Clock3, TriangleAlert, UserRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-
+import { CalendarDays, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/shared/Button";
 import { Card } from "@/components/shared/Card";
+import { Drawer } from "@/components/shared/Overlays";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { LoadingState } from "@/components/shared/States";
+import { WorkCalendar, type CalendarTone } from "@/components/shared/WorkCalendar";
+import { useIsPhone } from "@/lib/ui/useIsPhone";
+import { formatBusinessDate } from "@/lib/time/timezone";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+import { calendarWeeks, dailyLabels, dailySymbols, periodDates, reconcileTimesheet } from "../services/timesheetPresentation";
 import type { DailyTimesheet, TimesheetPeriod, TimesheetSummary } from "../types/timesheetTypes";
+import styles from "./EmployeeTimesheetMobile.module.css";
 
-const label: Record<string, string> = {
-  full_work: "Đủ công", late: "Đi trễ", early_leave: "Về sớm", missing_check_in: "Thiếu chấm vào",
-  missing_check_out: "Thiếu chấm ra", annual_leave: "Nghỉ phép", unpaid_leave: "Nghỉ không lương",
-  absent: "Vắng", business_trip: "Công tác", holiday: "Ngày lễ", rest_day: "Ngày nghỉ",
-  worker_site: "Công trường", needs_review: "Cần rà soát"
-};
-const time = (value?: string) => value ? new Date(value).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—";
+const sourceLabels = { SELF_ATTENDANCE: "Tự chấm công", SUPERVISOR_ROSTER: "Điểm danh công trường", APPROVED_LEAVE: "Đơn nghỉ đã duyệt", MANUAL_ADJUSTMENT: "Điều chỉnh nhân sự", SYSTEM_CALENDAR: "Lịch làm việc" };
+const time = (value?: string) => value ? new Date(value).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }) : "—";
+const count = (value: number) => typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("vi-VN", { maximumFractionDigits: 2 }) : "—";
+type Detail = { period: TimesheetPeriod; daily: DailyTimesheet[]; summary?: TimesheetSummary };
 
-export function EmployeeTimesheetMobile({ periodId, employeeId, selectedDate }: { periodId: string; employeeId: string; selectedDate?: string }) {
-  const [period, setPeriod] = useState<TimesheetPeriod>();
-  const [daily, setDaily] = useState<DailyTimesheet[]>([]);
-  const [summary, setSummary] = useState<TimesheetSummary>();
+export function EmployeeTimesheetMobile({ periodId, employeeId, selectedDate, canAdjust = false }: { periodId: string; employeeId: string; selectedDate?: string; canAdjust?: boolean }) {
+  const phone = useIsPhone();
+  const [detail, setDetail] = useState<Detail>();
   const [error, setError] = useState("");
-  const load = useCallback(async () => {
+  const [selected, setSelected] = useState<string>();
+  const requestVersion = useRef(0);
+  const load = useCallback(async (signal?: AbortSignal) => {
+    const version = ++requestVersion.current;
     try {
-      const response = await fetch(`/api/v1/timesheet-periods/${periodId}`, { cache: "no-store" });
+      const response = await fetch(`/api/v1/timesheet-periods/${encodeURIComponent(periodId)}`, { cache: "no-store", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000) });
       const body = await response.json() as { data?: { period: TimesheetPeriod; daily: DailyTimesheet[]; summaries: TimesheetSummary[] }; error?: { message: string } };
       if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể tải công nhân viên.");
-      setPeriod(body.data.period);
-      setDaily(body.data.daily.filter((item) => item.employeeId === employeeId || item.employeeCode === employeeId));
-      setSummary(body.data.summaries.find((item) => item.employeeId === employeeId || item.employeeCode === employeeId));
+      if (signal?.aborted || version !== requestVersion.current) return;
+      setDetail({ period: body.data.period, daily: body.data.daily.filter(item => item.employeeId === employeeId || item.employeeCode === employeeId), summary: body.data.summaries.find(item => item.employeeId === employeeId || item.employeeCode === employeeId) });
       setError("");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không thể tải công nhân viên.");
+      if (!signal?.aborted && version === requestVersion.current) setError(reason instanceof Error ? reason.message : "Không thể tải công nhân viên.");
     }
   }, [periodId, employeeId]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { const controller = new AbortController(); const timer = window.setTimeout(() => void load(controller.signal), 0); return () => { window.clearTimeout(timer); controller.abort(); }; }, [load]);
   useDomainReconciliation("timesheets", load);
-  const grouped = useMemo(() => [...daily].filter((item) => !selectedDate || item.workDate === selectedDate).sort((a, b) => b.workDate.localeCompare(a.workDate)), [daily, selectedDate]);
-  if (error) return <Card><p className="form-error" role="alert">{error}</p></Card>;
-  if (!period) return <Card>Đang tải…</Card>;
-  return <div className="employee-timesheet">
-    <Card className="employee-timesheet__summary">
-      <div className="employee-timesheet__summary-head">
-        <div className="employee-timesheet__identity">
-          <span className="employee-timesheet__eyebrow"><UserRound aria-hidden="true" size={15} /> Nhân viên</span>
-          <strong>{summary?.employeeName ?? daily[0]?.employeeName ?? "Nhân viên"}</strong>
-          <span>{summary?.departmentName ?? daily[0]?.departmentName ?? "—"}</span>
-        </div>
-        <div className="employee-timesheet__period"><CalendarDays aria-hidden="true" size={18} /><div><span>{period.name}</span><strong>{period.startDate} – {period.endDate}</strong></div></div>
-      </div>
-      {summary ? <div className="employee-timesheet__stats"><span><b>{summary.actualWorkdays}</b>Ngày công</span><span><b>{summary.lateDays}</b>Ngày trễ</span><span><b>{summary.annualLeaveDays}</b>Phép năm</span><span><b>{summary.exceptionCount}</b>Ngoại lệ</span></div> : null}
+  const period = detail?.period;
+  const daily = useMemo(() => detail?.daily ?? [], [detail]);
+  const summary = detail?.summary;
+  const days = useMemo(() => period ? periodDates(period.startDate, period.endDate) : [], [period]);
+  const weeks = useMemo(() => calendarWeeks(days), [days]);
+  const byDate = useMemo(() => new Map(daily.map(item => [item.workDate, item])), [daily]);
+  const selectedDay = selected ?? (selectedDate && days.includes(selectedDate) ? selectedDate : "");
+  const record = byDate.get(selectedDay);
+  const employeeName = summary?.employeeName ?? daily[0]?.employeeName ?? "Nhân viên";
+  if (error && !detail) return <Card><p className="form-error" role="alert">{error}</p><Button onClick={() => void load()}>Thử lại</Button></Card>;
+  if (!period) return <LoadingState title="Đang mở công nhân viên" />;
+  if (!summary && !daily.length) return <Card>Không tìm thấy nhân viên trong kỳ công</Card>;
+  return <div className={styles.workspace}>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    <Card className={styles.summary}>
+      <div className={styles.identity}><div><h2>{employeeName}</h2><span>{summary?.employeeCode ?? daily[0]?.employeeCode}{(summary?.departmentName ?? daily[0]?.departmentName) ? ` · ${summary?.departmentName ?? daily[0]?.departmentName}` : ""}</span></div><div className={styles.period}><CalendarDays aria-hidden="true" size={18}/><span><strong>{period.name}</strong><small>{formatBusinessDate(period.startDate)} – {formatBusinessDate(period.endDate)}</small></span></div></div>
     </Card>
-    {selectedDate ? <div className="timesheet-selected-date"><strong>{selectedDate}</strong><Link href={`/timesheets/periods/${periodId}/employees/${employeeId}`}>Xem tất cả ngày</Link></div> : null}
-    <section className="employee-timesheet__days"><header className="employee-timesheet__list-head"><div><span>Lịch công</span><strong>{selectedDate ?? period.name}</strong></div><b>{grouped.length} ngày</b></header>{grouped.map((item) => <Card className="employee-timesheet__day" key={item.id}>
-      <div className="employee-timesheet__date"><strong>{new Date(`${item.workDate}T00:00:00`).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}</strong><TimesheetStatus item={item} /></div>
-      <div className="employee-timesheet__time"><Clock3 size={17} /><b>{time(item.effectiveCheckIn)} → {time(item.effectiveCheckOut)}</b><span>{item.shiftName || "—"}</span></div>
-      {item.lateMinutes > 0 ? <span>Đi trễ {item.lateMinutes} phút</span> : null}
-      {item.earlyLeaveMinutes > 0 ? <span>Về sớm {item.earlyLeaveMinutes} phút</span> : null}
-      {item.exceptionCount > 0 ? <Link href={`/timesheets/exceptions?periodId=${periodId}`}><TriangleAlert size={16} />Ngoại lệ: {item.exceptionCount}</Link> : null}
-    </Card>)}{!grouped.length ? <Card>Chưa có dữ liệu công.</Card> : null}</section>
+    <div className={styles.layout}>
+    <Card className={styles.calendar}>
+      <div className={styles.calendarHeading}><h2>Lịch công</h2><Button aria-label="Cập nhật lịch công" onClick={() => void load()}><RefreshCw aria-hidden="true" size={16}/></Button></div>
+      {summary && reconcileTimesheet(summary, daily).mismatch ? <p className={styles.dataAlert} role="status">Chưa đủ dữ liệu công từng ngày</p> : null}
+      <WorkCalendar label={`Lịch công ${employeeName}`} weeks={weeks} selectedDate={selectedDay} onSelectDate={setSelected} getDay={(date) => {
+        const item = byDate.get(date);
+        const tone: CalendarTone = !item ? "neutral" : ["full_work", "worker_site"].includes(item.status) ? "success" : ["absent", "unpaid_leave"].includes(item.status) ? "danger" : ["annual_leave", "business_trip", "holiday"].includes(item.status) ? "info" : "warning";
+        return { label: `${formatBusinessDate(date)}: ${item ? dailyLabels[item.status] : "Chưa có dữ liệu"}`, content: item ? dailySymbols[item.status] : undefined, tone };
+      }} />
+      <details className={styles.legend}><summary>Chú thích</summary><div>{[["X", "Có công"], ["M / S", "Trễ / sớm"], ["P", "Nghỉ phép"], ["KL", "Không lương"], ["V", "Vắng"], ["!", "Cần xử lý"]].map(([symbol, label]) => <span key={symbol}><b>{symbol}</b>{label}</span>)}</div></details>
+    </Card>
+    {!phone && selectedDay ? <aside aria-label="Chi tiết ngày công" className={styles.selectedDetail}><div className={styles.detailToolbar}><h2>Chi tiết ngày công</h2><Button onClick={() => setSelected("")} variant="ghost">Đóng</Button></div>{renderDayDetail()}</aside> : <aside aria-label="Tổng hợp kỳ công" className={styles.inspector}>
+      <h2>Tổng hợp kỳ công</h2>
+      {summary ? <dl className={styles.metrics}>{[["Ngày công", summary.actualWorkdays], ["Đi trễ", summary.lateDays], ["Nghỉ phép", summary.annualLeaveDays], ["Không lương", summary.unpaidLeaveDays], ["Vắng", summary.absentDays], ["Ngoại lệ", summary.exceptionCount]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{count(value as number)}</dd></div>)}</dl> : null}
+    </aside>}
+    </div>
+    <Drawer open={phone && Boolean(selectedDay)} onClose={() => setSelected("")} title={`${employeeName} · ${selectedDay ? formatBusinessDate(selectedDay) : "Ngày công"}`}>
+      {phone ? renderDayDetail() : null}
+    </Drawer>
   </div>;
-}
 
-function TimesheetStatus({ item }: { item: DailyTimesheet }) {
-  return <StatusBadge tone={item.exceptionCount ? "warning" : item.status === "full_work" || item.status === "holiday" ? "success" : "neutral"}>{label[item.status] ?? item.status}</StatusBadge>;
+  function renderDayDetail() {
+    return <div className={styles.dayDetail}><div className={styles.dayHeading}><strong>{selectedDay ? formatBusinessDate(selectedDay) : "Ngày công"}</strong><StatusBadge tone={record?.exceptionCount ? "warning" : "neutral"}>{record ? dailyLabels[record.status] : "Chưa có dữ liệu"}</StatusBadge></div>
+        {record ? <><dl className={styles.facts}>{[["Ca làm", record.shiftName || "—"], ["Giờ ca", record.shiftStart ? `${record.shiftStart} – ${record.shiftEnd || "—"}` : "—"], ["Chấm vào", time(record.effectiveCheckIn)], ["Chấm ra", time(record.effectiveCheckOut)], ["Ngày công", count(record.workFraction)], ["Thời gian làm", `${record.workMinutes} phút`], ["Đi trễ", `${record.lateMinutes} phút`], ["Về sớm", `${record.earlyLeaveMinutes} phút`], ["Nghỉ phép", count(record.leaveFraction)], ["Ngoại lệ", record.exceptionCount]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+        {record.sources.length ? <section><h3>Nguồn dữ liệu</h3><div className={styles.sources}>{record.sources.map(source => <StatusBadge key={source}>{sourceLabels[source]}</StatusBadge>)}</div></section> : null}
+        {record.hrNote ? <section><h3>Ghi nhận nhân sự</h3><p>{record.hrNote}</p></section> : null}
+        {record.adjustments.length ? <section><h3>Lịch sử điều chỉnh</h3>{record.adjustments.map(item => <div className={styles.adjustment} key={item.id}><strong>{item.reason}</strong><small>{item.createdByName || "Nhân sự"} · {formatBusinessDate(item.createdAt)}</small>{item.hrNote ? <span>{item.hrNote}</span> : null}</div>)}</section> : null}</> : <p className={styles.dataAlert}>Chưa có bản ghi công cho ngày này</p>}
+        <div className={styles.actions}>{record?.exceptionCount ? <Link className="button button--secondary button--md" href={`/timesheets/exceptions?periodId=${encodeURIComponent(periodId)}`}>Ngoại lệ · {record.exceptionCount}</Link> : null}{canAdjust && summary && period && period.status !== "locked" ? <Link className="button button--primary button--md" href={`/timesheets/adjustments?periodId=${encodeURIComponent(periodId)}&employeeId=${encodeURIComponent(summary.employeeId)}&date=${selectedDay}&rowVersion=${period.rowVersion}`}>Điều chỉnh công</Link> : null}</div>
+      </div>;
+  }
 }

@@ -1,5 +1,6 @@
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
 import { can } from "@/lib/auth/permissions";
+import { approvalInboxPermissions } from "@/lib/auth/approvalAccess";
 import {
   dashboardProfileKeys,
   dashboardWidgetKeys,
@@ -13,14 +14,14 @@ import {
 interface DashboardProfileDefinition {
   key: DashboardProfileKey;
   label: string;
-  requiredAny: Permission[];
+  requiredAny: readonly Permission[];
   defaultLandingPage: DashboardLandingPage;
 }
 
 interface DashboardWidgetDefinition {
   key: DashboardWidgetKey;
   label: string;
-  requiredAny: Permission[];
+  requiredAny: readonly Permission[];
   allowedProfiles: DashboardProfileKey[];
 }
 
@@ -30,7 +31,7 @@ export const dashboardProfiles: DashboardProfileDefinition[] = [
   { key: "import_export", label: "Xuất nhập khẩu", requiredAny: ["import_export.view", "shipment.view"], defaultLandingPage: "/dashboard" },
   { key: "warehouse", label: "Kho", requiredAny: ["warehouse.view"], defaultLandingPage: "/dashboard" },
   { key: "accounting", label: "Kế toán", requiredAny: ["accounting.access", "salary.view", "payroll.view"], defaultLandingPage: "/dashboard" },
-  { key: "hr", label: "Nhân sự", requiredAny: ["employee.view", "timesheet.view_all", "leave.view_all"], defaultLandingPage: "/dashboard" },
+  { key: "hr", label: "Nhân sự", requiredAny: ["employee.view", "timesheet.view_all", "leave.view_all", "attendance.view_all", "attendance.manage"], defaultLandingPage: "/dashboard" },
   { key: "employee", label: "Nhân viên", requiredAny: ["attendance.self.view", "leave.self.view", "profile.view", "dashboard.view"], defaultLandingPage: "/dashboard" }
 ];
 
@@ -38,14 +39,13 @@ export const dashboardWidgetRegistry: DashboardWidgetDefinition[] = [
   { key: "attendance_overview", label: "Chấm công hôm nay", requiredAny: ["attendance.view_all", "attendance.manage"], allowedProfiles: ["management", "hr"] },
   { key: "employee_today", label: "Hôm nay", requiredAny: ["attendance.self.view", "attendance.self.create"], allowedProfiles: ["employee"] },
   { key: "supervisor_today", label: "Công trường hôm nay", requiredAny: ["worker_attendance.create", "worker_attendance.self_scope"], allowedProfiles: ["supervisor"] },
-  { key: "my_approvals", label: "Phê duyệt cần xử lý", requiredAny: ["approval.inbox.view", "approval.view"], allowedProfiles: [...dashboardProfileKeys] },
-  { key: "timesheet_exceptions", label: "Bảng công cần xử lý", requiredAny: ["timesheet.view", "timesheet.view_all", "timesheet.view_team"], allowedProfiles: ["hr", "management"] },
+  { key: "my_approvals", label: "Phê duyệt cần xử lý", requiredAny: approvalInboxPermissions, allowedProfiles: [...dashboardProfileKeys] },
+  { key: "timesheet_exceptions", label: "Bảng công cần xử lý", requiredAny: ["timesheet.adjust", "timesheet.view_all", "timesheet.view_team"], allowedProfiles: ["hr", "management"] },
   { key: "project_attention", label: "Dự án cần chú ý", requiredAny: ["project_monitoring.view", "project_monitoring.view_all"], allowedProfiles: ["supervisor", "management"] },
   { key: "warehouse_low_stock", label: "Cảnh báo kho", requiredAny: ["warehouse.view"], allowedProfiles: ["warehouse", "management"] },
   { key: "shipment_attention", label: "Lô hàng cần chú ý", requiredAny: ["import_export.view", "shipment.view"], allowedProfiles: ["import_export", "management"] },
   { key: "accounting_summary", label: "Tổng quan kế toán", requiredAny: ["salary.view", "payroll.view", "payslip.self.view"], allowedProfiles: ["accounting", "management", "employee"] },
   { key: "hr_summary", label: "Tổng quan nhân sự", requiredAny: ["employee.view"], allowedProfiles: ["hr", "management"] },
-  { key: "recent_activity", label: "Hoạt động gần đây", requiredAny: ["audit.view"], allowedProfiles: ["hr", "warehouse", "import_export", "management"] },
   { key: "recent_notifications", label: "Thông báo", requiredAny: ["notification.self.view", "notification.view"], allowedProfiles: [...dashboardProfileKeys] },
   { key: "quick_actions", label: "Tác vụ thường dùng", requiredAny: ["dashboard.view"], allowedProfiles: [...dashboardProfileKeys] }
 ];
@@ -80,6 +80,7 @@ export function resolveDashboardProfile(user: AuthenticatedUser, settings: Dashb
   const configuredProfiles = new Set(settings.presetOrder);
   for (const key of dashboardProfileKeys) {
     if (!configuredProfiles.has(key)) continue;
+    if (key === "management" && can(user.permissions, "project_monitoring.view") && !matchesAnyPermission(user.permissions, ["worker_attendance.create", "worker_attendance.self_scope"])) return "management";
     const profile = dashboardProfiles.find((item) => item.key === key);
     if (profile && matchesAnyPermission(user.permissions, profile.requiredAny)) return profile.key;
   }
@@ -95,6 +96,11 @@ export function resolveLandingPage(user: AuthenticatedUser, settings: DashboardS
   return resolveRoleLandingPage(user, settings);
 }
 
+export function resolveMobileLandingPage(user: AuthenticatedUser, settings: DashboardSettings): string {
+  void user; void settings;
+  return "/personal";
+}
+
 export function resolveRoleLandingPage(user: AuthenticatedUser, settings: DashboardSettings): string {
   const profile = resolveDashboardProfile(user, settings);
   const configured = settings.presets.find((item) => item.profile === profile)?.landingPage;
@@ -105,7 +111,7 @@ export function resolveRoleLandingPage(user: AuthenticatedUser, settings: Dashbo
   return isLandingPageAllowed(user, candidate) ? candidate : firstAccessibleRoute(user);
 }
 
-const landingRoutes: ReadonlyArray<{ route: string; requiredAny: Permission[] }> = [
+const landingRoutes: ReadonlyArray<{ route: string; requiredAny: readonly Permission[] }> = [
   { route: "/dashboard", requiredAny: ["dashboard.view", "salary.view", "payroll.view", "payslip.self.view"] },
   { route: "/attendance/me", requiredAny: ["attendance.self", "attendance.self.view", "attendance.self.create"] },
   { route: "/attendance/history", requiredAny: ["attendance.self.view", "attendance.self_history"] },
@@ -142,7 +148,7 @@ const landingRoutes: ReadonlyArray<{ route: string; requiredAny: Permission[] }>
   { route: "/accounting/payroll", requiredAny: ["payroll.view", "payroll.create"] },
   { route: "/accounting/payslips", requiredAny: ["payslip.self.view"] },
   { route: "/accounting/salary-history", requiredAny: ["salary.history.view"] },
-  { route: "/approvals", requiredAny: ["approval.inbox.view", "approval.view"] },
+  { route: "/approvals", requiredAny: approvalInboxPermissions },
   { route: "/documents", requiredAny: ["document.view"] },
   { route: "/reports", requiredAny: ["report.view"] },
   { route: "/messages", requiredAny: ["chat.access"] },

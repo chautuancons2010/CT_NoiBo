@@ -15,6 +15,7 @@ import type {
   EmploymentType,
   Position
 } from "@/features/employees/types";
+import styles from "./EmployeeCreateForm.module.css";
 
 interface EmployeeEditFormProps {
   employee: EmployeeRecord;
@@ -89,13 +90,13 @@ export function EmployeeEditForm({
   }
 
   return (
-    <form className="employee-create-form" onSubmit={handleSubmit}>
-      {error ? <div className="form-alert form-alert--error">{error}</div> : null}
+    <form className={`employee-create-form ${styles.editForm}`} onSubmit={handleSubmit}>
+      {error ? <div className="form-alert form-alert--error" role="alert">{error}</div> : null}
       <FormSection title="Thông tin cơ bản">
         <Input defaultValue={employee.employeeCode} label="Mã nhân viên" name="employeeCode" required />
         <Input defaultValue={employee.fullName} label="Họ và tên" name="fullName" required />
         <Input defaultValue={employee.displayName} label="Tên hiển thị" name="displayName" />
-        <Input defaultValue={employee.personalPhone} label="Số điện thoại" name="personalPhone" required />
+        <Input defaultValue={employee.personalPhone} label="Số điện thoại" name="personalPhone" required type="tel" />
         <Input defaultValue={employee.personalEmail} label="Email cá nhân" name="personalEmail" type="email" />
         <Input defaultValue={employee.companyEmail} label="Email công ty" name="companyEmail" type="email" />
       </FormSection>
@@ -122,8 +123,8 @@ export function EmployeeEditForm({
 
       <StickyActionBar>
         <Button disabled={submitting} onClick={() => router.back()}>Hủy</Button>
-        <Button disabled={submitting} leftIcon={<Save aria-hidden="true" size={16} />} type="submit" variant="primary">
-          {submitting ? "Đang lưu" : "Lưu thay đổi"}
+        <Button disabled={submitting} leftIcon={<Save aria-hidden="true" size={16} />} type="submit" variant="primary" busy={submitting}>
+          {"Lưu thay đổi"}
         </Button>
       </StickyActionBar>
     </form>

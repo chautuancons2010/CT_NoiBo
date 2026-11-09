@@ -1,0 +1,4 @@
+.identity { display: flex; width: 100%; min-width: 0; max-width: 100%; align-items: center; gap: 12px; }
+.copy { display: grid; min-width: 0; max-width: 100%; flex: 1 1 0; gap: 4px; }
+.copy > small { display: block; min-width: 0; max-width: 100%; overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 767px) { .identity { gap: 10px; } }

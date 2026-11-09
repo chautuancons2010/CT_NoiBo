@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   deriveBrandColorTokens,
@@ -26,6 +26,11 @@ export function SystemSettingsProvider({
   children: ReactNode;
 }) {
   const [settings, setSettings] = useState(initialSettings);
+  const updateGroup = useCallback<SystemSettingsContextValue["updateGroup"]>((group, groupValue) => {
+    setSettings((current) => JSON.stringify(current[group]) === JSON.stringify(groupValue)
+      ? current
+      : { ...current, [group]: groupValue });
+  }, []);
 
   useEffect(() => {
     const tokens = deriveBrandColorTokens(settings.appearance.primaryColor);
@@ -51,11 +56,9 @@ export function SystemSettingsProvider({
   const value = useMemo<SystemSettingsContextValue>(
     () => ({
       settings,
-      updateGroup: (group, groupValue) => {
-        setSettings((current) => ({ ...current, [group]: groupValue }));
-      }
+      updateGroup
     }),
-    [settings]
+    [settings, updateGroup]
   );
 
   return <SystemSettingsContext.Provider value={value}>{children}</SystemSettingsContext.Provider>;

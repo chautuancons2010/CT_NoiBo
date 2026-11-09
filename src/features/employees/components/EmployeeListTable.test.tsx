@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { EmployeeListTable } from "@/features/employees/components/EmployeeListTable";
 import type { EmployeeSummary } from "@/features/employees/types";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const employee: EmployeeSummary = {
   id: "employee/id with spaces",
@@ -25,13 +27,13 @@ const employee: EmployeeSummary = {
 };
 
 describe("EmployeeListTable", () => {
-  it("builds selection links from serializable route data", () => {
-    render(<EmployeeListTable employees={[employee]} permissions={[]} selectionBaseHref="/employees?page=2&pageSize=10" />);
+  it("opens the employee profile from the name", () => {
+    render(<EmployeeListTable employees={[employee]} permissions={[]} />);
 
     const links = screen.getAllByRole("link", { name: employee.fullName });
     expect(links).toHaveLength(1);
     for (const link of links) {
-      expect(link).toHaveAttribute("href", "/employees?page=2&pageSize=10&selected=employee%2Fid%20with%20spaces");
+      expect(link).toHaveAttribute("href", "/employees/employee%2Fid%20with%20spaces/profile");
     }
     expect(screen.queryByRole("columnheader", { name: "Ngày vào làm" })).not.toBeInTheDocument();
     expect(screen.queryByText("NV001")).not.toBeInTheDocument();
@@ -47,5 +49,15 @@ describe("EmployeeListTable", () => {
       "src",
       `/api/v1/employees/${employeeWithPhoto.id}/avatar?v=0`
     );
+  });
+
+  it("keeps the archive dialog open after choosing it from the row menu", () => {
+    render(<EmployeeListTable employees={[employee]} permissions={["employee.archive"]} />);
+    fireEvent.click(screen.getByRole("button", { name: `Thao tác ${employee.fullName}` }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Lưu trữ" }));
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Lưu trữ hồ sơ" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Lý do" })).toBeInTheDocument();
   });
 });

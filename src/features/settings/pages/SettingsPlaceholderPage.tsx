@@ -87,14 +87,13 @@ export function SettingsPlaceholderPage({
               description="Thông tin hiển thị trong hệ thống và tài liệu xuất nội bộ."
               title="Thông tin nền tảng"
             >
-              <Input helperText="Tên hiển thị trong header và tài liệu xuất." label="Tên tổ chức" />
+              <Input label="Tên tổ chức" />
               <Select
-                helperText="Timestamp nghiệp vụ hiển thị theo timezone công ty."
                 label="Timezone"
                 options={[{ label: "Việt Nam (Asia/Ho_Chi_Minh)", value: "Asia/Ho_Chi_Minh" }]}
               />
-              <Input helperText="Dùng cho API, webhook và link nội bộ." label="Base URL" />
-              <Switch checked label="Bật audit log" helperText="Ghi nhận thao tác quan trọng của người dùng." />
+              <Input label="Base URL" />
+              <Switch checked label="Bật audit log" />
             </FormSection>
             <StickyActionBar>
               <Button variant="secondary">Hủy</Button>

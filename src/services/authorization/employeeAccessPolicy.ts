@@ -56,3 +56,16 @@ export function toggleEmployeeRole(
 export function withEmployeeBaseline(permissions: readonly Permission[]): Permission[] {
   return [...new Set([...employeeBaselinePermissions, ...permissions])];
 }
+
+const employeePersonalPermissions = new Set<Permission>([
+  "attendance.self", "attendance.self.view", "attendance.self.create",
+  "attendance.self_history", "attendance.self_request", "timesheet.self.view",
+  "leave.self.view", "leave.self.create", "leave.self.withdraw",
+  "leave.balance.view_self", "leave.pdf.export_self", "payslip.self.view"
+]);
+
+/** Personal HR actions require an employee; system administration does not. */
+export function resolveAccountPermissions(permissions: readonly Permission[], employeeId?: string | null, managementOnly = false): Permission[] {
+  if (employeeId && !managementOnly) return withEmployeeBaseline(permissions);
+  return [...new Set<Permission>(["profile.view", ...permissions.filter((permission) => !employeePersonalPermissions.has(permission))])];
+}
