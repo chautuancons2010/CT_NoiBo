@@ -107,7 +107,6 @@ export const desktopNavigation: NavigationGroup[] = [
         mobilePriority: 1,
         exact: true
       },
-      { label: "Ảnh & công công trường", href: "/employees/field-attendance", icon: "Camera", requiredPermission: "worker_attendance.view", alternativePermission: "worker_attendance.view_all" },
       {
         label: "Phòng ban",
         href: "/employees/departments",
@@ -153,7 +152,7 @@ export const desktopNavigation: NavigationGroup[] = [
         icon: "CalendarRange",
         requiredPermission: "attendance.self.view",
         mobilePriority: 2,
-        alternativePermission: "attendance.self_history"
+        alternativePermissions: ["attendance.self_history", "attendance.self.create"]
       },
       {
         label: "Nghỉ phép",

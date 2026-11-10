@@ -172,7 +172,7 @@ export function enabledWidgetsFor(user: AuthenticatedUser, profile: DashboardPro
   const selected = settings.presets.find((item) => item.profile === profile)?.enabledWidgets ?? defaultWidgets[profile];
   return selected.flatMap((key) => {
     const widget = dashboardWidgetRegistry.find((item) => item.key === key);
-    return widget && widget.allowedProfiles.includes(profile) && matchesAnyPermission(user.permissions, widget.requiredAny) ? [widget] : [];
+    return widget && !(profile === "supervisor" && widget.key === "project_attention") && widget.allowedProfiles.includes(profile) && matchesAnyPermission(user.permissions, widget.requiredAny) ? [widget] : [];
   });
 }
 

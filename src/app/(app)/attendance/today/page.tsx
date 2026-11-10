@@ -5,5 +5,5 @@ import { can } from "@/lib/auth/permissions";
 
 export default async function Page() {
   const user = await getRequestUser();
-  return <div className="page-stack"><PageHeader title="Kiểm tra ảnh chấm công" /><AttendanceAdminDashboard canViewWorkers={Boolean(user && can(user.permissions, "worker_attendance.view"))} ownerAccountId={user?.id} /></div>;
+  return <div className="page-stack"><PageHeader title="Kiểm tra công" /><AttendanceAdminDashboard canViewWorkers={Boolean(user && can(user.permissions, "worker_attendance.view"))} ownerAccountId={user?.id} /></div>;
 }

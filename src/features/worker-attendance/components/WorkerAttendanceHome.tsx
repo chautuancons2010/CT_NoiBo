@@ -59,7 +59,7 @@ export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: s
     if (loadingRequest.current) return loadingRequest.current;
     const pending = (async () => {
     setLoading(true); setError("");
-    const local = listWorkerDrafts().then(setLocalDrafts).catch(() => undefined);
+    void listWorkerDrafts().then(setLocalDrafts).catch(() => undefined);
     try {
       const result = await readWorkerResponse<Omit<CachedWorkerTasks, "key" | "date" | "cachedAt">>(await fetch(`/api/v1/worker-attendance/today?date=${date}`, { cache: "no-store", signal: AbortSignal.timeout(20_000) }));
       const cache = { ...result, key: `${result.accountId}:${date}`, date, cachedAt: new Date().toISOString() };
@@ -70,7 +70,6 @@ export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: s
       if (cached && cached.accountId === user.id) { setData(cached); setOffline(true); }
       else setError(caught instanceof Error ? caught.message : "Không thể tải lịch điểm danh.");
     } finally { setLoading(false); }
-    await local;
     })();
     loadingRequest.current = pending;
     void pending.finally(() => { if (loadingRequest.current === pending) loadingRequest.current = null; }).catch(() => undefined);

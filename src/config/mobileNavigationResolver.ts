@@ -113,7 +113,8 @@ export function resolveMobileNavigation(pathname: string, user: AuthenticatedUse
   const workHref = workApplication ? mobileApplicationDestination(workApplication, user) : undefined;
   if (supervisor) {
     if (settings.modules?.projects !== false) direct.push({ href: "/worker-attendance/today", label: "Điểm danh", icon: "UsersRound", routePrefixes: ["/worker-attendance"] });
-    if (canSubmitPersonalAttendance(user.permissions) && settings.modules?.attendance !== false) direct.push({ href: "/attendance/quick", label: "Chấm công", icon: "Camera", quick: true });
+    if (can(user.permissions, "project.view") && settings.modules?.projects !== false) direct.push({ href: "/projects", label: "Gói", icon: "BriefcaseBusiness", exact: true });
+    if (can(user.permissions, "attendance.self.view") || can(user.permissions, "attendance.self_history") || can(user.permissions, "attendance.self") || can(user.permissions, "attendance.self.create")) direct.push({ href: "/attendance/history", label: "Lịch công", icon: "CalendarRange" });
   } else if (workApplication && workHref) {
     direct.push({ href: workHref, label: workHref === "/worker-attendance/today" ? "Điểm danh" : applicationLabels[workApplication.id] ?? workApplication.label, icon: workHref === "/worker-attendance/today" ? "UsersRound" : workApplication.icon, routePrefixes: workApplication.routePrefixes.filter((prefix) => !["/notifications", "/profile"].includes(prefix)) });
     const workerItem = supervisor && can(user.permissions, "worker_attendance.view") && settings.modules?.projects !== false
@@ -133,8 +134,8 @@ export function resolveMobileNavigation(pathname: string, user: AuthenticatedUse
     if (history) direct.push({ ...destination(history), label: "Lịch công" });
     if (canSubmitPersonalAttendance(user.permissions) && settings.modules?.attendance !== false) direct.push({ href: "/attendance/quick", label: "Chấm công", icon: "Camera", quick: true });
   }
-  if (can(user.permissions, "chat.access")) direct.push({ href: "/messages", label: "Tin nhắn", icon: "MessageCircle" });
-  else if (can(user.permissions, "notification.view") || can(user.permissions, "notification.self.view")) direct.push({ href: "/notifications", label: "Thông báo", icon: "Bell" });
+  if (!supervisor && can(user.permissions, "chat.access")) direct.push({ href: "/messages", label: "Tin nhắn", icon: "MessageCircle" });
+  else if (!supervisor && (can(user.permissions, "notification.view") || can(user.permissions, "notification.self.view"))) direct.push({ href: "/notifications", label: "Thông báo", icon: "Bell" });
   if (direct.length < 3) direct.push({ href: "/profile", label: "Tài khoản", icon: "UserRound" });
   const primary = direct.slice(0, 4);
   primary.push({ href: "/applications", label: "Ứng dụng", icon: "Grid2X2", action: "applications" });

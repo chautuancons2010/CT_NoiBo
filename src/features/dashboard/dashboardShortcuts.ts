@@ -40,7 +40,7 @@ const definitions: ShortcutDefinition[] = [
 const profileShortcuts: Record<DashboardProfileKey, readonly string[]> = {
   hr: ["attendance.photos", "timesheets", "leave.manage", "employees", "attendance.adjustments", "approvals"],
   management: ["projects.monitoring", "approvals", "attendance.photos", "warehouse.inventory", "shipments", "reports"],
-  supervisor: ["worker.today", "projects", "projects.updates", "projects.monitoring"],
+  supervisor: ["worker.today", "projects"],
   warehouse: ["warehouse.inventory", "warehouse.receipts", "warehouse.issues", "warehouse.stock-counts"],
   import_export: ["shipments", "shipments.new", "shipments.documents", "shipments.customs"],
   accounting: ["payroll", "salaries", "payslips", "salaries.history", "timesheets", "approvals"],

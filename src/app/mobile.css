@@ -500,6 +500,13 @@
     background-color: var(--surface-hover);
   }
 
+  .button,
+  button,
+  a,
+  summary {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .page-main :is(.input, .select, .search-input),
   .input,
   .select,

@@ -40,6 +40,9 @@ function AppShellContent({ children, user, testEnvironment }: { children: ReactN
   const isShipmentWorkspace = /^\/import-export\/shipments\/[^/]+\/(overview|lines|containers|documents|customs|receiving|history)$/.test(pathname);
   const router = useRouter();
   useLayoutEffect(() => installBackHistory(user.id), [user.id]);
+  useLayoutEffect(() => {
+    window.getSelection()?.removeAllRanges();
+  }, [pathname]);
   const { settings } = useSystemSettings();
   const [collapsed, setCollapsed] = useState(false);
   const railPreferenceKey = `ct:sidebar-layout:v2:${user.id}`;

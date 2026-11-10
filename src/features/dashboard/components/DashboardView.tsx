@@ -42,7 +42,7 @@ const dashboardPresentation: Record<DashboardProfileKey, {
   warehouse: { pageTitle: "Kho", overviewTitle: "Kho hôm nay", attentionTitle: "Ưu tiên trong kho", chartTitle: "Tồn kho và chứng từ", focusWidget: "warehouse_low_stock", chartOrder: ["warehouse-stock-alerts", "warehouse-pending"] },
   accounting: { pageTitle: "Kế toán", overviewTitle: "Lương và kỳ chốt", attentionTitle: "Kỳ lương cần xử lý", chartTitle: "Lương và phiếu lương", focusWidget: "accounting_summary", chartOrder: ["payroll-fund", "payslip-status", "salary-profiles"] },
   import_export: { pageTitle: "Xuất nhập khẩu", overviewTitle: "Luồng lô hàng", attentionTitle: "Lô hàng cần xử lý", chartTitle: "Tiến độ lô hàng", focusWidget: "shipment_attention", chartOrder: ["shipment-status", "shipment-flags"] },
-  supervisor: { pageTitle: "Công trường", overviewTitle: "Công trường hôm nay", attentionTitle: "Phiên cần theo dõi", chartTitle: "Điểm danh công trường", focusWidget: "supervisor_today", chartOrder: ["supervisor-sessions", "project-progress", "project-health"] },
+  supervisor: { pageTitle: "Chấm công công nhân", overviewTitle: "Điểm danh hôm nay", attentionTitle: "Phiên cần theo dõi", chartTitle: "Điểm danh công trường", focusWidget: "supervisor_today", chartOrder: ["supervisor-sessions"] },
   employee: { pageTitle: "Cá nhân", overviewTitle: "Ca làm hôm nay", attentionTitle: "Việc của tôi", chartTitle: "Chấm công cá nhân", focusWidget: "employee_today", chartOrder: ["personal-attendance", "payslip-status"] }
 };
 

@@ -8,7 +8,7 @@ import { can } from "@/lib/auth/permissions";
 export async function GET(request: Request) {
   try {
     const user = requireAuthenticatedUser(await getRequestUser());
-    if (!can(user.permissions, "attendance.self.view") && !can(user.permissions, "attendance.self")) throw new AppError("PERMISSION_DENIED");
+    if (!can(user.permissions, "attendance.self.view") && !can(user.permissions, "attendance.self") && !can(user.permissions, "attendance.self.create")) throw new AppError("PERMISSION_DENIED");
     const url = new URL(request.url);
     return successResponse(await listAttendanceHistory(user, url.searchParams.get("from") ?? undefined, url.searchParams.get("to") ?? undefined));
   } catch (error) {

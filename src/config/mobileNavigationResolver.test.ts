@@ -26,7 +26,8 @@ describe("personal mobile navigation", () => {
     const supervisor = resolveMobileNavigation("/worker-attendance/today", user(["project.view", "worker_attendance.view", "worker_attendance.create", "attendance.self.create", "chat.access"]));
     expect(supervisor.mode).toBe("supervisor");
     expect(supervisor.direct[1]).toMatchObject({ href: "/worker-attendance/today", label: "Điểm danh" });
-    expect(supervisor.direct[2]).toMatchObject({ href: "/attendance/quick", label: "Chấm công", quick: true });
+    expect(supervisor.direct[2]).toMatchObject({ href: "/projects", label: "Gói" });
+    expect(supervisor.direct[3]).toMatchObject({ href: "/attendance/history", label: "Lịch công" });
     expect(canUseWorkerAttendance(user(["worker_attendance.create"]))).toBe(true);
     expect(canUseWorkerAttendance(user(["project.view"]))).toBe(false);
   });
