@@ -2,13 +2,30 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CurrentUserProvider } from "@/components/providers/CurrentUserProvider";
 import { AttendanceCameraExperience } from "./AttendanceCameraExperience";
+const viewport = vi.hoisted(() => ({ value: false as boolean | null }));
+vi.mock("@/lib/ui/useMobileViewport", () => ({ useMobileViewport: () => viewport.value }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock("@/lib/realtime/useDomainReconciliation", () => ({ useDomainReconciliation: vi.fn() }));
 vi.mock("@/features/attendance/client/attendanceQueue", () => ({ countPendingAttendance: vi.fn().mockResolvedValue(0), listPendingAttendance: vi.fn().mockResolvedValue([]) }));
-afterEach(() => { cleanup(); Reflect.deleteProperty(navigator, "mediaDevices"); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); viewport.value = false; Reflect.deleteProperty(navigator, "mediaDevices"); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("quick attendance opening", () => {
+  it("waits for the phone camera layer to be stable before requesting its stream", async () => {
+    viewport.value = null;
+    vi.stubGlobal("isSecureContext", true);
+    const getUserMedia = vi.fn(() => new Promise<MediaStream>(() => undefined));
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+    const content = () => <CurrentUserProvider user={{ id: "stable-phone", username: "camera", displayName: "Giám sát", email: "camera@example.invalid", status: "active", permissions: ["attendance.self.create"] }}><AttendanceCameraExperience initialCapture /></CurrentUserProvider>;
+    const view = render(content());
+    await Promise.resolve();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    viewport.value = true;
+    view.rerender(content());
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText("Chụp ảnh chấm công").parentElement?.parentElement).toBe(document.body);
+  });
   it("keeps both attendance actions available after an earlier complete pair and shows a repeat warning", async () => {
     const getUserMedia = vi.fn(() => new Promise<MediaStream>(() => undefined));
     vi.stubGlobal("isSecureContext", true);

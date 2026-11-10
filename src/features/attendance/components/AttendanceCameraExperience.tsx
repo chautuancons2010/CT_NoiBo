@@ -304,15 +304,15 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
   }, [initialCapture, dashboard, stopCamera]);
 
   useEffect(() => {
-    if (!initialCapture || autoCaptureStartedRef.current || !canSubmit) return;
+    if (mobile === null || !initialCapture || autoCaptureStartedRef.current || !canSubmit) return;
     autoCaptureStartedRef.current = true;
     queueMicrotask(openCapture);
-  }, [initialCapture, canSubmit, openCapture]);
+  }, [mobile, initialCapture, canSubmit, openCapture]);
 
   useEffect(() => {
     if (step !== "camera" || cameraState !== "ready" || !videoRef.current || !streamRef.current) return;
-    videoRef.current.srcObject = streamRef.current;
-    void videoRef.current.play().catch(() => undefined);
+    if (videoRef.current.srcObject !== streamRef.current) videoRef.current.srcObject = streamRef.current;
+    if (videoRef.current.paused) void videoRef.current.play().catch(() => undefined);
   }, [step, cameraState, mobile]);
 
   const closeCapture = () => {
