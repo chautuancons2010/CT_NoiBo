@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -33,18 +33,26 @@ describe("AppHeader", () => {
     expect(screen.getByText("Châu Tuấn")).toBeInTheDocument();
     expect(screen.queryByText("Đồng bộ tức thời")).not.toBeInTheDocument();
     expect(screen.getByText("Tìm kiếm")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+    expect(within(document.querySelector(".app-header__mobile-leading") as HTMLElement).getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
   });
 
   it("keeps the module launcher on non-dashboard screens", () => {
     render(<AppHeader connectionState="connected" pathname="/employees" user={user} />);
     expect(screen.getByRole("navigation", { name: "Vị trí hiện tại" })).toHaveTextContent("Nhân viên");
-    expect(screen.getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+    expect(within(document.querySelector(".app-header__desktop-leading") as HTMLElement).getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thu gọn điều hướng" })).not.toBeInTheDocument();
   });
 
-  it("uses a local return target when a screen provides one", () => {
-    render(<AppHeader backHrefOverride="/projects" connectionState="connected" pathname="/worker-attendance/today" user={user} />);
-    expect(screen.getByRole("link", { name: "Quay lại" })).toHaveAttribute("href", "/projects");
+  it.each(["/projects", "/projects/project-one/team", "/settings/attendance", "/worker-attendance/today"])("keeps the same mobile brand toolbar on %s", (pathname) => {
+    render(<AppHeader backHrefOverride="/projects" connectionState="connected" pathname={pathname} user={user} />);
+    const leading = document.querySelector(".app-header__mobile-leading") as HTMLElement;
+    expect(within(leading).getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+    expect(within(leading).getByLabelText("Châu Tuấn")).toBeInTheDocument();
+    expect(within(leading).getByText("Châu Tuấn")).toBeInTheDocument();
+    expect(within(leading).queryByRole("link", { name: "Quay lại" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thông báo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tài khoản" })).toBeInTheDocument();
+    expect(document.querySelector(".app-header__mobile-menu")).toBeNull();
   });
 
   it("only shows realtime state when the connection needs attention", () => {

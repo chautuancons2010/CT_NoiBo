@@ -19,8 +19,6 @@ export const configurableNavigationPaths = [
   "/timesheets/matrix",
   "/timesheets",
   "/timesheets/adjustments",
-  "/shifts",
-  "/shifts/calendar",
   "/leave/manage",
   "/attendance",
   "/attendance/me",
@@ -464,7 +462,7 @@ export function deriveBrandColorTokens(primaryColor: string): BrandColorTokens {
 
 export function moduleForPath(pathname: string): ModuleKey | null {
   const matches = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
-  if (["/employees", "/dashboard/hr", "/attendance/today", "/attendance/logs", "/timesheets", "/shifts", "/leave/manage", "/leave/adjustments", "/leave/balances", "/leave/settlements", "/settings/attendance", "/settings/leave", "/settings/export-templates"].some(matches)) return "human_resources";
+  if (["/employees", "/dashboard/hr", "/attendance/today", "/attendance/logs", "/timesheets", "/leave/manage", "/leave/adjustments", "/leave/balances", "/leave/settlements", "/settings/attendance", "/settings/leave", "/settings/export-templates"].some(matches)) return "human_resources";
   if (["/personal", "/attendance", "/leave"].some(matches)) return "attendance";
   if (["/projects", "/project-monitoring", "/worker-attendance"].some(matches)) return "projects";
   if (["/warehouse", "/dashboard/warehouse", "/settings/warehouse"].some(matches)) return "warehouse";

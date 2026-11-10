@@ -148,9 +148,15 @@ export function registerConcurrencyCases(s) {
       for (const route of ["shipments", "transport", "customs", "contracts", "documents", "partners"]) {
         const target = `/import-export/${route}`;
         const started = performance.now();
-        const shipmentGroup = page.locator('.app-rail__group-toggle').filter({ hasText: "Xuất nhập khẩu" });
-        if (await shipmentGroup.count() && await shipmentGroup.getAttribute("aria-expanded") !== "true") await shipmentGroup.click();
-        await page.locator(`.app-rail a[href="${target}"]`).click();
+        const expandRail = page.locator('.app-rail').getByRole('button', { name: 'Mở rộng điều hướng', exact: true });
+        if (await expandRail.count()) await expandRail.click();
+        const link = page.locator(`.app-rail a[href="${target}"]`);
+        if (!await link.isVisible()) {
+          const group = link.locator('xpath=ancestor::li[contains(@class,"app-rail__group")][1]');
+          const toggle = group.locator('button.app-rail__group-toggle');
+          if (await toggle.count() && await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+        }
+        await link.click();
         await page.waitForURL(url => url.pathname === target);
         await observer.ready();
         assert.equal(await page.evaluate(() => window.__shipmentNavigationMarker), marker);

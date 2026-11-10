@@ -12,6 +12,7 @@ import { registerTesterCases } from "./tester.mjs";
 import { registerPlatformCases } from "./platform-workflows.mjs";
 import { registerConcurrencyCases } from "./concurrency.mjs";
 import { observePage } from "./page-ready.mjs";
+import { sanitizeE2EError } from "./sanitize-error.mjs";
 
 nextEnv.loadEnvConfig(process.cwd());
 const runId = new Date().toISOString().slice(0, 10).replaceAll("-", "") + randomBytes(3).toString("hex");
@@ -74,7 +75,7 @@ async function execute(test) {
   const started = performance.now();
   const result = { id: test.id, name: test.name, kind: test.kind, status: "PASS" };
   try { await test.fn(); }
-  catch (error) { result.status = error instanceof BlockedError ? "BLOCKED" : "FAIL"; result.error = error.stack || String(error); }
+  catch (error) { result.status = error instanceof BlockedError ? "BLOCKED" : "FAIL"; result.error = sanitizeE2EError(error, [fixture?.password, process.env.SUPABASE_SERVICE_ROLE_KEY, process.env.SUPABASE_SECRET_KEY]); }
   result.ms = Math.round(performance.now() - started);
   report.cases.push(result);
   console.log(`${result.status} ${result.id} ${result.name}${result.error ? `: ${result.error.split("\n")[0]}` : ""}`);

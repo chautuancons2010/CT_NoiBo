@@ -14,11 +14,11 @@ vi.mock("@/features/auth/components/LogoutButton", () => ({ LogoutButton: () => 
 
 beforeEach(() => { state.mobile = true; state.permissions = ["attendance.self", "attendance.self.view", "worker_attendance.create", "worker_attendance.view", "profile.view"]; });
 describe("engineer phone home", () => {
-  it("opens personal attendance without mounting the site dashboard on a phone", () => {
+  it("places personal attendance before the assigned worker packages on a phone", () => {
     render(<PersonalPage />);
     const personal = screen.getByTestId("personal-attendance");
-    const workerLink = screen.getByRole("link", { name: "Điểm danh công nhân" });
-    expect(screen.queryByTestId("field-today")).not.toBeInTheDocument();
+    const workerLink = screen.getByRole("link", { name: "Mở danh sách điểm danh công nhân" });
+    expect(screen.getByTestId("field-today")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Công trường hôm nay" })).not.toBeInTheDocument();
     expect(workerLink).toHaveAttribute("href", "/worker-attendance/today");
     expect(personal.compareDocumentPosition(workerLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

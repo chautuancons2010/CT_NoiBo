@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 
 const getSupabaseServiceClient = vi.hoisted(() => vi.fn());
@@ -15,7 +15,7 @@ const user: AuthenticatedUser = { id: "11111111-1111-4111-8111-111111111111", us
 const sessionRow = { id: "session-1", client_session_id: "capture-1", project_id: "project-1", project_name_snapshot: "Dự án", worksite_id: "site-1", worksite_name_snapshot: "Công trường", attendance_date: "2026-10-05", shift_code: "DAY", shift_name_snapshot: "Ca ngày", session_type: "morning", supervisor_employee_id: "employee-1", supervisor_name_snapshot: "Giám sát", started_at: "2026-10-05T01:00:00Z", captured_at_client: "2026-10-05T01:00:00Z", geofence_status: "outside", latitude: 21.0278, longitude: 105.8342, accuracy_meters: 20, status: "in_progress", sync_status: "synced", photo_status: "uploaded", version: 1, worker_attendance_entries: [], worker_attendance_photos: [], worker_attendance_adjustments: [], checklist_snapshot: [], checklist_responses: [] };
 
 type Row = Record<string, unknown>;
-function database({ existing = true, referenceCoordinates = true, sessionPatch = {}, commandError, siteRows = [] }: { existing?: boolean; referenceCoordinates?: boolean; sessionPatch?: Row; commandError?: { message: string; code?: string }; siteRows?: Row[] } = {}) {
+function database({ existing = true, referenceCoordinates = true, sessionPatch = {}, commandError, siteRows = [], personalReady = true }: { existing?: boolean; referenceCoordinates?: boolean; sessionPatch?: Row; commandError?: { message: string; code?: string }; siteRows?: Row[]; personalReady?: boolean } = {}) {
   let saved: Row | undefined = existing ? { ...sessionRow, ...sessionPatch } : undefined;
   const mutations: Record<string, unknown>[] = [];
   const tablesRead: string[] = [];
@@ -40,7 +40,7 @@ function database({ existing = true, referenceCoordinates = true, sessionPatch =
         insert: (values: Record<string, unknown>) => { if (table === "worker_attendance_sessions") { mutations.push(values); saved = { ...sessionRow, ...values }; } return query; },
         update: (values: Record<string, unknown>) => { mutations.push(values); saved = { ...saved, ...values }; return query; },
         single: async () => ({ data: table === "worksites" ? { latitude: referenceCoordinates ? 10.7769 : null, longitude: referenceCoordinates ? 106.7009 : null, allowed_accuracy_threshold_meters: 100 } : { id: "session-1" }, error: null }),
-        maybeSingle: async () => ({ data: table === "app_accounts" ? { id: user.id, employee_id: "employee-1", status: "active", employees: { full_name: "Giám sát" } } : table === "worker_attendance_policies" ? { minimum_photos: 0, work_note_required: false, end_of_day_required: false, offline_enabled: true, edit_window_minutes: 120 } : table === "worker_attendance_sessions" ? clientReplay ? null : saved : null, error: null }),
+        maybeSingle: async () => ({ data: table === "attendance_events" ? personalReady ? { event_type: "check_in", photo_status: "uploaded", attendance_status: "recorded" } : null : table === "app_accounts" ? { id: user.id, employee_id: "employee-1", status: "active", employees: { full_name: "Giám sát" } } : table === "worker_attendance_policies" ? { minimum_photos: 0, work_note_required: false, end_of_day_required: false, offline_enabled: true, edit_window_minutes: 120 } : table === "worker_attendance_sessions" ? clientReplay ? null : saved : null, error: null }),
         then(onFulfilled: (value: unknown) => unknown) { return Promise.resolve({ data: table === "worksites" ? siteRows : [], error: null }).then(onFulfilled); }
       };
       return query;
@@ -51,10 +51,13 @@ function database({ existing = true, referenceCoordinates = true, sessionPatch =
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-05T01:00:00Z"));
   getSupabaseServiceClient.mockReset();
   getProjectRoster.mockReset().mockResolvedValue([]);
   getProject.mockResolvedValue({ id: "project-1", name: "Dự án", status: "active", worksites: [{ id: "site-1", name: "Công trường", status: "active", gpsRequired: true, allowedAccuracyThresholdMeters: 100, radiusMeters: 10 }] });
 });
+afterEach(() => vi.useRealTimers());
 
 const entryRow = { id: "33333333-3333-4333-8333-333333333333", session_id: "session-1", worker_id: "employee-2", employee_code_snapshot: "NV002", worker_name_snapshot: "Công nhân", assignment_role_snapshot: "worker", status: "present", day_exception: "none" };
 
@@ -175,10 +178,17 @@ describe("package and worker selection", () => {
   });
 
   it("creates a selection session with mandatory photo evidence without a fixed supervisor", async () => {
+    vi.setSystemTime(new Date("2026-11-07T01:00:00Z"));
     const writes = database({ existing: false });
     await createWorkerSession(supervisor, { clientSessionId: "capture-1", projectId: "project-1", worksiteId: "site-1", date: "2026-11-07", shiftCode: "DAY", sessionType: "morning", capturedAtClient: "2026-11-07T01:00:00Z" });
     expect(writes[0]).toMatchObject({ selection_mode: true, safety_confirmed: false, minimum_photos_snapshot: 1, supervisor_employee_id: "employee-1" });
     expect(writes.tablesRead).not.toContain("project_assignments");
+  });
+
+  it("requires personal check-in with an uploaded photo before creating a worker session", async () => {
+    const writes = database({ existing: false, personalReady: false });
+    await expect(createWorkerSession(supervisor, { clientSessionId: "capture-1", projectId: "project-1", worksiteId: "site-1", date: "2026-10-05", shiftCode: "DAY", sessionType: "morning", capturedAtClient: "2026-10-05T01:00:00Z" })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(writes).toHaveLength(0);
   });
 
   it("keeps unchecked candidates in a draft but omits them from a submitted attendance record", async () => {

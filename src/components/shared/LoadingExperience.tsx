@@ -26,7 +26,7 @@ export function ContentSkeleton() {
 }
 
 export function PageSkeleton() {
-  return <div aria-label="Đang tải trang" className={styles.page} data-ui="page-skeleton" role="status"><LoadingSpinner /><span className="sr-only">Đang tải trang</span><div aria-hidden="true" className={styles.pageHeading}><span /><span /></div><div className={styles.cards}><CardSkeleton /><CardSkeleton /><CardSkeleton /></div><TableSkeleton /></div>;
+  return <div aria-busy="true" aria-label="Đang tải trang" className={styles.page} data-ui="page-skeleton" role="status"><LoadingSpinner /><span className="sr-only">Đang tải trang</span><div aria-hidden="true" className={styles.pageHeading}><span /><span /></div><div className={styles.cards}><CardSkeleton /><CardSkeleton /><CardSkeleton /></div><TableSkeleton /></div>;
 }
 
 export function ModuleTransition() {

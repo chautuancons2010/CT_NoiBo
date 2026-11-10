@@ -54,6 +54,17 @@ describe("personal mobile navigation", () => {
     const model = resolveMobileNavigation("/worker-attendance/sessions/one", user(["worker_attendance.view", "worker_attendance.create"]));
     expect(activeMobileDestination("/worker-attendance/sessions/one", model)?.href).toBe("/worker-attendance/today");
   });
+  it.each([
+    ["supervisor", ["project.view", "worker_attendance.view", "worker_attendance.create", "attendance.self.create", "chat.access"]],
+    ["HR with other applications", ["employee.view", "attendance.view_all", "project.view", "warehouse.view", "attendance.self.view", "chat.access"]],
+    ["management", ["dashboard.view", "project_monitoring.view", "employee.view", "warehouse.view", "payroll.view", "chat.access"]]
+  ] as const)("keeps global destinations and slots stable for %s while navigating", (_role, permissions) => {
+    const actor = user([...permissions]);
+    const initial = resolveMobileNavigation("/personal", actor);
+    for (const pathname of ["/projects", "/projects/one/team", "/worker-attendance/today", "/settings/attendance", "/employees", "/warehouse", "/personal/payslips", "/attendance/history"]) {
+      expect(resolveMobileNavigation(pathname, actor)).toEqual(initial);
+    }
+  });
 
   it("prefers an exact child destination over its parent", () => {
     const destinations: MobileNavDestination[] = [{ href: "/attendance", label: "Công", icon: "Camera" }, { href: "/attendance/history", label: "Lịch", icon: "CalendarRange" }];

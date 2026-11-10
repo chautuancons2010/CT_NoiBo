@@ -102,12 +102,6 @@ export function registerBusinessCases(s) {
     assert.equal(result.event.photoStatus, "uploaded");
     assert.equal(result.event.syncStatus, "synced");
   });
-  test("ATT-04", "Chấm ra rồi chặn lượt thứ ba trong ngày", async () => {
-    need("checkIn");
-    const result = await api("supervisor", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
-    await f().track("attendance_events", result.event.id); assert.equal(result.event.eventType, "check_out");
-    await conflict("supervisor", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
-  });
   test("ATT-05", "Thời gian/GPS không hợp lệ và truy cập chéo hồ sơ bị chặn", async () => {
     await invalid("supervisor", "POST", "/api/v1/attendance/events", { clientEventId: uuid(), capturedAtClient: "invalid", capturedOffline: false, deviceMetadata: {} });
     need("checkIn");
@@ -324,7 +318,10 @@ export function registerBusinessCases(s) {
     need("checkIn");
     const uploaded = await f().query(f().db.from("attendance_events").select("photo_status").eq("id", state.checkIn.id).single(), "supervisor check-in photo status");
     assert.equal(uploaded.photo_status, "uploaded", "Giám sát cần đồng bộ ảnh chấm công cá nhân trước khi điểm danh công nhân");
-    state.workerInput = { clientSessionId: uuid(), projectId: state.project.id, worksiteId: state.site.id, date: today, capturedAtClient: new Date().toISOString() };
+    const available = await api("supervisor", "GET", `/api/v1/worker-attendance/today?date=${today}`);
+    const task = available.tasks.find(item => item.projectId === state.project.id && item.worksiteId === state.site.id && item.roster.some(worker => worker.workerId === person("outsider").employeeId));
+    assert(task, "Gói E2E cần có công nhân và ca hiệu lực từ danh mục nhân sự");
+    state.workerInput = { clientSessionId: uuid(), projectId: state.project.id, worksiteId: state.site.id, shiftCode: task.shiftCode, date: today, capturedAtClient: new Date().toISOString() };
     const result = await api("supervisor", "POST", "/api/v1/worker-attendance/sessions", state.workerInput);
     state.worker = result.session;
     await f().track("worker_attendance_sessions", state.worker.id);
@@ -337,7 +334,7 @@ export function registerBusinessCases(s) {
   test("WORKER-03", "Lưu trạng thái công nhân và nội dung công việc", async () => {
     need("worker");
     const checklist = state.worker.checklist;
-    state.worker = await api("supervisor", "PATCH", `/api/v1/worker-attendance/sessions/${state.worker.id}/draft`, { version: state.worker.version, entries: state.worker.entries.map((row) => ({ id: row.id, status: "present" })), workNote: "E2E kiểm tra vận hành công trường", checklistResponses: checklist.map((item) => ({ itemId: item.id, checked: true })) });
+    state.worker = await api("supervisor", "PATCH", `/api/v1/worker-attendance/sessions/${state.worker.id}/draft`, { version: state.worker.version, entries: state.worker.entries.map((row) => ({ id: row.id, status: "present", isSelected: true })), safetyConfirmed: true, safetyReport: { ...state.worker.safetyReport, briefing: state.worker.safetyReport.briefing.map(item => ({ ...item, checked: true })), workArea: "[E2E] Khu thi công" }, workNote: "E2E kiểm tra vận hành công trường", checklistResponses: checklist.map((item) => ({ itemId: item.id, checked: true })) });
     assert(state.worker.entries.every((row) => row.status === "present"));
     state.workerReady = true;
   });
@@ -354,6 +351,14 @@ export function registerBusinessCases(s) {
     assert.equal(state.worker.status, "submitted");
     state.worker = await api("supervisor", "POST", `/api/v1/worker-attendance/sessions/${state.worker.id}/close-day`, { version: state.worker.version, reason: "E2E đối chiếu bàn giao cuối ngày", entries: state.worker.entries.map((row, index) => ({ id: row.id, dayException: index === 0 ? "half_day" : "none" })) });
     assert(state.worker.dayClosedAt); assert.equal(state.worker.entries[0].dayException, "half_day");
+  });
+
+  // The supervisor closes personal attendance after the worker session is sent.
+  test("ATT-04", "Chấm ra rồi chặn lượt thứ ba trong ngày", async () => {
+    need("checkIn");
+    const result = await api("supervisor", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
+    await f().track("attendance_events", result.event.id); assert.equal(result.event.eventType, "check_out");
+    await conflict("supervisor", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
   });
 
   test("WH-01", "Tạo hàng hóa, đơn vị tính và hai kho riêng", async () => {

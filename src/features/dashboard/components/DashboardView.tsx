@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/shared/Button";
+import { ModuleLauncher } from "@/components/shared/ModuleLauncher";
 import { DashboardPageTemplate } from "@/components/shared/PageLayouts";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
@@ -184,6 +185,7 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   return <MobileAttendanceHomeGate><DashboardPageTemplate className={styles.page}>
+    <div className={styles.launcher} data-dashboard-applications><ModuleLauncher layout="bar" /></div>
     {children}
   </DashboardPageTemplate></MobileAttendanceHomeGate>;
 }

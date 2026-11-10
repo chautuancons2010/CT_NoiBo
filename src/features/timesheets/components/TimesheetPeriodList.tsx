@@ -12,13 +12,13 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 import type { TimesheetPeriod } from "../types/timesheetTypes";
 import { InlineForm, FormFields, FormActions } from "@/components/shared/FormLayout";
+import { formatBusinessDate } from "@/lib/time/timezone";
 
 const statusLabel = { open: "Mở", reviewing: "Đang rà soát", locked: "Đã khóa", reopened: "Đã mở lại" };
 
 const periodColumns: DataTableColumn<TimesheetPeriod>[] = [
-  { id: "period", header: "Kỳ công", cell: (item) => <Link className="table-link" href={`/timesheets/periods/${item.id}`}><strong>{item.name}</strong><br /><small>{item.code}</small></Link> },
-  { id: "dates", header: "Thời gian", cell: (item) => `${item.startDate} – ${item.endDate}` },
-  { id: "version", header: "Phiên bản", cell: (item) => `v${item.version}` },
+  { id: "period", header: "Kỳ công", priority: "primary", sortable: true, accessor: "name", cell: (item) => <Link className="table-link record-identity" href={`/timesheets/periods/${item.id}`}><strong>{item.name}</strong><small>{item.code} · v{item.version}</small></Link> },
+  { id: "dates", header: "Thời gian", sortable: true, sortValue: (item) => item.startDate, cell: (item) => `${formatBusinessDate(item.startDate)} – ${formatBusinessDate(item.endDate)}` },
   { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge tone={item.status === "locked" ? "success" : item.status === "reviewing" ? "warning" : "neutral"}>{statusLabel[item.status]}</StatusBadge> }
 ];
 
@@ -71,6 +71,6 @@ export function TimesheetPeriodList({ canCreate = false, initialItems, initialEr
 <Input label="Từ ngày" name="startDate" required type="date" />
 <Input label="Đến ngày" name="endDate" required type="date" /></FormFields><FormActions><Button type="submit" variant="primary">Lưu</Button></FormActions></InlineForm></Card> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
-    <DataSurface><DataTable columns={periodColumns} data={items} emptyDescription="" emptyTitle="Chưa có kỳ công" getRowId={(item) => item.id} loading={loading} rowHrefPrefix="/timesheets/periods/" /></DataSurface>
+    <DataSurface><DataTable ariaLabel="Danh sách kỳ công" columns={periodColumns} data={items} emptyDescription="" emptyTitle="Chưa có kỳ công" getRowId={(item) => item.id} loading={loading} pageSize={15} rowHrefPrefix="/timesheets/periods/" /></DataSurface>
   </ListPageLayout>;
 }

@@ -82,12 +82,6 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   "/timesheets/matrix": { title: "Bảng công", description: "", module: "Quản trị công" },
   "/timesheets/exceptions": { title: "Ngoại lệ bảng công", description: "", module: "Quản trị công" },
   "/timesheets/adjustments": { title: "Điều chỉnh bảng công", description: "", module: "Quản trị công" },
-  "/shifts": {
-    title: "Ca làm",
-    description: "Cấu hình ca làm và chính sách liên quan sẽ nằm trong dữ liệu cấu hình.",
-    module: "Quản trị công"
-  },
-  "/shifts/calendar": { title: "Lịch ngày làm việc và ngày nghỉ", description: "", module: "Quản trị công" },
   "/leave": {
     title: "Nghỉ phép",
     description: "Nền tảng route cho đơn từ, phê duyệt và xuất PDF ở bước sau.",
@@ -215,6 +209,8 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
   },
   "/settings/attendance/shifts": { title: "Ca làm", description: "", module: "Hệ thống" },
   "/settings/attendance/calendar": { title: "Lịch ngày làm việc và ngày nghỉ", description: "", module: "Hệ thống" },
+  "/shifts": { title: "Cấu hình chấm công", description: "", module: "Hệ thống" },
+  "/shifts/calendar": { title: "Lịch làm việc", description: "", module: "Hệ thống" },
   "/settings/attendance/policies": { title: "Chính sách chấm công", description: "", module: "Hệ thống" },
   "/settings/roles": {
     title: "Vai trò & phân quyền",

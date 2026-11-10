@@ -14,6 +14,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:operations": "node --test scripts/operations/*.test.mjs",
     "test:e2e": "node scripts/e2e/run.mjs",
     "test:e2e:catalog": "node scripts/testing/case-doc.mjs",
     "test:e2e:readiness": "node --test scripts/e2e/page-ready.node-test.mjs",

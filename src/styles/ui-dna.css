@@ -554,13 +554,14 @@ body .overlay .button.button {
 .app-shell .page-main .data-table {
   width: 100%;
   min-width: 100%;
-  table-layout: auto;
+  table-layout: fixed;
   border-radius: 0;
 }
 .app-shell .page-main .data-table :is(th, td) {
   min-width: 112px;
   padding: var(--space-2) var(--space-3);
   border-radius: 0;
+  vertical-align: middle;
   overflow-wrap: normal;
   word-break: normal;
   line-height: var(--line-height-normal);
@@ -570,6 +571,10 @@ body .overlay .button.button {
 .app-shell .page-main .data-table :is(th, td)[data-priority="primary"] { min-width: 220px; }
 .app-shell .page-main .data-table :is(th, td)[data-column="selection"] { min-width: var(--table-selection-column-width); }
 .app-shell .page-main .data-table :is(th, td)[data-column="actions"] { min-width: var(--table-action-column-width); white-space: nowrap; }
+.app-shell .page-main .data-table :is(th, td)[data-column="status"],
+.app-shell .page-main .data-table :is(th, td)[data-column="state"],
+.app-shell .page-main .data-table :is(th, td)[data-column="receipt"],
+.app-shell .page-main .data-table :is(th, td)[data-column="actions"] { text-align: center; }
 .app-shell .page-main .data-table :is(.status-badge, .badge) { white-space: nowrap; overflow-wrap: normal; }
 .app-shell .page-main .data-table__sort { text-align: start; }
 .app-shell .page-main .data-table tr:hover { background: var(--surface-hover); }

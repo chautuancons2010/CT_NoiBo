@@ -5,6 +5,7 @@ import { AttendanceAdminDashboard } from "./AttendanceAdminDashboard";
 import type { AttendanceAdminToday, AttendanceAdminTodayRow, AttendanceEvent } from "@/features/attendance/types/attendanceTypes";
 
 vi.mock("@/lib/realtime/useDomainReconciliation", () => ({ useDomainReconciliation: vi.fn() }));
+vi.mock("@/components/providers/CurrentUserProvider", () => ({ useCurrentUser: () => ({ id: "hr-1", permissions: ["timesheet.export", "worker_attendance.view_all", "attendance.view_all"] }) }));
 // Address lookup has its own API/client tests; do not let it consume this workstation's staged attendance fetches.
 vi.mock("@/features/attendance/client/attendanceAddressClient", () => ({ lookupAttendanceAddress: vi.fn().mockResolvedValue({ status: "unavailable" }) }));
 

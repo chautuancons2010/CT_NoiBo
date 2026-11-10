@@ -25,7 +25,7 @@ describe("timesheet period list", () => {
     render(<TimesheetPeriodList initialItems={[period]} />);
 
     expect(screen.getByText(period.name)).toBeInTheDocument();
-    expect(screen.getByText(period.code)).toBeInTheDocument();
+    expect(screen.getByText(`${period.code} · v${period.version}`)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
 });

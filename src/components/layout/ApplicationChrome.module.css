@@ -19,7 +19,7 @@
   scroll-padding: 20px; scrollbar-gutter: stable; transform: none;
 }
 .main:focus { outline: none; }
-.main > :global(.page-context-navigation) { display: flex; min-height: 28px; margin: 0 0 12px; padding: 0; }
+.main > :global(.page-context-navigation) { display: flex; min-height: 28px; margin: 0 0 4px; padding: 0; }
 .main :global(.page-context-navigation .back-link) { display: inline-flex; width: auto; min-height: 28px; align-items: center; gap: 8px; margin: 0; border: 0; border-radius: 4px; padding: 0; background: transparent; color: var(--text-secondary); font-size: 12px; box-shadow: none; }
 .rail {
   position: relative; inset: auto; display: flex; width: 100%; min-width: 0; max-width: 100%;
@@ -66,7 +66,13 @@
 .rail :global(.app-rail__collapse) { display: flex; width: 100%; min-height: 38px; align-items: center; justify-content: flex-start; gap: 10px; border: 0; border-radius: 8px; padding: 8px 12px; background: transparent; color: var(--sidebar-text); font-size: 12px; }
 .rail :global(.app-rail__collapse:hover) { background: var(--sidebar-hover); }
 .rail:global(.is-collapsed) :global(.app-rail__brand) { height: var(--topbar-height); min-height: var(--topbar-height); justify-content: center; padding: 0 8px; }
-.rail:global(.is-collapsed) :global(.app-rail__link) { width: 44px; min-height: 40px; justify-content: center; margin-inline: auto; padding: 8px; }
+.rail:global(.is-collapsed) :global(.app-rail__nav) { overflow-x: hidden; padding: 12px 8px; scrollbar-gutter: auto; }
+.rail:global(.is-collapsed) :global(.app-rail__nav ul) { width: 100%; min-width: 0; justify-items: center; gap: 6px; }
+.rail:global(.is-collapsed) :global(.app-rail__nav li) { width: 100%; min-width: 0; }
+.rail:global(.is-collapsed) :global(.app-rail__section-label) { display: none; }
+.rail:global(.is-collapsed) :global(.app-rail__tooltip) { display: flex; width: 100%; min-width: 0; justify-content: center; }
+.rail:global(.is-collapsed) :global(.app-rail__link) { width: 44px; min-width: 44px; height: 44px; min-height: 44px; justify-content: center; gap: 0; margin-inline: auto; padding: 0; }
+.rail:global(.is-collapsed) :global(.app-rail__footer) { padding-inline: 8px; }
 .rail:global(.is-collapsed) :global(.app-rail__collapse) { justify-content: center; }
 @media (prefers-reduced-motion: reduce) { .rail :global(.app-rail__chevron) { transition: none; } }
 .header {
@@ -77,6 +83,8 @@
   border-radius: 0; padding: 0 24px; background: var(--surface); box-shadow: none; backdrop-filter: none;
 }
 .header :global(.app-header__desktop-leading) { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.header :global(.app-header__desktop-leading > .dropdown > .dropdown__trigger) { width: 40px; min-width: 40px; min-height: 40px; justify-content: center; gap: 0; padding: 0; }
+.header :global(.app-header__desktop-leading > .dropdown > .dropdown__trigger > svg) { display: none; }
 .header :global(.app-header__mobile-leading), .header :global(.app-header__mobile-menu) { display: none; }
 .header :global(.app-header__context) { display: flex; min-width: 0; align-items: center; gap: 8px; overflow: hidden; color: var(--text-secondary); font-size: 13px; white-space: nowrap; }
 .header :global(.app-header__context [aria-current]) { min-width: 0; overflow: hidden; color: var(--text-primary); text-overflow: ellipsis; }
@@ -108,16 +116,20 @@
   .shell, .shell[data-navigation-collapsed="true"] { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
   .main { padding: 16px 12px max(20px, env(safe-area-inset-bottom)); scrollbar-gutter: auto; }
-  .main > :global(.page-context-navigation) { display: none; }
+  .main > :global(.page-context-navigation) { display: flex; min-height: 44px; }
+  .main :global([data-ui="back-control"]), .main :global(.back-link) { display: inline-flex; min-height: 44px; align-items: center; }
   .header { display: flex; height: var(--topbar-height); min-height: var(--topbar-height); align-items: center; gap: 8px; padding: 0 12px; }
   .header :global(.app-header__desktop-leading), .header :global(.app-header__search) { display: none; }
   .header :global(.app-header__mobile-leading) { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; }
-  .header :global(.app-header__mobile-title) { display: block; min-width: 0; overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-  .header :global(.app-header__mobile-back) { display: inline-flex; width: 40px; min-width: 40px; height: 44px; min-height: 44px; align-items: center; justify-content: center; border: 0; border-radius: 5px; padding: 0; background: transparent; box-shadow: none; }
+  .header :global(.app-header__mobile-leading > .mobile-app-launcher__trigger) { display: inline-flex; width: 44px; height: 44px; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; flex: 0 0 44px; border: 0; border-radius: 12px; padding: 0; background: var(--primary-soft); color: var(--primary); }
+  .header :global(.app-header__mobile-logo), .header :global(.app-header__mobile-logo .app-logo) { display: grid; width: 36px; height: 44px; flex: 0 0 36px; place-items: center; }
+  .header :global(.app-header__mobile-brand) { display: block; min-width: 0; overflow: hidden; color: var(--text-primary); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
   .header :global(.app-header__actions) { flex: 0 0 auto; gap: 4px; }
-  .header :global(.app-header__mobile-menu) { display: block; }
   .header :global(.app-header__actions > .dropdown > .dropdown__trigger), .header :global(.app-header__mobile-menu > .mobile-app-launcher__trigger) { display: inline-flex; width: 44px; height: 44px; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-control); padding: 0; background: transparent; color: var(--text-secondary); box-shadow: none; }
-  .header :global(.user-menu__name), .header :global(.user-menu__chevron), .header :global(.notification-bell), .header :global(.message-bell) { display: none; }
+  .header :global(.user-menu__name), .header :global(.user-menu__chevron), .header :global(.message-bell) { display: none; }
+  .header :global(.notification-bell) { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  .header :global(.connection-status) { width: 8px; min-width: 8px; padding: 0; background: transparent; }
+  .header :global(.connection-status > span) { display: none; }
   .content:global(.app-content--capture) .header { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .main { scroll-behavior: auto; } }

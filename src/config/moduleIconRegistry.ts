@@ -25,7 +25,7 @@ export interface ModuleIconDefinition {
 export const moduleIconRegistry: Record<ApplicationId, ModuleIconDefinition> = {
   overview: { icon: "LayoutDashboard", tone: "teal", accentColor: "var(--accent-cyan)", accentSoft: "var(--pastel-cyan)" },
   "human-resources": { icon: "Users", tone: "green", accentColor: "var(--accent-green)", accentSoft: "var(--pastel-mint)" },
-  attendance: { icon: "Clock3", tone: "blue", accentColor: "var(--accent-blue)", accentSoft: "var(--pastel-blue)" },
+  attendance: { icon: "Clock3", tone: "green", accentColor: "var(--primary)", accentSoft: "var(--primary-soft)" },
   projects: { icon: "BriefcaseBusiness", tone: "purple", accentColor: "var(--accent-violet)", accentSoft: "var(--pastel-lavender)" },
   warehouse: { icon: "Boxes", tone: "amber", accentColor: "var(--accent-orange)", accentSoft: "var(--pastel-cream)" },
   "import-export": { icon: "Ship", tone: "teal", accentColor: "var(--accent-cyan)", accentSoft: "var(--pastel-cyan)" },

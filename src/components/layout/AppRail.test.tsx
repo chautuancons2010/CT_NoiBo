@@ -46,7 +46,7 @@ describe("AppRail", () => {
   it("preserves the full HR function list on its dashboard and employee records", async () => {
     const manager: AuthenticatedUser={...user,permissions:["dashboard.view","employee.view","contract.view","insurance.view","attendance.view_all","shift.view"]};
     const view=render(<AppRail collapsed={false} onCollapsedChange={vi.fn()} pathname="/dashboard" user={manager} />);
-    for(const name of ["Nhân viên","Phòng ban","Hợp đồng","Bảo hiểm xã hội","Bảng công","Ca làm"]) expect(screen.getByRole("link",{name})).toBeInTheDocument();
+    for(const name of ["Nhân viên","Phòng ban","Hợp đồng","Bảo hiểm xã hội","Bảng công","Cấu hình chấm công"]) expect(screen.getByRole("link",{name})).toBeInTheDocument();
     view.rerender(<AppRail collapsed={false} onCollapsedChange={vi.fn()} pathname="/employees/employee-id/profile" user={manager} />);
     await waitFor(()=>expect(screen.getByRole("link",{name:"Nhân viên"})).toHaveAttribute("aria-current","page"));
     expect(screen.getByRole("link",{name:"Bảng công"})).toBeInTheDocument();

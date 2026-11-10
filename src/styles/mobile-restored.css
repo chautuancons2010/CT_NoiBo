@@ -2,6 +2,9 @@
 @media (max-width: 767px) {
   :root { --mobile-bottom-bar-height: 76px; }
   .app-shell .mobile-bottom-nav { position: fixed; z-index: 60; inset: auto 0 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; gap: 2px; min-height: 72px; padding: 8px max(8px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); border-top: 1px solid var(--border-subtle); background: var(--surface); box-shadow: 0 -4px 22px color-mix(in srgb, var(--text-primary) 6%, transparent); }
+  .app-shell .mobile-bottom-nav[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .app-shell .mobile-bottom-nav[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .app-shell .mobile-bottom-nav[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .app-shell .mobile-bottom-nav__item { display: flex; min-width: 0; min-height: 54px; align-items: center; justify-content: center; flex-direction: column; gap: 4px; border: 0; border-radius: 12px; padding: 4px 2px; background: transparent; color: var(--text-muted); font: inherit; text-decoration: none; }
   .app-shell .mobile-bottom-nav__item.is-active { color: var(--primary); background: var(--primary-soft); }
   .mobile-bottom-nav__icon { display: grid; width: 30px; height: 26px; place-items: center; }

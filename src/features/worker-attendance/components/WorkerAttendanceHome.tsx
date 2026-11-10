@@ -8,9 +8,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconButton } from "@/components/shared/Button";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { ListWorkspace } from "@/components/shared/PageLayouts";
-import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { Input, SearchInput, Select } from "@/components/shared/FormControls";
+import { AttendanceExport } from "@/features/attendance/components/AttendanceExport";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/States";
 import { cacheWorkerTasks, getLatestCachedWorkerTasks, listWorkerDrafts, saveWorkerDraft, type CachedWorkerTasks, type WorkerLocalDraft } from "@/features/worker-attendance/client/workerDraftStore";
@@ -38,7 +38,7 @@ function makeLocalSession(task: WorkerAttendanceTask, clientSessionId: string, l
   };
 }
 
-export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: string; worksiteId?: string }) {
+export function WorkerAttendanceToday({ projectId, worksiteId, embedded = false }: { projectId?: string; worksiteId?: string; embedded?: boolean }) {
   const user = useCurrentUser();
   const canCreate = can(user.permissions, "worker_attendance.create");
   const router = useRouter();
@@ -85,7 +85,7 @@ export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: s
   useDomainReconciliation("timesheets", load);
 
   async function start(task: WorkerAttendanceTask) {
-    if (task.existingSessionId) {
+    if (task.existingSessionId && (!canCreate || !["submitted", "locked", "needs_review"].includes(task.existingStatus ?? ""))) {
       router.push(!canCreate || task.existingStatus === "submitted" || task.existingStatus === "locked" || task.existingStatus === "needs_review" ? `/worker-attendance/sessions/${task.existingSessionId}` : `/worker-attendance/sessions/${task.existingSessionId}/roster`);
       return;
     }
@@ -115,9 +115,9 @@ export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: s
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {canCreate && data?.personalAttendanceReady === false ? <Link className="button button--primary button--lg" href="/attendance/quick">Chụp ảnh chấm công cá nhân</Link> : null}
-    <ol className={styles.flowSteps} aria-label="Các bước chấm công"><li aria-current="step"><span>1</span>Gói</li><li><span>2</span>Công nhân</li><li><span>3</span>An toàn</li><li><span>4</span>Chụp ảnh</li></ol>
+    {!embedded ? <><ol className={styles.flowSteps} aria-label="Các bước chấm công"><li aria-current="step"><span>1</span>Gói</li><li><span>2</span>Công nhân</li><li><span>3</span>An toàn</li><li><span>4</span>Chụp ảnh</li></ol>
     <dl className={styles.summary}><div><dt>Gói / ca làm</dt><dd>{visibleTasks.length}</dd></div><div><dt>Đã điểm danh</dt><dd>{finished}</dd></div><div><dt>Bản nháp trên máy</dt><dd>{deviceDrafts.length}</dd></div></dl>
-    <SearchInput aria-label="Tìm gói chấm công" placeholder="Tên gói, công trường, ca làm" value={query} onChange={event => setQuery(event.target.value)} />
+    <SearchInput aria-label="Tìm gói chấm công" placeholder="Tên gói, công trường, ca làm" value={query} onChange={event => setQuery(event.target.value)} /></> : null}
     <div className={styles.taskGrid}>
       {visibleTasks.map(task => {
         const hasLocalDraft = deviceDrafts.some(item => item.session.projectId === task.projectId && item.session.worksiteId === task.worksiteId && item.session.date === task.date && item.session.shiftCode === task.shiftCode);
@@ -130,8 +130,8 @@ export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: s
           <div className={styles.taskStatus}><StatusBadge tone={task.existingStatus ? sessionTones[task.existingStatus] : hasLocalDraft ? "warning" : "neutral"}>{task.existingStatus ? sessionLabels[task.existingStatus] : hasLocalDraft ? "Bản nháp" : "Chưa điểm danh"}</StatusBadge></div>
           <dl className={styles.taskFacts}><div><dt><Users aria-hidden="true" size={16} />Công nhân dự kiến</dt><dd>{task.expectedWorkers}</dd></div><div><dt><ClipboardCheck aria-hidden="true" size={16} />Ca làm</dt><dd>{task.shiftName}</dd></div></dl>
           <footer className={styles.taskActions}>
-            {canCreate && !task.existingSessionId && selectedTaskKey === taskKey ? <Button busy={Boolean(starting)} disabled={Boolean(starting) || !task.roster.length} onClick={() => void start(task)} variant="primary">Tiếp tục</Button> : null}
-            {task.existingSessionId ? <Button disabled={Boolean(starting)} onClick={() => void start(task)} rightIcon={<ArrowUpRight aria-hidden="true" size={17} />}>{task.existingStatus === "submitted" || task.existingStatus === "locked" || task.existingStatus === "needs_review" || !canCreate ? "Xem điểm danh" : "Tiếp tục điểm danh"}</Button> : null}
+            {canCreate && selectedTaskKey === taskKey ? <Button busy={Boolean(starting)} disabled={Boolean(starting) || !task.roster.length} onClick={() => void start(task)} variant="primary">{task.existingSessionId && ["submitted", "locked", "needs_review"].includes(task.existingStatus ?? "") ? "Điểm danh lượt mới" : "Tiếp tục"}</Button> : null}
+            {task.existingSessionId ? <Link className="button button--secondary" href={`/worker-attendance/sessions/${task.existingSessionId}`}>Xem điểm danh<ArrowUpRight aria-hidden="true" size={17} /></Link> : null}
             {!canCreate && can(user.permissions, "project.view") ? <Link aria-label={`Mở công trường ${task.projectName}`} className={styles.projectLink} href={`/projects/${task.projectId}/today`}>Công trường<ArrowUpRight aria-hidden="true" size={16} /></Link> : null}
           </footer>
         </article>;
@@ -144,35 +144,36 @@ export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: s
   </div>;
 }
 
-export function WorkerAttendanceSessionList({ detailBasePath = "/worker-attendance/sessions" }: { detailBasePath?: string }) {
+export function WorkerAttendanceSessionList({ detailBasePath = "/worker-attendance/sessions", date, onDateChange, showExport = true }: { detailBasePath?: string; date?: string; onDateChange?: (date: string) => void; showExport?: boolean }) {
   const user = useCurrentUser();
   const [sessions, setSessions] = useState<WorkerAttendanceSession[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [localDate, setLocalDate] = useState(getBusinessDateKey);
+  const selectedDate = date ?? localDate;
+  const changeDate = (value: string) => { if (/^\d{4}-\d{2}-\d{2}$/.test(value)) (onDateChange ?? setLocalDate)(value); };
   const [status, setStatus] = useState("");
-  const [view, setView] = useState<"sessions" | "table">("sessions");
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try { setSessions(await readWorkerResponse<WorkerAttendanceSession[]>(await fetch("/api/v1/worker-attendance/sessions", { cache: "no-store" }))); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu."); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  const requestRef = useRef<{ date: string; controller: AbortController; pending: Promise<void> } | null>(null);
+  const load = useCallback(() => {
+    if (requestRef.current?.date === selectedDate && !requestRef.current.controller.signal.aborted) return requestRef.current.pending;
+    requestRef.current?.controller.abort();
+    const controller = new AbortController();
+    const pending = (async () => {
+      setLoading(true); setError("");
+      try { const result = await readWorkerResponse<WorkerAttendanceSession[]>(await fetch(`/api/v1/worker-attendance/sessions?from=${selectedDate}&to=${selectedDate}`, { cache: "no-store", signal: controller.signal })); if (!controller.signal.aborted) setSessions(result); }
+      catch (caught) { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu."); }
+      finally { if (!controller.signal.aborted) setLoading(false); }
+    })();
+    requestRef.current = { date: selectedDate, controller, pending };
+    void pending.finally(() => { if (requestRef.current?.pending === pending) requestRef.current = null; });
+    return pending;
+  }, [selectedDate]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => { window.clearTimeout(timer); requestRef.current?.controller.abort(); requestRef.current = null; }; }, [load]);
   useDomainReconciliation("worker-attendance", load);
-  const visible = useMemo(() => sessions.filter(session => (!from || session.date >= from) && (!to || session.date <= to) && (!status || session.status === status) && `${session.projectName} ${session.worksiteName}`.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))), [from, sessions, status, to, query]);
-  const filtered = Boolean(from || to || status || query);
-  const columns: DataTableColumn<WorkerAttendanceSession>[] = [
-    { id: "project", header: "Công trường", priority: "primary", sortable: true, accessor: "projectName", cell: session => <span className="record-identity"><strong>{session.projectName}</strong><small>{session.worksiteName}</small></span> },
-    { id: "date", header: "Ngày điểm danh", sortable: true, accessor: "date", cell: session => formatBusinessDate(session.date) },
-    { id: "shift", header: "Ca làm", cell: session => session.shiftName },
-    { id: "status", header: "Trạng thái", cell: session => <StatusBadge tone={sessionTones[session.status]}>{sessionLabels[session.status]}</StatusBadge> }
-  ];
-  return <ListWorkspace label="Lịch sử điểm danh công trường" filters={<><FilterBar busy={loading}><SearchInput aria-label="Tìm phiên điểm danh" placeholder="Dự án hoặc công trường" value={query} onChange={event => setQuery(event.target.value)} /><Input label="Từ ngày" onChange={event => setFrom(event.target.value)} type="date" value={from} /><Input label="Đến ngày" onChange={event => setTo(event.target.value)} type="date" value={to} /><Select label="Trạng thái" onChange={event => setStatus(event.target.value)} options={Object.entries(sessionLabels).map(([value, label]) => ({ value, label }))} placeholder="Tất cả" value={status} /></FilterBar></>} status={<div className="worklist-summary"><span role="status">{visible.length} phiên điểm danh</span>{filtered ? <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setFrom(""); setTo(""); setStatus(""); }}>Xóa bộ lọc</Button> : null}</div>}>
-{error && sessions.length ? <ErrorState title="Không thể cập nhật danh sách" description={error} action={<Button onClick={() => void load()}>Thử lại</Button>} /> : null}
-<div aria-label="Cách xem điểm danh" className="worklist-summary" role="group"><Button aria-pressed={view === "sessions"} onClick={() => setView("sessions")} size="sm" variant={view === "sessions" ? "primary" : "secondary"}>Theo phiên</Button><Button aria-pressed={view === "table"} onClick={() => setView("table")} size="sm" variant={view === "table" ? "primary" : "secondary"}>Danh sách</Button></div>
-{view === "sessions" && visible.length ? <WorkerSessionEvidenceCards detailBasePath={detailBasePath} sessions={visible} canViewPhotos={can(user.permissions, "worker_attendance.view_photo") || can(user.permissions, "worker_attendance.create")} canExport={can(user.permissions, "timesheet.export")} /> : <DataTable ariaLabel="Lịch sử điểm danh công trường" columns={columns} data={visible} error={!sessions.length ? error : undefined} onRetry={() => void load()} loading={loading && !sessions.length} emptyTitle={filtered ? "Không có phiên phù hợp" : "Chưa có phiên điểm danh"} emptyDescription="" getRowId={session => session.id} getRowHref={session => `${detailBasePath}/${session.id}`} pageSize={15} />}
-</ListWorkspace>;
+  const visible = useMemo(() => sessions.filter(session => session.date === selectedDate && (!status || session.status === status) && `${session.projectName} ${session.worksiteName} ${session.supervisorName} ${session.entries.filter(entry => entry.isSelected !== false).map(entry => `${entry.employeeCode} ${entry.workerName}`).join(" ")}`.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))), [selectedDate, sessions, status, query]);
+  const workerCount = new Set(visible.filter(session => session.submittedAt || ["submitted", "locked"].includes(session.status)).flatMap(session => session.entries.filter(entry => entry.isSelected !== false && ["present", "late"].includes(entry.status)).map(entry => entry.workerId))).size;
+  return <ListWorkspace label="Điểm danh công trường theo ngày" filters={<><FilterBar busy={loading}><Input label="Ngày" type="date" value={selectedDate} onChange={event => changeDate(event.target.value)} /><Button onClick={() => changeDate(getBusinessDateKey())} variant="ghost">Hôm nay</Button><SearchInput aria-label="Tìm điểm danh trong ngày" placeholder="Công trường, giám sát hoặc công nhân" value={query} onChange={event => setQuery(event.target.value)} /><Select label="Trạng thái" onChange={event => setStatus(event.target.value)} options={Object.entries(sessionLabels).map(([value, label]) => ({ value, label }))} placeholder="Tất cả trạng thái" value={status} /><IconButton label="Cập nhật điểm danh" disabled={loading} onClick={() => void load()}><RefreshCw size={17} /></IconButton></FilterBar>{showExport ? <AttendanceExport month={selectedDate.slice(0, 7)} onMonthChange={month => changeDate(`${month}-01`)} /> : null}</>} status={<div className={styles.sessionToolbar}><span role="status">{workerCount} công nhân · {visible.length} lượt điểm danh · {visible.reduce((count, session) => count + session.photos.length, 0)} ảnh</span>{status || query ? <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setStatus(""); }}>Xóa bộ lọc</Button> : null}</div>}>
+    {error ? <ErrorState description={error} action={<Button onClick={() => void load()}>Thử lại</Button>} /> : loading && !visible.length ? <LoadingState title="Đang tải điểm danh trong ngày" /> : visible.length ? <WorkerSessionEvidenceCards detailBasePath={detailBasePath} sessions={visible} canViewPhotos={can(user.permissions, "worker_attendance.view_photo") || can(user.permissions, "worker_attendance.create")} /> : <EmptyState title={status || query ? "Không có điểm danh phù hợp" : "Chưa có điểm danh trong ngày"} description="" />}
+  </ListWorkspace>;
 }

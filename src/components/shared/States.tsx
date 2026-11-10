@@ -28,7 +28,7 @@ export function LoadingState({
   className
 }: Partial<StateProps>) {
   return (
-    <div aria-label={title} aria-live="polite" className={cn("state-box state-box--loading", className)} role="status">
+    <div aria-busy="true" aria-label={title} aria-live="polite" className={cn("state-box state-box--loading", className)} role="status">
       <span className="sr-only">{title}</span>
       <LoadingSpinner />
       <ContentSkeleton />

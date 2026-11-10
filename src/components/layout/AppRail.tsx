@@ -69,7 +69,7 @@ function RailNavigation({ groups, pathname, collapsed }: {
 
   return <ul className="app-rail__groups">
     {groups.map((group) => {
-      if (group.flat) return <li className="app-rail__direct-group" key={group.id ?? group.label}><span className="app-rail__section-label">{group.label}</span><ul>{group.items.map(item => renderLink(item))}</ul></li>;
+      if (group.flat) return <li className="app-rail__direct-group" key={group.id ?? group.label}>{!collapsed ? <span className="app-rail__section-label">{group.label}</span> : null}<ul>{group.items.map(item => renderLink(item))}</ul></li>;
       if (!group.id || group.items.length === 1) {
         return <li className={cn("app-rail__direct-group", group.items[0]?.href === "/dashboard" && "app-rail__home")} key={group.id ?? group.label}><ul>{group.items.map((item) => renderLink(item))}</ul></li>;
       }

@@ -1,11 +1,10 @@
 "use client";
 
-import type {} from "react/canary";
-import { ViewTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
-import { AppHeader, isMobileHeaderRootScreen } from "@/components/layout/AppHeader";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { AppRail } from "@/components/layout/AppRail";
 import { MobileNavigationProvider } from "@/components/layout/MobileNavigationContext";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
@@ -22,22 +21,13 @@ import { can } from "@/lib/auth/permissions";
 import { CurrentUserProvider } from "@/components/providers/CurrentUserProvider";
 import { installBackHistory } from "@/lib/navigation/backHistory";
 import { readWorkspacePreferences, type WorkspacePreferences } from "@/lib/ui/workspacePreferencesRequest";
-import { animatePageEntry, supportsPageViewTransitions } from "@/lib/ui/pageEntryMotion";
 import chrome from "./ApplicationChrome.module.css";
 
 const INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
-/** This boundary adds no DOM and never keys or remounts the current page. */
-function WorkspacePageMotion({ children, instant = false }: { children: ReactNode; instant?: boolean }) {
-  // Next's App Router supplies React canary. Keep plain React consumers usable.
-  if (!ViewTransition) return children;
-  return <ViewTransition default="none" name="workspace-content" update={instant ? "none" : "workspace-page-motion"}>{children}</ViewTransition>;
-}
-
 function AppShellContent({ children, user, testEnvironment }: { children: ReactNode; user: AuthenticatedUser; testEnvironment?: string }) {
   const pathname = usePathname();
   useModuleAvailability(pathname);
-  const isShipmentWorkspace = /^\/import-export\/shipments\/[^/]+\/(overview|lines|containers|documents|customs|receiving|history)$/.test(pathname);
   const router = useRouter();
   useLayoutEffect(() => installBackHistory(user.id), [user.id]);
   useLayoutEffect(() => {
@@ -51,17 +41,6 @@ function AppShellContent({ children, user, testEnvironment }: { children: ReactN
   const shellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => { mainRef.current?.scrollTo?.({ top: 0, left: 0, behavior: "auto" }); }, [pathname]);
-  useLayoutEffect(() => {
-    const main = mainRef.current;
-    // Native snapshots animate both screens after React commits navigation;
-    // running an entry animation too would produce two competing movements.
-    if (!main || isShipmentWorkspace || supportsPageViewTransitions()) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const animation = animatePageEntry(main, reduced.matches);
-    const stop = () => { if (reduced.matches) animation?.cancel(); };
-    reduced.addEventListener("change", stop);
-    return () => { animation?.cancel(); reduced.removeEventListener("change", stop); };
-  }, [pathname, isShipmentWorkspace]);
   const preferencesRef = useRef<WorkspacePreferences | undefined>(undefined);
   const connectionState = useRealtimeConnectionState();
   const isPackageRoute = /^\/projects\/[^/]+\/(?:today|progress|team|profile|documents|updates)$/.test(pathname);
@@ -239,13 +218,13 @@ function AppShellContent({ children, user, testEnvironment }: { children: ReactN
         pathname={pathname}
         user={user}
       />
-      <div className={`${contentClassName} ${chrome.content}`} data-mobile-title-in-bar={Boolean(pageTitles?.pathname === pathname && pageTitles.pageTitle && !isMobileHeaderRootScreen(pathname))}>
+      <div className={`${contentClassName} ${chrome.content}`}>
         <AppHeader backHrefOverride={localBackHref} connectionState={connectionState} documentTitleOverride={pageTitles?.pathname === pathname ? pageTitles.documentTitle : undefined} homeHref={resolveLandingPage(user, settings.dashboard)} mobileHomeHref={resolveMobileLandingPage(user, settings.dashboard)} onSidebarToggle={() => changeSidebarState(!collapsed)} pageTitleOverride={pageTitles?.pathname === pathname ? pageTitles.pageTitle : undefined} pathname={pathname} sidebarCollapsed={collapsed} testEnvironment={testEnvironment} user={user} />
         <SystemNoticeBanner />
-        <WorkspacePageMotion instant={isShipmentWorkspace}><main className={`page-main ${chrome.main}`} id="main-content" ref={mainRef} tabIndex={-1}>
+        <main className={`page-main ${chrome.main}`} id="main-content" ref={mainRef} tabIndex={-1}>
           {backHref && !localBackHref ? <nav aria-label="Điều hướng quay lại" className="page-context-navigation"><BackLink href={backHref} label={backHref === "/projects" ? "Danh sách gói" : "Trở lại"} /></nav> : null}
           {unavailableModule ? <ModuleLockedState module={unavailableModule} canManage={can(user.permissions, "system_admin.access") && can(user.permissions, "module.manage")} /> : children}
-        </main></WorkspacePageMotion>
+        </main>
       </div>
       <MobileBottomNav pathname={pathname} user={user} />
     </div>

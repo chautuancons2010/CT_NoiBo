@@ -1,4 +1,9 @@
 .home, .wizard, .detail { display: grid; width: 100%; min-width: 0; max-width: 1120px; align-content: start; gap: var(--space-5); }
+.sessionToolbar { display: flex; min-width: 0; width: 100%; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.sessionToolbar > span { margin-right: auto; color: var(--text-secondary); font-size: 13px; }
+.viewSwitch { display: inline-flex; min-width: 0; border: 1px solid var(--border-subtle); border-radius: 10px; padding: 3px; background: var(--surface-2); }
+.viewSwitch :global(.button) { min-height: 36px; border-radius: 7px; }
+.viewSwitch :global(.button[aria-pressed="true"]) { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-card); }
 .home, .wizard, .detail { box-sizing: border-box; width: 100%; max-width: 1120px; overflow-wrap: anywhere; }
 .detail > *, .wizard > * { min-width: 0; max-width: 100%; }
 .detail :global(.worker-photo-button), .wizard :global(.worker-photo-button) { display: block; width: 100%; min-width: 0; max-width: 100%; border-radius: 12px; overflow: hidden; }
@@ -27,13 +32,14 @@
 .todayHeader { display: flex; min-width: 0; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); }
 .todayHeader > time, .todayHeader > div { display: flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-size: var(--font-meta); }
 .updatedAt { color: var(--text-muted); }
-.summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-3); margin: 0; }
-.summary > div { display: grid; gap: var(--space-2); min-width: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); padding: var(--space-4) var(--space-5); background: var(--surface); }
+.summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0; margin: 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface); }
+.summary > div { display: grid; align-content: start; gap: var(--space-2); min-width: 0; border: 0; border-right: 1px solid var(--border-subtle); border-radius: 0; padding: var(--space-4) var(--space-5); background: transparent; }
+.summary > div:last-child { border-right: 0; }
 .summary dt { color: var(--text-secondary); font-size: var(--font-meta); }
 .summary dd { margin: 0; color: var(--text-primary); font-size: 25px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .taskGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-4); min-width: 0; }
 .taskGrid:has(> :only-child) { grid-template-columns: minmax(0,1fr); max-width: 720px; }
-.task { display: grid; min-width: 0; gap: var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); padding: var(--space-5); background: var(--surface); box-shadow: var(--shadow-card); }
+.task { display: grid; min-width: 0; gap: var(--space-4); border: 1px solid var(--border-subtle); border-radius: 18px; padding: var(--space-5); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease, box-shadow 160ms ease; }
 .task > header { display: flex; min-width: 0; align-items: start; gap: var(--space-3); }
 .taskIcon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; border-radius: var(--radius-control); background: var(--color-primary-soft); color: var(--primary); }
 .task > header > div { display: grid; min-width: 0; gap: var(--space-2); }
@@ -55,7 +61,8 @@
 .flowSteps li > span { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid var(--border-subtle); border-radius: var(--radius-pill); }
 .packageRadio { width: 24px; height: 24px; flex: 0 0 24px; margin-top: var(--space-2); accent-color: var(--primary); cursor: pointer; }
 .task h2 label { display: inline-flex; min-height: 44px; align-items: center; cursor: pointer; }
-.task[data-selected="true"] { border-color: var(--primary); background: var(--color-primary-soft); }
+.task[data-selected="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary-soft) 35%, var(--surface)); box-shadow: inset 0 0 0 1px var(--primary), var(--shadow-card); }
+.task:has(.packageRadio:focus-visible) { outline: 2px solid var(--primary); outline-offset: 3px; }
 .selectionActions { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-3); background: var(--surface); }
 .selectionActions > span { min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary); }
 .workerChoices { display: grid; }

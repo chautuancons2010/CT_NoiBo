@@ -125,7 +125,7 @@ const landingRoutes: ReadonlyArray<{ route: string; requiredAny: readonly Permis
   { route: "/timesheets", requiredAny: ["attendance.period.manage"] },
   { route: "/timesheets/matrix", requiredAny: ["timesheet.view_team", "timesheet.view_all"] },
   { route: "/timesheets/adjustments", requiredAny: ["timesheet.adjust", "attendance.adjust"] },
-  { route: "/shifts", requiredAny: ["shift.view"] },
+  { route: "/settings/attendance/shifts", requiredAny: ["shift.view"] },
   { route: "/leave/manage", requiredAny: ["leave.view_all"] },
   { route: "/leave", requiredAny: ["leave.self.view", "leave.self.create"] },
   { route: "/project-monitoring", requiredAny: ["project_monitoring.view", "project_monitoring.view_all", "project_issue.view"] },

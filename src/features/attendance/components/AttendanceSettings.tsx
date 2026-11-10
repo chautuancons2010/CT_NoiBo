@@ -8,7 +8,7 @@ import { Card } from "@/components/shared/Card";
 import { Input } from "@/components/shared/FormControls";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Tabs } from "@/components/shared/Tabs";
+import { AttendanceSettingsTabs } from "./AttendanceSettingsTabs";
 import type { AttendanceLocation, AttendancePolicy } from "@/features/attendance/types/attendanceTypes";
 import styles from "./AttendanceSettings.module.css";
 
@@ -51,7 +51,7 @@ export function AttendanceSettings({ activeTab = "policy" }: { activeTab?: "poli
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể lưu địa điểm."); }
   };
   return <div className={`attendance-page ${styles.page}`}>
-    <Tabs label="Cấu hình chấm công" items={[{ label: "Chính sách", href: "/settings/attendance", active: activeTab === "policy" }, { label: "Địa điểm", href: "/settings/attendance/locations", active: activeTab === "locations" }]} />
+    <AttendanceSettingsTabs active={activeTab} />
     {saved ? <div className="attendance-notice attendance-notice--success" role="status">{saved}</div> : null}
     {error ? <div className="attendance-notice" role="alert">{error}</div> : null}
     {activeTab === "policy" ? <>

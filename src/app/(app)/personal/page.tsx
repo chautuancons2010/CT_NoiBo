@@ -12,6 +12,8 @@ import { can } from "@/lib/auth/permissions";
 import { LogoutButton } from "@/features/auth/components/LogoutButton";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { getBusinessDateKey } from "@/lib/time/timezone";
+import styles from "./PersonalHome.module.css";
+import { WorkerAttendanceToday } from "@/features/worker-attendance/components/WorkerAttendanceHome";
 
 export default function PersonalPage() {
   const user = useCurrentUser();
@@ -26,9 +28,9 @@ export default function PersonalPage() {
   const identity = <><span className="personal-home__avatar" aria-hidden="true">{initials || <UserRound size={22} />}</span><span className="personal-home__identity"><span>Xin chào,</span><strong>{user.displayName}</strong></span>{profileAllowed ? <ChevronRight aria-hidden="true" size={18} /> : null}</>;
 
   return (
-    <div className="personal-home page-stack">
+    <div className={`personal-home page-stack ${styles.page}`}>
       <PageHeader title="Cá nhân" />
-      <header className="personal-home__mobile-only personal-home__welcome">
+      <header className={`personal-home__welcome ${styles.welcome}`}>
         {profileAllowed ? <Link aria-label={`Hồ sơ của ${user.displayName}`} className="personal-home__person" href="/profile">{identity}</Link> : <div className="personal-home__person">{identity}</div>}
         <time dateTime={getBusinessDateKey(today)} suppressHydrationWarning>{new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", weekday: "long", day: "2-digit", month: "2-digit" }).format(today)}</time>
       </header>
@@ -37,15 +39,15 @@ export default function PersonalPage() {
       ) : can(user.permissions, "profile.view") ? (
         <Link className="personal-home__profile" href="/profile"><UserRound aria-hidden="true" size={19} />Hồ sơ của tôi<ArrowUpRight aria-hidden="true" size={17} /></Link>
       ) : null}
-      {canReviewWorkers && settings.modules.projects ? <nav aria-label="Điểm danh công nhân" className="personal-home__mobile-only personal-home__links"><Link href="/worker-attendance/today"><UsersRound aria-hidden="true" size={20} /><span>Điểm danh công nhân</span><ChevronRight aria-hidden="true" size={18} /></Link></nav> : null}
-      {canViewAttendance || canViewPayslips || canUseLeave ? <section aria-labelledby="personal-services-title" className="personal-home__services">
+      {canViewAttendance || canViewPayslips || canUseLeave ? <section aria-labelledby="personal-services-title" className={`personal-home__services ${styles.services}`}>
       <h2 className="personal-home__section-title" id="personal-services-title">Tiện ích cá nhân</h2>
-      <nav aria-label="Thông tin của tôi" className="personal-home__links">
+      <nav aria-label="Thông tin của tôi" className={`personal-home__links ${styles.links}`}>
         {canViewAttendance ? <Link href="/attendance/history"><CalendarRange aria-hidden="true" size={20} /><span><span className="personal-home__label-desktop">Lịch công của tôi</span><span className="personal-home__label-mobile">Lịch công</span></span><ChevronRight aria-hidden="true" size={18} /></Link> : null}
         {canViewPayslips ? <Link href="/personal/payslips"><WalletCards aria-hidden="true" size={20} /><span><span className="personal-home__label-desktop">Phiếu lương của tôi</span><span className="personal-home__label-mobile">Phiếu lương</span></span><ChevronRight aria-hidden="true" size={18} /></Link> : null}
         {canUseLeave ? <Link href="/leave"><CalendarOff aria-hidden="true" size={20} /><span><span className="personal-home__label-desktop">Nghỉ phép của tôi</span><span className="personal-home__label-mobile">Nghỉ phép</span></span><ChevronRight aria-hidden="true" size={18} /></Link> : null}
       </nav>
       </section> : null}
+      {canReviewWorkers && settings.modules.projects ? <section aria-labelledby="personal-workers-title" className={styles.workers}><header><h2 id="personal-workers-title"><UsersRound aria-hidden="true" size={20}/>Điểm danh công nhân</h2><Link aria-label="Mở danh sách điểm danh công nhân" href="/worker-attendance/today"><ArrowUpRight aria-hidden="true" size={20}/></Link></header><WorkerAttendanceToday embedded /></section> : null}
       <div className="personal-home__mobile-only personal-home__logout"><LogoutButton /></div>
     </div>
   );

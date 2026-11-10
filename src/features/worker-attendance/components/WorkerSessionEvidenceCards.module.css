@@ -1,5 +1,17 @@
-.grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,360px),1fr)); gap: 20px; width: 100%; min-width: 0; }
-.session { min-width: 0; border: 1px solid var(--border-subtle); border-radius: 22px; background: var(--surface); overflow: hidden; box-shadow: var(--shadow-card); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,400px),1fr)); align-items: start; gap: 16px; width: 100%; min-width: 0; padding: 16px; }
+.rounds { display: grid; min-width: 0; }
+.round { border-top: 1px solid var(--border-subtle); min-width: 0; }
+.round > summary { display: flex; min-height: 60px; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 20px; cursor: pointer; }
+.round > summary::before { content: "›"; color: var(--primary); font-size: 22px; line-height: 1; }
+.round[open] > summary::before { transform: rotate(90deg); }
+.round > summary strong { color: var(--text-primary); font-size: 13px; }
+.round > summary > span:last-child { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
+.roundContent { display: grid; gap: 12px; padding-bottom: 12px; }
+.supervisor { padding-inline: 20px; color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.roundContent .names { padding-bottom: 0; }
+.roundContent .roundLink { display: flex; justify-content: flex-end; align-items: center; gap: 6px; min-height: 44px; margin-inline: 20px; color: var(--primary); font-size: 13px; font-weight: 600; }
+.round summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; }
+.session { display: grid; min-width: 0; align-content: start; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface); overflow: hidden; box-shadow: none; }
 .session > header { display: flex; gap: 12px; align-items: start; padding: 20px 20px 12px; }
 .icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; background: var(--primary-soft); border-radius: 14px; color: var(--primary); }
 .session header > div { display: grid; min-width: 0; flex: 1; gap: 4px; }
@@ -16,13 +28,15 @@
 .crew { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 18px 20px 12px; }
 .crew strong { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: 14px; }
 .crew > span { color: var(--text-secondary); font-size: 12px; }
-.names { display: flex; align-content: start; flex-wrap: wrap; gap: 6px; min-height: 36px; padding: 0 20px 18px; }
+.names { display: flex; align-content: start; flex-wrap: wrap; gap: 6px; padding: 0 20px 16px; }
+.names:empty { display: none; }
 .names > span, .names > a { display: inline-flex; align-items: center; gap: 4px; border-radius: 8px; background: var(--primary-soft); padding: 5px 8px; color: var(--primary); font-size: 12px; }
 .names > a { min-height: 32px; }
 .names svg { flex-shrink: 0; }
-.session > footer { display: grid; gap: 6px; padding: 12px 20px; border-top: 1px solid var(--border-subtle); background: color-mix(in srgb,var(--surface-2) 50%,var(--surface)); }
+.session > footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--border-subtle); background: color-mix(in srgb,var(--surface-2) 50%,var(--surface)); }
+.session footer > span { flex: 1; }
+.session footer > a { flex-shrink: 0; }
 .session footer > span { color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
-.session footer > div { display: flex; justify-content: space-between; gap: 12px; }
 .session footer a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; gap: 6px; color: var(--primary); font-size: 13px; font-weight: 600; }
 .session a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 @media (max-width: 360px) { .session > header { padding: 16px 14px 12px; gap: 8px; flex-wrap: wrap; } .session header > div { flex-basis: calc(100% - 60px); } .session header > :last-child { margin-left: 50px; } .photos { margin-inline: 14px; height: 120px; } .meta,.crew,.names,.session > footer { padding-inline: 14px; } }

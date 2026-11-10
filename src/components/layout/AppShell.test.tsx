@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -22,7 +23,9 @@ vi.mock("@/components/providers/RealtimeProvider", () => ({
   useRealtimeConnectionState: () => "connected"
 }));
 vi.mock("@/components/layout/MobileNavigationContext", () => ({
-  MobileNavigationProvider: ({ children }: { children: ReactNode }) => children
+  MobileNavigationProvider: ({ children }: { children: ReactNode }) => children,
+  useMobileNavigation: () => ({ override: null }),
+  useOptionalMobileNavigation: () => null
 }));
 vi.mock("@/components/layout/AppHeader", () => ({
   AppHeader: () => <header>Châu Tuấn</header>,
@@ -49,5 +52,12 @@ describe("AppShell keyboard navigation", () => {
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
     expect(screen.getByRole("main")).toHaveAttribute("tabindex", "-1");
     await waitFor(() => expect(screen.getByLabelText("Tìm nhân viên")).toHaveValue("Đơn đang soạn"));
+  });
+  it("keeps the page title and its local return control in content", async () => {
+    render(<AppShell user={user}><div><Link className="back-link" data-ui="back-control" href="/accounting">Kế toán</Link><header className="page-header" data-ui="page-header"><h1>Kỳ lương</h1></header></div></AppShell>);
+    expect(screen.getByRole("heading", { name: "Kỳ lương" })).toBeInTheDocument();
+    expect(within(screen.getByRole("main")).getByRole("link", { name: "Kế toán" })).toHaveAttribute("href", "/accounting");
+    await waitFor(() => expect(document.querySelector(".app-content")).not.toHaveAttribute("data-mobile-title-in-bar"));
+    expect(screen.queryByRole("navigation", { name: "Điều hướng quay lại" })).not.toBeInTheDocument();
   });
 });

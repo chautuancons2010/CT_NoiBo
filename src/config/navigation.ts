@@ -215,13 +215,6 @@ export const desktopNavigation: NavigationGroup[] = [
         exact: true
       },
       {
-        label: "Ca làm",
-        href: "/shifts",
-        icon: "CalendarClock",
-        requiredPermission: "shift.view",
-        mobilePriority: 3
-      },
-      {
         label: "Quản lý nghỉ phép",
         href: "/leave/manage",
         icon: "CalendarCheck",
@@ -242,7 +235,7 @@ export const desktopNavigation: NavigationGroup[] = [
         href: "/settings/attendance",
         icon: "SlidersHorizontal",
         requiredPermission: "attendance.config.view",
-        alternativePermission: "attendance.config.manage"
+        alternativePermissions: ["attendance.config.manage", "shift.view", "shift.manage", "shift.edit"]
       },
     ]
   },

@@ -1,5 +1,6 @@
 /* Dashboard composition uses the same ERP surfaces and controls as records. */
 .page { display: grid; width: 100%; min-width: 0; max-width: none; gap: 22px; margin-inline: auto; container-type: inline-size; }
+.launcher { width: 100%; min-width: 0; }
 .headingActions { display: flex; align-items: center; gap: 12px; }
 .headingActions time { color: var(--text-muted); font-size: 13px; }
 .analytics { display: grid; min-width: 0; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); align-items: start; gap: 22px; }

@@ -101,7 +101,7 @@ export async function registerBrowserCases(s) {
       assert.equal(await page.getByRole("heading", { name: /^Bảng lương tháng / }).count(), 1);
       await page.screenshot({ path: path.join(s.output, "payroll-1440.png"), fullPage: true });
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.locator('[aria-label="Lương nhân viên"]:visible').waitFor();
+      await page.locator('[aria-label="Lương nhân viên"]:visible').first().waitFor();
       assert.equal(await pageContent(page).locator(".mobile-record:visible").count(), 0, "Bảng lương không hiển thị trùng thẻ nhân viên trên điện thoại");
       const employeeName = `[E2E ${s.fixture.manifest.runId}] employee`;
       const visibleEmployeeCount = await pageContent(page).getByText(employeeName, { exact: true }).evaluateAll((elements) => elements.filter((element) => element.getClientRects().length > 0).length);

@@ -88,7 +88,7 @@ const [actionBars, pageHeader, filterBar, imageUploader, workerAttendanceWizard,
 
 assert(!/applicationForPath/.test(header), "Topbar đang sở hữu lại tên ứng dụng/route.");
 assert(!/app-header__(?:identity|application)/.test(header), "Topbar đang render lại khối định danh ứng dụng.");
-assert(/app-header__mobile-leading/.test(header) && /app-header__mobile-title/.test(header) && /<AppLogo compact href="\/personal"/.test(header), "Topbar mobile phải có một tên route gọn trong header và điều hướng về Cá nhân.");
+assert(/app-header__mobile-leading/.test(header) && /app-header__mobile-brand/.test(header) && /mobileHomeHref = "\/personal"/.test(header) && /<AppLogo compact href=\{mobileHomeHref\}/.test(header) && !/app-header__mobile-back/.test(header), "Topbar mobile phải giữ launcher, logo và tên công ty khi chuyển trang.");
 assert(!/\bBreadcrumb\b|\bgetBreadcrumbs\b|page-breadcrumb/.test(shell), "AppShell vẫn render đường dẫn breadcrumb.");
 assert(/getBackHref/.test(shell) && /<BackLink\s+href=\{backHref\}/.test(shell), "AppShell chưa bảo đảm nút Trở lại cho mọi route nghiệp vụ.");
 assert(/href\s*=\s*\{href\}/.test(backLink), "BackLink chưa dùng route cha an toàn được truyền vào.");
@@ -98,7 +98,7 @@ assert(/pathname\s*===\s*["']\/dashboard["'][\s\S]{0,80}?return\s*\[\]/.test(reg
 assert(/@fontsource\/inter\/400\.css/.test(layout), "Thiếu Inter đầy đủ Latin + Vietnamese 400.");
 assert(/@fontsource\/inter\/500\.css/.test(layout), "Thiếu Inter đầy đủ Latin + Vietnamese 500.");
 assert(/@fontsource\/inter\/600\.css/.test(layout), "Thiếu Inter đầy đủ Latin + Vietnamese 600.");
-assert(!/@fontsource\/inter\/700\.css/.test(layout), "Visual direction mới không tải Inter 700 mặc định.");
+assert(/@fontsource\/inter\/700\.css/.test(layout), "Thiếu Inter đầy đủ Latin + Vietnamese 700 cho các tiêu đề đậm.");
 assert(!/@fontsource\/inter\/vietnamese-(?:400|500|600)\.css/.test(layout), "Không được dùng riêng subset Vietnamese vì sẽ thiếu glyph Latin.");
 assert(/--topbar-height:\s*56px/.test(tokenCss), "Topbar ERP phải dùng token 56px.");
 assert(!/top:\s*(?:58|66)px/.test(css), "Vẫn còn sticky offset hardcode 58/66px.");
@@ -121,9 +121,9 @@ assert(!/WarehouseDashboardView/.test(warehouseViews) && !/ImportExportDashboard
 assert(/operational-section__body/.test(workbench), "Panel nghiệp vụ chưa tách header và body.");
 assert(/--workspace-canvas:\s*var\(--app-canvas-mid\)/.test(tokenCss), "Workspace phải dùng canvas nhận diện hiện hành.");
 assert(/--radius-button:\s*var\(--radius-control\)/.test(tokenCss) && /--radius-search:\s*var\(--radius-control\)/.test(tokenCss), "Button/search phải dùng cùng token control.");
-assert(/--ui-radius-card:\s*8px/.test(tokenCss) && /--radius-control:\s*var\(--ui-radius-control\)/.test(tokenCss), "Card/control geometry chưa dùng hệ quy chiếu chung.");
-assert(/--ui-radius-control:\s*6px/.test(tokenCss) && /--control-height-md:\s*44px/.test(tokenCss), "Control geometry chưa đi qua token chung.");
-assert(/--sidebar-width:\s*232px/.test(tokenCss) && /--sidebar-collapsed-width:\s*84px/.test(tokenCss), "Sidebar mở rộng và rail icon mẫu chưa đi qua token chung.");
+assert(/--ui-radius-card:\s*16px/.test(tokenCss) && /--radius-control:\s*var\(--ui-radius-control\)/.test(tokenCss), "Card/control geometry chưa dùng hệ quy chiếu chung.");
+assert(/--ui-radius-control:\s*10px/.test(tokenCss) && /--control-height-md:\s*44px/.test(tokenCss), "Control geometry chưa đi qua token chung.");
+assert(/--sidebar-width:\s*240px/.test(tokenCss) && /--sidebar-collapsed-width:\s*80px/.test(tokenCss), "Sidebar mở rộng và rail icon mẫu chưa đi qua token chung.");
 assert(/--reference-surface:/.test(tokenCss) && /--reference-shadow:/.test(tokenCss) && /--reference-orange:/.test(tokenCss), "Thiếu hệ vật liệu mềm và màu điểm nhấn theo mẫu.");
 assert(/--erp-primary:\s*var\(--color-primary\)/.test(tokenCss) && /deriveBrandColorTokens/.test(layout), "Màu nhận diện phải tiếp tục dùng cấu hình thương hiệu.");
 assert(/\.page-main \.page-header/.test(themeCss) && /font-weight:\s*600/.test(themeCss), "Thiếu theme chung nhẹ cho tiêu đề trang.");

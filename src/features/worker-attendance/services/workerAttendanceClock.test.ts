@@ -27,7 +27,7 @@ describe("worker time and Excel", () => {
     expect(sheet.getCell("N4").value).toBe(8);
     expect(book.getWorksheet("Tổng hợp công nhân")!.getCell("E2").value).toBe(8);
     expect(book.getWorksheet("Bảng dấu công")!.getCell("K3").value).toBe("X");
-    expect(book.getWorksheet("Ảnh theo phiên")!.rowCount).toBe(2);
+    expect(book.getWorksheet("Ảnh theo ngày")!.rowCount).toBe(2);
   });
   it("keeps one shared photo set while marking each selected worker", async () => {
     const session = { id: "session-1", status: "submitted", date: "2026-11-09", projectName: "Gói A", worksiteName: "Khu A", shiftName: "Ca ngày", photos: [1, 2].map(index => ({ id: `photo-${index}`, capturedAt: "2026-11-09T00:00:00Z", address: "SC05" })), entries: [entry, { ...entry, id: "2", workerId: "second", employeeCode: "CN02", workerName: "Công nhân B", dayException: "half_day" }] } as WorkerAttendanceSession;
@@ -36,7 +36,7 @@ describe("worker time and Excel", () => {
     expect(book.getWorksheet("Chấm công công trường")!.rowCount).toBe(5);
     expect(book.getWorksheet("Bảng dấu công")!.getCell("K3").value).toBe("X");
     expect(book.getWorksheet("Bảng dấu công")!.getCell("K4").value).toBe("½");
-    expect(book.getWorksheet("Ảnh theo phiên")!.rowCount).toBe(3);
+    expect(book.getWorksheet("Ảnh theo ngày")!.rowCount).toBe(3);
   });
   it("does not turn an unsent draft into confirmed Excel attendance", async () => {
     const draft = { id: "draft", status: "in_progress", date: "2026-11-09", entries: [entry], photos: [] } as unknown as WorkerAttendanceSession;

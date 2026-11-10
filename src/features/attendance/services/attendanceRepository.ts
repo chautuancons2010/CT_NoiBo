@@ -222,7 +222,7 @@ async function readEvents(
   client: SupabaseClient,
   filters: { employeeId?: string; date?: string; from?: string; to?: string; limit?: number } = {}
 ): Promise<AttendanceEvent[]> {
-  let query = client.from("attendance_events").select(eventSelect).order("effective_at", { ascending: false });
+  let query = client.from("attendance_events").select(eventSelect).order("effective_at", { ascending: false }).order("id", { ascending: false });
   if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
   if (filters.date) query = query.eq("attendance_date", filters.date);
   if (filters.from) query = query.gte("attendance_date", filters.from);
@@ -566,6 +566,11 @@ export async function listAttendanceRecords(user: AuthenticatedUser, filters: { 
   const { data, error } = await query;
   if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách chấm công.");
   return (data ?? []).map((row) => mapEvent(row as Row));
+}
+
+export async function listAttendanceExportEvents(user: AuthenticatedUser, from: string, to: string): Promise<AttendanceEvent[]> {
+  if (!can(user.permissions, "timesheet.export") || !(["attendance.view_all", "attendance.manage", "attendance.log.view"] as const).some(permission => can(user.permissions, permission))) throw new AppError("PERMISSION_DENIED");
+  return readEvents(clientOrThrow(), { from, to });
 }
 
 export async function getAttendanceEvent(user: AuthenticatedUser, eventId: string): Promise<AttendanceEvent> {

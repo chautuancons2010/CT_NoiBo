@@ -156,7 +156,7 @@ export function DataTable<TData extends object>({
   }
 
   if (loading) {
-    return <div aria-label="Đang tải dữ liệu" className="data-table-loading" role="status"><span className="sr-only">Đang tải dữ liệu</span><TableSkeleton columns={columns.length + (hasActions ? 1 : 0)} /></div>;
+    return <div aria-busy="true" aria-label="Đang tải dữ liệu" className="data-table-loading" role="status"><span className="sr-only">Đang tải dữ liệu</span><TableSkeleton columns={columns.length + (hasActions ? 1 : 0)} /></div>;
   }
 
   if (error) {

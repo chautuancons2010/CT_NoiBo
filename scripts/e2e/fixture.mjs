@@ -59,7 +59,7 @@ export async function createFixture(runId, manifestPath, allowRemote) {
         id: employeeId, employee_code: `${fixture.prefix}_${name}`, full_name: `[E2E ${runId}] ${name}`,
         personal_phone: "", normalized_phone: "", join_date: "2026-01-01", employment_status: "active",
         department_id: fixture.references.departmentId, position_id: fixture.references.positionId,
-        employment_type_id: (name === "outsider" ? employmentTypes.find((type) => type.code === "worker")?.id : undefined) || fixture.references.employmentTypeId
+        employment_type_id: (name === "supervisor" ? employmentTypes.find((type) => type.code === "supervisor")?.id : name === "outsider" ? employmentTypes.find((type) => type.code === "worker")?.id : employmentTypes.find((type) => type.code === "office_employee")?.id) || fixture.references.employmentTypeId
       });
       const username = `e2e.${runId}.${name}`;
       const { data, error } = await db.auth.admin.createUser({ email: `${username}@e2e.invalid`, password, email_confirm: true, user_metadata: { e2eRun: runId, testData: true } });

@@ -116,3 +116,5 @@
 .sourceNav button { border: 0; background: transparent; font: inherit; cursor: pointer; }
 .sourceNav button { -webkit-tap-highlight-color: transparent; }
 .sourceNav button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.reviewToolbar { display: flex; min-width: 0; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+@media(max-width:767px){.reviewToolbar{display:grid;grid-template-columns:minmax(0,1fr);}.sourceNav{width:100%;}.sourceNav>button{flex:1;padding-inline:8px;font-size:13px;}}

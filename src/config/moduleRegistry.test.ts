@@ -115,7 +115,7 @@ describe("application registry", () => {
 
   it("keeps HR administration and personal attendance separate", () => {
     const hr = contextualNavigationGroups("/attendance/today", user(["attendance.view_all", "timesheet.view", "shift.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
-    expect(hr.flatMap((group) => group.items).map((item) => item.href)).toEqual(["/attendance/today", "/timesheets/matrix", "/timesheets", "/shifts", "/timesheets/adjustments"]);
+    expect(hr.flatMap((group) => group.items).map((item) => item.href)).toEqual(["/attendance/today", "/timesheets/matrix", "/timesheets", "/timesheets/adjustments", "/settings/attendance"]);
     const personal = contextualNavigationGroups("/attendance/me", user(["attendance.self", "attendance.self.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
     expect(personal[0].items.map((item) => item.href)).toEqual(["/attendance/me", "/attendance/history", "/attendance/requests", "/attendance/notifications"]);
   });
@@ -138,9 +138,9 @@ describe("application registry", () => {
     const groups = contextualNavigationGroups("/employees/departments", user(["employee.view", "contract.view", "insurance.view", "attendance.view_all", "shift.view", "leave.view_all", "attendance.config.view"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
     expect(groups.map((group) => group.id)).toEqual(["hr-records", "hr-attendance", "hr-settings"]);
     const paths = groups.flatMap((group) => group.items.map((item) => item.href));
-    expect(paths).toHaveLength(12);
+    expect(paths).toHaveLength(11);
     expect(new Set(paths).size).toBe(paths.length);
-    expect(paths).toEqual(expect.arrayContaining(["/employees/departments", "/employees/positions", "/shifts"]));
+    expect(paths).toEqual(expect.arrayContaining(["/employees/departments", "/employees/positions", "/settings/attendance"]));
     expect(groups.every(group=>group.flat)).toBe(true);
     expect(paths).not.toContain("/attendance/me");
     expect(paths).not.toContain("/warehouse");

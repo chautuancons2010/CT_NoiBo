@@ -1,3 +1,5 @@
+@import "./mobile-restored.css";
+
 /* ERP component contract. Compatibility rules are contained in layer(legacy).
    These zero-specificity defaults allow scoped business composition without
    selector escalation. Keep brand values in tokens.css and runtime settings. */

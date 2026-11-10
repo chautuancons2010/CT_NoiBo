@@ -85,23 +85,20 @@ export function mobileApplicationDestination(application: ApplicationDefinition,
 }
 
 export function resolveMobileNavigation(pathname: string, user: AuthenticatedUser, settings: MobileNavigationSettings = {}): MobileNavigationModel {
+  void pathname;
   const supervisor = canUseWorkerAttendance(user);
   const applications = visibleApplications(user, settings.modules).filter((application) => mobileApplicationDestination(application, user) !== undefined);
   const accessibleItems = filterGroupsByAccess(desktopNavigation, user.permissions, settings.modules, settings.navigation).flatMap((group) => group.items);
   const businessApplications = applications.filter((application) => application.id !== "attendance" && application.id !== "overview");
-  const currentApplication = applicationForPath(pathname);
   const profile = resolveDashboardProfile(user, settings.dashboard ?? defaultDashboardSettings);
   const roleApplications: Record<string, ApplicationDefinition["id"]> = {
     management: "overview", supervisor: "projects", hr: "human-resources",
     warehouse: "warehouse", accounting: "accounting", import_export: "import-export"
   };
-  const contextualApplication = !isMobilePersonalRoute(pathname, user)
-    ? applications.find((application) => application.id === currentApplication.id)
-    : undefined;
-  const workApplication = contextualApplication && contextualApplication.id !== "attendance" && contextualApplication.id !== "overview"
-    ? contextualApplication
-    : applications.find((application) => application.id === roleApplications[profile] && (profile !== "employee"))
-      ?? businessApplications[0];
+  // Global navigation follows the user's role. Opening a module changes only
+  // the active destination; module-specific links stay inside the app sheet.
+  const workApplication = applications.find((application) => application.id === roleApplications[profile] && profile !== "employee")
+    ?? businessApplications[0];
   const workItems = workApplication ? accessibleItems
     .filter((item) => applicationForPath(item.href).id === workApplication.id)
     .filter((item) => profile !== "supervisor" || !["/project-monitoring", "/projects/updates"].some((prefix) => item.href === prefix || item.href.startsWith(`${prefix}/`)))
@@ -114,7 +111,7 @@ export function resolveMobileNavigation(pathname: string, user: AuthenticatedUse
   const workHref = workApplication ? mobileApplicationDestination(workApplication, user) : undefined;
   if (supervisor) {
     if (settings.modules?.projects !== false) direct.push({ href: "/worker-attendance/today", label: "Điểm danh", icon: "UsersRound", routePrefixes: ["/worker-attendance"] });
-    if (can(user.permissions, "project.view") && settings.modules?.projects !== false) direct.push({ href: "/projects", label: "Gói", icon: "BriefcaseBusiness", exact: true });
+    if (can(user.permissions, "project.view") && settings.modules?.projects !== false) direct.push({ href: "/projects", label: "Gói", icon: "BriefcaseBusiness", exact: true, routePrefixes: ["/projects"] });
     if (can(user.permissions, "attendance.self.view") || can(user.permissions, "attendance.self_history") || can(user.permissions, "attendance.self") || can(user.permissions, "attendance.self.create")) direct.push({ href: "/attendance/history", label: "Lịch công", icon: "CalendarRange" });
   } else if (workApplication && workHref) {
     direct.push({ href: workHref, label: workHref === "/worker-attendance/today" ? "Điểm danh" : applicationLabels[workApplication.id] ?? workApplication.label, icon: workHref === "/worker-attendance/today" ? "UsersRound" : workApplication.icon, routePrefixes: workApplication.routePrefixes.filter((prefix) => !["/notifications", "/profile"].includes(prefix)) });

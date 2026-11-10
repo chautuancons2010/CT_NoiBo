@@ -37,9 +37,10 @@
 - Kiểm tra chiều rộng 320/390 và desktop 1440 trên các màn liên quan; camera/GPS mô phỏng trong trình duyệt. Chưa thay thế nghiệm thu camera/GPS trên điện thoại thật.
 - Giữ nguyên deployment production; chỉ phát hành link Vercel TEST.
 
-## Production còn chờ quyền
+## Production — trạng thái mới nhất
 
 - TEST Supabase `lgmlkagcytfjazulgfbz`; production `uioywupuuestcaliawlc`, hai database riêng.
-- Người dùng đã cho phép xóa toàn bộ dữ liệu/tài khoản production và giữ duy nhất tài khoản `admin`.
-- Kiểm tra lại ngày 10/11: Supabase Management SQL vẫn trả 403. Chưa sao lưu, chưa xóa production. Không thực hiện xóa từng phần qua REST.
-- Các migration mới hiện chỉ áp dụng TEST; production cần sao lưu, migration, cấu hình lịch và nghiệm thu trước khi đưa vào vận hành.
+- Người dùng đã đăng nhập Supabase CLI, cấp quyền SQL, sau đó yêu cầu bỏ backup và xóa trực tiếp dữ liệu mẫu, giữ `admin`.
+- Đã rehearsal rollback rồi commit dọn 157 bảng; Auth/Storage dọn qua API. Còn đúng một app account, một Auth user và hồ sơ tối thiểu liên kết admin; dữ liệu chấm công, phiên, dự án và Storage trống. Mật khẩu admin giữ nguyên.
+- Đã áp dụng 14 migration thiếu ban đầu, hai migration hỗ trợ nhiều lượt điểm danh và khởi tạo danh mục/chính sách vận hành tối thiểu, không thêm dữ liệu mẫu. Production đủ 61 migration; deployment ứng dụng production chưa đổi.
+- Trạng thái giao diện/Excel, minh chứng và bước kích hoạt retention sau deploy: [attendance-interface-release-20261110.md](operations/attendance-interface-release-20261110.md).

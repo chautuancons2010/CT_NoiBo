@@ -1,9 +1,54 @@
 import { describe, expect, it } from "vitest";
 import { computeDailyTimesheet, resolveCalendarDay, resolveShift, scheduledMinutes } from "./timesheetRules";
 import type { Shift } from "../types/timesheetTypes";
+import type { TimesheetAdjustment, TimesheetWorkerInput } from "../types/timesheetTypes";
+import { aggregateWorkerDay } from "@/features/worker-attendance/services/workerAttendanceDay";
 
 const shift: Shift = { id:"1", code:"OFFICE", name:"Hành chính", startTime:"08:00", endTime:"17:00", breakMinutes:60, lateGraceMinutes:5, earlyLeaveGraceMinutes:5, checkInEarliestMinutes:120, checkInLatestMinutes:240, checkOutEarliestMinutes:0, checkOutLatestMinutes:360, crossMidnight:false, active:true };
 const base = { periodId:"p", employee:{id:"e",code:"NV01",name:"An",departmentName:"HC",positionName:"NV",employmentTypeName:"Chính thức"}, date:"2026-09-10", shift, adjustments:[] };
+
+it("uses merged worker intervals without filling gaps between rounds", () => {
+  const daily = computeDailyTimesheet({ ...base, events: [], worker: { status: "present", checkedInAt: "2026-09-10T01:00:00Z", checkedOutAt: "2026-09-10T10:00:00Z", workMinutes: 300, workFraction: 1, sessionIds: ["round-1", "round-2"] } });
+  expect(daily.workMinutes).toBe(300);
+  expect(daily.workFraction).toBe(1);
+  expect(daily.rawSource.worker).toMatchObject({ sessionIds: ["round-1", "round-2"] });
+});
+
+describe("worker round clock adjustments", () => {
+  const observation = (start?: string, end?: string) => ({ status: "present" as const, checkedInAt: start ? `2026-09-10T${start}:00+07:00` : undefined, checkedOutAt: end ? `2026-09-10T${end}:00+07:00` : undefined, breakMinutes: 60 });
+  const correction = (adjustmentType: TimesheetAdjustment["adjustmentType"], hour: string, timeTarget = "check_out"): TimesheetAdjustment => ({ id: "fix", periodId: "p", employeeId: "e", workDate: base.date, adjustmentType, effectiveTime: `2026-09-10T${hour}:00+07:00`, reason: "Clock correction", createdAt: "2026-09-11T00:00:00Z", before: {}, after: { timeTarget } });
+  const compute = (observations: ReturnType<typeof observation>[], adjustments: TimesheetAdjustment[] = []) => computeDailyTimesheet({ ...base, events: [], worker: aggregateWorkerDay(observations) as TimesheetWorkerInput, adjustments });
+
+  it("changes the last checkout without filling the gap between two completed rounds", () => {
+    const result = compute([observation("08:00", "11:00"), observation("14:00", "17:00")], [correction("adjust_effective_time", "18:00")]);
+    expect(result.workMinutes).toBe(360);
+    expect(result.effectiveCheckOut).toBe("2026-09-10T18:00:00+07:00");
+  });
+
+  it("changes the first checkin while preserving subsequent completed rounds", () => {
+    const result = compute([observation("08:00", "11:00"), observation("14:00", "17:00")], [correction("adjust_effective_time", "07:00", "check_in")]);
+    expect(result.workMinutes).toBe(360);
+  });
+
+  it("flags a missing checkin even when another round has complete clocks", () => {
+    const result = compute([observation(undefined, "11:00"), observation("14:00", "17:00")]);
+    expect(result.status).toBe("missing_check_in");
+    expect(result.exceptions.filter(item => item.type === "missing_check_in")).toHaveLength(1);
+    expect(result.workMinutes).toBe(120);
+  });
+
+  it("repairs a missing checkin on its own round without joining the afternoon interval", () => {
+    const result = compute([observation(undefined, "11:00"), observation("14:00", "17:00")], [correction("add_missing_check_in", "08:00", "check_in")]);
+    expect(result.workMinutes).toBe(300);
+    expect(result.exceptions.some(item => item.type === "missing_check_in")).toBe(false);
+  });
+
+  it("repairs a missing checkout without filling the earlier gap", () => {
+    const result = compute([observation("08:00", "11:00"), observation("14:00")], [correction("add_missing_check_out", "17:00")]);
+    expect(result.workMinutes).toBe(300);
+    expect(result.exceptions.some(item => item.type === "missing_check_out")).toBe(false);
+  });
+});
 
 describe("timesheet rules", () => {
   it("không tăng giờ công hoặc mất giờ nghỉ khi chấm lặp cùng loại", () => {

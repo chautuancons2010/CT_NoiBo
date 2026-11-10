@@ -1,11 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import Link from "next/link";
 
 import { EntityContextHeader, PageHeader, RecordHeader, ResponsivePageHeader } from "@/components/shared/PageHeader";
 
 describe("PageHeader", () => {
   it("keeps record identity, status, editing and section navigation under one main title", () => {
-    render(<RecordHeader action={<a href="/employees/one/edit">Chỉnh sửa hồ sơ</a>} avatar={<span>TP</span>} code="NV018" meta={<span>Công nhân</span>} navigation={<nav aria-label="Thông tin nhân viên"><a href="/employees/one/salary">Lương & phúc lợi</a></nav>} status={<span>Đang làm việc</span>} title="Đặng Thảo Phương" />);
+    render(<RecordHeader action={<Link href="/employees/one/edit">Chỉnh sửa hồ sơ</Link>} avatar={<span>TP</span>} code="NV018" meta={<span>Công nhân</span>} navigation={<nav aria-label="Thông tin nhân viên"><Link href="/employees/one/salary">Lương & phúc lợi</Link></nav>} status={<span>Đang làm việc</span>} title="Đặng Thảo Phương" />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getAllByText("Đặng Thảo Phương")).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Chỉnh sửa hồ sơ" })).toHaveAttribute("href", "/employees/one/edit");

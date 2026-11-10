@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir, writeFile, mkdir, unlink } from "node:fs/promises";
+import { access, readFile, readdir, writeFile, mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { parseEnv } from "node:util";
 
@@ -20,7 +20,11 @@ async function cliPath() {
     if (!entry.isDirectory()) continue;
     const packageDir = path.join(cache, entry.name, "node_modules", "vercel");
     const info = await readFile(path.join(packageDir, "package.json"), "utf8").then(JSON.parse).catch(() => null);
-    if (info) candidates.push({ version: info.version, filename: path.join(packageDir, "dist", "index.js") });
+    if (info) {
+      const executable = typeof info.bin === "string" ? info.bin : info.bin?.vercel;
+      const filename = path.join(packageDir, executable || "dist/index.js");
+      if (await access(filename).then(() => true, () => false)) candidates.push({ version: info.version, filename });
+    }
   }
   candidates.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
   assert(candidates.length, "Install or authenticate Vercel CLI first");
@@ -144,7 +148,11 @@ async function main() {
   }
   if (action === "dry") {
     const result = await runCli(["deploy", "--dry", "--json", "--yes", "--scope", project.orgId]);
-    assert(result.code === 0, "Vercel deployment input inspection failed");
+    if (result.code !== 0) {
+      let detail = result.stderr || "Vercel returned no diagnostic";
+      for (const { value } of variables) if (value.length >= 8) detail = detail.split(value).join("[redacted]");
+      throw new Error(`Vercel deployment input inspection failed: ${detail.slice(-1500)}`);
+    }
     const report = JSON.parse(result.stdout.trim());
     await mkdir(".tmp", { recursive: true });
     await writeFile(".tmp/vercel-dry.private.json", JSON.stringify(report), { mode: 0o600 });

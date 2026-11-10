@@ -1,6 +1,5 @@
-import { PageHeader } from "@/components/shared/PageHeader";
-import { CalendarSettings } from "@/features/timesheets/components/CalendarSettings";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <div className="page-stack"><PageHeader title="Lịch ngày làm việc và ngày nghỉ" /><CalendarSettings /></div>;
+  redirect("/settings/attendance/calendar");
 }

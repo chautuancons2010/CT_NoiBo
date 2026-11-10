@@ -31,7 +31,7 @@ export async function seedAccounts(db, target) {
     assert(!existingEmployee || existingEmployee.note === `[TEST:${TEST_OWNER}] ${profile.username}`, "Employee ID collision");
     const departmentId = departments.find((row) => row.code === profile.department)?.id;
     const positionId = positions.find((row) => row.code === profile.position)?.id;
-    const employmentTypeId = types.find((row) => row.code === "office_employee")?.id;
+    const employmentTypeId = types.find((row) => row.code === (profile.roleCode === "supervisor" ? "supervisor" : "office_employee"))?.id;
     assert(departmentId && positionId && employmentTypeId, `Thiếu danh mục của ${profile.username}`);
     let role = roles.find((row) => row.code === profile.roleCode);
     if (profile.roleCode.startsWith("qa_")) {

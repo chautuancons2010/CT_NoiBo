@@ -1,4 +1,5 @@
 import type { CalendarDay, DailyTimesheet, Shift, TimesheetAdjustment, TimesheetDailyStatus, TimesheetEventInput, TimesheetExceptionType, TimesheetLeaveInput, TimesheetSource, TimesheetWorkerInput } from "@/features/timesheets/types/timesheetTypes";
+import { aggregateWorkerDay } from "@/features/worker-attendance/services/workerAttendanceDay";
 
 const MINUTE=60_000;
 export function minutesOfDay(value:string,timeZone="Asia/Ho_Chi_Minh"){const parts=new Intl.DateTimeFormat("en-GB",{timeZone,hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(value));return Number(parts.find(p=>p.type==="hour")?.value)*60+Number(parts.find(p=>p.type==="minute")?.value);}
@@ -8,9 +9,34 @@ export function resolveCalendarDay<T extends CalendarDay>(items:T[],input:{date:
 
 export interface ComputeDailyInput{periodId:string;employee:{id:string;code:string;name:string;departmentName:string;positionName:string;employmentTypeName:string};date:string;shift?:Shift;calendarDay?:CalendarDay;events:TimesheetEventInput[];worker?:TimesheetWorkerInput;leave?:TimesheetLeaveInput;adjustments:TimesheetAdjustment[];}
 export interface ComputedDaily extends Omit<DailyTimesheet,"id">{exceptions:Array<{type:TimesheetExceptionType;severity:"warning"|"high";details:Record<string,unknown>}>;}
+
+function adjustWorkerClocks(worker: TimesheetWorkerInput | undefined, adjustments: TimesheetAdjustment[]): TimesheetWorkerInput | undefined {
+  if (!worker) return undefined;
+  const observations = worker.observations ?? worker.mergedIntervals?.map(interval => ({ ...interval, status: worker.status, breakMinutes: worker.breakMinutes }));
+  if (!observations) return worker;
+  const updated = observations.map(item => ({ ...item }));
+  const present = updated.filter(item => item.status === "present" || item.status === "late");
+  for (const adjustment of adjustments) {
+    if (!adjustment.effectiveTime) continue;
+    const missingIn = adjustment.adjustmentType === "add_missing_check_in";
+    const missingOut = adjustment.adjustmentType === "add_missing_check_out";
+    if (!missingIn && !missingOut && adjustment.adjustmentType !== "adjust_effective_time") continue;
+    const key = missingOut || !missingIn && adjustment.after.timeTarget === "check_out" ? "checkedOutAt" : "checkedInAt";
+    const valid = (value?: string) => Number.isFinite(Date.parse(value ?? ""));
+    const missing = present.filter(item => !valid(item[key]) || key === "checkedOutAt" && valid(item.checkedInAt) && Date.parse(item.checkedOutAt!) < Date.parse(item.checkedInAt!));
+    const candidates = (missingIn || missingOut) && missing.length ? missing : [...present];
+    const endpoint = (item: typeof candidates[number]) => Date.parse(item[key] ?? item[key === "checkedInAt" ? "checkedOutAt" : "checkedInAt"] ?? "") || 0;
+    candidates.sort((first, second) => key === "checkedInAt" ? endpoint(first) - endpoint(second) : endpoint(second) - endpoint(first));
+    if (candidates[0]) candidates[0][key] = adjustment.effectiveTime;
+  }
+  const daily = aggregateWorkerDay(updated);
+  return daily ? { ...worker, ...daily, status: worker.status } : worker;
+}
+
 export function computeDailyTimesheet(input:ComputeDailyInput):ComputedDaily{
+  const worker = !input.events.length ? adjustWorkerClocks(input.worker, input.adjustments) : input.worker;
   const observed=[...input.events];
-  for(const [eventType,time] of [["check_in",input.worker?.checkedInAt],["check_out",input.worker?.checkedOutAt]] as const){if(time&&!observed.some(event=>event.eventType===eventType))observed.push({id:`worker-${eventType}-${input.worker?.sessionId}`,eventType,effectiveAt:time,geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"});}
+  for(const [eventType,time] of [["check_in",worker?.checkedInAt],["check_out",worker?.checkedOutAt]] as const){if(time&&!observed.some(event=>event.eventType===eventType))observed.push({id:`worker-${eventType}-${worker?.sessionId}`,eventType,effectiveAt:time,geofenceStatus:"inside",photoStatus:"uploaded",syncStatus:"synced"});}
   const events=[...observed].sort((a,b)=>a.effectiveAt.localeCompare(b.effectiveAt));let effectiveIn=events.find(e=>e.eventType==="check_in")?.effectiveAt;let effectiveOut=[...events].reverse().find(e=>e.eventType==="check_out")?.effectiveAt;
   let statusOverride:TimesheetDailyStatus|undefined;let workOverride:number|undefined;let hrNote:string|undefined;let markLeave=false;
   for(const adjustment of input.adjustments){if(adjustment.adjustmentType==="add_missing_check_in")effectiveIn=adjustment.effectiveTime;if(adjustment.adjustmentType==="add_missing_check_out")effectiveOut=adjustment.effectiveTime;if(adjustment.adjustmentType==="correct_status"||adjustment.adjustmentType==="mark_business_trip")statusOverride=adjustment.correctedStatus??(adjustment.adjustmentType==="mark_business_trip"?"business_trip":undefined);if(adjustment.adjustmentType==="mark_leave"){markLeave=true;statusOverride=adjustment.correctedStatus??"annual_leave";}if(adjustment.correctedWorkFraction!==undefined)workOverride=adjustment.correctedWorkFraction;if(adjustment.hrNote)hrNote=adjustment.hrNote;}
@@ -33,9 +59,10 @@ export function computeDailyTimesheet(input:ComputeDailyInput):ComputedDaily{
   const workingDay=input.calendarDay?.isWorkingDay??Boolean(input.shift);let workMinutes=0;
   let opened:TimesheetEventInput|undefined;let completedIntervals=0;for(const event of calculationEvents){if(event.eventType==="check_in"&&!opened)opened=event;else if(event.eventType==="check_out"&&opened){workMinutes+=Math.max(0,Math.round((new Date(event.effectiveAt).getTime()-new Date(opened.effectiveAt).getTime())/MINUTE));opened=undefined;completedIntervals++;}}
   if(completedIntervals===1&&!opened&&input.shift)workMinutes=Math.max(0,workMinutes-input.shift.breakMinutes);
+  if(!input.events.length&&worker?.workMinutes!==undefined&&(worker.observations||!input.adjustments.some(item=>["add_missing_check_in","add_missing_check_out","adjust_effective_time"].includes(item.adjustmentType))))workMinutes=worker.workMinutes;
   let lateMinutes=0,earlyLeaveMinutes=0;if(input.shift&&effectiveIn){const start=input.shift.startTime.slice(0,5).split(":").map(Number);lateMinutes=Math.max(0,minutesOfDay(effectiveIn)-(start[0]*60+start[1])-input.shift.lateGraceMinutes);}if(input.shift&&effectiveOut){const end=input.shift.endTime.slice(0,5).split(":").map(Number);let actual=minutesOfDay(effectiveOut);const target=end[0]*60+end[1];if(input.shift.crossMidnight&&actual<720)actual+=1440;earlyLeaveMinutes=Math.max(0,target+(input.shift.crossMidnight?1440:0)-actual-input.shift.earlyLeaveGraceMinutes);}
-  const leaveFraction=markLeave?1:(input.leave?.fraction??0);let workFraction=input.shift?Math.min(1,workMinutes/Math.max(1,scheduledMinutes(input.shift))):0;if(input.worker?.status==="present"||input.worker?.status==="late")workFraction=input.worker.dayException==="half_day"?.5:1;if(input.worker?.status==="absent")workFraction=0;if(workOverride!==undefined)workFraction=workOverride;else if(input.leave)workFraction=Math.min(workFraction,Math.max(0,1-leaveFraction));
-  if(workingDay&&!effectiveIn&&effectiveOut)exceptions.push({type:"missing_check_in",severity:"high",details:{}});if(workingDay&&((effectiveIn&&!effectiveOut)||opened))exceptions.push({type:"missing_check_out",severity:"high",details:{unpairedCheckInId:opened?.id}});if(input.worker?.status==="unconfirmed")exceptions.push({type:"worker_roster_conflict",severity:"high",details:{sessionId:input.worker.sessionId}});
+  const leaveFraction=markLeave?1:(input.leave?.fraction??0);let workFraction=input.shift?Math.min(1,workMinutes/Math.max(1,scheduledMinutes(input.shift))):0;if(input.worker?.status==="present"||input.worker?.status==="late")workFraction=input.worker.workFraction??(input.worker.dayException==="half_day"?.5:1);if(input.worker?.status==="absent")workFraction=0;if(workOverride!==undefined)workFraction=workOverride;else if(input.leave)workFraction=Math.min(workFraction,Math.max(0,1-leaveFraction));
+  if(workingDay&&(!effectiveIn&&effectiveOut||!input.events.length&&worker?.missingCheckIn))exceptions.push({type:"missing_check_in",severity:"high",details:{}});if(workingDay&&((effectiveIn&&!effectiveOut)||opened||!input.events.length&&worker?.missingCheckOut))exceptions.push({type:"missing_check_out",severity:"high",details:{unpairedCheckInId:opened?.id}});if(input.worker?.status==="unconfirmed")exceptions.push({type:"worker_roster_conflict",severity:"high",details:{sessionId:input.worker.sessionId}});
   let status:TimesheetDailyStatus;if(statusOverride)status=statusOverride;else if(exceptions.some(e=>e.type==="attendance_leave_conflict"))status="needs_review";else if(!workingDay)status=input.calendarDay?.dayType==="holiday"||input.calendarDay?.dayType==="company_holiday"?"holiday":"rest_day";else if(input.leave&&leaveFraction>=1)status=input.leave.deductsBalance?"annual_leave":"unpaid_leave";else if(exceptions.some(e=>e.type==="missing_check_in"))status="missing_check_in";else if(exceptions.some(e=>e.type==="missing_check_out"))status="missing_check_out";else if(input.worker?.status==="absent")status="absent";else if(lateMinutes>0)status="late";else if(earlyLeaveMinutes>0)status="early_leave";else if(input.worker&&(input.worker.status==="present"||input.worker.status==="late"))status="worker_site";else if(effectiveIn&&effectiveOut)status="full_work";else if(input.leave)status=input.leave.deductsBalance?"annual_leave":"unpaid_leave";else status="absent";
   return{periodId:input.periodId,employeeId:input.employee.id,employeeCode:input.employee.code,employeeName:input.employee.name,departmentName:input.employee.departmentName,positionName:input.employee.positionName,employmentTypeName:input.employee.employmentTypeName,workDate:input.date,shiftId:input.shift?.id,shiftName:input.shift?.name,shiftStart:input.shift?.startTime,shiftEnd:input.shift?.endTime,sources:[...sources],effectiveCheckIn:effectiveIn,effectiveCheckOut:effectiveOut,workMinutes,workFraction:Number(workFraction.toFixed(2)),leaveFraction,lateMinutes,earlyLeaveMinutes,leaveTypeCode:input.leave?.typeCode,leaveTypeName:input.leave?.typeName,status,hrNote,exceptionCount:exceptions.length,rawSource:{events,worker:input.worker,leave:input.leave,calendar:input.calendarDay},adjustments:input.adjustments,calculationVersion:1,exceptions};
 }

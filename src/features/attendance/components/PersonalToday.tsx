@@ -126,7 +126,7 @@ export function PersonalToday() {
 
   const checkIn = dashboard.todayEvents.find((event) => event.eventType === "check_in");
   const checkOut = [...dashboard.todayEvents].reverse().find((event) => event.eventType === "check_out");
-  const status = !dashboard.policy.attendanceEnabled ? "Tạm ngừng" : `${dashboard.todayEvents.length} lượt hôm nay`;
+  const status = !dashboard.policy.attendanceEnabled ? "Tạm ngừng" : checkIn && checkOut ? "Hoàn tất" : checkIn ? "Đang trong ca" : "Chưa vào ca";
 
   return (
     <section aria-label="Ca làm hôm nay" className={styles.today}>
@@ -134,26 +134,22 @@ export function PersonalToday() {
       <div className={styles.card} data-state={!dashboard.policy.attendanceEnabled ? "paused" : dashboard.nextAction}>
         <div className={styles.top}><span><Clock3 aria-hidden="true" size={18} />Ca làm hôm nay</span><span className={styles.status}>{status}</span></div>
         <div className={styles.clockFace}>
-          <svg aria-hidden="true" className={styles.dial} viewBox="0 0 240 240"><circle cx="120" cy="120" r="108" /><circle cx="120" cy="120" r="83" />{Array.from({ length: 12 }, (_, index) => <path d="M120 15v10" key={index} transform={`rotate(${index * 30} 120 120)`} />)}<path className={styles.dialHand} d="M120 57v63l42 24" /><circle className={styles.dialCenter} cx="120" cy="120" r="5" /></svg>
-          <span className={styles.clockLabel}>HÔM NAY</span>
-          <time className={styles.liveClock} dateTime={today.toISOString()} suppressHydrationWarning>{formatTime(today.toISOString())}</time>
-          <span className={styles.shift}>{dashboard.policy.shiftName}</span>
           <strong className={styles.hours}>{dashboard.policy.shiftStart} – {dashboard.policy.shiftEnd}</strong>
+          <span className={styles.shift}>{dashboard.policy.shiftName}</span>
         </div>
         <div className={styles.content}>
           <dl className={styles.events}>
-            <div data-recorded={Boolean(checkIn)}><dt><LogIn aria-hidden="true" size={17} />Chấm vào</dt><dd>{checkIn ? formatTime(checkIn.effectiveAt) : "—"}</dd></div>
-            <div data-recorded={Boolean(checkOut)}><dt><LogOut aria-hidden="true" size={17} />Chấm ra</dt><dd>{checkOut ? formatTime(checkOut.effectiveAt) : "—"}</dd></div>
+            {([checkIn, checkOut] as const).map((event, index) => <div data-recorded={Boolean(event)} key={index}><dt>{index === 0 ? <LogIn aria-hidden="true" size={17} /> : <LogOut aria-hidden="true" size={17} />}{index === 0 ? "Chấm vào" : "Chấm ra"}</dt><dd>{event?.photoId && event.photoStatus === "uploaded" ? <button aria-label={`Xem ảnh ${index === 0 ? "chấm vào" : "chấm ra"} · ${formatTime(event.effectiveAt)}`} className={styles.photoLink} onClick={() => setActivePhotoId(event.id)} type="button"><span>{formatTime(event.effectiveAt)}</span><Camera aria-hidden="true" size={17} /></button> : <span>{event ? formatTime(event.effectiveAt) : "—"}</span>}</dd></div>)}
           </dl>
-          {captureAllowed ? <div className={styles.action}>{dashboard.policy.attendanceEnabled ? (["check_in", "check_out"] as const).map(type => <button disabled={Boolean(attendanceActionBlocked(dashboard.todayEvents, type))} data-primary={dashboard.nextAction === type} key={type} onClick={() => { setCaptureType(type); setCaptureOpen(true); }} type="button"><span className={styles.actionIcon}>{dashboard.nextAction === type ? <Camera aria-hidden="true" size={21} /> : type === "check_in" ? <LogIn aria-hidden="true" size={20} /> : <LogOut aria-hidden="true" size={20} />}</span><span>{type === "check_in" ? "Chấm vào" : "Chấm ra"}</span></button>) : <span className={styles.complete}><CheckCircle2 aria-hidden="true" size={19} />Chấm công tạm ngừng</span>}</div> : null}
+          {captureAllowed ? <div className={styles.action}>{!dashboard.policy.attendanceEnabled ? <span className={styles.complete}><CheckCircle2 aria-hidden="true" size={19} />Chấm công tạm ngừng</span> : dashboard.nextAction === "check_in" || dashboard.nextAction === "check_out" ? <button disabled={Boolean(attendanceActionBlocked(dashboard.todayEvents, dashboard.nextAction))} onClick={() => { setCaptureType(dashboard.nextAction as "check_in" | "check_out"); setCaptureOpen(true); }} type="button"><Camera aria-hidden="true" size={21} /><span>{dashboard.nextAction === "check_in" ? "Chấm vào" : "Chấm ra"}</span><ArrowUpRight aria-hidden="true" size={18} /></button> : <span className={styles.complete}><CheckCircle2 aria-hidden="true" size={19} />Đã hoàn tất chấm công</span>}</div> : null}
         </div>
         <div className={styles.facts}>
           <div className={styles.connection} data-online={online}>{online ? <Cloud aria-hidden="true" size={16} /> : <CloudOff aria-hidden="true" size={16} />}<span>{online ? "Trực tuyến" : "Ngoại tuyến"}</span></div>
+          <span className={styles.eventCount}>{Number(Boolean(checkIn)) + Number(Boolean(checkOut))}/2 lượt chấm</span>
           {dashboard.todayEvents.some((event) => event.syncStatus !== "synced") ? <div><span>Chờ đồng bộ lượt chấm</span></div> : null}
         </div>
       </div>
       {historyAllowed ? <Link className={styles.history} href="/attendance/history">Lịch sử chấm công<ArrowUpRight aria-hidden="true" size={17} /></Link> : null}
-      {dashboard.todayEvents.filter(event => event.photoId && event.photoStatus === "uploaded").map(event => <button className={styles.photoLink} key={event.id} onClick={() => setActivePhotoId(event.id)} type="button"><Camera aria-hidden="true" size={16} />Xem ảnh {event.eventType === "check_in" ? "chấm vào" : "chấm ra"} · {formatTime(event.effectiveAt)}</button>)}
       <AttendanceEvidenceViewer activeId={activePhotoId} items={dashboard.todayEvents.filter(event => event.photoId && event.photoStatus === "uploaded").map(event => ({ employeeName: user.displayName, event }))} onChange={setActivePhotoId} onClose={() => setActivePhotoId(undefined)} />
     </section>
   );

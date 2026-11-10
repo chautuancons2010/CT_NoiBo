@@ -37,6 +37,12 @@ const nextConfig = {
   poweredByHeader: false,
   devIndicators: false,
   reactStrictMode: true,
+  async redirects() {
+    return [
+      { source: "/shifts", destination: "/settings/attendance/shifts", permanent: true },
+      { source: "/shifts/calendar", destination: "/settings/attendance/calendar", permanent: true }
+    ];
+  },
   outputFileTracingIncludes: {
     "/api/v1/accounting/payslips/*/download": ["./assets/fonts/pdf/**"],
     "/api/v1/leave-requests/*/pdf": ["./assets/fonts/pdf/**"]

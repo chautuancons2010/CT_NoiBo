@@ -230,7 +230,7 @@ export async function listTodayTasks(user: AuthenticatedUser, date: string): Pro
     const shifts = new Map(roster.map((worker) => [worker.shiftCode, worker.shiftName]));
     if (!shifts.size) shifts.set("DAY", "Ca ngày");
     for (const [shiftCode, shiftName] of shifts) {
-      const { data: session, error: sessionError } = await client.from("worker_attendance_sessions").select("id,status").eq("project_id", row.project_id).eq("worksite_id", row.id).eq("attendance_date", date).eq("shift_code", shiftCode).eq("session_type", "morning").maybeSingle();
+      const { data: session, error: sessionError } = await client.from("worker_attendance_sessions").select("id,status").eq("project_id", row.project_id).eq("worksite_id", row.id).eq("attendance_date", date).eq("shift_code", shiftCode).eq("supervisor_employee_id", actor.employeeId).order("started_at", { ascending: false }).order("id").limit(1).maybeSingle();
       if (sessionError) throw new AppError("SERVER_ERROR", "Không thể đọc phiên điểm danh hiện có.");
       const workers = [...new Map(roster.filter((item) => item.shiftCode === shiftCode).map((worker) => [worker.employeeId, worker])).values()];
       tasks.push({ projectId: String(row.project_id), projectName: required(project, "name"), worksiteId: String(row.id), worksiteName: required(row as Row, "name"), date, shiftCode, shiftName, expectedWorkers: workers.length, gpsRequired: Boolean(row.gps_required), allowedAccuracyThresholdMeters: Number(row.allowed_accuracy_threshold_meters), existingSessionId: session?.id, existingStatus: session?.status, checklist, roster: workers.map((worker) => ({ workerId: worker.employeeId, employeeCode: worker.employeeCode, workerName: worker.employeeName, assignmentRole: worker.assignmentRole, approvedLeave: worker.approvedLeave })) });
@@ -305,8 +305,8 @@ export async function createWorkerSession(user: AuthenticatedUser, input: z.infe
     status: "in_progress", sync_status: "syncing", selection_mode: true, safety_confirmed: false, safety_report: createWorkerSafetyReport(), minimum_photos_snapshot: Math.max(1, workerPolicy.minimumPhotos), checklist_snapshot: checklist, checklist_responses: [], created_by: actor.accountId
   }).select("id").single();
   if (error || !data) {
-    const { data: existing } = await client.from("worker_attendance_sessions").select(sessionSelect).eq("project_id", input.projectId).eq("worksite_id", input.worksiteId).eq("attendance_date", input.date).eq("shift_code", input.shiftCode).eq("session_type", input.sessionType).maybeSingle();
-    if (existing) return { session: mapSession(existing as Row), idempotentReplay: true };
+    const { data: existing } = await client.from("worker_attendance_sessions").select(sessionSelect).eq("client_session_id", input.clientSessionId).maybeSingle();
+    if (existing) return { session: await getWorkerSession(user, String(existing.id)), idempotentReplay: true };
     throw new AppError("SERVER_ERROR", "Không thể tạo phiên điểm danh.");
   }
   if (roster.length) {

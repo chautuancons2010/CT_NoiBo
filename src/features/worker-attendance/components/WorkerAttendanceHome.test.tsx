@@ -34,15 +34,18 @@ describe("field attendance home", () => {
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith(expect.stringMatching(/\/local-.*\/roster$/)));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
-  it("opens a submitted session for review instead of creating another one", async () => {
+  it("keeps the previous round available and starts another round with a fresh draft", async () => {
     const fetchMock = vi.fn().mockResolvedValue(ok({ ...result, tasks: [{ ...task, existingSessionId: "existing-one", existingStatus: "submitted" }] }));vi.stubGlobal("fetch", fetchMock);
-    render(<WorkerAttendanceToday />);fireEvent.click(await screen.findByRole("button", { name: "Xem điểm danh" }));
-    expect(navigation.push).toHaveBeenCalledWith("/worker-attendance/sessions/existing-one");
+    render(<WorkerAttendanceToday />);
+    expect(await screen.findByRole("link", { name: "Xem điểm danh" })).toHaveAttribute("href", "/worker-attendance/sessions/existing-one");
+    fireEvent.click(screen.getByRole("radio", { name: /Chọn gói/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Điểm danh lượt mới" }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith(expect.stringMatching(/\/local-.*\/roster$/)));
     expect(fetchMock.mock.calls).toHaveLength(1);
   });
   it("recovers an initial history read error with the owning retry action", async () => {
     const fetchMock = vi.fn().mockRejectedValueOnce(new Error("Mất kết nối thử nghiệm")).mockResolvedValue(ok([{ id: "session-one", ...task, status: "submitted", startedAt: "2026-11-07T01:00:00Z", entries: [], photos: [], supervisorName: "Giám sát" }]));vi.stubGlobal("fetch", fetchMock);
-    render(<WorkerAttendanceSessionList />);
+    render(<WorkerAttendanceSessionList date={task.date} />);
     fireEvent.click(await screen.findByRole("button", { name: "Thử lại" }));
     await waitFor(() => expect(screen.getByText("Công trường mẫu")).toBeInTheDocument());
     expect(screen.queryByText("Mất kết nối thử nghiệm")).not.toBeInTheDocument();expect(fetchMock).toHaveBeenCalledTimes(2);

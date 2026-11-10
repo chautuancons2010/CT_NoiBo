@@ -34,16 +34,24 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
   const personal = isMobilePersonalRoute(pathname, user) && !pathname.startsWith("/worker-attendance");
   const contextApplication = personal ? applications.find((application) => application.id === "attendance") : applications.find((application) => application.id === currentApplication.id);
   const workspaceItems = (navigationItems ?? navigation?.override?.items)?.filter((item) => !item.href.startsWith("/worker-attendance") || can(user.permissions, "worker_attendance.view"));
-  const shortcuts: readonly MobileNavDestination[] = workspaceItems?.length ? workspaceItems
+  const personalUtilities: MobileNavDestination[] = [
+    ...settings.modules.attendance && ["attendance.self", "attendance.self.view", "attendance.self.create", "attendance.self_history"].some(permission => user.permissions.some(item => item === permission)) ? [{ href: "/attendance/history", label: "Lịch công của tôi", icon: "CalendarRange" as const }] : [],
+    ...can(user.permissions, "payslip.self.view") ? [{ href: "/personal/payslips", label: "Phiếu lương của tôi", icon: "ReceiptText" as const }] : [],
+    ...can(user.permissions, "leave.self.view") || can(user.permissions, "leave.self.create") ? [{ href: "/leave", label: "Nghỉ phép", icon: "CalendarOff" as const }] : []
+  ];
+  const contextualShortcuts: readonly MobileNavDestination[] = workspaceItems?.length ? workspaceItems
     : contextApplication ? visibleApplicationShortcuts(contextApplication, user, settings.modules, settings.navigation)
       .filter((item) => !item.href.startsWith("/worker-attendance") || can(user.permissions, "worker_attendance.view"))
       .map((item) => ({ href: item.href, label: item.href === "/attendance/notifications" ? "Thông báo công" : item.mobileLabel ?? item.label, icon: item.icon })) : [];
+  const missingPersonalUtilities = personalUtilities.filter(item => !contextualShortcuts.some(shortcut => shortcut.href === item.href));
+  const shortcuts = personal ? [...contextualShortcuts, ...missingPersonalUtilities] : contextualShortcuts;
   const contextLabel = workspaceItems?.length ? "Công trường đang mở" : contextApplication?.label;
   const normalize = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[đĐ]/g, (letter) => letter === "Đ" ? "D" : "d").toLocaleLowerCase("vi");
   const query = normalize(search.trim());
   const matches = (value: string) => !query || normalize(value).includes(query);
   const visibleApps = applications.filter((application) => matches(application.id === "overview" ? "Tổng quan" : application.id === "projects" ? "Công trường" : application.label));
   const visibleShortcuts = shortcuts.filter((item) => matches(item.label));
+  const visiblePersonalUtilities = personal ? [] : missingPersonalUtilities.filter(item => matches(item.label));
   const visibleUtilities = [
     matches("Tìm kiếm"),
     !applications.some((application) => application.id === "attendance") && matches("Cá nhân"),
@@ -93,6 +101,12 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
             return <Link aria-current={active ? "page" : undefined} className={cn(active && "is-active")} href={item.href} key={item.href} onClick={close}><span className="mobile-app-sheet__link-icon"><Icon aria-hidden="true" size={20} strokeWidth={1.8} /></span><span>{item.label}</span><ChevronRight aria-hidden="true" size={16} /></Link>;
           })}
         </nav></section> : null}
+        {visiblePersonalUtilities.length ? <section className="mobile-app-sheet__section mobile-app-sheet__section--context"><h3>Cá nhân</h3><nav aria-label="Thông tin của tôi" className="mobile-app-sheet__links">
+          {visiblePersonalUtilities.map(item => {
+            const Icon = navigationIconMap[item.icon];
+            return <Link href={item.href} key={item.href} onClick={close}><span className="mobile-app-sheet__link-icon"><Icon aria-hidden="true" size={20} strokeWidth={1.8}/></span><span>{item.label}</span><ChevronRight aria-hidden="true" size={16}/></Link>;
+          })}
+        </nav></section> : null}
         {visibleUtilities ? <section className="mobile-app-sheet__section"><h3>Tiện ích</h3><nav aria-label="Tiện ích cá nhân" className="mobile-app-sheet__links">
           {matches("Tìm kiếm") ? <Link href="/search" onClick={close}><span className="mobile-app-sheet__link-icon"><Search aria-hidden="true" size={20} /></span><span>Tìm kiếm</span><ChevronRight aria-hidden="true" size={16} /></Link> : null}
           {!applications.some((application) => application.id === "attendance") && matches("Cá nhân") ? <Link href="/personal" onClick={close}><span className="mobile-app-sheet__link-icon"><UserRound aria-hidden="true" size={20} /></span><span>Cá nhân</span><ChevronRight aria-hidden="true" size={17} /></Link> : null}
@@ -101,7 +115,7 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
           {can(user.permissions, "profile.view") && matches("Tài khoản") ? <Link href="/profile" onClick={close}><span className="mobile-app-sheet__link-icon"><UserRound aria-hidden="true" size={20} /></span><span>Tài khoản</span><ChevronRight aria-hidden="true" size={17} /></Link> : null}
         </nav></section>
           : null}
-        {query && !visibleApps.length && !visibleShortcuts.length && !visibleUtilities ? <p className="mobile-app-launcher__empty">Không tìm thấy kết quả</p> : null}
+        {query && !visibleApps.length && !visibleShortcuts.length && !visiblePersonalUtilities.length && !visibleUtilities ? <p className="mobile-app-launcher__empty">Không tìm thấy kết quả</p> : null}
         </div>
       </Drawer>
     </>

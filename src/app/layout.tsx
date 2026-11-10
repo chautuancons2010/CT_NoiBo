@@ -9,7 +9,6 @@ import "@/styles/inter-vietnamese.css";
 import "@/styles/tokens.css";
 import "@/styles/legacy.css";
 import "@/styles/erp-components.css";
-import "@/styles/mobile-restored.css";
 import { SystemSettingsProvider } from "@/components/providers/SystemSettingsProvider";
 import { GlobalLoadingIndicator } from "@/components/shared/GlobalLoadingIndicator";
 import { deriveBrandColorTokens } from "@/config/systemSettings";

@@ -104,7 +104,7 @@ export function PayrollDetailConsole({ id, permissions }: { id: string; permissi
     { id: "gross", header: "Thu nhập", cell: line => money(line.baseSalary + line.allowance + line.bonus + (line.leaveCashoutAmount ?? 0)), align: "right" },
     ...(data.lines.some(line => (line.leaveCashoutAmount ?? 0) > 0) ? [{ id: "leave", header: "Phép dư", cell: (line: PayrollLine) => money(line.leaveCashoutAmount ?? 0), align: "right" as const }] : []),
     { id: "deduction", header: "Khấu trừ", cell: line => money(line.deduction), align: "right" },
-    { id: "receipt", header: "Phiếu lương", cell: line => <StatusBadge tone={line.deliveryStatus === "failed" ? "error" : line.payslipStatus === "published" ? "success" : "neutral"}>{receipt(line)}</StatusBadge> }
+    { id: "receipt", header: "Phiếu lương", cell: line => <StatusBadge tone={line.deliveryStatus === "failed" ? "error" : line.payslipStatus === "published" ? "success" : "neutral"}>{receipt(line)}</StatusBadge>, align: "center" }
   ];
   const issues = workspace.issues;
   const issueHref = (issue: (typeof issues)[number]) => issue.code === "salary" ? "/accounting/salaries" : issue.employeeId && workspace.sourceId ? `${workspace.sourceHref}/employees/${issue.employeeId}` : workspace.sourceHref;
