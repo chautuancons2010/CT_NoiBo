@@ -60,9 +60,11 @@ async function transact<T>(storeName: string, mode: IDBTransactionMode, action: 
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(storeName, mode);
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => reject(transaction.error);
-    action(transaction.objectStore(storeName), resolve, reject);
+    let result: T;
+    transaction.oncomplete = () => { database.close(); resolve(result); };
+    transaction.onabort = () => { database.close(); reject(transaction.error ?? new Error("Không thể lưu bản nháp.")); };
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
+    action(transaction.objectStore(storeName), (value) => { result = value; }, reject);
   });
 }
 

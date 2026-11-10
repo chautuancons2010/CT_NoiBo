@@ -28,10 +28,10 @@ import { WorkerSafetyReportView } from "./WorkerSafetyReport";
 
 const labels: Record<string, string> = { unconfirmed: "Chưa xác nhận", present: "Có mặt", absent: "Vắng", leave: "Nghỉ phép", late: "Đi trễ", transferred: "Điều chuyển", draft: "Nháp", in_progress: "Đang điểm danh", submitted: "Đã điểm danh", locked: "Đã khóa", needs_review: "Cần rà soát" };
 
-export function WorkerAttendanceSessionDetail({ sessionId }: { sessionId: string }) {
+export function WorkerAttendanceSessionDetail({ sessionId, reviewOnly = false, initialPhotoId }: { sessionId: string; reviewOnly?: boolean; initialPhotoId?: string }) {
   const user = useCurrentUser();
   const [session, setSession] = useState<WorkerAttendanceSession>();
-  const [selectedPhoto, setSelectedPhoto] = useState<string>();
+  const [selectedPhoto, setSelectedPhoto] = useState<string | undefined>(initialPhotoId);
   const [editingEntry, setEditingEntry] = useState<string>();
   const [adjustmentStatus, setAdjustmentStatus] = useState<WorkerAttendanceEntry["status"]>("present");
   const [adjustmentReason, setAdjustmentReason] = useState("");
@@ -44,7 +44,7 @@ export function WorkerAttendanceSessionDetail({ sessionId }: { sessionId: string
   useEffect(() => { void load(); }, [load]);
   useDomainReconciliation("worker-attendance", load);
   const counts = useMemo(() => countWorkerAttendance(session?.entries ?? []), [session]);
-  const images = useMemo(() => session?.photos.map((photo, index) => ({ id: photo.id, src: `/api/v1/worker-attendance/photos/${photo.id}`, alt: `Ảnh điểm danh ${index + 1}`, title: `${session.projectName} · Ảnh ${index + 1}`, metadata: { "Thời gian": new Date(photo.capturedAt).toLocaleString("vi-VN") } })) ?? [], [session]);
+  const images = useMemo(() => session?.photos.filter(photo => photo.evidenceStatus !== "expired").map((photo, index) => ({ id: photo.id, src: `/api/v1/worker-attendance/photos/${photo.id}`, alt: `Ảnh điểm danh ${index + 1}`, title: `${session.projectName} · Ảnh ${index + 1}`, metadata: { "Thời gian": new Date(photo.capturedAt).toLocaleString("vi-VN") } })) ?? [], [session]);
 
   async function adjust(formData: FormData) {
     if (!session || !editingEntry || saving) return;
@@ -74,12 +74,12 @@ export function WorkerAttendanceSessionDetail({ sessionId }: { sessionId: string
   }
 
   if (!session) return message ? <Card>{message}</Card> : <LoadingState title="Đang mở phiên điểm danh" />;
-  const canContinue = can(user.permissions, "worker_attendance.create") && !session.submittedAt && session.status !== "locked";
+  const canContinue = !reviewOnly && can(user.permissions, "worker_attendance.create") && !session.submittedAt && session.status !== "locked";
   const canAdjust = can(user.permissions, "worker_attendance.adjust");
-  const canCloseDay = Boolean(session.submittedAt) && !session.dayClosedAt && session.status !== "locked" && (can(user.permissions, "worker_attendance.create") || canAdjust);
+  const canCloseDay = !reviewOnly && Boolean(session.submittedAt) && !session.dayClosedAt && session.status !== "locked" && (can(user.permissions, "worker_attendance.create") || canAdjust);
   const editedEntry = session.entries.find((entry) => entry.id === editingEntry);
   return <div className={workspaceStyles.detail}>
-    <BackLink href="/worker-attendance" />
+    <BackLink href={reviewOnly ? "/employees/field-attendance" : "/worker-attendance"} />
     <div className="worker-wizard__title"><div><h1>{session.projectName}</h1><span>{session.worksiteName} · {new Date(`${session.date}T00:00:00`).toLocaleDateString("vi-VN")}</span></div><StatusBadge status={session.status}>{labels[session.status]}</StatusBadge></div>
     <div className={styles.actions}>{canContinue ? <Link className="button button--primary button--lg" href={`/worker-attendance/sessions/${session.id}/roster`}>Tiếp tục điểm danh</Link> : null}{session.dayClosedAt ? <StatusBadge tone="success">Đã chốt ngày · {new Date(session.dayClosedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" })}</StatusBadge> : canCloseDay ? <Button onClick={openDayClose} variant="secondary">Chốt công cuối ngày</Button> : null}</div>
     {message ? <div className="form-message form-message--info">{message}</div> : null}
@@ -93,10 +93,11 @@ export function WorkerAttendanceSessionDetail({ sessionId }: { sessionId: string
     <Drawer onClose={() => { if (!saving) setClosingDay(false); }} open={closingDay} title="Chốt công cuối ngày"><SectionedForm action={closeDay} className={styles.form}>
 <FormFields>{Object.entries(dayChanges).map(([id, value]) => { const entry = session.entries.find((item) => item.id === id); if (!entry) return null; return <fieldset className={styles.dayRow} key={id}><legend>{entry.workerName}</legend><Select label="Ngoại lệ" onChange={(event) => setDayChanges((current) => ({ ...current, [id]: { ...current[id], dayException: event.target.value as WorkerAttendanceEntry["dayException"], exceptionTime: event.target.value === "none" ? undefined : current[id].exceptionTime } }))} options={[{ value: "none", label: "Không có" }, { value: "early_leave", label: "Về sớm" }, { value: "transferred", label: "Điều chuyển" }, { value: "half_day", label: "Nửa ngày" }, { value: "overtime", label: "Làm thêm" }, { value: "left_worksite", label: "Rời công trường" }]} value={value.dayException} /><Input disabled={value.dayException === "none"} label="Thời gian" onChange={(event) => setDayChanges((current) => ({ ...current, [id]: { ...current[id], exceptionTime: event.target.value } }))} type="time" value={value.exceptionTime ?? ""} /></fieldset>; })}<Input defaultValue="Chốt công cuối ngày" label="Lý do" minLength={3} name="reason" required />{actionError ? <p className="form-message form-message--error" role="alert">{actionError}</p> : null}</FormFields>
 <FormActions className={styles.footer}><Button disabled={saving} onClick={() => setClosingDay(false)}>Hủy</Button><Button busy={saving} type="submit" variant="primary">Xác nhận chốt ngày</Button></FormActions></SectionedForm></Drawer>
-    {session.photos.length ? <Card><div className="worker-photo-grid">{session.photos.map((photo, index) => <button className="worker-photo-button" key={photo.id} onClick={() => setSelectedPhoto(photo.id)} type="button"><Image alt={`Ảnh điểm danh ${index + 1}`} height={240} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320} /></button>)}</div></Card> : null}
-    {session.workNote ? <Card><div className="panel-header"><h3 className="section-title">Nội dung công việc</h3>{session.submittedAt ? <Link className="button button--primary button--md" href={`/projects/${session.projectId}/updates/new?worksiteId=${session.worksiteId}&attendanceSessionId=${session.id}&content=${encodeURIComponent(session.workNote)}`}>Tạo cập nhật dự án</Link> : null}</div><p className="worker-note">{session.workNote}</p></Card> : null}
+    {session.photos.length ? <Card><div className="worker-photo-grid">{session.photos.map((photo, index) => photo.evidenceStatus === "expired" ? <div className="worker-photo-expired" key={photo.id}>Ảnh đã hết hạn lưu 45 ngày</div> : <button aria-label={`Xem ảnh điểm danh ${index + 1}`} className="worker-photo-button" key={photo.id} onClick={() => setSelectedPhoto(photo.id)} type="button"><Image alt={`Ảnh điểm danh ${index + 1}`} style={{objectFit:"contain"}} height={240} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320} /></button>)}</div></Card> : null}
+    {session.workNote ? <Card><div className="panel-header"><h3 className="section-title">Nội dung công việc</h3>{!reviewOnly && session.submittedAt ? <Link className="button button--primary button--md" href={`/projects/${session.projectId}/updates/new?worksiteId=${session.worksiteId}&attendanceSessionId=${session.id}&content=${encodeURIComponent(session.workNote)}`}>Tạo cập nhật dự án</Link> : null}</div><p className="worker-note">{session.workNote}</p></Card> : null}
     {session.adjustments.length ? <Card><h3 className="section-title">Lịch sử điều chỉnh</h3><ol className="worker-adjustments">{session.adjustments.map((item) => <li key={item.id}><span>{new Date(item.createdAt).toLocaleString("vi-VN")}</span><strong>{item.reason}</strong></li>)}</ol></Card> : null}
     <Card><h2 className="section-title">Giờ công từng công nhân</h2><div className="table-scroll"><table className="data-table"><thead><tr><th>Công nhân</th><th>Giờ vào</th><th>Giờ ra</th><th>Giờ công</th></tr></thead><tbody>{session.entries.filter(entry => entry.isSelected !== false).map(entry => { const clock = workerClock(entry, session); return <tr key={entry.id}><td>{entry.workerName}</td><td>{workerClockLabel(entry.checkedInAt) || "—"}</td><td>{workerClockLabel(entry.checkedOutAt) || "Chưa chốt"}</td><td>{clock.workMinutes === undefined ? "—" : (clock.workMinutes / 60).toFixed(2)}</td></tr>; })}</tbody></table></div></Card>
-    <ImageLightbox images={images} initialImageId={selectedPhoto} onClose={() => setSelectedPhoto(undefined)} open={Boolean(selectedPhoto)} />
+    {selectedPhoto && session.photos.some(photo => photo.id === selectedPhoto && photo.evidenceStatus === "expired") ? <p role="status">Ảnh đã hết hạn lưu 45 ngày.</p> : null}
+    <ImageLightbox key={selectedPhoto ?? "closed"} images={images} initialImageId={selectedPhoto} onClose={() => setSelectedPhoto(undefined)} open={Boolean(selectedPhoto && images.some(photo => photo.id === selectedPhoto))} />
   </div>;
 }

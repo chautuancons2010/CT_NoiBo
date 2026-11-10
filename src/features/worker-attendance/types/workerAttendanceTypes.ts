@@ -35,6 +35,7 @@ export interface WorkerAttendanceEntry {
 }
 
 export interface WorkerAttendancePhoto {
+  evidenceStatus?: "available" | "expired";
   address?: string;
   latitude?: number;
   longitude?: number;

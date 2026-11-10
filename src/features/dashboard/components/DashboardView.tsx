@@ -144,7 +144,7 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
       action={<>{(profile === "employee" || profile === "supervisor") && primaryAction && primaryHref && !shortcuts.some((shortcut) => shortcut.href === primaryHref) ? <Link className="button button--primary button--md" href={primaryHref} prefetch={false}>{primaryAction}<ArrowUpRight aria-hidden="true" size={16} /></Link> : null}<Button aria-label="Cập nhật dashboard" busy={refreshing} leftIcon={<RefreshCw aria-hidden="true" size={18} />} onClick={() => void refresh()} size="sm"><span className={styles.refreshLabel}>Cập nhật</span></Button></>}
     />
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    {shortcuts.length ? <section aria-labelledby="dashboard-shortcuts-title" className={styles.shortcutsSection} data-dashboard-shortcuts data-dashboard-profile={profile}>
+    {shortcuts.length && profile !== "hr" ? <section aria-labelledby="dashboard-shortcuts-title" className={styles.shortcutsSection} data-dashboard-shortcuts data-dashboard-profile={profile}>
       <header className={styles.sectionHeading}><h2 id="dashboard-shortcuts-title">Thao tác nhanh</h2><span className={styles.roleBadge}>{model?.profileLabel}</span></header>
       <div className={styles.shortcuts}>{shortcuts.map((shortcut, index) => {
         const Icon = navigationIconMap[shortcut.icon];

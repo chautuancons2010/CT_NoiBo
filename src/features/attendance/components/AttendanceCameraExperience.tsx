@@ -37,7 +37,7 @@ import { AttendanceEvidenceViewer } from "./AttendanceEvidence";
 import { countPendingAttendance, listPendingAttendance, savePendingAttendance } from "@/features/attendance/client/attendanceQueue";
 import { AttendanceSyncError, syncAttendanceItem } from "@/features/attendance/client/attendanceSync";
 import { AttendanceLocationError, captureAttendanceLocation } from "@/features/attendance/client/locationCapture";
-import { getAttendanceLateMinutes, getAttendanceSequenceWarning } from "@/features/attendance/services/attendanceRules";
+import { getAttendanceLateMinutes, attendanceActionBlocked } from "@/features/attendance/services/attendanceRules";
 import { pendingAttendanceEvent, withPendingAttendance } from "@/features/attendance/client/pendingDashboard";
 import { canSubmitPersonalAttendance } from "@/lib/auth/applicationAccess";
 import type { AttendanceCoordinates, AttendanceDashboard, AttendanceEvent, AttendanceType, PendingAttendanceItem, AttendancePhotoStampMetadata } from "@/features/attendance/types/attendanceTypes";
@@ -329,7 +329,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
   };
 
   const takePhoto = async () => {
-    if (!videoRef.current || photoBusyRef.current || submitBusyRef.current || cameraState !== "ready" || !dashboard || !dashboard.policy.attendanceEnabled) return;
+    if (!videoRef.current || photoBusyRef.current || submitBusyRef.current || cameraState !== "ready" || !dashboard || !dashboard.policy.attendanceEnabled || attendanceActionBlocked(dashboard.todayEvents, captureType)) return;
     photoBusyRef.current = true;
     const requestId = cameraRequestRef.current;
     const capture: CaptureIdentity = { clientEventId: crypto.randomUUID(), capturedAtClient: new Date().toISOString(), intendedType: captureType };
@@ -341,7 +341,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
       setPhoto(processed);
       rawPhotoRef.current = processed;
       stopCamera();
-      await submitPhoto(processed, capture);
+      setStep("preview");
     } catch (error) {
       if (requestId === cameraRequestRef.current) setNotice(errorMessage(error));
     } finally { photoBusyRef.current = false; }
@@ -359,6 +359,8 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
 
   async function submitPhoto(processed = rawPhotoRef.current ?? photo, capture = captureIdentityRef.current, retry = false) {
     if (!dashboard || !processed || !capture || submitBusyRef.current) return;
+    const blocked = attendanceActionBlocked(dashboard.todayEvents, capture.intendedType);
+    if (blocked) { setNotice(blocked); return; }
     submitBusyRef.current = true;
     setStep("saving");
     setNotice(undefined);
@@ -461,7 +463,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
   const lateMinutes = successEvent?.eventType === "check_in" && dashboard && (!firstCheckIn || firstCheckIn.clientEventId === successEvent.clientEventId) ? getAttendanceLateMinutes(successEvent.effectiveAt, dashboard.policy) : 0;
   const nextLabel = !dashboard ? "Chấm công" : captureType === "check_in" ? "Chấm vào" : "Chấm ra";
   const attendanceStatus = !dashboard?.policy.attendanceEnabled ? "Tạm ngừng" : `${dashboard.todayEvents.length} lượt hôm nay`;
-  const sequenceWarning = dashboard ? getAttendanceSequenceWarning(dashboard.todayEvents, captureType) : undefined;
+  const sequenceWarning = dashboard ? attendanceActionBlocked(dashboard.todayEvents, captureType) : undefined;
 
   if (initialCapture && (step === "home" || step === "camera") && dashboard && !dashboard.policy.attendanceEnabled) {
     return <section className={styles.emptyCapture}><CheckCircle2 aria-hidden="true" size={36} /><strong>Chấm công đang tạm ngừng</strong><Link href={returnHref ?? "/personal"}>Về Cá nhân<ArrowUpRight aria-hidden="true" size={16} /></Link></section>;
@@ -504,7 +506,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
 
       {step === "camera" ? (
         <section className={styles.capture} aria-label="Chụp ảnh chấm công" data-camera-state={cameraState} data-facing={facingMode}>
-          <div className={styles.cameraToolbar}><div className={styles.attendanceChoice} aria-label="Loại chấm công" role="group">{(["check_in", "check_out"] as const).map(type => <button aria-pressed={captureType === type} key={type} onClick={() => setSelectedType(type)} type="button">{type === "check_in" ? "Chấm vào" : "Chấm ra"}</button>)}</div><IconButton label="Đóng camera" onClick={closeCapture}><X size={20} /></IconButton></div>
+          <div className={styles.cameraToolbar}><div className={styles.attendanceChoice} aria-label="Loại chấm công" role="group">{(["check_in", "check_out"] as const).map(type => <button aria-pressed={captureType === type} disabled={Boolean(dashboard && attendanceActionBlocked(dashboard.todayEvents, type))} key={type} onClick={() => setSelectedType(type)} type="button">{type === "check_in" ? "Chấm vào" : "Chấm ra"}</button>)}</div><IconButton label="Đóng camera" onClick={closeCapture}><X size={20} /></IconButton></div>
           <div className={styles.livePreview}>
             <video aria-label="Camera chấm công" muted playsInline ref={videoRef} />
             {cameraState === "ready" ? <><div className={styles.cameraOverlay}><span><i />{captureType === "check_in" ? "CHẤM VÀO" : "CHẤM RA"}</span><time>{formatTime(now)}</time></div><div aria-hidden="true" className={styles.viewfinder}><i /><i /><i /><i /></div><div className={styles.photoMarkPreview}><span>CHÂU TUẤN</span><strong>{formatTime(now)} <small>· {new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(now ?? undefined)}</small></strong><span><MapPin aria-hidden="true" size={13} />{locationLabel}</span></div></> : null}
@@ -517,7 +519,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
           </div>
           <div className={styles.captureActions}>
             <Button className={styles.cameraUtility} disabled={cameraState !== "ready"} leftIcon={<SwitchCamera aria-hidden="true" size={20} />} onClick={() => { const next = facingMode === "user" ? "environment" : "user"; setFacingMode(next); void startCamera(next); }} variant="ghost">Đổi camera</Button>
-            <button aria-label={`Chụp và ${nextLabel.toLowerCase()}`} className={styles.shutter} disabled={cameraState !== "ready" || !dashboard || !dashboard.policy.attendanceEnabled} onClick={() => void takePhoto()} type="button"><span /><b>{nextLabel}</b></button>
+            <button aria-label={`Chụp và ${nextLabel.toLowerCase()}`} className={styles.shutter} disabled={cameraState !== "ready" || !dashboard || !dashboard.policy.attendanceEnabled || Boolean(sequenceWarning)} onClick={() => void takePhoto()} type="button"><span /><b>{nextLabel}</b></button>
             <Button className={styles.cameraUtility} disabled={locationState === "requesting" || locationState === "insecure"} leftIcon={<RefreshCcw aria-hidden="true" size={20} />} onClick={() => void requestLocation()} variant="ghost">Lấy lại GPS</Button>
           </div>
           {!dashboard ? <div className={styles.captureLoadStatus} role="status">{loadError ?? "Đang tải ca làm…"}{loadError ? <Button onClick={() => void loadDashboard()} size="sm">Thử lại</Button> : null}</div> : null}
@@ -530,15 +532,15 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img alt="Ảnh chấm công vừa chụp" src={photo.previewUrl} />
           <div className={styles.captureStatus}><div className={styles.locationStatus} role="status"><MapPin aria-hidden="true" size={18} /><div><span>Vị trí GPS</span><strong>{locationLabel}</strong></div></div><span className={styles.networkStatus} data-online={online}>{online ? <Cloud aria-hidden="true" size={16} /> : <CloudOff aria-hidden="true" size={16} />}{online ? "Trực tuyến" : "Lưu trên thiết bị"}</span></div>
-          <div className={styles.reviewActions}><Button leftIcon={<RotateCcw aria-hidden="true" size={16} />} onClick={retake}>Chụp lại</Button><Button className={styles.confirmAction} leftIcon={<CheckCircle2 aria-hidden="true" size={18} />} onClick={() => void submitPhoto(undefined, undefined, true)} size="lg" variant="primary">Thử lại và ghi nhận</Button></div>
+          <div className={styles.reviewActions}><Button leftIcon={<RotateCcw aria-hidden="true" size={16} />} onClick={retake}>Chụp lại</Button><Button leftIcon={<CheckCircle2 aria-hidden="true" size={18} />} onClick={() => void submitPhoto(undefined, undefined, true)} size="lg" variant="primary">{captureType === "check_in" ? "Ghi nhận chấm vào" : "Ghi nhận chấm ra"}</Button></div>
         </section>
       ) : null}
 
       {step === "saving" ? <LoadingState title={locationState === "requesting" && !coordinates ? "Đang lấy GPS…" : "Đang ghi thời gian, địa chỉ lên ảnh…"} /> : null}
       {step === "success" ? (
-        <section className={styles.successCard} aria-live="polite"><span className={styles.successIcon}><CheckCircle2 aria-hidden="true" size={42} /></span><h2>{successSynced ? "Chấm công thành công" : "Đã lưu lượt chấm trên thiết bị"}</h2><span>{successEvent?.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</span><strong>{formatTime(successEvent?.effectiveAt ?? null)}</strong>{lateMinutes > 0 ? <StatusBadge tone="warning">Đi trễ {lateMinutes} phút</StatusBadge> : null}{successEvent?.latitude !== undefined && successEvent.longitude !== undefined ? <AttendanceLocationAddress accuracyMeters={successEvent.accuracyMeters} latitude={successEvent.latitude} longitude={successEvent.longitude} /> : null}<StatusBadge tone={successSynced ? "success" : "info"}>{successSynced ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge><Button onClick={closeCapture} size="lg" variant="primary">{onClose || returnHref ? "Xong" : "Về màn hình hôm nay"}</Button></section>
+        <section className={styles.successCard} aria-live="polite"><header className={styles.successHeading}><CheckCircle2 aria-hidden="true" size={24} /><div><h2>{successSynced ? "Chấm công thành công" : "Đã lưu trên thiết bị"}</h2><span>{successEvent?.eventType === "check_in" ? "Chấm vào" : "Chấm ra"} · {formatTime(successEvent?.effectiveAt ?? null)}</span></div></header>{photo && successEvent ? <button aria-label="Xem ảnh chấm công" className={styles.successImage} onClick={() => setActivePhotoId(successEvent.id)} type="button"><Image alt="Ảnh chấm công có thời gian và địa điểm" height={photo.height} src={photo.previewUrl} unoptimized width={photo.width} /></button> : null}<div className={styles.successMeta}><StatusBadge tone={successSynced ? "success" : "info"}>{successSynced ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge>{lateMinutes > 0 ? <StatusBadge tone="warning">Đi trễ {lateMinutes} phút</StatusBadge> : null}</div><Button onClick={closeCapture} size="lg" variant="primary">Xong</Button></section>
       ) : null}
-      {step === "success" && photo && successEvent ? <div className={styles.successPhoto}><button onClick={() => setActivePhotoId(successEvent.id)} type="button"><Image alt="Ảnh chấm công có thời gian và địa điểm" height={photo.height} src={photo.previewUrl} unoptimized width={photo.width} /><span>Xem ảnh chấm công</span></button><AttendanceEvidenceViewer activeId={activePhotoId} items={[{ employeeName: user.displayName, event: successEvent, imageUrl: photo.previewUrl }]} onChange={setActivePhotoId} onClose={() => setActivePhotoId(undefined)} /></div> : null}
+      {step === "success" && photo && successEvent ? <AttendanceEvidenceViewer activeId={activePhotoId} items={[{ employeeName: user.displayName, event: successEvent, imageUrl: photo.previewUrl }]} onChange={setActivePhotoId} onClose={() => setActivePhotoId(undefined)} /> : null}
     </div>
   );
   return mobile && (step !== "home" || initialCapture) ? createPortal(content, document.body) : content;

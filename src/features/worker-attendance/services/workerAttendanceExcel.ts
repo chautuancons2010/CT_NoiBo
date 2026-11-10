@@ -14,7 +14,7 @@ const statusLabels: Record<string, string> = {
   unconfirmed: "Chưa xác nhận"
 };
 
-export async function generateWorkerAttendanceExcel(allSessions: WorkerAttendanceSession[], month: string): Promise<Buffer> {
+export async function generateWorkerAttendanceExcel(allSessions: WorkerAttendanceSession[], month: string, baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000"): Promise<Buffer> {
   const sessions = allSessions.filter(session => Boolean(session.submittedAt) || session.status === "submitted" || session.status === "locked");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Châu Tuấn ERP";
@@ -38,7 +38,7 @@ export async function generateWorkerAttendanceExcel(allSessions: WorkerAttendanc
       const fraction = entry.status === "present" || entry.status === "late" ? entry.dayException === "half_day" ? .5 : 1 : 0;
       mark.dates.set(session.date, Math.max(mark.dates.get(session.date) ?? 0, fraction));
       marks.set(entry.workerId, mark);
-      sheet.addRow([
+      const workerRow = sheet.addRow([
         session.date,
         sanitizeSpreadsheetCell(session.projectName),
         sanitizeSpreadsheetCell(session.worksiteName),
@@ -56,6 +56,8 @@ export async function generateWorkerAttendanceExcel(allSessions: WorkerAttendanc
         clock.complete ? "Đủ giờ vào / ra" : !entry.checkedInAt ? "Thiếu giờ vào" : "Chưa chốt giờ ra",
         sanitizeSpreadsheetCell(entry.note ?? "")
       ]);
+      workerRow.getCell(16).value = { text: `${session.photos.length} ảnh minh chứng`, hyperlink: new URL(`/worker-attendance/sessions/${session.id}`, baseUrl).href };
+      workerRow.getCell(16).font = { color: { argb: "FF0563C1" }, underline: true };
     }
   }
   sheet.columns = Array.from({length: 20}, (_, i) => ({ width: [1,2,4,16,19].includes(i) ? 30 : [9,10].includes(i) ? 23 : 17 }));
@@ -83,7 +85,9 @@ export async function generateWorkerAttendanceExcel(allSessions: WorkerAttendanc
   const evidence = workbook.addWorksheet("Ảnh theo phiên");
   evidence.addRow(["Mã phiên", "Ngày", "Gói", "Công trường", "Giám sát", "Số công nhân", "Ảnh", "Thời gian chụp", "Địa chỉ", "GPS"]);
   for (const session of sessions) for (const [index, photo] of session.photos.entries()) {
-    evidence.addRow([session.id, session.date, sanitizeSpreadsheetCell(session.projectName), sanitizeSpreadsheetCell(session.worksiteName), sanitizeSpreadsheetCell(session.supervisorName), session.entries.filter(entry => entry.isSelected !== false && (entry.status === "present" || entry.status === "late")).length, index + 1, workerClockLabel(photo.capturedAt), sanitizeSpreadsheetCell(photo.address ?? ""), photo.latitude !== undefined && photo.longitude !== undefined ? `${photo.latitude}, ${photo.longitude}` : ""]);
+    const row = evidence.addRow([session.id, session.date, sanitizeSpreadsheetCell(session.projectName), sanitizeSpreadsheetCell(session.worksiteName), sanitizeSpreadsheetCell(session.supervisorName), session.entries.filter(entry => entry.isSelected !== false && (entry.status === "present" || entry.status === "late")).length, index + 1, workerClockLabel(photo.capturedAt), sanitizeSpreadsheetCell(photo.address ?? ""), photo.latitude !== undefined && photo.longitude !== undefined ? `${photo.latitude}, ${photo.longitude}` : ""]);
+    row.getCell(7).value = { text: photo.evidenceStatus === "expired" ? "Đã hết hạn 45 ngày" : `Xem ảnh ${index + 1}`, hyperlink: new URL(`/worker-attendance/sessions/${session.id}?photo=${encodeURIComponent(photo.id)}`, baseUrl).href };
+    row.getCell(7).font = { color: { argb: "FF0563C1" }, underline: true };
   }
   evidence.columns = [36, 16, 30, 30, 28, 18, 10, 26, 60, 30].map(width => ({ width }));
   evidence.getRow(1).font = { bold: true };

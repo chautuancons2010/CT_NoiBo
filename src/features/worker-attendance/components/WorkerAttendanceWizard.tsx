@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, RefreshCw, Trash2, UserPlus } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -28,6 +27,7 @@ import { WorkerSafetyReportEditor, WorkerSafetyReportView } from "./WorkerSafety
 
 import { formatBusinessDate } from "@/lib/time/timezone";
 import styles from "./WorkerAttendanceWorkspace.module.css";
+import { WorkerEvidencePhoto } from "./WorkerEvidencePhoto";
 
 type WizardStep = "roster" | "photos" | "review";
 
@@ -41,9 +41,7 @@ const stepLabels: Record<WizardStep, string> = { roster: "Công nhân", photos: 
 function route(id: string, step: WizardStep) { return `/worker-attendance/sessions/${id}/${step}`; }
 
 function DraftPhoto({ photo }: { photo: Blob }) {
-  const [url] = useState(() => URL.createObjectURL(photo));
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
-  return <Image alt="Ảnh điểm danh chưa đồng bộ" height={240} src={url} unoptimized width={320} />;
+  return <WorkerEvidencePhoto photo={photo} />;
 }
 
 export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeOptions = [] }: { sessionId: string; step: WizardStep; employeeOptions?: EmployeePickerOption[] }) {
@@ -395,7 +393,7 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
       </> : null}
 
       {step === "photos" && !laterStepBlocked ? <>
-        <Card><div className={styles.sectionHeading}><h2>Ảnh hiện trường</h2><span>{photoCount} ảnh{photoCount < minimumPhotos ? ` · Tối thiểu ${minimumPhotos}` : ""}</span></div><div className="worker-photo-grid">{draft.session.photos.map((photo, index) => <figure className={styles.photoTile} key={photo.id}><Image alt={`Ảnh hiện trường ${index + 1}`} height={240} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320} /><figcaption>Ảnh {index + 1}</figcaption></figure>)}{draft.photos.map((photo, index) => <div className="worker-photo-local" key={photo.id}><DraftPhoto photo={photo.thumbnail} /><span className={styles.photoNumber}>{draft.session.photos.length + index + 1}</span><IconButton label="Xóa ảnh" onClick={() => void update({ ...draft, photos: draft.photos.filter((item) => item.id !== photo.id), updatedAt: new Date().toISOString() })}><Trash2 size={17} /></IconButton></div>)}</div><ImageUploader accept="image/*" capture="environment" className={styles.fieldCamera} disabled={locked} error={photoError} file={photoFile} label={photoCount ? "Chụp thêm ảnh hiện trường" : "Chụp ảnh điểm danh"} onFileChange={(file) => { setPhotoFile(file); setPhotoError(""); if (file) void addPhoto(file); }} onRetry={() => void addPhoto(photoFile)} uploading={photoBusy} />{photoBusy ? <span role="status">Đang ghi vị trí và thời gian lên ảnh…</span> : locationBusy ? <span role="status">Đang lấy GPS…</span> : null}{locationError ? <div className="form-message form-message--error" role="alert">{locationError}<Button disabled={locationBusy} onClick={() => void retryLocation()} size="sm">Thử lại GPS</Button></div> : null}</Card>
+        <Card><div className={styles.sectionHeading}><h2>Ảnh hiện trường</h2><span>{photoCount} ảnh{photoCount < minimumPhotos ? ` · Tối thiểu ${minimumPhotos}` : ""}</span></div><div className="worker-photo-grid">{draft.session.photos.map((photo, index) => <figure className={styles.photoTile} key={photo.id}><WorkerEvidencePhoto id={photo.id} label={`Ảnh hiện trường ${index + 1}`} /><figcaption>Ảnh {index + 1}</figcaption></figure>)}{draft.photos.map((photo, index) => <div className="worker-photo-local" key={photo.id}><DraftPhoto photo={photo.photo} /><span className={styles.photoNumber}>{draft.session.photos.length + index + 1}</span><IconButton label="Xóa ảnh" onClick={() => void update({ ...draft, photos: draft.photos.filter((item) => item.id !== photo.id), updatedAt: new Date().toISOString() })}><Trash2 size={17} /></IconButton></div>)}</div><ImageUploader accept="image/*" capture="environment" className={styles.fieldCamera} disabled={locked} error={photoError} file={photoFile} label={photoCount ? "Chụp thêm ảnh hiện trường" : "Chụp ảnh điểm danh"} onFileChange={(file) => { setPhotoFile(file); setPhotoError(""); if (file) void addPhoto(file); }} onRetry={() => void addPhoto(photoFile)} uploading={photoBusy} />{photoBusy ? <span role="status">Đang ghi vị trí và thời gian lên ảnh…</span> : locationBusy ? <span role="status">Đang lấy GPS…</span> : null}{locationError ? <div className="form-message form-message--error" role="alert">{locationError}<Button disabled={locationBusy} onClick={() => void retryLocation()} size="sm">Thử lại GPS</Button></div> : null}</Card>
         <div className="sticky-action-bar"><Button disabled={locked || locationBusy || photoCount < minimumPhotos} busy={busy} onClick={() => selectionMode ? void submit() : void saveAndGo("review")} size="lg" variant="primary">{selectionMode ? "Gửi điểm danh" : "Tiếp tục"}</Button></div>
       </> : null}
 

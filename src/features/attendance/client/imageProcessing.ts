@@ -22,10 +22,10 @@ function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Không thể ghi thông tin lên ảnh.");
   const scale = canvas.width / 1000;
-  const size = Math.max(10, Math.round(22 * scale));
-  const timeSize = Math.max(13, Math.round(34 * scale));
-  const labelSize = Math.max(9, Math.round(18 * scale));
-  const padding = Math.max(8, 18 * scale);
+  const size = Math.max(10, Math.round(28 * scale));
+  const timeSize = Math.max(15, Math.round(42 * scale));
+  const labelSize = Math.max(9, Math.round(16 * scale));
+  const padding = Math.max(8, 22 * scale);
   context.font = `600 ${size}px sans-serif`;
   const words = stamp.address.split(/\s+/);
   const lines: string[] = []; let current = "";
@@ -34,21 +34,22 @@ function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
     if (context.measureText(next).width > canvas.width - padding * 2 && current) { lines.push(current); current = word; } else current = next;
   }
   if (current) lines.push(current);
+  if (lines.length > 2) lines.splice(1, lines.length - 1, `${lines.slice(1).join(" ").slice(0, Math.max(20, lines[0].length - 2))}…`);
   const time = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(stamp.capturedAt));
   const date = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(stamp.capturedAt));
   const content = [
     { text: `${time} · ${date}`, size: timeSize },
-    { text: stamp.label || "CHÂU TUẤN · ĐIỂM DANH", size: labelSize },
+    { text: (stamp.label || "CHÂU TUẤN · ĐIỂM DANH").slice(0, 70), size: labelSize },
     ...lines.map(text => ({ text, size }))
   ];
   if (stamp.latitude !== undefined && stamp.longitude !== undefined) content.push({ text: `GPS ${stamp.latitude.toFixed(6)}, ${stamp.longitude.toFixed(6)}`, size: labelSize });
   const height = Math.min(canvas.height, content.reduce((total, line) => total + line.size * 1.4, 0) + padding * 2);
-  context.fillStyle = "rgba(0,0,0,.8)";
+  context.fillStyle = "rgba(13,31,23,.72)";
   context.fillRect(0, canvas.height - height, canvas.width, height);
   context.fillStyle = "#fff"; context.textBaseline = "top";
   let y = canvas.height - height + padding;
   for (const line of content) {
-    context.font = `600 ${line.size}px sans-serif`;
+    context.font = `${line.size === timeSize ? 700 : 500} ${line.size}px sans-serif`;
     context.fillText(line.text, padding, y, canvas.width - padding * 2);
     y += line.size * 1.4;
   }

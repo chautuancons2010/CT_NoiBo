@@ -110,7 +110,9 @@ export function contextualNavigationGroups(
   modules: ModuleSettings,
   navigation: NavigationSettings
 ): NavigationGroup[] {
-  const application = applicationForPath(pathname);
+  const resolved = applicationForPath(pathname);
+  const application = resolved.id === "overview" && can(user.permissions, "employee.view")
+    ? applicationRegistry.find(item => item.id === "human-resources")! : resolved;
   const accessibleGroups = filterGroupsByAccess(desktopNavigation, user.permissions, modules, navigation);
   const dashboardGroup = accessibleGroups
     .filter((group) => group.label === "Tổng quan")
@@ -145,13 +147,13 @@ export function contextualNavigationGroups(
   }
   if (application.id !== "human-resources") return [...dashboardGroup, ...(items.length ? [{ label: application.label, items }] : [])];
   const sections = [
-    { id: "hr-records", icon: "Users", label: "Hồ sơ nhân sự", paths: ["/employees", "/employees/contracts", "/employees/insurance"] },
-    { id: "hr-attendance", icon: "Clock3", label: "Công & nghỉ phép", paths: ["/attendance/today", "/timesheets/matrix", "/timesheets", "/timesheets/adjustments", "/leave/manage"] },
-    { id: "hr-catalog", icon: "Library", label: "Danh mục", paths: ["/employees/departments", "/employees/positions", "/shifts"] },
+    { id: "hr-records", icon: "Users", label: "Hồ sơ", paths: ["/employees", "/employees/departments", "/employees/positions", "/employees/contracts", "/employees/insurance"] },
+    { id: "hr-attendance", icon: "Clock3", label: "Quản lý công", paths: ["/attendance/today", "/employees/field-attendance", "/timesheets/matrix", "/timesheets", "/shifts", "/leave/manage", "/timesheets/adjustments"] },
     { id: "hr-settings", icon: "Settings", label: "Thiết lập", paths: ["/settings/attendance"] }
   ] satisfies { id: string; icon: NavigationIcon; label: string; paths: string[] }[];
-  return [...dashboardGroup, ...sections.map((section) => ({ id: section.id, icon: section.icon, label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
-    .filter((section) => section.items.length > 0)];
+  const apps = visibleApplications(user, modules).filter(app => !["overview", "human-resources", "attendance"].includes(app.id)).map(app => ({label:app.label,href:app.defaultRoute,icon:app.icon,requiredPermission:app.requiredAny.find(permission=>can(user.permissions,permission))!}));
+  return [...dashboardGroup, ...sections.map((section) => ({ id: section.id, flat: true, icon: section.icon, label: section.label, items: section.paths.flatMap((path) => items.find((item) => item.href === path) ?? []) }))
+    .filter((section) => section.items.length > 0), ...(apps.length ? [{ id: "hr-applications", flat: true, label: "Ứng dụng", items: apps }] : [])];
 }
 
 export function visibleApplicationShortcuts(

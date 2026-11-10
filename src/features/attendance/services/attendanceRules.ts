@@ -69,6 +69,12 @@ export function getAttendanceSequenceWarning(events: readonly SequenceEvent[], i
   if (!latest && intendedType === "check_out") return "Hôm nay chưa có lượt chấm vào. Bạn đang chấm ra.";
   return undefined;
 }
+export function attendanceActionBlocked(events: readonly SequenceEvent[], intendedType: AttendanceType): string | undefined {
+  const accepted = orderedAttendance(events);
+  if (accepted.some(event => event.eventType === intendedType)) return intendedType === "check_in" ? "Hôm nay đã chấm vào." : "Hôm nay đã chấm ra.";
+  if (intendedType === "check_out" && !accepted.some(event => event.eventType === "check_in")) return "Cần chấm vào trước khi chấm ra.";
+  return undefined;
+}
 
 export function summarizeAttendanceIntervals<T extends Pick<AttendanceEvent, "eventType" | "effectiveAt" | "attendanceStatus">>(events: readonly T[]) {
   const ordered = orderedAttendance(events) as T[];

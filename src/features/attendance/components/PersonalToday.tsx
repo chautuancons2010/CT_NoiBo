@@ -18,6 +18,7 @@ import { syncAttendanceItem } from "@/features/attendance/client/attendanceSync"
 import { rememberAttendanceDashboard } from "@/features/attendance/client/attendanceDashboardCache";
 import { AttendanceEvidenceViewer } from "./AttendanceEvidence";
 import styles from "./PersonalToday.module.css";
+import { attendanceActionBlocked } from "../services/attendanceRules";
 
 function subscribeOnline(callback: () => void) {
   window.addEventListener("online", callback);
@@ -144,7 +145,7 @@ export function PersonalToday() {
             <div data-recorded={Boolean(checkIn)}><dt><LogIn aria-hidden="true" size={17} />Chấm vào</dt><dd>{checkIn ? formatTime(checkIn.effectiveAt) : "—"}</dd></div>
             <div data-recorded={Boolean(checkOut)}><dt><LogOut aria-hidden="true" size={17} />Chấm ra</dt><dd>{checkOut ? formatTime(checkOut.effectiveAt) : "—"}</dd></div>
           </dl>
-          {captureAllowed ? <div className={styles.action}>{dashboard.policy.attendanceEnabled ? (["check_in", "check_out"] as const).map(type => <button data-primary={dashboard.nextAction === type} key={type} onClick={() => { setCaptureType(type); setCaptureOpen(true); }} type="button"><span className={styles.actionIcon}>{dashboard.nextAction === type ? <Camera aria-hidden="true" size={21} /> : type === "check_in" ? <LogIn aria-hidden="true" size={20} /> : <LogOut aria-hidden="true" size={20} />}</span><span>{type === "check_in" ? "Chấm vào" : "Chấm ra"}</span></button>) : <span className={styles.complete}><CheckCircle2 aria-hidden="true" size={19} />Chấm công tạm ngừng</span>}</div> : null}
+          {captureAllowed ? <div className={styles.action}>{dashboard.policy.attendanceEnabled ? (["check_in", "check_out"] as const).map(type => <button disabled={Boolean(attendanceActionBlocked(dashboard.todayEvents, type))} data-primary={dashboard.nextAction === type} key={type} onClick={() => { setCaptureType(type); setCaptureOpen(true); }} type="button"><span className={styles.actionIcon}>{dashboard.nextAction === type ? <Camera aria-hidden="true" size={21} /> : type === "check_in" ? <LogIn aria-hidden="true" size={20} /> : <LogOut aria-hidden="true" size={20} />}</span><span>{type === "check_in" ? "Chấm vào" : "Chấm ra"}</span></button>) : <span className={styles.complete}><CheckCircle2 aria-hidden="true" size={19} />Chấm công tạm ngừng</span>}</div> : null}
         </div>
         <div className={styles.facts}>
           <div className={styles.connection} data-online={online}>{online ? <Cloud aria-hidden="true" size={16} /> : <CloudOff aria-hidden="true" size={16} />}<span>{online ? "Trực tuyến" : "Ngoại tuyến"}</span></div>

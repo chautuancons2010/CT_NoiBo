@@ -35,42 +35,21 @@ describe("AppRail", () => {
     expect(onCollapsedChange).toHaveBeenCalledWith(true);
   });
 
-  it("opens catalog functions from a compact group menu when collapsed", () => {
+  it("keeps each function directly accessible when the rail is collapsed", () => {
     render(<AppRail collapsed onCollapsedChange={vi.fn()} pathname="/employees" user={user} />);
-
-    const employeeLink = screen.getByRole("link", { name: "Nhân viên" });
-    expect(employeeLink).toHaveAttribute("href", "/employees");
-    expect(screen.queryByRole("link", { name: "Phòng ban" })).not.toBeInTheDocument();
-    const catalog = screen.getByRole("button", { name: "Danh mục" });
-    fireEvent.keyDown(catalog, { key: "ArrowDown" });
-    expect(screen.getByRole("menuitem", { name: "Phòng ban" })).toHaveAttribute("href", "/employees/departments");
-    expect(screen.getByRole("menuitem", { name: "Chức vụ" })).toHaveAttribute("href", "/employees/positions");
-    expect(screen.getByRole("menuitem", { name: "Phòng ban" })).toHaveFocus();
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(catalog).toHaveFocus();
-    fireEvent.focus(employeeLink);
-    expect(employeeLink).toHaveAttribute("aria-describedby", screen.getByRole("tooltip", { name: "Nhân viên" }).id);
+    expect(screen.getByRole("link", {name:"Nhân viên"})).toHaveAttribute("href","/employees");
+    expect(screen.getByRole("link", {name:"Phòng ban"})).toHaveAttribute("href","/employees/departments");
+    fireEvent.focus(screen.getByRole("link",{name:"Nhân viên"}));
+    expect(screen.getByRole("tooltip",{name:"Nhân viên"})).toBeInTheDocument();
   });
 
-  it("toggles groups independently and retains them when a deep link changes", async () => {
-    const manager: AuthenticatedUser = { ...user, permissions: ["employee.view", "contract.view", "insurance.view", "attendance.view_all", "shift.view"] };
-    const { rerender } = render(<AppRail collapsed={false} onCollapsedChange={vi.fn()} pathname="/employees/departments" user={manager} />);
-    expect(screen.getByRole("button", { name: "Danh mục" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("link", { name: "Phòng ban" })).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("link", { name: "Nhân viên" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Công & nghỉ phép" }));
-    expect(screen.getByRole("button", { name: "Danh mục" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("link", { name: "Bảng công" })).toHaveAttribute("href", "/timesheets/matrix");
-    fireEvent.click(screen.getByRole("button", { name: "Danh mục" }));
-    expect(screen.getByRole("button", { name: "Danh mục" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: "Công & nghỉ phép" })).toHaveAttribute("aria-expanded", "true");
-
-    rerender(<AppRail collapsed={false} onCollapsedChange={vi.fn()} pathname="/employees/employee-id/salary" user={manager} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Hồ sơ nhân sự" })).toHaveAttribute("aria-expanded", "true"));
-    expect(screen.getByRole("link", { name: "Nhân viên" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Bảng công" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Tồn kho" })).not.toBeInTheDocument();
+  it("preserves the full HR function list on its dashboard and employee records", async () => {
+    const manager: AuthenticatedUser={...user,permissions:["dashboard.view","employee.view","contract.view","insurance.view","attendance.view_all","shift.view"]};
+    const view=render(<AppRail collapsed={false} onCollapsedChange={vi.fn()} pathname="/dashboard" user={manager} />);
+    for(const name of ["Nhân viên","Phòng ban","Hợp đồng","Bảo hiểm xã hội","Bảng công","Ca làm"]) expect(screen.getByRole("link",{name})).toBeInTheDocument();
+    view.rerender(<AppRail collapsed={false} onCollapsedChange={vi.fn()} pathname="/employees/employee-id/profile" user={manager} />);
+    await waitFor(()=>expect(screen.getByRole("link",{name:"Nhân viên"})).toHaveAttribute("aria-current","page"));
+    expect(screen.getByRole("link",{name:"Bảng công"})).toBeInTheDocument();
   });
 
   it("keeps a sole authorized function directly accessible without a group toggle", () => {
@@ -80,11 +59,11 @@ describe("AppRail", () => {
     expect(screen.queryByRole("link", { name: "Nhân viên" })).not.toBeInTheDocument();
   });
 
-  it("does not repeat unrelated applications below the current module", () => {
+  it("lists each authorized application once with the restored ERP navigation", () => {
     render(<AppRail collapsed={false} onCollapsedChange={vi.fn()} pathname="/employees" user={{ ...user, permissions: ["employee.view", "warehouse.view", "payroll.view", "project.view"] }} />);
-    expect(screen.queryByRole("link", { name: "Kho" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Kế toán" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Gói / Công trường" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Kho" })).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "Kế toán" })).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "Gói / Công trường" })).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Nhân viên" })).toBeInTheDocument();
   });
 });

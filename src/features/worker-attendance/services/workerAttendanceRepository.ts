@@ -73,7 +73,7 @@ function nested(row: Row, key: string): Row | undefined {
   return value && typeof value === "object" ? value as Row : undefined;
 }
 
-const sessionSelect = "*,worksites(address,latitude,longitude,radius_meters),worker_attendance_entries(*),worker_attendance_photos(id,session_id,captured_at,sort_order,metadata),worker_attendance_adjustments(id,entry_id,reason,before_data,after_data,created_at)";
+const sessionSelect = "*,worksites(address,latitude,longitude,radius_meters),worker_attendance_entries(*),worker_attendance_photos(id,session_id,captured_at,sort_order,metadata,evidence_status),worker_attendance_adjustments(id,entry_id,reason,before_data,after_data,created_at)";
 
 function mapEntry(row: Row): WorkerAttendanceEntry {
   return {
@@ -90,7 +90,7 @@ function mapEntry(row: Row): WorkerAttendanceEntry {
 
 function mapPhoto(row: Row): WorkerAttendancePhoto {
   const meta = (row.metadata ?? {}) as Row;
-  return { id: required(row, "id"), sessionId: required(row, "session_id"), capturedAt: required(row, "captured_at"), sortOrder: Number(row.sort_order), address: optional(meta, "address"), latitude: typeof meta.latitude === "number" ? meta.latitude : undefined, longitude: typeof meta.longitude === "number" ? meta.longitude : undefined };
+  return { id: required(row, "id"), sessionId: required(row, "session_id"), capturedAt: required(row, "captured_at"), sortOrder: Number(row.sort_order), evidenceStatus: row.evidence_status === "expired" ? "expired" : "available", address: optional(meta, "address"), latitude: typeof meta.latitude === "number" ? meta.latitude : undefined, longitude: typeof meta.longitude === "number" ? meta.longitude : undefined };
 }
 
 function mapAdjustment(row: Row): WorkerAttendanceAdjustment {

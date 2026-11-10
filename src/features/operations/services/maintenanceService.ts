@@ -12,14 +12,13 @@ type Row = Record<string, unknown>;
 async function removeExpiredEvidence(
   client: SupabaseClient,
   table: "attendance_photos" | "worker_attendance_photos",
-  relation: "attendance_events" | "worker_attendance_sessions",
   cutoffDate: string
 ) {
   const { data, error } = await client
     .from(table)
-    .select(`id,file_id,thumbnail_file_id,${relation}!inner(attendance_date)`)
+    .select("id,file_id,thumbnail_file_id")
     .eq("evidence_status", "available")
-    .lt(`${relation}.attendance_date`, cutoffDate)
+    .lte("captured_at", cutoffDate)
     .limit(500);
   if (error) throw new AppError("SERVER_ERROR", "Không thể đọc danh sách ảnh hết hạn.");
 
@@ -34,6 +33,7 @@ async function removeExpiredEvidence(
   const pathsByBucket = new Map<string, string[]>();
   for (const asset of (assets ?? []) as Row[]) {
     const bucket = String(asset.bucket), path = String(asset.object_path);
+    if (bucket !== (table === "attendance_photos" ? "attendance-photos" : "worker-attendance-photos") || !path) throw new AppError("SERVER_ERROR", "Kho ảnh minh chứng không hợp lệ.");
     pathsByBucket.set(bucket, [...(pathsByBucket.get(bucket) ?? []), path]);
   }
   for (const [bucket, paths] of pathsByBucket) {
@@ -42,25 +42,15 @@ async function removeExpiredEvidence(
   }
 
   const photoIds = photos.map((photo) => String(photo.id));
-  const deletedAt = new Date().toISOString();
-  const { error: updateError } = await client.from(table).update({
-    file_id: null,
-    thumbnail_file_id: null,
-    evidence_status: "expired",
-    evidence_deleted_at: deletedAt
-  }).in("id", photoIds);
-  if (updateError) throw new AppError("SERVER_ERROR", "Không thể đánh dấu ảnh chấm công hết hạn.");
-  if (assetIds.length) {
-    const { error: deleteError } = await client.from("file_assets").delete().in("id", assetIds);
-    if (deleteError) throw new AppError("SERVER_ERROR", "Không thể dọn metadata tệp ảnh hết hạn.");
-  }
-  return photos.length;
+  const { data: expired, error: finalizeError } = await client.rpc("finalize_attendance_evidence_expiry", { p_kind: table, p_photo_ids: photoIds });
+  if (finalizeError) throw new AppError("SERVER_ERROR", "Không thể hoàn tất dọn ảnh chấm công hết hạn.");
+  return Number(expired ?? 0);
 }
 
 export async function purgeExpiredAttendanceEvidence(client: SupabaseClient) {
-  const cutoffDate = getBusinessDateKey(new Date(Date.now() - 45 * 86_400_000));
-  const personal = await removeExpiredEvidence(client, "attendance_photos", "attendance_events", cutoffDate);
-  const worker = await removeExpiredEvidence(client, "worker_attendance_photos", "worker_attendance_sessions", cutoffDate);
+  const cutoffDate = new Date(Date.now() - 45 * 86_400_000).toISOString();
+  const personal = await removeExpiredEvidence(client, "attendance_photos", cutoffDate);
+  const worker = await removeExpiredEvidence(client, "worker_attendance_photos", cutoffDate);
   return { attendancePhotosExpired: personal, workerAttendancePhotosExpired: worker, retentionDays: 45 };
 }
 

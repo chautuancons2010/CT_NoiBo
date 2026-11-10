@@ -24,7 +24,7 @@ type CookieWriter = { set: (name: string, value: string, options: Record<string,
 
 const validStatuses = new Set<AccountStatus>(["pending_activation", "active", "disabled", "locked", "invited"]);
 const validPermissions = new Set<string>(allFoundationPermissions);
-const accountFields = "id,employee_id,username,display_name,primary_email,status,metadata,account_roles!account_roles_account_id_fkey(roles(code,role_permissions(permission_key)))";
+const accountFields = "id,employee_id,username,display_name,primary_email,status,metadata,employees!app_accounts_employee_fk(employment_types(worker_category)),account_roles!account_roles_account_id_fkey(roles(code,role_permissions(permission_key)))";
 const pendingSessionResolutions = new Map<string, Promise<AuthenticatedUser | null>>();
 
 interface StoredAccount {
@@ -36,6 +36,7 @@ interface StoredAccount {
   primary_email?: string | null;
   status: string;
   metadata?: unknown;
+  employees?: { employment_types?: { worker_category?: string } | null } | null;
   account_roles?: Array<{ roles?: { code?: string; role_permissions?: Array<{ permission_key?: string }> } | null }>;
 }
 
@@ -170,7 +171,9 @@ function mapAccount(account: StoredAccount, fallbackEmail: string): Authenticate
   const rawRoles = account.account_roles || [];
   const assignedPermissions = [...new Set(rawRoles.flatMap(item => item.roles?.role_permissions || []).map(item => item.permission_key).filter((key): key is Permission => Boolean(key && validPermissions.has(key))))];
   const managementOnly = rawRoles.some((item) => item.roles?.code === "admin");
-  const permissions = resolveAccountPermissions(assignedPermissions, account.employee_id, managementOnly);
+  const resolvedPermissions = resolveAccountPermissions(assignedPermissions, account.employee_id, managementOnly);
+  const permissions = account.employees?.employment_types?.worker_category === "office"
+    ? resolvedPermissions.filter(permission => permission !== "attendance.self" && permission !== "attendance.self.create") : resolvedPermissions;
   const status = String(account.status);
   return {
     id: String(account.id),

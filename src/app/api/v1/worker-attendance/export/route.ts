@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const from = `${input.month}-01`;
     const to = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
     const sessions = await listWorkerSessions(user, { projectId: input.projectId, from, to });
-    const bytes = await generateWorkerAttendanceExcel(sessions, input.month);
+    const bytes = await generateWorkerAttendanceExcel(sessions, input.month, process.env.APP_BASE_URL ?? new URL(request.url).origin);
     return new Response(new Uint8Array(bytes), { headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "content-disposition": `attachment; filename="Bang_cham_cong_cong_truong_${input.month}.xlsx"`,

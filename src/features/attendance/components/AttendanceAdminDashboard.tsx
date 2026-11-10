@@ -41,5 +41,5 @@ export function AttendanceAdminDashboard({ ownerAccountId, canViewWorkers = fals
   useDomainReconciliation("attendance", load);
 
   // Never render or inspect evidence left over from a different selected day.
-  return <div className="page-stack">{canViewWorkers ? <nav aria-label="Nguồn ảnh chấm công" className={styles.sourceNav}><span aria-current="page"><Camera aria-hidden="true" size={17} />Ảnh cá nhân</span><Link href="/worker-attendance"><Users aria-hidden="true" size={17} />Ảnh công trường</Link></nav> : null}<AttendancePhotoReview data={data?.date === date ? data : undefined} date={date} error={error} onDateChange={setDate} onRefresh={load} ownerAccountId={ownerAccountId} refreshing={refreshing} /></div>;
+  return <div className="page-stack">{canViewWorkers ? <nav aria-label="Nguồn ảnh chấm công" className={styles.sourceNav}><span aria-current="page"><Camera aria-hidden="true" size={17} />Ảnh cá nhân</span><Link href="/employees/field-attendance"><Users aria-hidden="true" size={17} />Ảnh công trường</Link></nav> : null}<AttendancePhotoReview data={data?.date === date ? data : undefined} date={date} error={error} onDateChange={setDate} onRefresh={load} ownerAccountId={ownerAccountId} refreshing={refreshing} /></div>;
 }

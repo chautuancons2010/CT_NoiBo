@@ -34,6 +34,7 @@ export interface AttendancePolicy {
   id: string;
   name: string;
   attendanceEnabled: boolean;
+  disabledReason?: string;
   photoRequired: boolean;
   gpsRequired: boolean;
   offlineEnabled: boolean;

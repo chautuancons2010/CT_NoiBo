@@ -37,6 +37,8 @@ function RailNavigation({ groups, pathname, collapsed }: {
   const activeGroup = groups.find((group) => group.items.some((item) => item.href === activeHref));
   const activeGroupId = activeGroup?.id;
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => {
+    const hrGroups = groups.filter(group => group.id?.startsWith("hr-"));
+    if (hrGroups.length) return new Set(hrGroups.map(group => group.id!));
     const initial = activeGroupId ?? (activeGroup ? undefined : groups.find(group => group.id)?.id);
     return new Set(initial ? [initial] : []);
   });
@@ -67,6 +69,7 @@ function RailNavigation({ groups, pathname, collapsed }: {
 
   return <ul className="app-rail__groups">
     {groups.map((group) => {
+      if (group.flat) return <li className="app-rail__direct-group" key={group.id ?? group.label}><span className="app-rail__section-label">{group.label}</span><ul>{group.items.map(item => renderLink(item))}</ul></li>;
       if (!group.id || group.items.length === 1) {
         return <li className={cn("app-rail__direct-group", group.items[0]?.href === "/dashboard" && "app-rail__home")} key={group.id ?? group.label}><ul>{group.items.map((item) => renderLink(item))}</ul></li>;
       }

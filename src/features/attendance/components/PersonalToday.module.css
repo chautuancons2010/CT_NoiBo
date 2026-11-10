@@ -19,6 +19,7 @@
 .action .complete { grid-column: 1/-1; }
 .action > button:hover { border-color: var(--primary-hover); background: var(--primary-hover); }
 .action > button:active { border-color: var(--color-primary-active); background: var(--color-primary-active); }
+.action > button:disabled { opacity: .4; cursor: default; background: var(--surface-2); color: var(--text-secondary); border-color: var(--border-subtle); }
 .complete { display: flex; min-height: 50px; align-items: center; justify-content: center; gap: var(--space-2); border-radius: var(--radius-control); background: var(--success-soft); padding: var(--space-3); color: var(--success); font-size: 14px; font-weight: var(--font-weight-semibold); }
 .card[data-state="paused"] .complete { background: var(--surface-2); color: var(--text-secondary); }
 .events { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; gap: var(--space-3); margin: 0; }
@@ -128,4 +129,13 @@
   .content { padding-inline: 14px; }
   .action > button { min-height: 56px; gap: 6px; padding-inline: 10px; font-size: 14px; }
   .action .actionIcon { width: 28px; height: 28px; flex-basis: 28px; }
+}
+@media(min-width:768px) {
+  .today { max-width: 1120px; }
+  .card { display: grid; grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr); }
+  .top, .facts { grid-column: 1/-1; }
+  .clockFace { grid-column: 1; padding-block: 28px; }
+  .content { grid-column: 2; align-content: center; padding: 28px; }
+  .liveClock { font-size: 64px; }
+  .dial { right: -130px; }
 }

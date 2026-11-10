@@ -1,4 +1,24 @@
 .home, .wizard, .detail { display: grid; width: 100%; min-width: 0; max-width: 1120px; align-content: start; gap: var(--space-5); }
+.home, .wizard, .detail { box-sizing: border-box; width: 100%; max-width: 1120px; overflow-wrap: anywhere; }
+.detail > *, .wizard > * { min-width: 0; max-width: 100%; }
+.detail :global(.worker-photo-button), .wizard :global(.worker-photo-button) { display: block; width: 100%; min-width: 0; max-width: 100%; border-radius: 12px; overflow: hidden; }
+.detail :global(.worker-photo-grid img) { object-fit: contain; background: var(--text-primary); }
+.detail :global(.panel-header) { flex-wrap: wrap; gap: 12px; }
+.detail :global(.panel-header .button) { max-width: 100%; white-space: normal; }
+.detail :global(.data-table) { width: 100%; min-width: 0; table-layout: fixed; }
+.detail :global(.data-table :is(td,th)) { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+@media(max-width:767px) {
+  .detail :global(.table-scroll) { overflow: visible; }
+  .detail :global(.data-table thead) { display: none; }
+  .detail :global(.data-table tbody), .detail :global(.data-table tr) { display: grid; width: 100%; }
+  .detail :global(.data-table tr) { grid-template-columns: repeat(3,minmax(0,1fr)); border-bottom: 1px solid var(--border-subtle); padding-block: 12px; }
+  .detail :global(.data-table td) { border: 0; padding: 6px; font-size: 12px; }
+  .detail :global(.data-table td:first-child) { grid-column: 1/-1; font-size: 14px; font-weight: 600; }
+  .detail :global(.data-table td:nth-child(2))::before { content: "Giờ vào"; }
+  .detail :global(.data-table td:nth-child(3))::before { content: "Giờ ra"; }
+  .detail :global(.data-table td:nth-child(4))::before { content: "Giờ công"; }
+  .detail :global(.data-table td)::before { display: block; margin-bottom: 4px; color: var(--text-secondary); }
+}
 .photoTile { position: relative; min-width: 0; margin: 0; }
 .wizard[data-step="photos"] :global(.worker-photo-grid) { display: flex; gap: 10px; overflow-x: auto; padding-block: 4px; scroll-snap-type: x proximity; }
 .wizard[data-step="photos"] :global(.worker-photo-grid) > * { flex: 0 0 112px; width: 112px; scroll-snap-align: start; }
@@ -160,4 +180,13 @@
   .wizard[data-step="photos"] :global(.worker-photo-local > .icon-button) { top: 0; right: 0; }
   .wizard[data-step="photos"] :global(.image-uploader__trigger) { min-height: 44px; gap: 8px; padding: 8px; flex-direction: row; }
   .wizard[data-step="photos"] :global(.sticky-action-bar) { padding: 8px; }
+}
+.detail :global(.worker-photo-expired) {
+  display: grid;
+  min-height: 100px;
+  place-items: center;
+  padding: 16px;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border-radius: 12px;
 }

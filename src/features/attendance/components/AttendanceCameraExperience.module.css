@@ -1,4 +1,16 @@
 .page { display: grid; width: 100%; min-width: 0; gap: var(--space-4); }
+.successHeading { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; color: var(--primary); }
+.successHeading > div { min-width: 0; display: grid; gap: 3px; }
+.successHeading h2 { font-size: 18px; color: var(--text-primary); }
+.successHeading span { font-size: 13px; color: var(--text-secondary); }
+.successImage { width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 16px; overflow: hidden; background: var(--text-primary); cursor: zoom-in; }
+.successImage img { display: block; width: 100%; max-height: 48dvh; object-fit: contain; }
+.successMeta { display: flex; width: 100%; gap: 8px; flex-wrap: wrap; }
+.successCard { min-height: 0; align-content: start; gap: 14px; padding: 20px; }
+.successCard > .successImage { margin: 0; }
+.attendanceChoice > button:disabled { opacity: .4; cursor: default; }
+.photoReview > img { max-height: 48dvh; }
+.reviewActions > button { min-width: 0; padding-inline: 10px; }
 .homeGrid { display: grid; min-width: 0; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: stretch; gap: var(--space-5); }
 
 .clockCard,
@@ -237,3 +249,11 @@
   .captureLoadStatus { grid-column: 1/-1; font-size: 11px; }
   .cameraOverlay > span { display: none; }
 }
+.successCard { min-height: 0; padding: 18px; gap: 12px; align-content: start; }
+.successCard .successHeading h2 { font-size: 18px; }
+.successCard .successImage { margin: 0; min-height: 0; }
+.successCard .successImage img { width: 100%; max-height: 48dvh; object-fit: contain; }
+.successCard > button:last-child { margin: 0; }
+.reviewActions { grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr); }
+.photoReview { height: auto; max-height: 100%; min-height: 0; grid-template-rows: auto minmax(80px,1fr) auto auto; }
+.photoReview > img { max-height: 45dvh; }

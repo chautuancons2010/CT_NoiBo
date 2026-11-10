@@ -44,6 +44,7 @@ export const routeMetaByPath: Record<string, RouteMeta> = {
     module: "Nhân sự"
   },
   "/employees/insurance": { title: "Bảo hiểm xã hội", description: "", module: "Nhân sự" },
+  "/employees/field-attendance": { title: "Ảnh & công công trường", description: "", module: "Nhân sự" },
   "/employees/departments": { title: "Phòng ban", description: "", module: "Nhân sự" },
   "/employees/positions": { title: "Chức vụ", description: "", module: "Nhân sự" },
   "/employees/contracts": { title: "Hợp đồng lao động", description: "", module: "Nhân sự" },
@@ -286,6 +287,8 @@ const employeeSectionLabels: Record<string, string> = {
   contracts: "Hợp đồng",
   salary: "Lương & phúc lợi",
   attendance: "Chấm công",
+  documents: "Tài liệu",
+  projects: "Công trường",
   history: "Lịch sử",
   leave: "Nghỉ phép",
   account: "Tài khoản"

@@ -28,10 +28,13 @@ export async function readSharedShiftCatalog(client: SupabaseClient, date: strin
 export async function applyEmployeeShift(client: SupabaseClient, employeeId: string, date: string, policy: AttendancePolicy): Promise<AttendancePolicy> {
   const [resolve, employee, projects] = await Promise.all([
     readSharedShiftCatalog(client, date),
-    client.from("employees").select("department_id").eq("id", employeeId).single(),
+    client.from("employees").select("department_id,employment_types(worker_category)").eq("id", employeeId).single(),
     client.from("project_assignments").select("project_id").eq("employee_id", employeeId).eq("status", "active").lte("start_date", date).or(`end_date.is.null,end_date.gte.${date}`)
   ]);
   if (employee.error || projects.error) throw new AppError("SERVER_ERROR", "Không thể đọc phân ca của nhân viên.");
   const shift = resolve({ employeeId, departmentId: employee.data?.department_id, projectIds: (projects.data ?? []).map(row => String(row.project_id)) });
-  return shift ? { ...policy, shiftName: String(shift.name), shiftStart: String(shift.start_time).slice(0,5), shiftEnd: String(shift.end_time).slice(0,5), lateThresholdMinutes: Number(shift.late_grace_minutes ?? policy.lateThresholdMinutes) } : policy;
+  const type = employee.data?.employment_types;
+  const office = (Array.isArray(type) ? type[0] : type)?.worker_category === "office";
+  const base = office ? { ...policy, attendanceEnabled: false, disabledReason: "Văn phòng tạm ngừng chấm công." } : policy;
+  return shift ? { ...base, shiftName: String(shift.name), shiftStart: String(shift.start_time).slice(0,5), shiftEnd: String(shift.end_time).slice(0,5), lateThresholdMinutes: Number(shift.late_grace_minutes ?? policy.lateThresholdMinutes) } : base;
 }

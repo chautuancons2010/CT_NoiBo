@@ -1,4 +1,13 @@
 .page { min-width: 0; container: employee-workspace / inline-size; }
+.page :global(.content-grid--two) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.page :global(.content-grid--two > .card) { grid-column: auto; min-width: 0; padding: 24px; border-radius: 16px; }
+.page :global(.identity-document-grid) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.page :global(.identity-document-preview) { width: 100%; max-width: 320px; min-height: 0; height: auto; aspect-ratio: 1.58; }
+.page :global(.identity-document-preview img) { width: 100%; height: 100%; object-fit: contain; }
+.page :global(.detail-field-list > div) { display: grid; grid-template-columns: minmax(100px,.65fr) minmax(0,1fr); gap: 12px; border-bottom: 1px solid var(--border-subtle); padding-block: 12px; }
+.page :global(.detail-field-list dt) { font-size: 13px; color: var(--text-secondary); }
+.page :global(.detail-field-list dd) { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 14px; }
+.page :global(.employee-profile-assessment) { background: var(--primary-soft); }
 .page :global(.content-grid--two) { align-items: start; }
 .salaryLayout { display: grid; min-width: 0; grid-template-columns: minmax(0,1.15fr) minmax(300px,.85fr); align-items: start; gap: var(--section-gap); }
 .salaryLayout[data-has-history="false"] { grid-template-columns: minmax(0,1fr); max-width: var(--form-workspace-max-width); }

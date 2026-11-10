@@ -76,6 +76,7 @@ export interface NavigationItem {
 
 export interface NavigationGroup {
   id?: string;
+  flat?: boolean;
   icon?: NavigationIcon;
   label: string;
   items: NavigationItem[];
@@ -106,6 +107,7 @@ export const desktopNavigation: NavigationGroup[] = [
         mobilePriority: 1,
         exact: true
       },
+      { label: "Ảnh & công công trường", href: "/employees/field-attendance", icon: "Camera", requiredPermission: "worker_attendance.view", alternativePermission: "worker_attendance.view_all" },
       {
         label: "Phòng ban",
         href: "/employees/departments",

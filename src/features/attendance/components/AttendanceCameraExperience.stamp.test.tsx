@@ -42,14 +42,16 @@ describe("personal capture stamp gate", () => {
     fireEvent.click(shutter);
     expect(await screen.findByText("Ảnh chưa được gửi")).toBeInTheDocument();
     expect(screen.getByAltText("Ảnh chấm công vừa chụp")).toHaveAttribute("src", photo.previewUrl);
-    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(mocks.save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button",{name:"Ghi nhận chấm vào"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
     expect(mocks.save).not.toHaveBeenCalled();
     expect(mocks.sync).not.toHaveBeenCalled();
     const capture = mocks.stamp.mock.calls[0][1];
     const stamped = { ...photo, photo: new Blob(["stamped-full-jpeg"], { type: "image/jpeg" }), thumbnail: new Blob(["stamped-thumbnail-jpeg"], { type: "image/jpeg" }), previewUrl: "blob:stamped-photo" };
     const metadata = { version: 1, capturedAt: capture.capturedAtClient, address: "12 Nguyễn Huệ, TP. Hồ Chí Minh", latitude: 10.7769, longitude: 106.7009 };
     mocks.stamp.mockResolvedValueOnce({ photo: stamped, stamp: metadata });
-    fireEvent.click(screen.getByRole("button", { name: "Thử lại và ghi nhận" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ghi nhận chấm vào" }));
     await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
     expect(mocks.capture).toHaveBeenCalledOnce();
     expect(mocks.stamp.mock.calls[1][1]).toEqual(capture);

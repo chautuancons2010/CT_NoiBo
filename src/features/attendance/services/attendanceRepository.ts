@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError } from "@/lib/api/errors";
 import { can, type AuthenticatedUser } from "@/lib/auth/permissions";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
-import { matchAttendanceLocation, getNextAttendanceAction, getAttendanceSequenceWarning, summarizeAttendanceIntervals } from "@/features/attendance/services/attendanceRules";
+import { matchAttendanceLocation, getNextAttendanceAction, getAttendanceSequenceWarning, summarizeAttendanceIntervals, attendanceActionBlocked } from "@/features/attendance/services/attendanceRules";
 import type {
   AttendanceDashboard,
   AttendanceAdminToday,
@@ -334,7 +334,7 @@ export async function recordAttendance(
 
   const [policy, locations] = await Promise.all([readPolicy(client).then(base => applyEmployeeShift(client, identity.employeeId, localDate(new Date(input.capturedAtClient), base.timezone), base)), readLocations(client, identity.employeeId)]);
   if (can(user.permissions, "worker_attendance.create")) policy.photoRequired = true;
-  if (!policy.attendanceEnabled) throw new AppError("PERMISSION_DENIED", "Chức năng chấm công đang tạm khóa.");
+  if (!policy.attendanceEnabled) throw new AppError("PERMISSION_DENIED", policy.disabledReason ?? "Chức năng chấm công đang tạm khóa.");
   if (input.capturedOffline && !policy.offlineEnabled) {
     throw new AppError("NETWORK_ERROR", "Chính sách hiện tại không cho phép chấm công khi ngoại tuyến.");
   }
@@ -356,6 +356,8 @@ export async function recordAttendance(
   const existing = await readEvents(client, { employeeId: identity.employeeId, date: attendanceDate });
   const eventType = input.intendedType ?? getNextAttendanceAction(existing);
 
+  const blocked = attendanceActionBlocked(existing, eventType);
+  if (blocked) throw new AppError("DUPLICATE", blocked);
   const anomalyFlags: string[] = [];
   if (getAttendanceSequenceWarning(existing, eventType)) anomalyFlags.push(eventType === "check_in" ? "repeated_check_in" : existing.some(event => event.attendanceStatus !== "rejected") ? "repeated_check_out" : "check_out_without_check_in");
   if (match.status === "accuracy_low") anomalyFlags.push("gps_accuracy_low");
@@ -394,6 +396,8 @@ export async function recordAttendance(
       .from("attendance_events").select(eventSelect).eq("client_event_id", input.clientEventId).eq("employee_id", identity.employeeId).maybeSingle();
     if (concurrentReplay) return { event: mapEvent(concurrentReplay as Row), idempotentReplay: true };
     if (error.code === "23505") throw new AppError("DUPLICATE", "Lượt chấm công tương ứng đã tồn tại.");
+    if (error.message?.includes("OFFICE_ATTENDANCE_PAUSED")) throw new AppError("PERMISSION_DENIED", "Văn phòng tạm ngừng chấm công.");
+    if (error.message?.includes("CHECK_IN_REQUIRED")) throw new AppError("VALIDATION_ERROR", "Cần chấm vào trước khi chấm ra.");
     throw new AppError("SERVER_ERROR", "Không thể ghi nhận lượt chấm công.");
   }
   const event = mapEvent(data as Row);
