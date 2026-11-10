@@ -28,6 +28,7 @@ describe("personal mobile navigation", () => {
     expect(supervisor.direct[1]).toMatchObject({ href: "/worker-attendance/today", label: "Điểm danh" });
     expect(supervisor.direct[2]).toMatchObject({ href: "/projects", label: "Gói" });
     expect(supervisor.direct[3]).toMatchObject({ href: "/attendance/history", label: "Lịch công" });
+    expect(supervisor.secondary.some((item) => item.href.startsWith("/project-monitoring") || item.href === "/projects/updates")).toBe(false);
     expect(canUseWorkerAttendance(user(["worker_attendance.create"]))).toBe(true);
     expect(canUseWorkerAttendance(user(["project.view"]))).toBe(false);
   });

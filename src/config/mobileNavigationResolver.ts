@@ -104,6 +104,7 @@ export function resolveMobileNavigation(pathname: string, user: AuthenticatedUse
       ?? businessApplications[0];
   const workItems = workApplication ? accessibleItems
     .filter((item) => applicationForPath(item.href).id === workApplication.id)
+    .filter((item) => profile !== "supervisor" || !["/project-monitoring", "/projects/updates"].some((prefix) => item.href === prefix || item.href.startsWith(`${prefix}/`)))
     .filter((item) => !item.href.startsWith("/worker-attendance") || can(user.permissions, "worker_attendance.view"))
     .sort((first, second) => (first.mobilePriority ?? 99) - (second.mobilePriority ?? 99)) : [];
   const roleHome = resolveMobileLandingPage(user, settings.dashboard ?? defaultDashboardSettings);

@@ -127,6 +127,14 @@ export function contextualNavigationGroups(
   const items = overviewFirst(groups.flatMap((group) => group.items));
   if (application.id === "overview") return dashboardGroup;
   if (application.id === "messaging") return dashboardGroup;
+  const supervisorWorkflow = can(user.permissions, "worker_attendance.create")
+    && !can(user.permissions, "attendance.view_all")
+    && !can(user.permissions, "attendance.manage")
+    && !can(user.permissions, "project_monitoring.view_all");
+  if (application.id === "projects" && supervisorWorkflow) {
+    const attendanceItems = items.filter((item) => !["/project-monitoring", "/projects/updates"].some((prefix) => item.href === prefix || item.href.startsWith(`${prefix}/`)));
+    return [...dashboardGroup, ...(attendanceItems.length ? [{ label: application.label, items: attendanceItems }] : [])];
+  }
   if (application.id === "warehouse") {
     const sections = [
       { id: "warehouse-operations", icon: "Boxes", label: "Vận hành kho", paths: ["/warehouse/inventory", "/warehouse/receipts", "/warehouse/issues", "/warehouse/transfers"] },

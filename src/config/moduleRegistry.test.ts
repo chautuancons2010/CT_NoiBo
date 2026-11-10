@@ -120,6 +120,11 @@ describe("application registry", () => {
     expect(personal[0].items.map((item) => item.href)).toEqual(["/attendance/me", "/attendance/history", "/attendance/requests", "/attendance/notifications"]);
   });
 
+  it("keeps supervisor construction navigation focused on packages and attendance", () => {
+    const groups = contextualNavigationGroups("/projects", user(["project.view", "project_monitoring.view", "worker_attendance.view", "worker_attendance.create"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
+    expect(groups.flatMap((group) => group.items.map((item) => item.href))).toEqual(["/projects", "/worker-attendance/today"]);
+  });
+
   it("opens the correct application for dedicated attendance permissions", () => {
     const manager = visibleApplications(user(["attendance.period.manage"]), defaultSystemSettings.modules);
     const personal = visibleApplications(user(["attendance.self_history"]), defaultSystemSettings.modules);
