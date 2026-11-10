@@ -314,6 +314,11 @@ body { overflow-x: hidden; background: var(--workspace-canvas); }
 :where(.filter-tabs > button[aria-pressed="true"]) { border-bottom-color: var(--color-primary); color: var(--color-primary-active); font-weight: 600; }
 :where(.filter-tabs > button:hover) { color: var(--color-primary-active); }
 :where(.filter-tabs > button:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: -3px; }
+@media (max-width: 767px) {
+  .payroll-console .list-workspace__navigation > .filter-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; overflow: visible; padding: 8px 12px; }
+  .payroll-console .list-workspace__navigation > .filter-tabs > button { min-width: 0; min-height: 42px; justify-content: center; border: 1px solid transparent; border-radius: 10px; padding: 6px; text-align: center; white-space: normal; line-height: 1.2; }
+  .payroll-console .list-workspace__navigation > .filter-tabs > button[aria-pressed="true"] { border-color: var(--color-primary-border); background: var(--color-primary-soft); }
+}
 :where(.filter-chip) { display: inline-flex; max-width: 100%; align-items: center; gap: 6px; border: 1px solid var(--color-primary-border); border-radius: var(--radius-control); padding: 3px 4px 3px 10px; background: var(--color-primary-soft); color: var(--text-primary); font-size: 12px; }
 :where(.filter-chip > span) { min-width: 0; overflow-wrap: anywhere; }
 :where(.filter-chip > .icon-button) { width: 28px; height: 28px; min-width: 28px; min-height: 28px; border: 0; background: transparent; }
