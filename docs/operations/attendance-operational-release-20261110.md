@@ -1,6 +1,6 @@
 # Hoàn thiện chấm công và kiểm tra vận hành trên TEST
 
-Ngày 10/11/2026, giữ tông xanh hiện tại, làm lại thẻ chấm công cá nhân với đồng hồ lớn, họa tiết mặt đồng hồ, ca làm và hai thao tác vào/ra. Camera có khung ngắm và xem trước ngày giờ; thanh điều khiển nằm dưới thanh đầu trang, trên thanh điều hướng điện thoại.
+Ngày 10/11/2026, giữ tông xanh hiện tại, làm lại thẻ chấm công cá nhân với đồng hồ lớn, họa tiết mặt đồng hồ, ca làm và hai thao tác vào/ra. Camera có khung ngắm và xem trước ngày giờ; lớp camera riêng trên điện thoại không bị thanh đầu trang che nút đóng, giữ thanh điều hướng dưới. Địa chỉ được thu gọn để khung chụp vẫn đủ lớn trên màn hình 320px.
 
 Nhãn vai trò Kỹ sư đổi thành Giám sát trong danh sách chọn vai trò công trường, nhóm nhân viên, thông báo và tài khoản mẫu. Giữ nguyên mã dữ liệu/quyền để các phân công cũ tiếp tục liên kết. Hai tài khoản mẫu trên TEST chỉ cập nhật tên hiển thị, không đổi tên đăng nhập hoặc mật khẩu.
 

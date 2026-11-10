@@ -16,9 +16,10 @@ export interface AttendanceLocationAddressProps {
   knownAddress?: string;
   className?: string;
   emptyLabel?: string;
+  compact?: boolean;
 }
 
-export function AttendanceLocationAddress({ latitude, longitude, accuracyMeters, referenceName, knownAddress, className, emptyLabel = "Chưa có GPS" }: AttendanceLocationAddressProps) {
+export function AttendanceLocationAddress({ latitude, longitude, accuracyMeters, referenceName, knownAddress, className, emptyLabel = "Chưa có GPS", compact = false }: AttendanceLocationAddressProps) {
   const root = useRef<HTMLSpanElement>(null);
   const [lookup, setLookup] = useState<{ key: string; result: AttendanceAddressResult }>();
   const hasCoordinates = validAddressCoordinates({ latitude, longitude });
@@ -50,7 +51,7 @@ export function AttendanceLocationAddress({ latitude, longitude, accuracyMeters,
   const accuracy = typeof accuracyMeters === "number" && Number.isFinite(accuracyMeters) && accuracyMeters >= 0 ? `GPS ±${Math.round(accuracyMeters)} m` : "GPS";
   const source = knownAddress?.trim() ? "Theo công trường" : address ? "Gần vị trí GPS" : undefined;
 
-  return <span className={`${styles.root} ${className ?? ""}`} ref={root}>
+  return <span className={`${styles.root} ${compact ? styles.compact : ""} ${className ?? ""}`} ref={root}>
     <a aria-label={`Vị trí chấm công · ${label} · ${accuracy} · mở bản đồ`} className={styles.map} href={`https://www.google.com/maps?q=${latitude},${longitude}`} rel="noopener noreferrer" target="_blank" title={`${coordinateLabel({ latitude: latitude!, longitude: longitude! })} · ${accuracy}`}>
       <MapPin aria-hidden="true" size={15} /><span className={styles.content}><span className={styles.address}>{label}</span><span className={styles.metadata}>{[source, accuracy].filter(Boolean).join(" · ")}</span></span>
     </a>

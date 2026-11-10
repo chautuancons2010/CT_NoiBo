@@ -1,4 +1,6 @@
 "use client";
+import { createPortal } from "react-dom";
+import { useMobileViewport } from "@/lib/ui/useMobileViewport";
 
 import {
   ArrowUpRight,
@@ -86,6 +88,7 @@ interface AttendanceCameraProps {
 }
 
 export function AttendanceCameraExperience({ initialCapture = false, initialDashboard, initialAttendanceType, returnHref, onClose, onRecorded }: AttendanceCameraProps = {}) {
+  const mobile = useMobileViewport();
   const router = useRouter();
   const user = useCurrentUser();
   const canSubmit = canSubmitPersonalAttendance(user.permissions);
@@ -310,7 +313,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     if (step !== "camera" || cameraState !== "ready" || !videoRef.current || !streamRef.current) return;
     videoRef.current.srcObject = streamRef.current;
     void videoRef.current.play().catch(() => undefined);
-  }, [step, cameraState]);
+  }, [step, cameraState, mobile]);
 
   const closeCapture = () => {
     captureIdentityRef.current = undefined;
@@ -452,7 +455,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     : <ErrorState title="Không thể mở chấm công" description={loadError} action={<Button onClick={() => void loadDashboard()}>Thử lại</Button>} />;
 
   const locationLabel = coordinates
-    ? <AttendanceLocationAddress accuracyMeters={coordinates.accuracy} latitude={coordinates.latitude} longitude={coordinates.longitude} />
+    ? <AttendanceLocationAddress compact accuracyMeters={coordinates.accuracy} latitude={coordinates.latitude} longitude={coordinates.longitude} />
     : locationState === "requesting" ? "Đang xác định vị trí..." : locationError ?? "Chưa có GPS";
   const firstCheckIn = dashboard?.todayEvents.find(event => event.eventType === "check_in" && event.attendanceStatus !== "rejected");
   const lateMinutes = successEvent?.eventType === "check_in" && dashboard && (!firstCheckIn || firstCheckIn.clientEventId === successEvent.clientEventId) ? getAttendanceLateMinutes(successEvent.effectiveAt, dashboard.policy) : 0;
@@ -465,7 +468,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
   }
   if (initialCapture && step === "home") return <LoadingState title="Đang mở camera" />;
 
-  return (
+  const content = (
     <div className={styles.page} data-attendance-capture={step !== "home" || initialCapture ? "true" : undefined}>
       {notice ? <div className={styles.notice} role="alert"><span>{notice}</span><IconButton label="Đóng thông báo" onClick={() => setNotice(undefined)}><X size={16} /></IconButton></div> : null}
       {pendingCount > 0 ? (
@@ -538,4 +541,5 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
       {step === "success" && photo && successEvent ? <div className={styles.successPhoto}><button onClick={() => setActivePhotoId(successEvent.id)} type="button"><Image alt="Ảnh chấm công có thời gian và địa điểm" height={photo.height} src={photo.previewUrl} unoptimized width={photo.width} /><span>Xem ảnh chấm công</span></button><AttendanceEvidenceViewer activeId={activePhotoId} items={[{ employeeName: user.displayName, event: successEvent, imageUrl: photo.previewUrl }]} onChange={setActivePhotoId} onClose={() => setActivePhotoId(undefined)} /></div> : null}
     </div>
   );
+  return mobile && (step !== "home" || initialCapture) ? createPortal(content, document.body) : content;
 }

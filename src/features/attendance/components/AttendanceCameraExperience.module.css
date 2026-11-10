@@ -191,7 +191,7 @@
 .successPhoto > button { display: grid; width: 100%; gap: 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: 10px; background: var(--surface); color: var(--primary); font: inherit; cursor: pointer; }
 .successPhoto img { width: 100%; max-height: 240px; object-fit: contain; border-radius: var(--radius-control); }
 @media (max-width: 767px) {
-  .page[data-attendance-capture="true"] { position: fixed; z-index: 55; inset: var(--topbar-height,56px) 0 calc(76px + env(safe-area-inset-bottom)); align-content: start; gap: 8px; overflow: auto; padding: 8px 10px; background: var(--workspace-canvas); }
+  .page[data-attendance-capture="true"] { position: fixed; z-index: 55; inset: 0 0 calc(76px + env(safe-area-inset-bottom)); align-content: start; gap: 8px; overflow: auto; padding: max(8px,env(safe-area-inset-top)) 10px 8px; background: var(--workspace-canvas); }
   .page[data-attendance-capture="true"]:has(.capture) { align-content: stretch; }
   .capture { height: 100%; max-height: 900px; grid-template-rows: auto minmax(80px,1fr) auto auto; gap: 8px; padding: 10px; }
   .cameraToolbar { min-height: 40px; }
@@ -201,6 +201,12 @@
   .captureStatus { gap: 6px; padding: 8px; }
   .locationStatus { flex: 1 1 0; gap: 6px; }
   .locationStatus strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.4; }
+  .locationStatus > div { flex: 1; }
+  .locationStatus strong:has(a) { display: block; }
+  .photoMarkPreview :is(a,span,small) { color: inherit; }
+  .photoMarkPreview > span:last-child > svg { display: none; }
+  .photoMarkPreview :global(a) { pointer-events: none; }
+  .captureStatus .locationStatus > svg:has(+ div a) { display: none; }
   .networkStatus { min-height: 24px; padding: 4px 6px; font-size: 11px; }
   .captureActions { grid-template-columns: minmax(0,1fr) 60px minmax(0,1fr); gap: 6px; padding: 2px 0 18px; }
   .shutter { width: 60px; height: 60px; }
