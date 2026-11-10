@@ -8,7 +8,6 @@ const viewport = vi.hoisted(() => ({ mobile: false }));
 
 vi.mock("@/components/providers/CurrentUserProvider", () => ({ useCurrentUser: () => ({ displayName: "Nguyễn Thị Mai", username: "mai" }) }));
 vi.mock("@/components/providers/SystemSettingsProvider", () => ({ useSystemSettings: () => ({ settings: defaultSystemSettings }) }));
-vi.mock("@/components/shared/ModuleLauncher", () => ({ ModuleLauncher: () => <section aria-label="Ứng dụng của tôi"><h2>Ứng dụng của tôi</h2><a href="/personal">Cá nhân</a></section> }));
 vi.mock("@/lib/realtime/useDomainReconciliation", () => ({ useDomainReconciliation: () => undefined }));
 vi.mock("@/lib/ui/useMobileViewport", () => ({ useMobileViewport: () => viewport.mobile }));
 beforeEach(() => { viewport.mobile = false; });
@@ -56,26 +55,33 @@ describe("dashboard greeting and panels", () => {
     expect(screen.queryByText("Hoạt động gần đây")).not.toBeInTheDocument();
     expect(screen.queryByText("Hoạt động cũ")).not.toBeInTheDocument();
   });
-  it.each([false, true])("shows role actions and metrics before the work queue with applications still available (mobile: %s)", (mobile) => {
+  it.each([false, true])("keeps HR metrics before the work queue without repeating toolbar navigation (mobile: %s)", (mobile) => {
     viewport.mobile = mobile;
     const model: DashboardReadModel = {
       profile: "hr", profileLabel: "Nhân sự", generatedAt: "2026-10-12T01:00:00Z", attention: [],
-      shortcuts: [{ key: "attendance.photos", label: "Kiểm tra ảnh chấm công", href: "/attendance/today", icon: "Camera" }],
+    shortcuts: [{ key: "attendance.photos", label: "Kiểm tra ảnh chấm công", href: "/attendance/today", icon: "Camera" }],
       widgets: [{ key: "hr_summary", label: "Nhân sự", status: "ready", data: { metrics: [{ label: "Tổng nhân viên", value: 50 }] } }]
     };
     const { container } = render(<DashboardView initialModel={model} />);
-    const launcher = container.querySelector("[data-dashboard-applications]");
-    const greeting = screen.getByRole("heading", { name: "Nhân sự", level: 1 });
     const overview = screen.getByText("Quy mô đội ngũ");
     const work = container.querySelector("[data-dashboard-panel]")!;
     expect(overview.compareDocumentPosition(work) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(overview.closest("details")).toBeNull();
-    const shortcut = screen.getByRole("link", { name: "Kiểm tra ảnh chấm công" });
-    expect(shortcut).toHaveAttribute("href", "/attendance/today");
-    expect(shortcut.compareDocumentPosition(overview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(greeting.compareDocumentPosition(launcher!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Ứng dụng của tôi" })).toBeVisible();
+    expect(container.querySelector("[data-dashboard-shortcuts]")).toBeNull();
+    expect(container.querySelector("[data-dashboard-applications]")).toBeNull();
     expect(screen.getByText("Tổng nhân viên")).toBeInTheDocument();
+  });
+
+  it("keeps supervisor entry points in the app toolbar instead of repeating dashboard shortcut cards", () => {
+    const model: DashboardReadModel = {
+      profile: "supervisor", profileLabel: "Giám sát", generatedAt: "2026-11-10T03:00:00Z", attention: [],
+      shortcuts: [{ key: "worker-attendance", label: "Điểm danh công nhân", href: "/worker-attendance", icon: "Users" }],
+      widgets: [{ key: "supervisor_today", label: "Công trường", status: "ready", data: { metrics: [{ label: "Công trường hôm nay", value: 2 }] } }]
+    };
+    const { container } = render(<DashboardView initialModel={model} />);
+    expect(container.querySelector("[data-dashboard-shortcuts]")).toBeNull();
+    expect(container.querySelector("[data-dashboard-applications]")).toBeNull();
+    expect(screen.getByText("Công trường hôm nay")).toBeInTheDocument();
   });
 
   it("keeps charts expanded and does not reserve an empty chart column", () => {

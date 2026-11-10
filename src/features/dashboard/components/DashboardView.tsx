@@ -5,11 +5,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/shared/Button";
-import { ModuleLauncher } from "@/components/shared/ModuleLauncher";
 import { DashboardPageTemplate } from "@/components/shared/PageLayouts";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
-import { navigationIconMap } from "@/components/layout/icons";
 import { isPathEnabled } from "@/config/systemSettings";
 import { LoadingState } from "@/components/shared/States";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -88,7 +86,6 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
     finally { setRefreshing(false); }
   }
 
-  const applications = <div data-dashboard-applications><ModuleLauncher layout="bar" /></div>;
   if (!model && !error) return <LoadingState description="" title="Đang tải Dashboard" />;
   const widgets = model?.widgets ?? [];
   const profile = model?.profile ?? "employee";
@@ -144,16 +141,6 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
       action={<>{(profile === "employee" || profile === "supervisor") && primaryAction && primaryHref && !shortcuts.some((shortcut) => shortcut.href === primaryHref) ? <Link className="button button--primary button--md" href={primaryHref} prefetch={false}>{primaryAction}<ArrowUpRight aria-hidden="true" size={16} /></Link> : null}<Button aria-label="Cập nhật dashboard" busy={refreshing} leftIcon={<RefreshCw aria-hidden="true" size={18} />} onClick={() => void refresh()} size="sm"><span className={styles.refreshLabel}>Cập nhật</span></Button></>}
     />
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    {shortcuts.length && profile !== "hr" ? <section aria-labelledby="dashboard-shortcuts-title" className={styles.shortcutsSection} data-dashboard-shortcuts data-dashboard-profile={profile}>
-      <header className={styles.sectionHeading}><h2 id="dashboard-shortcuts-title">Thao tác nhanh</h2><span className={styles.roleBadge}>{model?.profileLabel}</span></header>
-      <div className={styles.shortcuts}>{shortcuts.map((shortcut, index) => {
-        const Icon = navigationIconMap[shortcut.icon];
-        return <Link className={styles.shortcut} data-primary={index === 0} href={shortcut.href} key={shortcut.key} prefetch={false}>
-          <span className={styles.shortcutIcon}><Icon aria-hidden="true" size={22} strokeWidth={1.7} /></span>
-          <strong>{shortcut.label}</strong><ArrowUpRight aria-hidden="true" className={styles.shortcutArrow} size={17} />
-        </Link>;
-      })}</div>
-    </section> : null}
     {metrics.length ? <section aria-labelledby="dashboard-overview-title" className={styles.roleOverview}>
       <header className={styles.sectionHeading}><h2 id="dashboard-overview-title">{presentation.overviewTitle}</h2></header>
       <div className={styles.metrics} data-dashboard-metrics data-dashboard-profile={profile}>{metrics.map((metric, index) => {
@@ -192,7 +179,6 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
       {charts.length ? <section aria-label={presentation.chartTitle} className={styles.chartDisclosure} data-dashboard-profile={profile}><header className={styles.sectionHeading}><h2><ChartNoAxesCombined aria-hidden="true" size={18} />{presentation.chartTitle}</h2></header><div className={styles.chartGrid}>{charts.map((chart) => <ModuleChart chart={chart} key={chart.key} />)}</div></section> : null}
       {failed ? <div className={styles.error} role="alert"><span>Chưa tải được: {failedLabels.join(", ")}.</span><Button disabled={refreshing} onClick={() => void refresh()} size="sm">Thử lại</Button></div> : null}
     </section>
-    {applications}
   </>;
 }
 

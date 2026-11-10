@@ -78,36 +78,38 @@ export function registerBusinessCases(s) {
     assert(JSON.stringify(rows).includes(state.hire.id));
   });
   test("ATT-01", "Chấm vào với GPS tại địa điểm cho phép", async () => {
-    const dashboard = await api("employee", "GET", "/api/v1/attendance/dashboard");
+    // Văn phòng hiện đang tạm ngừng chấm công; quyền chấm cá nhân thuộc giám sát.
+    await api("employee", "POST", "/api/v1/attendance/events", { clientEventId: uuid(), capturedAtClient: new Date().toISOString(), capturedOffline: false, deviceMetadata: { platform: "E2E", browser: "Playwright" } }, [403]);
+    const dashboard = await api("supervisor", "GET", "/api/v1/attendance/dashboard");
     assert.equal(dashboard.nextAction, "check_in");
     const location = dashboard.locations[0];
     assert(location || !dashboard.policy.gpsRequired, "Chưa có địa điểm chấm công test");
     state.attendanceInput = { clientEventId: uuid(), capturedAtClient: new Date().toISOString(), capturedOffline: false, deviceMetadata: { platform: "E2E", browser: "Playwright" }, ...(location ? { location: { latitude: location.latitude, longitude: location.longitude, accuracy: 5, capturedAt: new Date().toISOString() } } : {}) };
-    const result = await api("employee", "POST", "/api/v1/attendance/events", state.attendanceInput);
+    const result = await api("supervisor", "POST", "/api/v1/attendance/events", state.attendanceInput);
     state.checkIn = result.event; await f().track("attendance_events", state.checkIn.id);
     assert.equal(state.checkIn.eventType, "check_in");
-    assert.equal(state.checkIn.employeeId, person("employee").employeeId);
+    assert.equal(state.checkIn.employeeId, person("supervisor").employeeId);
   });
   test("ATT-02", "Gửi lại thao tác chấm công không tạo lượt mới", async () => {
     need("checkIn");
-    const replay = await api("employee", "POST", "/api/v1/attendance/events", state.attendanceInput);
+    const replay = await api("supervisor", "POST", "/api/v1/attendance/events", state.attendanceInput);
     assert.equal(replay.event.id, state.checkIn.id); assert.equal(replay.idempotentReplay, true);
     const rows = await f().query(f().db.from("attendance_events").select("id").eq("client_event_id", state.attendanceInput.clientEventId), "attendance replay count"); assert.equal(rows.length, 1);
   });
   test("ATT-03", "Tải ảnh chấm công và đồng bộ hoàn tất", async () => {
     need("checkIn");
-    const result = await multipart("employee", `/api/v1/attendance/events/${state.checkIn.id}/photo`, uploadJpeg(await evidence()));
+    const result = await multipart("supervisor", `/api/v1/attendance/events/${state.checkIn.id}/photo`, uploadJpeg(await evidence()));
     assert.equal(result.event.photoStatus, "uploaded");
     assert.equal(result.event.syncStatus, "synced");
   });
   test("ATT-04", "Chấm ra rồi chặn lượt thứ ba trong ngày", async () => {
     need("checkIn");
-    const result = await api("employee", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
+    const result = await api("supervisor", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
     await f().track("attendance_events", result.event.id); assert.equal(result.event.eventType, "check_out");
-    await conflict("employee", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
+    await conflict("supervisor", "POST", "/api/v1/attendance/events", { ...state.attendanceInput, clientEventId: uuid(), capturedAtClient: new Date().toISOString() });
   });
   test("ATT-05", "Thời gian/GPS không hợp lệ và truy cập chéo hồ sơ bị chặn", async () => {
-    await invalid("employee", "POST", "/api/v1/attendance/events", { clientEventId: uuid(), capturedAtClient: "invalid", capturedOffline: false, deviceMetadata: {} });
+    await invalid("supervisor", "POST", "/api/v1/attendance/events", { clientEventId: uuid(), capturedAtClient: "invalid", capturedOffline: false, deviceMetadata: {} });
     need("checkIn");
     await api("outsider", "GET", `/api/v1/attendance/records/${state.checkIn.id}`, undefined, [403, 404]);
   });
@@ -318,6 +320,10 @@ export function registerBusinessCases(s) {
   });
   test("WORKER-01", "Mở phiên điểm danh có roster và chống ghi trùng", async () => {
     need("site");
+    // Worker-attendance is deliberately gated on the supervisor's own check-in photo.
+    need("checkIn");
+    const uploaded = await f().query(f().db.from("attendance_events").select("photo_status").eq("id", state.checkIn.id).single(), "supervisor check-in photo status");
+    assert.equal(uploaded.photo_status, "uploaded", "Giám sát cần đồng bộ ảnh chấm công cá nhân trước khi điểm danh công nhân");
     state.workerInput = { clientSessionId: uuid(), projectId: state.project.id, worksiteId: state.site.id, date: today, capturedAtClient: new Date().toISOString() };
     const result = await api("supervisor", "POST", "/api/v1/worker-attendance/sessions", state.workerInput);
     state.worker = result.session;

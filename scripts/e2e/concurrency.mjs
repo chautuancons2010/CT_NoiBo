@@ -148,6 +148,8 @@ export function registerConcurrencyCases(s) {
       for (const route of ["shipments", "transport", "customs", "contracts", "documents", "partners"]) {
         const target = `/import-export/${route}`;
         const started = performance.now();
+        const shipmentGroup = page.locator('.app-rail__group-toggle').filter({ hasText: "Xuất nhập khẩu" });
+        if (await shipmentGroup.count() && await shipmentGroup.getAttribute("aria-expanded") !== "true") await shipmentGroup.click();
         await page.locator(`.app-rail a[href="${target}"]`).click();
         await page.waitForURL(url => url.pathname === target);
         await observer.ready();
