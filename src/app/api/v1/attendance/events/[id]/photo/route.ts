@@ -7,6 +7,7 @@ import { parseWithSchema } from "@/lib/api/validation";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { requireAuthenticatedUser } from "@/services/authorization/requirePermission";
 import { can } from "@/lib/auth/permissions";
+import { attendancePhotoStampSchema } from "@/features/attendance/services/attendancePhotoMetadata";
 
 const paramsSchema = z.object({ id: z.string().uuid() });
 
@@ -23,7 +24,15 @@ export async function POST(request: Request, context: RouteContext<"/api/v1/atte
     const height = Number(form.get("height"));
     const capturedAt = String(form.get("capturedAt") ?? "");
     if (!z.string().datetime().safeParse(capturedAt).success) throw new AppError("VALIDATION_ERROR", "Thời gian chụp ảnh không hợp lệ.");
-    return successResponse(await uploadAttendancePhoto(user, id, { photo, thumbnail, width, height, capturedAt }));
+    const rawStamp = form.get("stamp");
+    let stampValue: unknown;
+    if (rawStamp !== null) {
+      if (typeof rawStamp !== "string" || rawStamp.length > 4096) throw new AppError("VALIDATION_ERROR", "Thông tin trên ảnh không hợp lệ.");
+      try { stampValue = JSON.parse(rawStamp); }
+      catch { throw new AppError("VALIDATION_ERROR", "Thông tin trên ảnh không phải JSON hợp lệ."); }
+    }
+    const photoStamp = rawStamp === null ? undefined : parseWithSchema(attendancePhotoStampSchema, stampValue);
+    return successResponse(await uploadAttendancePhoto(user, id, { photo, thumbnail, width, height, capturedAt, ...(photoStamp ? { photoStamp } : {}) }));
   } catch (error) {
     return errorResponse(error);
   }

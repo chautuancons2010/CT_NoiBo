@@ -11,6 +11,7 @@
 .briefing legend { display: inline-flex; max-width: 100%; align-items: center; gap: 6px; padding-inline: 4px; color: var(--primary); font-size: 13px; font-weight: 600; }
 .briefing > button { justify-self: end; }
 .briefingItem { display: grid; min-width: 0; gap: 6px; }
+.briefingProgress { color: var(--primary); font-size: 13px; font-weight: 600; }
 .briefingItem :global(.choice-field) { align-items: start; gap: 9px; min-height: 44px; border-radius: 8px; padding: 8px 0; }
 .briefingItem :global(.choice-field label) { font-size: 13px; line-height: 1.5; white-space: normal; overflow: visible; overflow-wrap: break-word; }
 .report, .preview { min-width: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface); padding: 18px; }

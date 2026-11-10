@@ -31,6 +31,7 @@ async function syncAttendanceItemUnlocked(item: PendingAttendanceItem): Promise<
   await savePendingAttendance(syncing);
 
   try {
+    if (syncing.requiresPhotoStamp && (!syncing.photoStamp?.address.trim() || syncing.photoStamp.version !== 1 || syncing.photoStamp.capturedAt !== syncing.capturedAtClient)) throw new AttendanceSyncError("PHOTO_UPLOAD", "Ảnh chưa có thời gian và địa chỉ. Giữ ảnh để thử lại.");
     let eventId = serverEventId;
     let result: AttendanceRecordResult;
     if (!eventId) {
@@ -78,6 +79,7 @@ async function syncAttendanceItemUnlocked(item: PendingAttendanceItem): Promise<
     formData.set("width", String(syncing.photoWidth));
     formData.set("height", String(syncing.photoHeight));
     formData.set("capturedAt", syncing.capturedAtClient);
+    if (syncing.photoStamp) formData.set("stamp", JSON.stringify(syncing.photoStamp));
     const photoResponse = await fetch(`/api/v1/attendance/events/${eventId}/photo`, {
       method: "POST",
       body: formData,

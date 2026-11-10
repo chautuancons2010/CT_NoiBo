@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { Suspense } from "react";
 
 import { PermissionDeniedState } from "@/components/shared/States";
@@ -8,10 +9,13 @@ import { getDashboardReadModel } from "@/features/dashboard/services/dashboardSe
 import { isAccountEnabled } from "@/lib/auth/permissions";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
+import { supervisorPhoneLanding } from "@/features/dashboard/mobileAttendanceHome";
 
 export async function DashboardPage() {
   const user = await getRequestUser();
   if (!user || !isAccountEnabled(user)) redirect("/login");
+  const mobileLanding = supervisorPhoneLanding(user, await headers());
+  if (mobileLanding) redirect(mobileLanding);
   if (!hasAreaAccess(user.permissions, "dashboard")) return <PermissionDeniedState />;
 
   return <DashboardShell>

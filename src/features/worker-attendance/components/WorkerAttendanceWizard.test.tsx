@@ -35,7 +35,7 @@ beforeEach(() => {
   vi.mocked(saveWorkerDraft).mockImplementation(async value => { stored = structuredClone(value); });
   vi.mocked(syncWorkerDraft).mockImplementation(async value => value.session);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 async function openRoster() {
   const view = render(<WorkerAttendanceWizard sessionId="session-1" step="roster" />);
@@ -190,6 +190,34 @@ describe("worker selection workflow", () => {
     stored.session.entries = stored.session.entries.map(entry => ({ ...entry, isSelected: false }));
   });
 
+  it("keeps the completed safety report when an older save returns in the same clock millisecond", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-09T09:00:00Z"));
+    stored.session.safetyReport = createWorkerSafetyReport();
+    stored.session.workNote = "";
+    let finishSave!: () => void;
+    vi.mocked(syncWorkerDraft).mockImplementation(value => new Promise(resolve => {
+      const oldSession = structuredClone(value.session);
+      finishSave = () => resolve({ ...oldSession, version: 2 });
+    }));
+    render(<WorkerAttendanceWizard sessionId="session-1" step="roster" />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Công nhân 01 · CN01" }));
+    await waitFor(() => expect(syncWorkerDraft).toHaveBeenCalled(), { timeout: 2000 });
+    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
+    await screen.findByRole("heading", { name: "An toàn lao động" });
+    for (const topic of createWorkerSafetyReport().briefing) fireEvent.click(screen.getByRole("checkbox", { name: topic.content }));
+    fireEvent.change(screen.getByLabelText(/Nội dung công việc/), { target: { value: "Sơn cẩu" } });
+    fireEvent.change(screen.getByLabelText(/Khu vực làm việc/), { target: { value: "SC05" } });
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận & chụp ảnh" }));
+    await screen.findByRole("heading", { name: "Ảnh hiện trường" });
+    await act(async () => finishSave());
+    await waitFor(() => expect(stored.session.version).toBe(2));
+    expect(stored.session.safetyConfirmed).toBe(true);
+    expect(stored.session.safetyReport?.briefing.every(item => item.checked)).toBe(true);
+    expect(stored.session.workNote).toBe("Sơn cẩu");
+    expect(screen.getByLabelText("Chụp ảnh điểm danh")).toBeEnabled();
+  });
+
   it("advances from selection through safety to camera while network synchronization is pending", async () => {
     vi.mocked(syncWorkerDraft).mockImplementation(() => new Promise(() => undefined));
     stored.session.checklist = [{ id: "safety-1", group: "Bảo hộ", content: "Đội mũ bảo hộ", required: true, sortOrder: 1 }];
@@ -199,8 +227,7 @@ describe("worker selection workflow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
     const safety = await screen.findByRole("checkbox", { name: "Đội mũ bảo hộ *" });
     fireEvent.click(safety);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Xác nhận an toàn và sức khỏe" }));
-    fireEvent.click(screen.getByRole("button", { name: "Chụp ảnh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận & chụp ảnh" }));
     expect(await screen.findByRole("heading", { name: "Ảnh hiện trường" })).toBeInTheDocument();
     expect(screen.getByLabelText("Chụp ảnh điểm danh")).toBeEnabled();
     expect(stored.session.safetyConfirmed).toBe(true);
@@ -240,40 +267,39 @@ describe("worker selection workflow", () => {
     expect(screen.queryByRole("button", { name: "Gửi chấm công" })).not.toBeInTheDocument();
   });
 
-  it("requires safety confirmation before moving to photo capture", async () => {
+  it("confirms a completed report when opening photo capture without a separately reset checkbox", async () => {
     stored.session.entries[0] = { ...stored.session.entries[0], isSelected: true, status: "present" };
     stored.session.photos = [{ id: "photo-1", sessionId: "session-1", capturedAt: stored.updatedAt, sortOrder: 0 }];
     render(<WorkerAttendanceWizard sessionId="session-1" step="review" />);
-    const safety = await screen.findByRole("checkbox", { name: "Xác nhận an toàn và sức khỏe" });
-    const send = screen.getByRole("button", { name: "Chụp ảnh" });
-    expect(send).toBeDisabled();
-    expect(screen.getByLabelText(/Nội dung công việc/)).toHaveValue("Thay bu lông, sơn cẩu");
-    fireEvent.click(safety);
-    await waitFor(() => expect(stored.session.safetyConfirmed).toBe(true));
+    const send = await screen.findByRole("button", { name: "Xác nhận & chụp ảnh" });
     expect(send).toBeEnabled();
+    expect(stored.session.safetyConfirmed).toBeFalsy();
+    expect(screen.queryByRole("checkbox", { name: "Xác nhận an toàn và sức khỏe" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Nội dung công việc/)).toHaveValue("Thay bu lông, sơn cẩu");
     fireEvent.click(send);
     expect(await screen.findByRole("heading", { name: "Ảnh hiện trường" })).toBeInTheDocument();
+    expect(stored.session.safetyConfirmed).toBe(true);
     expect(window.location.pathname).toBe("/worker-attendance/sessions/session-1/photos");
   });
 
-  it("requires the actual safety briefing and work report and resets confirmation after an edit", async () => {
+  it("enables confirmation after all safety fields are complete and saves the current report before camera", async () => {
     stored.session.safetyReport = createWorkerSafetyReport();
     stored.session.workNote = "";
     stored.session.entries[0] = { ...stored.session.entries[0], isSelected: true, status: "present" };
     render(<WorkerAttendanceWizard sessionId="session-1" step="review" />);
-    const confirm = await screen.findByRole("checkbox", { name: "Xác nhận an toàn và sức khỏe" });
-    const next = screen.getByRole("button", { name: "Chụp ảnh" });
-    fireEvent.click(confirm);
+    const next = await screen.findByRole("button", { name: "Xác nhận & chụp ảnh" });
     expect(next).toBeDisabled();
     for (const topic of createWorkerSafetyReport().briefing) fireEvent.click(screen.getByRole("checkbox", { name: topic.content }));
     fireEvent.change(screen.getByLabelText(/Nội dung công việc/), { target: { value: "Thay bu lông, sơn cẩu" } });
     fireEvent.change(screen.getByLabelText(/Khu vực làm việc/), { target: { value: "SC05" } });
-    expect(confirm).not.toBeChecked();
-    fireEvent.click(confirm);
     await waitFor(() => expect(next).toBeEnabled());
     expect(stored.session.safetyReport).toMatchObject({ workArea: "SC05", healthStatus: "Tốt", supervisorCount: 1 });
     fireEvent.change(screen.getByLabelText(/Nội dung công việc/), { target: { value: "Sơn cẩu" } });
-    expect(confirm).not.toBeChecked();
-    expect(next).toBeDisabled();
+    expect(stored.session.safetyConfirmed).toBe(false);
+    expect(next).toBeEnabled();
+    fireEvent.click(next);
+    expect(await screen.findByRole("heading", { name: "Ảnh hiện trường" })).toBeInTheDocument();
+    expect(stored.session.safetyConfirmed).toBe(true);
+    expect(stored.session.workNote).toBe("Sơn cẩu");
   });
 });

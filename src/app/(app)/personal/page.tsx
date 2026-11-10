@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, CalendarOff, CalendarRange, ChevronRight, UserRound, WalletCards } from "lucide-react";
+import { ArrowUpRight, CalendarOff, CalendarRange, ChevronRight, UserRound, UsersRound, WalletCards } from "lucide-react";
 
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { ModuleLauncher } from "@/components/shared/ModuleLauncher";
 import { visibleApplications } from "@/config/moduleRegistry";
 import { PersonalToday } from "@/features/attendance/components/PersonalToday";
-import { WorkerAttendanceToday } from "@/features/worker-attendance/components/WorkerAttendanceHome";
 import { canUseWorkerAttendance } from "@/config/mobileNavigationResolver";
 import { canOpenPersonalAttendance } from "@/lib/auth/applicationAccess";
 import { can } from "@/lib/auth/permissions";
-import { useMobileViewport } from "@/lib/ui/useMobileViewport";
 import { LogoutButton } from "@/features/auth/components/LogoutButton";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { getBusinessDateKey } from "@/lib/time/timezone";
@@ -23,7 +21,6 @@ export default function PersonalPage() {
   const canViewAttendance = settings.modules.attendance && canOpenPersonalAttendance(user.permissions);
   const canReviewWorkers = canUseWorkerAttendance(user);
   const hasOtherApplications = visibleApplications(user, settings.modules).some((application) => application.id !== "overview" && application.id !== "attendance");
-  const mobile = useMobileViewport();
   const today = new Date();
   const initials = user.displayName.trim().split(/\s+/).slice(-2).map((part) => part[0]).join("");
   const profileAllowed = can(user.permissions, "profile.view");
@@ -44,7 +41,7 @@ export default function PersonalPage() {
       ) : can(user.permissions, "profile.view") ? (
         <Link className="personal-home__profile" href="/profile"><UserRound aria-hidden="true" size={19} />Hồ sơ của tôi<ArrowUpRight aria-hidden="true" size={17} /></Link>
       ) : null}
-      {mobile && canReviewWorkers ? <section className="personal-home__mobile-only personal-supervisor-work" aria-label="Điểm danh công nhân"><h2>Công trường hôm nay</h2><WorkerAttendanceToday /></section> : null}
+      {canReviewWorkers && settings.modules.projects ? <nav aria-label="Điểm danh công nhân" className="personal-home__mobile-only personal-home__links"><Link href="/worker-attendance/today"><UsersRound aria-hidden="true" size={20} /><span>Điểm danh công nhân</span><ChevronRight aria-hidden="true" size={18} /></Link></nav> : null}
       {canViewAttendance || canViewPayslips || canUseLeave ? <section aria-labelledby="personal-services-title" className="personal-home__services">
       <h2 className="personal-home__section-title" id="personal-services-title">Tiện ích cá nhân</h2>
       <nav aria-label="Thông tin của tôi" className="personal-home__links">

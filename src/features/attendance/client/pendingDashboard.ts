@@ -21,6 +21,7 @@ export function pendingAttendanceEvent(item: PendingAttendanceItem, employeeId: 
     geofenceStatus: item.location ? "valid" : "unavailable",
     attendanceStatus: "recorded",
     photoStatus: "pending_upload",
+    photoStamp: item.photoStamp,
     syncStatus: item.syncState,
     anomalyFlags: []
   };

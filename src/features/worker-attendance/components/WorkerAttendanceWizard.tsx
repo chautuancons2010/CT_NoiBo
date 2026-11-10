@@ -137,7 +137,7 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
           const session = await syncWorkerDraft(snapshot);
           const latest = draftRef.current;
           if (!latest || latest.pendingSubmit) return;
-          const unchanged = latest.updatedAt === snapshot.updatedAt;
+          const unchanged = latest === snapshot;
           const localByWorker = new Map(latest.session.entries.map(entry => [entry.workerId, entry]));
           const next = { ...latest, id: session.id, session: unchanged ? session : { ...session, entries: session.entries.map(entry => ({ ...entry, ...localByWorker.get(entry.workerId), id: entry.id, sessionId: session.id, checkedInAt: entry.checkedInAt, checkedOutAt: entry.checkedOutAt })), checklistResponses: latest.session.checklistResponses, safetyConfirmed: latest.session.safetyConfirmed, safetyReport: latest.session.safetyReport, workNote: latest.session.workNote }, photos: latest.photos.filter(photo => !photo.uploaded && !session.photos.some(saved => saved.id === photo.id)) };
           await update(next);
@@ -226,13 +226,19 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
       const current = draftRef.current;
       if (!current) return;
       if (current.session.selectionMode && nextStep !== "roster") {
-        if (!current.session.entries.some((entry) => entry.isSelected && entry.status === "present")) { setMessage("Chọn ít nhất một công nhân."); return; }
-        if (nextStep === "photos" && (!current.session.safetyConfirmed || !current.session.checklist.every(item => !item.required || current.session.checklistResponses.some(response => response.itemId === item.id && response.checked)))) { setMessage("Hoàn tất các chuẩn an toàn lao động."); return; }
-        if (nextStep === "photos") { const errors = validateWorkerSafetyReport(current.session.safetyReport, current.session.workNote); if (errors.length) { setMessage(errors.join(" ")); return; } }
+        if (!current.session.entries.some((entry) => entry.isSelected && (entry.status === "present" || entry.status === "late"))) { setMessage("Chọn ít nhất một công nhân."); return; }
+        if (nextStep === "photos") {
+          const errors = validateWorkerSafetyReport(current.session.safetyReport, current.session.workNote);
+          if (!current.session.checklist.every(item => !item.required || current.session.checklistResponses.some(response => response.itemId === item.id && response.checked))) errors.push("Chưa chọn đủ chuẩn an toàn bắt buộc.");
+          if (errors.length) { setMessage(errors.join(" ")); return; }
+          // The primary action explicitly confirms this exact report. A second,
+          // separately reset checkbox must not strand an otherwise complete form.
+          await update({ ...current, session: { ...current.session, safetyConfirmed: true }, updatedAt: new Date().toISOString() });
+        }
       }
       stepRef.current = nextStep;
       setStep(nextStep);
-      window.history.pushState(null, "", route(current.id, nextStep));
+      window.history.pushState(null, "", route(draftRef.current?.id ?? current.id, nextStep));
       if (nextStep === "photos") void retryLocation();
       window.scrollTo({ top: 0, behavior: "instant" });
     } catch (caught) {
@@ -341,13 +347,14 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
   }, [draft]);
   if (!draft) return message ? <ErrorState description={message} action={<Button onClick={() => { setMessage(""); void load(); }}>Thử lại</Button>} /> : <LoadingState title="Đang mở phiên điểm danh" />;
   const selectionMode = draft.session.selectionMode === true;
-  const selectedCount = draft.session.entries.filter((entry) => entry.isSelected && entry.status === "present").length;
+  const selectedCount = draft.session.entries.filter((entry) => entry.isSelected && (entry.status === "present" || entry.status === "late")).length;
   const photoCount = draft.session.photos.length + draft.photos.length;
   const minimumPhotos = selectionMode ? Math.max(1, draft.session.minimumPhotos ?? 1) : 0;
   const requiredChecklistDone = draft.session.checklist.every((item) => !item.required || draft.session.checklistResponses.some((response) => response.itemId === item.id && response.checked));
   const reportErrors = validateWorkerSafetyReport(draft.session.safetyReport, draft.session.workNote);
   const locked = busy || draft.pendingSubmit || photoBusy;
-  const safetyDone = draft.session.safetyConfirmed && requiredChecklistDone && !reportErrors.length;
+  const safetyReady = requiredChecklistDone && !reportErrors.length;
+  const safetyDone = draft.session.safetyConfirmed && safetyReady;
   const laterStepBlocked = selectionMode && step !== "roster" && (!selectedCount || (step === "photos" && !safetyDone));
 
   function toggleAllSelected() {
@@ -406,14 +413,14 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
           {locationError ? <div className="form-message form-message--error" role="alert">{locationError}</div> : null}
           </>}
           {checklistGroups.length ? <div className="worker-checklist">{checklistGroups.map(([group, items]) => <fieldset key={group}><legend>{group}</legend>{items.map((item) => <Checkbox disabled={locked} checked={draft.session.checklistResponses.some((response) => response.itemId === item.id && response.checked)} key={item.id} label={`${item.content}${item.required ? " *" : ""}`} onChange={(event) => updateChecklist(item.id, event.target.checked)} />)}</fieldset>)}</div> : null}
-          {selectionMode ? <Checkbox checked={draft.session.safetyConfirmed === true} disabled={locked} label="Xác nhận an toàn và sức khỏe" onChange={event => { const current = draftRef.current; if (current) void update({ ...current, session: { ...current.session, safetyConfirmed: event.target.checked }, updatedAt: new Date().toISOString() }).catch(reportDraftError); }} /> : <>
+          {!selectionMode ? <>
             <Textarea label="Nội dung công việc" onChange={event => void update({ ...draft, session: { ...draft.session, workNote: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.workNote ?? ""} />
             <Textarea label="Ghi chú" onChange={event => void update({ ...draft, session: { ...draft.session, note: event.target.value }, updatedAt: new Date().toISOString() })} value={draft.session.note ?? ""} />
-          </>}
+          </> : null}
         </Card>
         {selectionMode ? <WorkerSafetyReportView preview session={draft.session} /> : null}
-        {selectionMode && !safetyDone ? <span role="status">{reportErrors[0] ?? (!requiredChecklistDone ? "Chưa chọn đủ chuẩn an toàn bắt buộc" : "Chưa xác nhận an toàn lao động")}</span> : null}
-        <div className="sticky-action-bar"><Button disabled={locked || (selectionMode && !safetyDone)} onClick={() => selectionMode ? void saveAndGo("photos") : void submit()} size="lg" variant="primary" busy={busy}>{selectionMode ? "Chụp ảnh" : "Hoàn tất điểm danh"}</Button></div>
+        {selectionMode && !safetyReady ? <span role="status">{reportErrors[0] ?? "Chưa chọn đủ chuẩn an toàn bắt buộc"}</span> : null}
+        <div className="sticky-action-bar"><Button disabled={locked || (selectionMode && !safetyReady)} onClick={() => selectionMode ? void saveAndGo("photos") : void submit()} size="lg" variant="primary" busy={busy}>{selectionMode ? "Xác nhận & chụp ảnh" : "Hoàn tất điểm danh"}</Button></div>
       </> : null}
     </div>
   );

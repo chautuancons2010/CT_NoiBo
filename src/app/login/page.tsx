@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { LoginBrand } from "@/features/system-admin/components/LoginBrand";
 import { LoginBackdrop } from "@/features/system-admin/components/LoginBackdrop";
@@ -8,11 +9,12 @@ import { getRequestUser } from "@/services/auth/getRequestUser";
 import { readSettingsGroup, readSystemSettings } from "@/services/system-settings/systemSettingsService";
 import { testToolsAvailable } from "@/lib/testing/policy.mjs";
 import { TestAccountPicker } from "@/features/testing/TestAccountPicker";
+import { supervisorPhoneLanding } from "@/features/dashboard/mobileAttendanceHome";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { reason } = await searchParams;
   const [settings, dashboard, user] = await Promise.all([readSystemSettings(), readSettingsGroup("dashboard"), getRequestUser()]);
-  if (user) redirect(resolveLandingPage(user, dashboard));
+  if (user) redirect(supervisorPhoneLanding(user, await headers()) ?? resolveLandingPage(user, dashboard));
   const testEnvironment = testToolsAvailable();
   return <main className={`login-page ${styles.preserved}`}><LoginBackdrop /><section className="login-shell">
     <aside className="login-brand-panel">

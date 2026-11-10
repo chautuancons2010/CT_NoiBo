@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/shared/Button";
@@ -17,10 +17,15 @@ function EvidenceImage({ event, employeeName, thumbnail = false, imageUrl, onLoa
   const [failed, setFailed] = useState(false);
   if (failed) return <span className={styles.imageFailure}><ImageOff aria-hidden="true" size={22} /><span>Ảnh không khả dụng</span></span>;
   // Authenticated API redirects to a short-lived private storage URL.
-  return <img alt={`${employeeName} · ${event.eventType === "check_in" ? "Chấm vào" : "Chấm ra"} ${time(event.effectiveAt)}`} decoding="async" height={thumbnail ? 72 : undefined} loading={thumbnail ? "lazy" : "eager"} onError={() => setFailed(true)} onLoad={() => onLoaded?.(event)} src={imageUrl ?? `/api/v1/attendance/photos/${encodeURIComponent(event.photoId!)}${thumbnail ? "?size=thumbnail" : ""}`} width={thumbnail ? 96 : undefined} />; // eslint-disable-line @next/next/no-img-element
+  const picture = <img alt={`${employeeName} · ${event.eventType === "check_in" ? "Chấm vào" : "Chấm ra"} ${time(event.effectiveAt)}`} decoding="async" height={thumbnail ? 72 : undefined} loading={thumbnail ? "lazy" : "eager"} onError={() => setFailed(true)} onLoad={() => onLoaded?.(event)} src={imageUrl ?? `/api/v1/attendance/photos/${encodeURIComponent(event.photoId!)}${thumbnail ? "?size=thumbnail" : ""}`} width={thumbnail ? 96 : undefined} />; // eslint-disable-line @next/next/no-img-element
+  if (thumbnail || event.photoStamp) return picture;
+  const capturedTime = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(event.capturedAtClient));
+  const hasLocation = typeof event.latitude === "number" && typeof event.longitude === "number";
+  return <div className={styles.historicalPhoto}>{picture}<div className={styles.historicalStamp}><strong>{capturedTime}</strong>{hasLocation ? <GpsEvidence event={event} /> : <span>Không ghi nhận GPS lúc chụp</span>}<small>Dữ liệu lượt chấm · Ảnh gốc</small></div></div>;
 }
 
 function GpsEvidence({ event }: { event: AttendanceEvent }) {
+  if (event.photoStamp) return <a className={styles.gps} href={`https://www.google.com/maps?q=${event.photoStamp.latitude},${event.photoStamp.longitude}`} rel="noopener noreferrer" target="_blank"><MapPin aria-hidden="true" size={15} /><span>{event.photoStamp.address}</span></a>;
   return <AttendanceLocationAddress accuracyMeters={event.accuracyMeters} latitude={event.latitude} longitude={event.longitude} referenceName={event.locationName} />;
 }
 

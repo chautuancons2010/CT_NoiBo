@@ -68,7 +68,16 @@ export interface AttendanceEvent {
   photoStatus: AttendancePhotoStatus;
   syncStatus: AttendanceSyncStatus;
   photoId?: string;
+  photoStamp?: AttendancePhotoStampMetadata;
   anomalyFlags: string[];
+}
+
+export interface AttendancePhotoStampMetadata {
+  version: 1;
+  capturedAt: string;
+  address: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface AttendanceDashboard {
@@ -156,6 +165,8 @@ export interface PendingAttendanceItem extends AttendanceRecordInput {
   thumbnail: Blob;
   photoWidth: number;
   photoHeight: number;
+  requiresPhotoStamp?: boolean;
+  photoStamp?: AttendancePhotoStampMetadata;
   createdAt: string;
   retryCount: number;
   lastErrorCategory?: string;

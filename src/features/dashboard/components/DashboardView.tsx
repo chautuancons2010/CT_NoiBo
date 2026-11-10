@@ -18,6 +18,7 @@ import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation"
 import { useMobileViewport } from "@/lib/ui/useMobileViewport";
 
 import { ModuleChart } from "./ModuleChart";
+import { MobileAttendanceHomeGate } from "./MobileAttendanceHomeGate";
 import { sortAttention } from "@/features/dashboard/attention";
 import styles from "./DashboardView.module.css";
 
@@ -196,9 +197,9 @@ export function DashboardView({ initialModel }: { initialModel?: DashboardReadMo
 }
 
 export function DashboardShell({ children }: { children: ReactNode }) {
-  return <DashboardPageTemplate className={styles.page}>
+  return <MobileAttendanceHomeGate><DashboardPageTemplate className={styles.page}>
     {children}
-  </DashboardPageTemplate>;
+  </DashboardPageTemplate></MobileAttendanceHomeGate>;
 }
 
 export function DashboardAnalyticsFallback() {

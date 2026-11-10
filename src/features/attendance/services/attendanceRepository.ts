@@ -16,10 +16,12 @@ import type {
   AttendanceHistoryDay,
   AttendanceLocation,
   AttendancePolicy,
+  AttendancePhotoStampMetadata,
   AttendanceRecordInput,
   AttendanceRecordResult
 } from "@/features/attendance/types/attendanceTypes";
 import { recordAuditLog } from "@/services/audit/auditLog";
+import { storedAttendancePhotoStamp, validateAttendancePhotoStamp } from "./attendancePhotoMetadata";
 import type { z } from "zod";
 import type { attendanceAdjustmentSchema } from "@/features/attendance/schemas/attendanceSchemas";
 
@@ -135,11 +137,12 @@ function mapEvent(row: Row): AttendanceEvent {
     photoStatus: requiredString(row, "photo_status") as AttendanceEvent["photoStatus"],
     syncStatus: requiredString(row, "sync_status") as AttendanceEvent["syncStatus"],
     photoId: photo ? optionalString(photo, "id") : undefined,
+    photoStamp: photo ? storedAttendancePhotoStamp(photo.metadata) : undefined,
     anomalyFlags: Array.isArray(row.anomaly_flags) ? row.anomaly_flags.filter((item): item is string => typeof item === "string") : []
   };
 }
 
-const eventSelect = "*,attendance_locations(name),employees(full_name,employee_code),attendance_photos(id)";
+const eventSelect = "*,attendance_locations(name),employees(full_name,employee_code),attendance_photos(id,metadata)";
 
 async function resolveIdentity(client: SupabaseClient, user: AuthenticatedUser): Promise<AttendanceIdentity> {
   let query = client
@@ -427,13 +430,18 @@ async function validatePhoto(file: File): Promise<"jpg" | "webp"> {
 export async function uploadAttendancePhoto(
   user: AuthenticatedUser,
   eventId: string,
-  input: { photo: File; thumbnail: File; width: number; height: number; capturedAt: string }
+  input: { photo: File; thumbnail: File; width: number; height: number; capturedAt: string; photoStamp?: AttendancePhotoStampMetadata }
 ): Promise<AttendanceRecordResult> {
   const client = clientOrThrow();
   const identity = await resolveIdentity(client, user);
   const { data: eventRow, error: eventError } = await client
     .from("attendance_events").select(eventSelect).eq("id", eventId).eq("employee_id", identity.employeeId).maybeSingle();
   if (eventError || !eventRow) throw new AppError("NOT_FOUND", "Không tìm thấy lượt chấm công.");
+  const photoStamp = input.photoStamp === undefined ? undefined : validateAttendancePhotoStamp(input.photoStamp, input.capturedAt, {
+    capturedAtClient: requiredString(eventRow as Row, "captured_at_client"),
+    latitude: numberValue(eventRow as Row, "latitude"),
+    longitude: numberValue(eventRow as Row, "longitude"),
+  });
   const { data: existingPhoto } = await client.from("attendance_photos").select("id").eq("attendance_event_id", eventId).maybeSingle();
   if (existingPhoto) return { event: mapEvent(eventRow as Row), idempotentReplay: true };
 
@@ -470,7 +478,7 @@ export async function uploadAttendancePhoto(
       captured_at: input.capturedAt,
       width: input.width,
       height: input.height,
-      metadata: { normalizedOrientation: true, source: "camera" }
+      metadata: { normalizedOrientation: true, source: "camera", ...(photoStamp ? { stamp: photoStamp } : {}) }
     }, { onConflict: "attendance_event_id" });
     if (photoError) throw new AppError("PHOTO_UPLOAD", "Không thể liên kết ảnh chấm công.");
     const { data: completed, error: updateError } = await client

@@ -18,11 +18,14 @@ export interface AttendancePhotoStamp {
 
 function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
   if (!stamp) return;
+  if (!Number.isFinite(Date.parse(stamp.capturedAt)) || !stamp.address.trim()) throw new Error("Thiếu thời gian hoặc địa chỉ để ghi lên ảnh.");
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Không thể ghi thông tin lên ảnh.");
   const scale = canvas.width / 1000;
-  const size = Math.max(10, Math.round(23 * scale));
-  const padding = Math.max(10, 22 * scale);
+  const size = Math.max(10, Math.round(22 * scale));
+  const timeSize = Math.max(13, Math.round(34 * scale));
+  const labelSize = Math.max(9, Math.round(18 * scale));
+  const padding = Math.max(8, 18 * scale);
   context.font = `600 ${size}px sans-serif`;
   const words = stamp.address.split(/\s+/);
   const lines: string[] = []; let current = "";
@@ -31,15 +34,24 @@ function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
     if (context.measureText(next).width > canvas.width - padding * 2 && current) { lines.push(current); current = word; } else current = next;
   }
   if (current) lines.push(current);
-  const time = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "medium" }).format(new Date(stamp.capturedAt));
-  const content = [stamp.label || "CHÂU TUẤN · ĐIỂM DANH", time, ...lines];
-  if (stamp.latitude !== undefined && stamp.longitude !== undefined) content.push(`GPS ${stamp.latitude.toFixed(6)}, ${stamp.longitude.toFixed(6)}`);
-  const lineHeight = size * 1.5;
-  const height = Math.min(canvas.height, content.length * lineHeight + padding * 2);
-  context.fillStyle = "rgba(0,0,0,.72)";
+  const time = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(stamp.capturedAt));
+  const date = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(stamp.capturedAt));
+  const content = [
+    { text: `${time} · ${date}`, size: timeSize },
+    { text: stamp.label || "CHÂU TUẤN · ĐIỂM DANH", size: labelSize },
+    ...lines.map(text => ({ text, size }))
+  ];
+  if (stamp.latitude !== undefined && stamp.longitude !== undefined) content.push({ text: `GPS ${stamp.latitude.toFixed(6)}, ${stamp.longitude.toFixed(6)}`, size: labelSize });
+  const height = Math.min(canvas.height, content.reduce((total, line) => total + line.size * 1.4, 0) + padding * 2);
+  context.fillStyle = "rgba(0,0,0,.8)";
   context.fillRect(0, canvas.height - height, canvas.width, height);
   context.fillStyle = "#fff"; context.textBaseline = "top";
-  content.forEach((line, index) => context.fillText(line, padding, canvas.height - height + padding + index * lineHeight, canvas.width - padding * 2));
+  let y = canvas.height - height + padding;
+  for (const line of content) {
+    context.font = `600 ${line.size}px sans-serif`;
+    context.fillText(line.text, padding, y, canvas.width - padding * 2);
+    y += line.size * 1.4;
+  }
 }
 
 function targetDimensions(width: number, height: number, longestEdge: number) {

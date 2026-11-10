@@ -16,6 +16,11 @@
 .viewer .viewerMedia { display: grid; min-height: 0; gap: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--surface-1); padding: 20px; }
 .viewerImage { display: grid; min-height: 200px; height: min(58dvh, 620px); place-items: center; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 17px; background: var(--surface-2); }
 .viewerImage img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.historicalPhoto { position: relative; width: 100%; height: 100%; min-height: 0; }
+.historicalStamp { position: absolute; inset: auto 0 0; display: grid; gap: 4px; padding: 12px; background: rgb(0 0 0 / 78%); color: white; font-size: 13px; line-height: 1.45; }
+.historicalStamp strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.historicalStamp small { font-size: 11px; opacity: .8; }
+.historicalStamp a, .historicalStamp a > span { color: white; }
 .viewerMetadata { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; padding: 18px 2px; color: var(--text-primary); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .viewerMetadata strong { font-weight: 600; }
 .viewerMetadata .gps { font-size: 13px; }

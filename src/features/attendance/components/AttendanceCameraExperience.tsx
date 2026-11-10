@@ -27,7 +27,8 @@ import { Button, IconButton } from "@/components/shared/Button";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { ErrorState, LoadingState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { captureAttendancePhoto, processAttendanceImage, type ProcessedAttendancePhoto } from "@/features/attendance/client/imageProcessing";
+import { captureAttendancePhoto, type ProcessedAttendancePhoto } from "@/features/attendance/client/imageProcessing";
+import { preparePersonalAttendancePhoto } from "@/features/attendance/client/personalPhotoStamp";
 import { cachedAttendanceDashboard, rememberAttendanceDashboard } from "@/features/attendance/client/attendanceDashboardCache";
 import { lookupAttendanceAddress } from "@/features/attendance/client/attendanceAddressClient";
 import { AttendanceEvidenceViewer } from "./AttendanceEvidence";
@@ -37,7 +38,7 @@ import { AttendanceLocationError, captureAttendanceLocation } from "@/features/a
 import { getAttendanceLateMinutes, getAttendanceSequenceWarning } from "@/features/attendance/services/attendanceRules";
 import { pendingAttendanceEvent, withPendingAttendance } from "@/features/attendance/client/pendingDashboard";
 import { canSubmitPersonalAttendance } from "@/lib/auth/applicationAccess";
-import type { AttendanceCoordinates, AttendanceDashboard, AttendanceEvent, AttendanceType, PendingAttendanceItem } from "@/features/attendance/types/attendanceTypes";
+import type { AttendanceCoordinates, AttendanceDashboard, AttendanceEvent, AttendanceType, PendingAttendanceItem, AttendancePhotoStampMetadata } from "@/features/attendance/types/attendanceTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 import styles from "./AttendanceCameraExperience.module.css";
 import { AttendanceLocationAddress } from "./AttendanceLocationAddress";
@@ -96,6 +97,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
   const locationPromiseRef = useRef<Promise<AttendanceCoordinates | undefined> | undefined>(undefined);
   const coordinatesRef = useRef<AttendanceCoordinates | undefined>(undefined);
   const captureIdentityRef = useRef<CaptureIdentity | undefined>(undefined);
+  const rawPhotoRef = useRef<ProcessedAttendancePhoto | undefined>(undefined);
   const successEventRef = useRef<AttendanceEvent | undefined>(undefined);
   const dashboardRef = useRef(initialDashboard);
   const onRecordedRef = useRef(onRecorded);
@@ -242,7 +244,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
         if (locationRequestRef.current !== requestId || controller.signal.aborted) return;
         coordinatesRef.current = position;
         setCoordinates(position);
-        void lookupAttendanceAddress(position);
+        void lookupAttendanceAddress(position, { priority: true });
       }
     }).then((location) => {
       if (locationRequestRef.current !== requestId || controller.signal.aborted) return undefined;
@@ -312,6 +314,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
 
   const closeCapture = () => {
     captureIdentityRef.current = undefined;
+    rawPhotoRef.current = undefined;
     locationRequestRef.current++;
     locationAbortRef.current?.abort();
     stopCamera();
@@ -333,6 +336,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
       const processed = await captureAttendancePhoto(videoRef.current);
       if (requestId !== cameraRequestRef.current) { URL.revokeObjectURL(processed.previewUrl); return; }
       setPhoto(processed);
+      rawPhotoRef.current = processed;
       stopCamera();
       await submitPhoto(processed, capture);
     } catch (error) {
@@ -342,6 +346,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
 
   const retake = () => {
     captureIdentityRef.current = undefined;
+    rawPhotoRef.current = undefined;
     if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl);
     setPhoto(undefined);
     setStep("camera");
@@ -349,12 +354,14 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     void startCamera();
   };
 
-  async function submitPhoto(processed = photo, capture = captureIdentityRef.current) {
+  async function submitPhoto(processed = rawPhotoRef.current ?? photo, capture = captureIdentityRef.current, retry = false) {
     if (!dashboard || !processed || !capture || submitBusyRef.current) return;
     submitBusyRef.current = true;
     setStep("saving");
+    setNotice(undefined);
     // Freeze capture time and event ID before image processing, GPS, or uploads.
     let location = coordinatesRef.current;
+    if (retry && (!location || Math.abs(Date.parse(location.capturedAt) - Date.parse(capture.capturedAtClient)) > 60_000)) location = await requestLocation();
     if ((!location || location.accuracy > locationAccuracyTarget) && locationPromiseRef.current) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -368,19 +375,18 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     location = coordinatesRef.current ?? location;
     if (location && Math.abs(Date.parse(location.capturedAt) - Date.parse(capture.capturedAtClient)) > 60_000) location = undefined;
     locationAbortRef.current?.abort();
+    let photoStamp: AttendancePhotoStampMetadata;
     try {
-      const address = location ? await lookupAttendanceAddress(location) : undefined;
-      const stamped = await processAttendanceImage(new File([processed.photo], "attendance.jpg", { type: "image/jpeg" }), {
-        capturedAt: capture.capturedAtClient,
-        address: address?.status === "resolved" && address.address ? address.address : location ? "Chưa xác định địa chỉ" : "Chưa có GPS",
-        latitude: location?.latitude, longitude: location?.longitude,
-        label: `CHÂU TUẤN · ${capture.intendedType === "check_in" ? "CHẤM VÀO" : "CHẤM RA"}`,
-      });
-      if (captureIdentityRef.current !== capture) { URL.revokeObjectURL(stamped.previewUrl); submitBusyRef.current = false; return; }
-      processed = stamped;
-      setPhoto(stamped);
-    } catch {
-      // Preserve the actual camera image if the device cannot encode the footer.
+      const prepared = await preparePersonalAttendancePhoto(processed, capture, location, retry);
+      if (captureIdentityRef.current !== capture) { URL.revokeObjectURL(prepared.photo.previewUrl); submitBusyRef.current = false; return; }
+      processed = prepared.photo;
+      photoStamp = prepared.stamp;
+      setPhoto(processed);
+    } catch (error) {
+      // No event, queue or upload is created until both JPEGs contain the footer.
+      if (captureIdentityRef.current === capture) { setNotice(errorMessage(error)); setStep("preview"); }
+      submitBusyRef.current = false;
+      return;
     }
     const item: PendingAttendanceItem = {
       clientEventId: capture.clientEventId,
@@ -394,6 +400,8 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
       thumbnail: processed.thumbnail,
       photoWidth: processed.width,
       photoHeight: processed.height,
+      requiresPhotoStamp: true,
+      photoStamp,
       createdAt: capture.capturedAtClient,
       retryCount: 0,
       syncState: "local_pending"
@@ -515,15 +523,15 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
 
       {step === "preview" && photo ? (
         <section className={styles.photoReview} aria-label="Kiểm tra ảnh chấm công">
-          <div className={styles.cameraToolbar}><div><span className={styles.toolbarIcon}><Camera aria-hidden="true" size={21} /></span><strong>Chưa lưu được lượt chấm</strong></div><IconButton label="Đóng ảnh chấm công" onClick={closeCapture}><X size={20} /></IconButton></div>
+          <div className={styles.cameraToolbar}><div><span className={styles.toolbarIcon}><Camera aria-hidden="true" size={21} /></span><strong>Ảnh chưa được gửi</strong></div><IconButton label="Đóng ảnh chấm công" onClick={closeCapture}><X size={20} /></IconButton></div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img alt="Ảnh chấm công vừa chụp" src={photo.previewUrl} />
           <div className={styles.captureStatus}><div className={styles.locationStatus} role="status"><MapPin aria-hidden="true" size={18} /><div><span>Vị trí GPS</span><strong>{locationLabel}</strong></div></div><span className={styles.networkStatus} data-online={online}>{online ? <Cloud aria-hidden="true" size={16} /> : <CloudOff aria-hidden="true" size={16} />}{online ? "Trực tuyến" : "Lưu trên thiết bị"}</span></div>
-          <div className={styles.reviewActions}><Button leftIcon={<RotateCcw aria-hidden="true" size={16} />} onClick={retake}>Chụp lại</Button><Button className={styles.confirmAction} leftIcon={<CheckCircle2 aria-hidden="true" size={18} />} onClick={() => void submitPhoto()} size="lg" variant="primary">Lưu lại lượt chấm</Button></div>
+          <div className={styles.reviewActions}><Button leftIcon={<RotateCcw aria-hidden="true" size={16} />} onClick={retake}>Chụp lại</Button><Button className={styles.confirmAction} leftIcon={<CheckCircle2 aria-hidden="true" size={18} />} onClick={() => void submitPhoto(undefined, undefined, true)} size="lg" variant="primary">Thử lại và ghi nhận</Button></div>
         </section>
       ) : null}
 
-      {step === "saving" ? <LoadingState title={locationState === "requesting" && !coordinates ? "Đang lấy GPS và ghi nhận…" : "Đang ghi nhận…"} /> : null}
+      {step === "saving" ? <LoadingState title={locationState === "requesting" && !coordinates ? "Đang lấy GPS…" : "Đang ghi thời gian, địa chỉ lên ảnh…"} /> : null}
       {step === "success" ? (
         <section className={styles.successCard} aria-live="polite"><span className={styles.successIcon}><CheckCircle2 aria-hidden="true" size={42} /></span><h2>{successSynced ? "Chấm công thành công" : "Đã lưu lượt chấm trên thiết bị"}</h2><span>{successEvent?.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</span><strong>{formatTime(successEvent?.effectiveAt ?? null)}</strong>{lateMinutes > 0 ? <StatusBadge tone="warning">Đi trễ {lateMinutes} phút</StatusBadge> : null}{successEvent?.latitude !== undefined && successEvent.longitude !== undefined ? <AttendanceLocationAddress accuracyMeters={successEvent.accuracyMeters} latitude={successEvent.latitude} longitude={successEvent.longitude} /> : null}<StatusBadge tone={successSynced ? "success" : "info"}>{successSynced ? "Đã đồng bộ" : "Chờ đồng bộ"}</StatusBadge><Button onClick={closeCapture} size="lg" variant="primary">{onClose || returnHref ? "Xong" : "Về màn hình hôm nay"}</Button></section>
       ) : null}
