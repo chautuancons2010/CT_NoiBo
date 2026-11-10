@@ -14,7 +14,8 @@ const statusLabels: Record<string, string> = {
   unconfirmed: "Chưa xác nhận"
 };
 
-export async function generateWorkerAttendanceExcel(sessions: WorkerAttendanceSession[], month: string): Promise<Buffer> {
+export async function generateWorkerAttendanceExcel(allSessions: WorkerAttendanceSession[], month: string): Promise<Buffer> {
+  const sessions = allSessions.filter(session => Boolean(session.submittedAt) || session.status === "submitted" || session.status === "locked");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Châu Tuấn ERP";
   workbook.created = new Date();
@@ -26,12 +27,17 @@ export async function generateWorkerAttendanceExcel(sessions: WorkerAttendanceSe
   sheet.addRow([]);
   sheet.addRow(["Ngày", "Gói", "Công trường", "Mã NV", "Họ tên", "Trạng thái", "Ca", "Ca bắt đầu", "Ca kết thúc", "Giờ vào", "Giờ ra", "Hiện diện (phút)", "Nghỉ theo ca (phút)", "Giờ công", "Giám sát", "Ảnh", "Địa chỉ ảnh", "An toàn", "Trạng thái giờ", "Ghi chú"]);
   const totals = new Map<string, { code: string; name: string; days: Set<string>; minutes: number; incomplete: number }>();
+  const marks = new Map<string, { code: string; name: string; dates: Map<string, number> }>();
   for (const session of sessions) {
     for (const entry of session.entries.filter(entry => entry.isSelected !== false)) {
       const clock = workerClock(entry, session);
       const item = totals.get(entry.workerId) ?? { code: entry.employeeCode, name: entry.workerName, days: new Set<string>(), minutes: 0, incomplete: 0 };
       item.days.add(session.date); item.minutes += clock.workMinutes ?? 0; if (!clock.complete) item.incomplete++;
       totals.set(entry.workerId, item);
+      const mark = marks.get(entry.workerId) ?? { code: entry.employeeCode, name: entry.workerName, dates: new Map<string, number>() };
+      const fraction = entry.status === "present" || entry.status === "late" ? entry.dayException === "half_day" ? .5 : 1 : 0;
+      mark.dates.set(session.date, Math.max(mark.dates.get(session.date) ?? 0, fraction));
+      marks.set(entry.workerId, mark);
       sheet.addRow([
         session.date,
         sanitizeSpreadsheetCell(session.projectName),
@@ -63,6 +69,25 @@ export async function generateWorkerAttendanceExcel(sessions: WorkerAttendanceSe
   summary.columns = [{width:18},{width:30},{width:22},{width:22},{width:22},{width:22}];
   summary.getRow(1).font = { bold: true };
   summary.autoFilter = "A1:F1";
+  const days = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+  const matrix = workbook.addWorksheet("Bảng dấu công", { views: [{ state: "frozen", xSplit: 2, ySplit: 2 }] });
+  matrix.addRow([`BẢNG DẤU CÔNG ${month} · X: Có mặt · ½: Nửa ngày · —: Chưa ghi công`]);
+  matrix.addRow(["Mã NV", "Họ tên", ...Array.from({ length: days }, (_, day) => day + 1), "Tổng công"]);
+  for (const item of marks.values()) {
+    const fractions = Array.from({ length: days }, (_, day) => item.dates.get(`${month}-${String(day + 1).padStart(2, "0")}`) ?? 0);
+    matrix.addRow([sanitizeSpreadsheetCell(item.code), sanitizeSpreadsheetCell(item.name), ...fractions.map(value => value === 1 ? "X" : value === .5 ? "½" : "—"), fractions.reduce((total, value) => total + value, 0)]);
+  }
+  matrix.columns = [{ width: 18 }, { width: 30 }, ...Array.from({ length: days }, () => ({ width: 5 })), { width: 14 }];
+  matrix.getRow(2).font = { bold: true };
+  matrix.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: days + 3 } };
+  const evidence = workbook.addWorksheet("Ảnh theo phiên");
+  evidence.addRow(["Mã phiên", "Ngày", "Gói", "Công trường", "Giám sát", "Số công nhân", "Ảnh", "Thời gian chụp", "Địa chỉ", "GPS"]);
+  for (const session of sessions) for (const [index, photo] of session.photos.entries()) {
+    evidence.addRow([session.id, session.date, sanitizeSpreadsheetCell(session.projectName), sanitizeSpreadsheetCell(session.worksiteName), sanitizeSpreadsheetCell(session.supervisorName), session.entries.filter(entry => entry.isSelected !== false && (entry.status === "present" || entry.status === "late")).length, index + 1, workerClockLabel(photo.capturedAt), sanitizeSpreadsheetCell(photo.address ?? ""), photo.latitude !== undefined && photo.longitude !== undefined ? `${photo.latitude}, ${photo.longitude}` : ""]);
+  }
+  evidence.columns = [36, 16, 30, 30, 28, 18, 10, 26, 60, 30].map(width => ({ width }));
+  evidence.getRow(1).font = { bold: true };
+  evidence.autoFilter = "A1:J1";
   const reports = workbook.addWorksheet("Báo cáo nhân lực");
   reports.addRow(["Ngày", "Nhà thầu", "Gói", "Công trường", "Tổng nhân lực", "Công nhân", "Giám sát", "Phổ biến an toàn, 5S, quy định", "Nội dung công việc", "Tình trạng sức khỏe", "Khu vực làm việc", "Xác nhận an toàn", "Người báo cáo"]);
   for (const session of sessions.filter(item => item.safetyReport)) {

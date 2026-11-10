@@ -84,3 +84,48 @@
   .action > button { transition: none; }
 }
 .photoLink { display: inline-flex; width: fit-content; min-height: 44px; align-items: center; gap: 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface); padding: 8px 12px; color: var(--primary); font: inherit; font-size: 13px; cursor: pointer; }
+.card { position: relative; border-radius: 26px; background: linear-gradient(145deg, color-mix(in srgb,var(--primary-soft) 80%,var(--surface)),var(--surface) 66%); box-shadow: 0 12px 36px color-mix(in srgb,var(--primary) 6%,transparent); }
+.top { position: relative; z-index: 1; padding: 20px 24px 0; background: transparent; }
+.top > span:first-child { color: var(--text-primary); font-weight: 600; }
+.clockFace { position: relative; display: grid; justify-items: start; gap: 5px; overflow: hidden; padding: 32px 28px 22px; }
+.clockFace > :not(.dial) { position: relative; z-index: 1; }
+.clockLabel { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .2em; }
+.liveClock { color: var(--text-primary); font-size: clamp(62px,9vw,86px); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.065em; line-height: 1.1; }
+.hours { color: var(--primary); font-size: 16px; font-weight: 600; letter-spacing: .02em; }
+.shift { margin: 4px 0 0; font-size: 13px; }
+.dial { position: absolute; width: 250px; height: 250px; top: -8px; right: -60px; fill: none; stroke: var(--primary); stroke-width: 1; opacity: .1; transform: rotate(-20deg); }
+.dialHand { stroke-width: 7; stroke-linecap: round; }
+.dialCenter { fill: var(--primary); }
+.content { grid-template-columns: 1fr; gap: 18px; padding: 0 24px 20px; }
+.events { grid-row: auto; gap: 12px; }
+.events > div { position: relative; gap: 8px; border: 0; border-left: 2px solid var(--border-subtle); border-radius: 0; background: transparent; padding: 0 16px; }
+.events > div[data-recorded="true"] { border-color: var(--primary); background: transparent; }
+.events dt { color: var(--text-secondary); font-size: 12px; }
+.events dd { font-size: 26px; }
+.action { grid-row: auto; gap: 10px; margin: 0; }
+.action > button { min-height: 62px; gap: 10px; border-radius: 18px; padding: 10px 14px; font-size: 15px; text-align: left; }
+.action > button > span { flex: 0 1 auto; }
+.action .actionIcon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 11px; background: color-mix(in srgb,currentColor 12%,transparent); }
+.action > button[data-primary="false"] { border-color: color-mix(in srgb,var(--primary) 15%,var(--border-subtle)); background: var(--surface); }
+.action > button[data-primary="false"]:hover { background: var(--primary-soft); color: var(--primary); }
+.facts { padding: 10px 24px; background: transparent; }
+.facts .connection { background: transparent; padding: 0; }
+.facts .connection[data-online="true"] { background: transparent; }
+.photoLink { width: 100%; justify-content: flex-start; border-radius: 14px; padding: 12px 16px; }
+@media (max-width: 767px) {
+  .top { padding: 18px 18px 0; }
+  .clockFace { padding: 24px 22px 22px; }
+  .content { padding: 0 18px 18px; }
+  .facts { padding: 10px 18px; }
+  .dial { right: -82px; }
+}
+@media (max-width: 350px) {
+  .top { gap: 5px; padding-inline: 14px; }
+  .top > span:first-child { gap: 6px; font-size: 12px; }
+  .status { font-size: 10px; padding: 4px 7px; }
+  .clockFace { padding: 18px; }
+  .liveClock { font-size: 62px; }
+  .content { padding-inline: 14px; }
+  .action > button { min-height: 56px; gap: 6px; padding-inline: 10px; font-size: 14px; }
+  .action .actionIcon { width: 28px; height: 28px; flex-basis: 28px; }
+}

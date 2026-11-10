@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { AppError } from "@/lib/api/errors";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import accounts from "@/config/testAccounts.json";
-import { TEST_GATE_COOKIE, TEST_OWNER, testToolsAvailable, validTesterToken } from "@/lib/testing/policy.mjs";
+import { TEST_GATE_COOKIE, TEST_OWNER, publicTesterAccess, testToolsAvailable, validTesterToken } from "@/lib/testing/policy.mjs";
 
 export function requireTestEnvironment() {
   const environment = testToolsAvailable();
@@ -15,13 +15,14 @@ export function requireTestEnvironment() {
 export async function getTestControlsEnvironment(username: string): Promise<string | undefined> {
   const environment = testToolsAvailable();
   if (!environment || !accounts.some((account) => account.username === username)) return undefined;
+  if (publicTesterAccess()) return environment.environment;
   const token = (await cookies()).get(TEST_GATE_COOKIE)?.value;
   return token && validTesterToken(token) ? environment.environment : undefined;
 }
 export async function requireTester() {
   const environment = requireTestEnvironment();
   const token = (await cookies()).get(TEST_GATE_COOKIE)?.value;
-  if (!token || !validTesterToken(token)) throw new AppError("AUTHENTICATION_REQUIRED");
+  if (!publicTesterAccess() && (!token || !validTesterToken(token))) throw new AppError("AUTHENTICATION_REQUIRED");
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR");
   const { data, error } = await client.from("app_configurations").select("value").eq("key", "testing.environment.guard").abortSignal(AbortSignal.timeout(8_000)).maybeSingle();

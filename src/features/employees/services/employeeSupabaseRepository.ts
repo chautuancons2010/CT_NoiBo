@@ -77,7 +77,7 @@ function mapPosition(row: Row): Position {
   return {
     id: requiredText(row, "id"),
     code: requiredText(row, "code"),
-    name: requiredText(row, "name"),
+    name: row.code === "engineer" ? "Giám sát" : requiredText(row, "name"),
     departmentId: text(row, "department_id"),
     active: bool(row, "active", true),
     sortOrder: int(row, "sort_order")
@@ -88,7 +88,7 @@ function mapEmploymentType(row: Row): EmploymentType {
   return {
     id: requiredText(row, "id"),
     code: requiredText(row, "code"),
-    name: requiredText(row, "name"),
+    name: row.code === "engineer" ? "Giám sát" : requiredText(row, "name"),
     workerCategory: requiredText(row, "worker_category") as EmploymentType["workerCategory"],
     active: bool(row, "active", true),
     sortOrder: int(row, "sort_order")

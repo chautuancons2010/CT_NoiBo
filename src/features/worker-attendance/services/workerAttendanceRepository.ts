@@ -491,13 +491,13 @@ export async function remindWorkerAttendanceSupervisor(user: AuthenticatedUser, 
     .in("assignment_role", ["supervisor_main", "supervisor_replacement", "project_manager"])
     .lte("start_date", input.date)
     .or(`end_date.is.null,end_date.gte.${input.date}`);
-  if (assignmentError) throw new AppError("SERVER_ERROR", "Không thể tìm kỹ sư phụ trách.");
+  if (assignmentError) throw new AppError("SERVER_ERROR", "Không thể tìm giám sát phụ trách.");
   const employeeIds = [...new Set((assignments ?? []).map((item) => String(item.employee_id)))];
-  if (!employeeIds.length) throw new AppError("NOT_FOUND", "Chưa phân công kỹ sư phụ trách.");
+  if (!employeeIds.length) throw new AppError("NOT_FOUND", "Chưa phân công giám sát phụ trách.");
   const { data: accounts, error: accountError } = await client.from("app_accounts").select("id").in("employee_id", employeeIds).eq("status", "active");
-  if (accountError) throw new AppError("SERVER_ERROR", "Không thể tìm tài khoản kỹ sư.");
+  if (accountError) throw new AppError("SERVER_ERROR", "Không thể tìm tài khoản giám sát.");
   const recipients = (accounts ?? []).map((item) => String(item.id));
-  if (!recipients.length) throw new AppError("NOT_FOUND", "Kỹ sư phụ trách chưa có tài khoản hoạt động.");
+  if (!recipients.length) throw new AppError("NOT_FOUND", "Giám sát phụ trách chưa có tài khoản hoạt động.");
   const result = await publishNotificationEvent({
     eventKey: "worker_attendance.reminder",
     aggregateType: "project",

@@ -168,6 +168,19 @@
 }
 
 .capture[data-facing="environment"] .livePreview video { transform: none; }
+.capture { border-radius: 26px; border-color: color-mix(in srgb,var(--primary) 15%,var(--border-subtle)); }
+.livePreview { border-radius: 20px; }
+.photoMarkPreview { position: absolute; inset: auto 0 0; display: grid; gap: 5px; padding: 38px 18px 18px; background: linear-gradient(transparent,rgba(0,0,0,.8)); color: white; pointer-events: none; }
+.photoMarkPreview > span:first-child { font-size: 10px; font-weight: 700; letter-spacing: .2em; }
+.photoMarkPreview > strong { font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.photoMarkPreview small { font-size: 13px; font-weight: 500; }
+.photoMarkPreview > span:last-child { display: flex; align-items: start; gap: 5px; max-width: 100%; font-size: 11px; line-height: 1.4; }
+.photoMarkPreview svg { flex-shrink: 0; margin-top: 1px; }
+.viewfinder { inset: 18% 20% 32%; border: 1px solid rgba(255,255,255,.12); border-radius: 24px; }
+.shutter { box-shadow: 0 0 0 5px var(--primary-soft); }
+.sequenceWarning { inset: 48px 8px auto; }
+.captureActions .cameraUtility { border-radius: 16px; }
+@media (max-height: 620px) { .photoMarkPreview { padding: 18px 12px 10px; gap: 3px; } .photoMarkPreview > strong { font-size: 20px; } .photoMarkPreview small { font-size: 11px; } .photoMarkPreview > span:last-child { display: none; } }
 .captureLoadStatus { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-secondary); font-size: 13px; }
 .cameraToolbar .attendanceChoice { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: 3px; background: var(--surface-2); }
 .attendanceChoice > button { min-height: 38px; min-width: 0; border: 0; border-radius: calc(var(--radius-control) - 3px); padding: 6px 12px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; }
@@ -178,7 +191,7 @@
 .successPhoto > button { display: grid; width: 100%; gap: 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: 10px; background: var(--surface); color: var(--primary); font: inherit; cursor: pointer; }
 .successPhoto img { width: 100%; max-height: 240px; object-fit: contain; border-radius: var(--radius-control); }
 @media (max-width: 767px) {
-  .page[data-attendance-capture="true"] { position: fixed; z-index: 55; inset: 0 0 calc(76px + env(safe-area-inset-bottom)); align-content: start; gap: 8px; overflow: auto; padding: max(8px,env(safe-area-inset-top)) 10px 8px; background: var(--workspace-canvas); }
+  .page[data-attendance-capture="true"] { position: fixed; z-index: 55; inset: var(--topbar-height,56px) 0 calc(76px + env(safe-area-inset-bottom)); align-content: start; gap: 8px; overflow: auto; padding: 8px 10px; background: var(--workspace-canvas); }
   .page[data-attendance-capture="true"]:has(.capture) { align-content: stretch; }
   .capture { height: 100%; max-height: 900px; grid-template-rows: auto minmax(80px,1fr) auto auto; gap: 8px; padding: 10px; }
   .cameraToolbar { min-height: 40px; }

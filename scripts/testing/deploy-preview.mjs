@@ -51,7 +51,7 @@ async function setup() {
   const publicKey = source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || source.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = source.SUPABASE_SECRET_KEY || source.SUPABASE_SERVICE_ROLE_KEY;
   Object.assign(env, {
-    APP_ENV: "test", RELEASE_ENVIRONMENT: "test", TEST_TOOLS_ENABLED: "true",
+    APP_ENV: "test", RELEASE_ENVIRONMENT: "test", TEST_TOOLS_ENABLED: "true", TEST_TOOLS_PUBLIC_ACCESS: "true",
     E2E_DATABASE_KIND: "preview", APP_BASE_URL: `https://${alias}`, E2E_BASE_URL: `https://${alias}`,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publicKey, NEXT_PUBLIC_SUPABASE_ANON_KEY: publicKey,
     SUPABASE_SECRET_KEY: serviceKey, SUPABASE_SERVICE_ROLE_KEY: serviceKey
@@ -114,7 +114,7 @@ async function assertPublicTestPreview(project, deployment, expected) {
   // Sensitive values cannot be read back. Isolation is verified from the public
   // database/config values, the locally validated secrets, and creation times.
   const readable = scoped.filter((row) => row.visibility === "config" || (!row.visibility && ["encrypted", "plain"].includes(row.type)));
-  const needed = ["APP_ENV", "RELEASE_ENVIRONMENT", "TEST_TOOLS_ENABLED", "E2E_DATABASE_KIND", "NEXT_PUBLIC_SUPABASE_URL",
+  const needed = ["APP_ENV", "RELEASE_ENVIRONMENT", "TEST_TOOLS_ENABLED", "TEST_TOOLS_PUBLIC_ACCESS", "E2E_DATABASE_KIND", "NEXT_PUBLIC_SUPABASE_URL",
     "TEST_SUPABASE_URL", "E2E_SUPABASE_URL", "TEST_SUPABASE_PROJECT_ID", "PRODUCTION_SUPABASE_URL",
     "PRODUCTION_SERVICE_KEY_SHA256", "PRODUCTION_SESSION_SECRET_SHA256", "APP_BASE_URL", "E2E_BASE_URL"];
   assert(needed.every((key) => readable.some((row) => row.key === key)), "Test environment flags and database isolation markers must be readable config values; use configure-public-marker for the release marker and deploy a new Preview");
@@ -173,10 +173,16 @@ async function main() {
     console.log(JSON.stringify({ configured: "RELEASE_ENVIRONMENT", value: "test", type: "config", target: "preview", branch }));
     return;
   }
+  if (action === "configure-public-access") {
+    const result = await runCli(["env", "add", "TEST_TOOLS_PUBLIC_ACCESS", "preview", "--force", "--type", "config", "--yes", "--scope", project.orgId], "true\n");
+    assert(result.code === 0, `Could not configure the Preview entry (exit ${result.code})`);
+    console.log(JSON.stringify({ configured: "TEST_TOOLS_PUBLIC_ACCESS", value: "true", target: "preview" }));
+    return;
+  }
   if (action === "configure") {
     let configured = 0;
     for (const { key, value } of variables) {
-      const type = key.startsWith("NEXT_PUBLIC_") || /(?:URL|ENV|ENVIRONMENT|TIMEZONE|ENABLED|PROJECT_ID|SHA256|DATABASE_KIND)$/.test(key) ? "config" : "secret";
+      const type = key.startsWith("NEXT_PUBLIC_") || /(?:URL|ENV|ENVIRONMENT|TIMEZONE|ENABLED|PUBLIC_ACCESS|PROJECT_ID|SHA256|DATABASE_KIND)$/.test(key) ? "config" : "secret";
       const result = await runCli(["env", "add", key, "preview", "--force", "--type", type, "--yes", "--scope", project.orgId], value + "\n");
       if (result.code !== 0) {
         let detail = result.stderr + "\n" + result.stdout;

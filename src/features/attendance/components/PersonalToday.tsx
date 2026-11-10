@@ -132,16 +132,19 @@ export function PersonalToday() {
       <time className={styles.date} dateTime={getBusinessDateKey(today)}>{date}</time>
       <div className={styles.card} data-state={!dashboard.policy.attendanceEnabled ? "paused" : dashboard.nextAction}>
         <div className={styles.top}><span><Clock3 aria-hidden="true" size={18} />Ca làm hôm nay</span><span className={styles.status}>{status}</span></div>
+        <div className={styles.clockFace}>
+          <svg aria-hidden="true" className={styles.dial} viewBox="0 0 240 240"><circle cx="120" cy="120" r="108" /><circle cx="120" cy="120" r="83" />{Array.from({ length: 12 }, (_, index) => <path d="M120 15v10" key={index} transform={`rotate(${index * 30} 120 120)`} />)}<path className={styles.dialHand} d="M120 57v63l42 24" /><circle className={styles.dialCenter} cx="120" cy="120" r="5" /></svg>
+          <span className={styles.clockLabel}>HÔM NAY</span>
+          <time className={styles.liveClock} dateTime={today.toISOString()} suppressHydrationWarning>{formatTime(today.toISOString())}</time>
+          <span className={styles.shift}>{dashboard.policy.shiftName}</span>
+          <strong className={styles.hours}>{dashboard.policy.shiftStart} – {dashboard.policy.shiftEnd}</strong>
+        </div>
         <div className={styles.content}>
-          <div className={styles.shiftBlock}>
-            <strong className={styles.hours}>{dashboard.policy.shiftStart} – {dashboard.policy.shiftEnd}</strong>
-            <span className={styles.shift}>{dashboard.policy.shiftName}</span>
-            {captureAllowed ? <div className={styles.action}>{dashboard.policy.attendanceEnabled ? (["check_in", "check_out"] as const).map(type => <button data-primary={dashboard.nextAction === type} key={type} onClick={() => { setCaptureType(type); setCaptureOpen(true); }} type="button">{type === "check_in" ? <LogIn aria-hidden="true" size={18} /> : <LogOut aria-hidden="true" size={18} />}<span>{type === "check_in" ? "Chấm vào" : "Chấm ra"}</span></button>) : <span className={styles.complete}><CheckCircle2 aria-hidden="true" size={19} />Chấm công tạm ngừng</span>}</div> : null}
-          </div>
           <dl className={styles.events}>
             <div data-recorded={Boolean(checkIn)}><dt><LogIn aria-hidden="true" size={17} />Chấm vào</dt><dd>{checkIn ? formatTime(checkIn.effectiveAt) : "—"}</dd></div>
             <div data-recorded={Boolean(checkOut)}><dt><LogOut aria-hidden="true" size={17} />Chấm ra</dt><dd>{checkOut ? formatTime(checkOut.effectiveAt) : "—"}</dd></div>
           </dl>
+          {captureAllowed ? <div className={styles.action}>{dashboard.policy.attendanceEnabled ? (["check_in", "check_out"] as const).map(type => <button data-primary={dashboard.nextAction === type} key={type} onClick={() => { setCaptureType(type); setCaptureOpen(true); }} type="button"><span className={styles.actionIcon}>{dashboard.nextAction === type ? <Camera aria-hidden="true" size={21} /> : type === "check_in" ? <LogIn aria-hidden="true" size={20} /> : <LogOut aria-hidden="true" size={20} />}</span><span>{type === "check_in" ? "Chấm vào" : "Chấm ra"}</span></button>) : <span className={styles.complete}><CheckCircle2 aria-hidden="true" size={19} />Chấm công tạm ngừng</span>}</div> : null}
         </div>
         <div className={styles.facts}>
           <div className={styles.connection} data-online={online}>{online ? <Cloud aria-hidden="true" size={16} /> : <CloudOff aria-hidden="true" size={16} />}<span>{online ? "Trực tuyến" : "Ngoại tuyến"}</span></div>

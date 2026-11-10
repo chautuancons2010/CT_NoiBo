@@ -34,6 +34,10 @@ export function assertTestEnvironment(env = process.env) {
 export function testToolsAvailable(env = process.env) {
   try { return assertTestEnvironment(env); } catch { return null; }
 }
+export function publicTesterAccess(env = process.env) {
+  return env.APP_ENV === "test" && env.RELEASE_ENVIRONMENT === "test"
+    && env.TEST_TOOLS_PUBLIC_ACCESS === "true" && Boolean(testToolsAvailable(env));
+}
 export function createTesterToken(env = process.env, now = Date.now()) {
   const config = assertTestEnvironment(env);
   const payload = Buffer.from(JSON.stringify({ expiresAt: now + 8 * 60 * 60 * 1000, target: config.databaseUrl, environment: config.environment })).toString("base64url");

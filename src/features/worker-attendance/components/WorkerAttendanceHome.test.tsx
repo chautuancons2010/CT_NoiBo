@@ -41,7 +41,7 @@ describe("field attendance home", () => {
     expect(fetchMock.mock.calls).toHaveLength(1);
   });
   it("recovers an initial history read error with the owning retry action", async () => {
-    const fetchMock = vi.fn().mockRejectedValueOnce(new Error("Mất kết nối thử nghiệm")).mockResolvedValue(ok([{ id: "session-one", ...task, status: "submitted" }]));vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = vi.fn().mockRejectedValueOnce(new Error("Mất kết nối thử nghiệm")).mockResolvedValue(ok([{ id: "session-one", ...task, status: "submitted", startedAt: "2026-11-07T01:00:00Z", entries: [], photos: [], supervisorName: "Giám sát" }]));vi.stubGlobal("fetch", fetchMock);
     render(<WorkerAttendanceSessionList />);
     fireEvent.click(await screen.findByRole("button", { name: "Thử lại" }));
     await waitFor(() => expect(screen.getByText("Công trường mẫu")).toBeInTheDocument());

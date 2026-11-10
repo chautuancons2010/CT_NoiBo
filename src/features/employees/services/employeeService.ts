@@ -111,7 +111,7 @@ export const employeeProfileStatusLabels: Record<EmployeeProfileStatus, string> 
 
 export const workerCategoryLabels: Record<WorkerCategory, string> = {
   office: "Văn phòng",
-  engineer: "Kỹ sư",
+  engineer: "Giám sát",
   supervisor: "Giám sát",
   worker: "Công nhân",
   seasonal: "Thời vụ",

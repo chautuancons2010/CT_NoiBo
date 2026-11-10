@@ -30,6 +30,10 @@
   .personal-home__person > svg { flex: 0 0 auto; color: var(--mobile-muted); }
   .personal-home__welcome > time { width: fit-content; border-radius: 8px; padding: 5px 10px; background: var(--mobile-soft); color: var(--mobile-muted); font-size: 13px; line-height: 1.5; text-transform: capitalize; }
   .personal-home__person:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 16px; }
+  .personal-home .personal-home__links[aria-label="Điểm danh công nhân"] { grid-template-columns: minmax(0,1fr); }
+  .personal-home .personal-home__links[aria-label="Điểm danh công nhân"] > a { display: flex; flex-direction: row; min-height: 66px; gap: 12px; padding: 12px 16px; border: 1px solid var(--border-subtle); border-radius: 20px; font-size: 14px; text-align: left; }
+  .personal-home .personal-home__links[aria-label="Điểm danh công nhân"] > a > svg:first-child { box-sizing: border-box; width: 40px; height: 40px; flex: 0 0 40px; padding: 10px; color: var(--primary); background: var(--primary-soft); border-radius: 13px; }
+  .personal-home .personal-home__links[aria-label="Điểm danh công nhân"] > a > svg:last-child { display: block; margin-left: auto; }
 
   .personal-home .personal-today { max-width: none; gap: 10px; }
   .personal-home .personal-today__date { display: none; }

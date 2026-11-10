@@ -68,7 +68,7 @@ export const positions: Position[] = [
   {
     id: "20000000-0000-4000-8000-000000000003",
     code: "engineer",
-    name: "Kỹ sư",
+    name: "Giám sát",
     departmentId: "10000000-0000-4000-8000-000000000003",
     active: true,
     sortOrder: 30
@@ -103,7 +103,7 @@ export const employmentTypes: EmploymentType[] = [
   {
     id: "30000000-0000-4000-8000-000000000002",
     code: "engineer",
-    name: "Kỹ sư",
+    name: "Giám sát",
     workerCategory: "engineer",
     active: true,
     sortOrder: 20
@@ -392,7 +392,7 @@ export const employeeHistoryEvents: EmployeeHistoryEvent[] = [
     actorAccountId: "demo-admin",
     after: {
       departmentName: "Kỹ thuật",
-      positionName: "Kỹ sư",
+      positionName: "Giám sát",
       employmentStatus: "probation"
     },
     reason: "Tạo hồ sơ nhân sự",

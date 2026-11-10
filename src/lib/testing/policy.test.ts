@@ -1,6 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { assertTestEnvironment, configuredUrl, createTesterInvitation, createTesterToken, externalDeliveryAllowed, productionAccountAllowed, sessionCookieNames, stagingAuthorized, testToolsAvailable, validTesterInvitation, validTesterToken, TEST_OWNER } from "./policy.mjs";
+import { assertTestEnvironment, configuredUrl, createTesterInvitation, createTesterToken, externalDeliveryAllowed, productionAccountAllowed, publicTesterAccess, sessionCookieNames, stagingAuthorized, testToolsAvailable, validTesterInvitation, validTesterToken, TEST_OWNER } from "./policy.mjs";
 export const testEnv = {
   APP_ENV: "test", RELEASE_ENVIRONMENT: "test", TEST_TOOLS_ENABLED: "true",
   NEXT_PUBLIC_SUPABASE_URL: "http://localhost:55321", TEST_SUPABASE_URL: "http://localhost:55321",
@@ -9,6 +9,14 @@ export const testEnv = {
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const staging = { ...testEnv, APP_ENV: "staging", RELEASE_ENVIRONMENT: "staging", APP_BASE_URL: "https://staging.example.invalid", NEXT_PUBLIC_SUPABASE_URL: "https://testproject.supabase.co", TEST_SUPABASE_URL: "https://testproject.supabase.co", TEST_SUPABASE_PROJECT_ID: "testproject", PRODUCTION_SUPABASE_URL: "https://productionproject.supabase.co", SUPABASE_SECRET_KEY: "unit-test-service-key", PRODUCTION_SERVICE_KEY_SHA256: hash("other-key"), PRODUCTION_SESSION_SECRET_SHA256: hash("other-session"), STAGING_ACCESS_USER: "tester", STAGING_ACCESS_PASSWORD: "unit-staging-gate-password" };
 describe("test environment server guards", () => {
+  it("opens code-free entry only in the explicitly enabled isolated test environment", () => {
+    const env = { ...testEnv, TEST_TOOLS_PUBLIC_ACCESS: "true" };
+    expect(publicTesterAccess(env)).toBe(true);
+    expect(publicTesterAccess(testEnv)).toBe(false);
+    expect(publicTesterAccess({ ...env, APP_ENV: "production" })).toBe(false);
+    expect(publicTesterAccess({ ...env, RELEASE_ENVIRONMENT: "production" })).toBe(false);
+    expect(publicTesterAccess({ ...env, TEST_SUPABASE_URL: "http://other.invalid" })).toBe(false);
+  });
   it("names missing or malformed URL fields without exposing their input", () => {
     for (const value of [undefined, "", "   "]) {
       expect(() => configuredUrl({ NEXT_PUBLIC_SUPABASE_URL: value }, "NEXT_PUBLIC_SUPABASE_URL")).toThrow("Thiếu NEXT_PUBLIC_SUPABASE_URL");

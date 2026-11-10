@@ -27,7 +27,7 @@ import styles from "./PackageWorkspace.module.css";
 import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
 const roleLabels: Record<AssignmentRole, string> = {
-  project_manager: "Quản lý dự án", engineer: "Kỹ sư", supervisor_main: "Giám sát chính",
+  project_manager: "Quản lý dự án", engineer: "Giám sát", supervisor_main: "Giám sát chính",
   supervisor_replacement: "Giám sát thay thế", worker: "Công nhân", support: "Hỗ trợ"
 };
 

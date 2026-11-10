@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Camera, Users } from "lucide-react";
 
 import { AttendancePhotoReview } from "@/features/attendance/components/AttendancePhotoReview";
 import type { AttendanceAdminToday } from "@/features/attendance/types/attendanceTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
+import styles from "./AttendanceAdminDashboard.module.css";
 
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
-export function AttendanceAdminDashboard({ ownerAccountId }: { ownerAccountId?: string }) {
+export function AttendanceAdminDashboard({ ownerAccountId, canViewWorkers = false }: { ownerAccountId?: string; canViewWorkers?: boolean }) {
   const [date, setDate] = useState(today);
   const [data, setData] = useState<AttendanceAdminToday>();
   const [error, setError] = useState("");
@@ -38,5 +41,5 @@ export function AttendanceAdminDashboard({ ownerAccountId }: { ownerAccountId?: 
   useDomainReconciliation("attendance", load);
 
   // Never render or inspect evidence left over from a different selected day.
-  return <AttendancePhotoReview data={data?.date === date ? data : undefined} date={date} error={error} onDateChange={setDate} onRefresh={load} ownerAccountId={ownerAccountId} refreshing={refreshing} />;
+  return <div className="page-stack">{canViewWorkers ? <nav aria-label="Nguồn ảnh chấm công" className={styles.sourceNav}><span aria-current="page"><Camera aria-hidden="true" size={17} />Ảnh cá nhân</span><Link href="/worker-attendance"><Users aria-hidden="true" size={17} />Ảnh công trường</Link></nav> : null}<AttendancePhotoReview data={data?.date === date ? data : undefined} date={date} error={error} onDateChange={setDate} onRefresh={load} ownerAccountId={ownerAccountId} refreshing={refreshing} /></div>;
 }

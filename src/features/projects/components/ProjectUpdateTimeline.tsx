@@ -7,7 +7,7 @@ const timelineItems = [
   {
     id: "progress",
     type: "Tiến độ",
-    author: "Kỹ sư hiện trường",
+    author: "Giám sát hiện trường",
     timestamp: "09/09/2026 08:30",
     content: "Cập nhật ngắn, có cấu trúc và có thể gắn ảnh hoặc tài liệu.",
     severity: "Bình thường",

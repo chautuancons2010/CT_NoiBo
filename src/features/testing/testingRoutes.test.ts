@@ -42,6 +42,14 @@ describe("quick login server permission boundaries", () => {
     }
     expect(mocks.signIn).not.toHaveBeenCalled();
   });
+  it("allows code-free test entry but still rejects unmanaged accounts", async () => {
+    vi.stubEnv("TEST_TOOLS_PUBLIC_ACCESS", "true");
+    mocks.token = "";
+    expect((await GET()).status).toBe(200);
+    expect((await POST(request({ username: "employee.test" }))).status).toBe(200);
+    database({ ...account, metadata: {} });
+    expect((await POST(request({ username: "employee.test" }))).status).toBe(403);
+  });
   it("rejects arbitrary accounts and supplied roles or passwords", async () => {
     expect((await POST(request({ username: "real.admin" }))).status).toBe(403);
     expect((await POST(request({ username: "employee.test", role: "admin" }))).status).toBe(400);

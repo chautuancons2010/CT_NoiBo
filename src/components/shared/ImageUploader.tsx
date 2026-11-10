@@ -74,7 +74,7 @@ export function ImageUploader({
         capture={capture}
         disabled={disabled || uploading}
         id={id}
-        onChange={(event) => choose(event.target.files?.[0])}
+        onChange={(event) => { choose(event.target.files?.[0]); event.target.value = ""; }}
         ref={inputRef}
         type="file"
       />

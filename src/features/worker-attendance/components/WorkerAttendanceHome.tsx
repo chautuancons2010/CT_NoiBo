@@ -21,6 +21,7 @@ import styles from "./WorkerAttendanceWorkspace.module.css";
 import { createWorkerSafetyReport } from "../services/workerSafetyReport";
 import { formatBusinessDate, getBusinessDateKey } from "@/lib/time/timezone";
 import { can } from "@/lib/auth/permissions";
+import { WorkerSessionEvidenceCards } from "./WorkerSessionEvidenceCards";
 
 const sessionLabels: Record<string, string> = { draft: "Nháp", in_progress: "Đang điểm danh", submitted: "Đã điểm danh", locked: "Đã khóa", needs_review: "Cần rà soát" };
 const sessionTones: Record<string, "neutral" | "info" | "success" | "warning"> = { draft: "neutral", in_progress: "info", submitted: "success", locked: "neutral", needs_review: "warning" };
@@ -137,6 +138,7 @@ export function WorkerAttendanceToday({ projectId, worksiteId }: { projectId?: s
 }
 
 export function WorkerAttendanceSessionList() {
+  const user = useCurrentUser();
   const [sessions, setSessions] = useState<WorkerAttendanceSession[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -144,6 +146,7 @@ export function WorkerAttendanceSessionList() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState("");
+  const [view, setView] = useState<"sessions" | "table">("sessions");
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setSessions(await readWorkerResponse<WorkerAttendanceSession[]>(await fetch("/api/v1/worker-attendance/sessions", { cache: "no-store" }))); }
@@ -162,6 +165,7 @@ export function WorkerAttendanceSessionList() {
   ];
   return <ListWorkspace label="Lịch sử điểm danh công trường" filters={<><FilterBar busy={loading}><SearchInput aria-label="Tìm phiên điểm danh" placeholder="Dự án hoặc công trường" value={query} onChange={event => setQuery(event.target.value)} /><Input label="Từ ngày" onChange={event => setFrom(event.target.value)} type="date" value={from} /><Input label="Đến ngày" onChange={event => setTo(event.target.value)} type="date" value={to} /><Select label="Trạng thái" onChange={event => setStatus(event.target.value)} options={Object.entries(sessionLabels).map(([value, label]) => ({ value, label }))} placeholder="Tất cả" value={status} /></FilterBar></>} status={<div className="worklist-summary"><span role="status">{visible.length} phiên điểm danh</span>{filtered ? <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setFrom(""); setTo(""); setStatus(""); }}>Xóa bộ lọc</Button> : null}</div>}>
 {error && sessions.length ? <ErrorState title="Không thể cập nhật danh sách" description={error} action={<Button onClick={() => void load()}>Thử lại</Button>} /> : null}
-<DataTable ariaLabel="Lịch sử điểm danh công trường" columns={columns} data={visible} error={!sessions.length ? error : undefined} onRetry={() => void load()} loading={loading && !sessions.length} emptyTitle={filtered ? "Không có phiên phù hợp" : "Chưa có phiên điểm danh"} emptyDescription="" getRowId={session => session.id} getRowHref={session => `/worker-attendance/sessions/${session.id}`} pageSize={15} />
+<div aria-label="Cách xem điểm danh" className="worklist-summary" role="group"><Button aria-pressed={view === "sessions"} onClick={() => setView("sessions")} size="sm" variant={view === "sessions" ? "primary" : "secondary"}>Theo phiên</Button><Button aria-pressed={view === "table"} onClick={() => setView("table")} size="sm" variant={view === "table" ? "primary" : "secondary"}>Danh sách</Button></div>
+{view === "sessions" && visible.length ? <WorkerSessionEvidenceCards sessions={visible} canViewPhotos={can(user.permissions, "worker_attendance.view_photo") || can(user.permissions, "worker_attendance.create")} canExport={can(user.permissions, "timesheet.export")} /> : <DataTable ariaLabel="Lịch sử điểm danh công trường" columns={columns} data={visible} error={!sessions.length ? error : undefined} onRetry={() => void load()} loading={loading && !sessions.length} emptyTitle={filtered ? "Không có phiên phù hợp" : "Chưa có phiên điểm danh"} emptyDescription="" getRowId={session => session.id} getRowHref={session => `/worker-attendance/sessions/${session.id}`} pageSize={15} />}
 </ListWorkspace>;
 }

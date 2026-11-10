@@ -52,7 +52,7 @@ export async function seedProjects(db) {
     await check(db.from("project_updates").upsert({ id: issueUpdateId, client_update_id: fixedId(`client-issue:${name}`), project_id: id, project_name_snapshot: `[TEST] Gói công trường ${name}`, worksite_id: siteId, worksite_name_snapshot: `[TEST] Khu thi công ${name}`, author_employee_id: fixedId(`employee:${engineer}`), author_name_snapshot: `[TEST] ${engineer}`, author_project_role_snapshot: "supervisor_main", update_type: "issue", title: `[TEST] Chờ vật tư gói ${name}`, content: "Vật tư giả lập chưa đến công trường; cần điều phối lịch giao và kiểm tra tiến độ.", status: "waiting", created_by: engineerId }, { onConflict: "id", ignoreDuplicates: true }), "seed issue report");
     await check(db.from("project_issues").upsert({ id: issueId, project_id: id, worksite_id: siteId, source_update_id: issueUpdateId, title: `[TEST] Chờ vật tư gói ${name}`, severity: index ? "medium" : "high", status: "open", owner_employee_id: fixedId(`employee:${engineer}`) }, { onConflict: "id", ignoreDuplicates: true }), "seed project issue");
   }
-  console.log("READY 2 gói đang thi công + 1 gói hoàn thành; hai kỹ sư có phạm vi khác nhau");
+  console.log("READY 2 gói đang thi công + 1 gói hoàn thành; hai giám sát có phạm vi khác nhau");
 }
 export async function verifyProjects(db) {
   const projects = await check(db.from("projects").select("id,note,status").in("id", projectIds), "verify projects");
@@ -66,5 +66,5 @@ export async function verifyProjects(db) {
   const issues = await check(db.from("project_issues").select("id").in("id", ["A", "B"].map((name) => fixedId(`issue:${name}`))), "verify issues");
   const photos = await check(db.from("project_update_attachments").select("id").in("id", ["A", "B"].map((name) => fixedId(`field-attachment:${name}`))), "verify photos");
   assert.equal(issues.length, 2); assert.equal(photos.length, 2);
-  console.log("PASS phạm vi riêng của hai kỹ sư; dự án và phân công đủ dữ liệu");
+  console.log("PASS phạm vi riêng của hai giám sát; dự án và phân công đủ dữ liệu");
 }
