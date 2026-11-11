@@ -1,15 +1,16 @@
 .mobile-bottom-nav { display: none; }
 @media (max-width: 767px) {
   :root { --mobile-bottom-bar-height: 76px; }
-  .app-shell .mobile-bottom-nav { position: fixed; z-index: 60; inset: auto 0 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; gap: 2px; min-height: 72px; padding: 8px max(8px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); border-top: 1px solid var(--border-subtle); background: var(--surface); box-shadow: 0 -4px 22px color-mix(in srgb, var(--text-primary) 6%, transparent); }
+  .app-shell .mobile-bottom-nav { position: fixed; z-index: 60; inset: auto 0 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; justify-items: stretch; gap: 0; min-height: 72px; padding: 8px max(8px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); border-top: 1px solid var(--border-subtle); background: var(--surface); box-shadow: 0 -4px 22px color-mix(in srgb, var(--text-primary) 6%, transparent); }
   .app-shell .mobile-bottom-nav[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .app-shell .mobile-bottom-nav[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .app-shell .mobile-bottom-nav[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .app-shell .mobile-bottom-nav__item { display: flex; min-width: 0; min-height: 54px; align-items: center; justify-content: center; flex-direction: column; gap: 4px; border: 0; border-radius: 12px; padding: 4px 2px; background: transparent; color: var(--text-muted); font: inherit; text-decoration: none; }
+  .app-shell .mobile-bottom-nav > *, .app-shell .mobile-bottom-nav__item { width: 100%; min-width: 0; justify-self: stretch; }
+  .app-shell .mobile-bottom-nav__item { display: flex; min-height: 54px; height: 100%; align-items: center; justify-content: center; flex-direction: column; gap: 4px; border: 0; border-radius: 12px; padding: 4px 2px; background: transparent; color: var(--text-muted); font: inherit; text-decoration: none; }
   .app-shell .mobile-bottom-nav__item.is-active { color: var(--primary); background: var(--primary-soft); }
   .mobile-bottom-nav__icon { display: grid; width: 30px; height: 26px; place-items: center; }
   .mobile-bottom-nav__label { font-size: 10px; font-weight: 600; line-height: 1.3; }
-  .app-shell .mobile-bottom-nav__item--quick .mobile-bottom-nav__icon { width: 44px; height: 40px; margin-top: -14px; border-radius: 14px; background: var(--primary); color: var(--color-primary-foreground); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 22%, transparent); }
+  .app-shell .mobile-bottom-nav__item--quick .mobile-bottom-nav__icon { width: 30px; height: 26px; margin: 0; border: 0; border-radius: 9px; background: transparent; color: inherit; box-shadow: none; }
   .app-shell .page-main { padding-bottom: calc(102px + env(safe-area-inset-bottom)); }
   .app-shell .sticky-action-bar { bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 40; }
   .app-shell[data-keyboard-open="true"] .mobile-bottom-nav { display: none; }

@@ -74,10 +74,11 @@ function AppShellContent({ children, user, testEnvironment }: { children: ReactN
         || active instanceof HTMLInputElement && !active.readOnly && ["text", "search", "email", "password", "url", "tel", "number"].includes(active.type)
         || active instanceof HTMLElement && active.isContentEditable;
       if (!editing) fullHeight = Math.max(fullHeight, viewport.height);
-      const keyboardOpen = phone.matches && editing && viewport.scale === 1
+      const compressedViewport = phone.matches && viewport.scale === 1
         && Math.max(fullHeight - viewport.height, window.innerHeight - viewport.height) > 120;
+      const keyboardOpen = compressedViewport && editing;
       shell.dataset.keyboardOpen = String(keyboardOpen);
-      shell.style.setProperty("--app-viewport-height", `${viewport.height}px`);
+      shell.style.setProperty("--app-viewport-height", `${compressedViewport ? fullHeight : viewport.height}px`);
     };
     const scheduleUpdate = () => {
       cancelAnimationFrame(frame);
