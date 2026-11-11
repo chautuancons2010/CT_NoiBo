@@ -74,6 +74,7 @@ export function visibleApplications(
   return applicationRegistry.filter((application) =>
     application.launcher &&
     (!application.moduleFlag || !modules || modules[application.moduleFlag]) &&
+    (application.id !== "projects" || can(user.permissions, "project.view")) &&
     application.requiredAny.some((permission) => can(user.permissions, permission))
   ).map((application) => ({ ...application, defaultRoute: applicationDefaultRoute(application, user, modules) }));
 }
@@ -100,7 +101,7 @@ export function applicationsForLauncher(
     .map((application) => ({
       ...application,
       defaultRoute: applicationDefaultRoute(application, user, modules),
-      accessible: application.requiredAny.some((permission) => can(user.permissions, permission))
+      accessible: (application.id !== "projects" || can(user.permissions, "project.view")) && application.requiredAny.some((permission) => can(user.permissions, permission))
     }));
 }
 
@@ -127,13 +128,9 @@ export function contextualNavigationGroups(
   const items = overviewFirst(groups.flatMap((group) => group.items));
   if (application.id === "overview") return dashboardGroup;
   if (application.id === "messaging") return dashboardGroup;
-  const supervisorWorkflow = can(user.permissions, "worker_attendance.create")
-    && !can(user.permissions, "attendance.view_all")
-    && !can(user.permissions, "attendance.manage")
-    && !can(user.permissions, "project_monitoring.view_all");
-  if (application.id === "projects" && supervisorWorkflow) {
-    const attendanceItems = items.filter((item) => !["/project-monitoring", "/projects/updates"].some((prefix) => item.href === prefix || item.href.startsWith(`${prefix}/`)));
-    return [...dashboardGroup, ...(attendanceItems.length ? [{ label: application.label, items: attendanceItems }] : [])];
+  if (application.id === "projects") {
+    const viewerItems = items.filter(item => item.href === "/projects");
+    return [...dashboardGroup, ...(viewerItems.length ? [{ label: application.label, items: viewerItems }] : [])];
   }
   if (application.id === "warehouse") {
     const sections = [
@@ -173,5 +170,6 @@ export function visibleApplicationShortcuts(
   return overviewFirst(filterGroupsByAccess(desktopNavigation, user.permissions, modules, navigation)
     .filter((group) => application.navigationGroups.includes(group.label))
     .flatMap((group) => group.items)
-    .filter((item) => itemBelongsToApplication(item, application)));
+    .filter((item) => itemBelongsToApplication(item, application))
+    .filter(item => application.id !== "projects" || item.href === "/projects"));
 }

@@ -30,6 +30,15 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("worker attendance session actions", () => {
+  it("keeps embedded package evidence read-only even for a user with adjustment permission", async () => {
+    state.permissions = ["worker_attendance.view", "worker_attendance.create", "worker_attendance.adjust"];
+    vi.mocked(fetchWorkerSession).mockResolvedValue(fixture({ status: "submitted", submittedAt: "2026-10-15T01:15:00Z" }));
+    render(<WorkerAttendanceSessionDetail sessionId="session-1" reviewOnly embedded readOnly />);
+    await screen.findByRole("heading", { name: "Công trường kiểm thử" });
+    expect(screen.queryByRole("button", { name: /Điều chỉnh/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Chốt công cuối ngày" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Tiếp tục điểm danh|Trở lại/ })).not.toBeInTheDocument();
+  });
   it("continues an unfinished roster and does not offer close-day before attendance is submitted", async () => {
     render(<WorkerAttendanceSessionDetail sessionId="session-1" />);
     expect(await screen.findByRole("link", { name: "Tiếp tục điểm danh" })).toHaveAttribute("href", "/worker-attendance/sessions/session-1/roster");

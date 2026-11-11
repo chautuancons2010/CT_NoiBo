@@ -120,9 +120,17 @@ describe("application registry", () => {
     expect(personal[0].items.map((item) => item.href)).toEqual(["/attendance/me", "/attendance/history", "/attendance/requests", "/attendance/notifications"]);
   });
 
-  it("keeps supervisor construction navigation focused on packages and attendance", () => {
+  it("keeps the package module focused on the attendance viewer for all roles", () => {
     const groups = contextualNavigationGroups("/projects", user(["project.view", "project_monitoring.view", "worker_attendance.view", "worker_attendance.create"]), defaultSystemSettings.modules, defaultSystemSettings.navigation);
-    expect(groups.flatMap((group) => group.items.map((item) => item.href))).toEqual(["/projects", "/worker-attendance/today"]);
+    expect(groups.flatMap((group) => group.items.map((item) => item.href))).toEqual(["/projects"]);
+    const manager = user(["project.view", "project.create", "project.edit", "project_monitoring.view_all", "worker_attendance.view_all"]);
+    expect(contextualNavigationGroups("/projects/one/attendance", manager, defaultSystemSettings.modules, defaultSystemSettings.navigation).flatMap(group => group.items.map(item => item.href))).toEqual(["/projects"]);
+    expect(visibleApplicationShortcuts(applicationForPath("/projects"), manager, defaultSystemSettings.modules, defaultSystemSettings.navigation).map(item => item.href)).toEqual(["/projects"]);
+  });
+  it("does not send attendance-only users into the package viewer without project read permission", () => {
+    const actor = user(["worker_attendance.create", "worker_attendance.view"]);
+    expect(visibleApplications(actor, defaultSystemSettings.modules).some(item => item.id === "projects")).toBe(false);
+    expect(applicationsForLauncher(actor, defaultSystemSettings.modules).find(item => item.id === "projects")?.accessible).toBe(false);
   });
 
   it("opens the correct application for dedicated attendance permissions", () => {

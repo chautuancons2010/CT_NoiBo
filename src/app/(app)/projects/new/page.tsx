@@ -1,11 +1,5 @@
-import { PageHeader } from "@/components/shared/PageHeader";
-import { PermissionDeniedState } from "@/components/shared/States";
-import { ProjectCreateForm } from "@/features/projects/components/ProjectCreateForm";
-import { can } from "@/lib/auth/permissions";
-import { getRequestUser } from "@/services/auth/getRequestUser";
+import { redirect } from "next/navigation";
 
-export default async function Page() {
-  const user = await getRequestUser();
-  if (!user || !can(user.permissions, "project.create")) return <PermissionDeniedState />;
-  return <div className="page-stack project-create-page"><PageHeader title="Tạo gói" /><ProjectCreateForm /></div>;
+export default function Page() {
+  redirect("/projects");
 }

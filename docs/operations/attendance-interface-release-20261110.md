@@ -17,6 +17,7 @@
 - Nhân sự kiểm tra công trường theo ngày; mỗi công trường/ca có một nhóm, đếm công nhân duy nhất và mở các lượt theo thời gian. Bỏ chuyển đổi “Theo phiên/Danh sách”. Đổi ngày xóa minh chứng của ngày cũ ngay lập tức.
 - Danh sách ca, gán ca, lịch sử phiên bản và lịch làm việc nằm trong Cấu hình chấm công. Bỏ mục Ca làm độc lập; `/shifts` và `/shifts/calendar` chuyển sang đường dẫn cấu hình tương ứng. Giữ nguyên dữ liệu ca và quyền quản lý.
 - Kỳ công: tên kỳ là định danh chính, ngày Việt Nam, trạng thái rõ, mã và phiên bản cùng một dòng phụ; bản mobile không ép bảng desktop hoặc thêm disclosure chỉ để xem phiên bản.
+- Điều chỉnh phạm vi Gói ngày 11/11: module chỉ chọn gói và xem bảng công công nhân theo ngày/tháng. Bảng gộp nhiều lượt mỗi công nhân/ngày, có giờ thực tế, trạng thái thiếu giờ và minh chứng chỉ xem. Công nhân được phân công chưa có lượt gửi hiện “Chưa điểm danh”, không tự ghi công. Không còn các tab Hôm nay/Công việc/Nhân lực/Vật tư/Thông tin/Tài liệu hoặc nút tạo, phân công, điểm danh trong Gói. Đường dẫn cũ chuyển về `/projects/[id]/attendance`; điểm danh vẫn ở luồng Điểm danh riêng.
 - Giữ dữ liệu khi cập nhật realtime; các tải cùng phạm vi đang chạy được gộp lại. `aria-busy` phản ánh đúng trạng thái tải để screen reader và QA không coi skeleton là màn đã sẵn sàng.
 - Bộ TEST gán đúng loại nhân sự Giám sát; văn phòng vẫn tạm ngừng tự chấm theo yêu cầu trước.
 
@@ -54,7 +55,7 @@ Tool thực hiện: `production-clear-data.mjs`, `production-prepare-release.mjs
 
 ## Minh chứng và trạng thái kiểm tra
 
-- 1.337 unit/integration test qua, 37 test chủ động bỏ qua; 13 kiểm tra operations qua.
+- 1.348 unit/integration test qua, 37 test chủ động bỏ qua; 13 kiểm tra operations qua.
 - Migration validator kiểm tra 61 migration. Audit route theo contract hiện hành: Inter đủ 400–700, rail 240/80px, control 44px và token bo góc đang sử dụng.
 - Build webpack production thành công. Có lần đọc cấu hình quá ngưỡng timeout khi prerender; kiểm tra runtime bản production local và các rào môi trường đã qua.
 - QA vai trò HR tải workbook từ nút thật và đối chiếu số lượt với TEST; kiểm tra tám sheet, ngày công trường, sidebar thu/mở, bảng kỳ công 320/390/430/1440px, camera 320/390/430px và ngang 568px. Báo cáo nhiều lượt tại `test-results/interface-finish-20261110/rounds-local/` và `rounds-hosted/`; bộ trải nghiệm chung ở `user-experience.json` và `hosted/user-experience.json`.

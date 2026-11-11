@@ -1,3 +1,5 @@
-import { ProjectMonitoringPage } from "@/features/projects/pages/ProjectMonitoringPage";
+import { redirect } from "next/navigation";
 
-export default function Page() { return <ProjectMonitoringPage recentOnly />; }
+export default function Page() {
+  redirect("/projects");
+}

@@ -1,0 +1,83 @@
+.page { display: grid; min-width: 0; gap: 18px; }
+.heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.heading > div { display: grid; gap: 4px; min-width: 0; }
+.heading h2 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.heading > div > span { color: var(--text-secondary); font-size: 12px; }
+.projectIcon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; border: 1px solid var(--color-primary-border); border-radius: 14px; background: var(--primary-soft); color: var(--primary); }
+.monthSummary { min-width: 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface); }
+.monthSummary > header { display: flex; align-items: center; gap: 8px; padding: 12px 18px; background: color-mix(in srgb, var(--primary-soft) 50%, var(--surface)); color: var(--primary); font-size: 13px; }
+.monthSummary > header > span { margin-left: auto; color: var(--text-secondary); font-size: 11px; }
+.monthSummary dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 16px 18px; }
+.monthSummary dl > div { display: grid; gap: 6px; min-width: 0; }
+.monthSummary dt { color: var(--text-secondary); font-size: 12px; }
+.monthSummary dd { margin: 0; color: var(--text-primary); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sheet { min-width: 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface); }
+.filters { display: grid; min-width: 0; gap: 12px; padding: 16px 18px 12px; }
+.dateRow, .searchRow { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.viewSwitch { display: flex; flex-shrink: 0; gap: 4px; border: 1px solid var(--border-subtle); border-radius: 12px; padding: 3px; background: var(--surface-2); }
+.viewSwitch button { min-height: 38px; border: 0; border-radius: 9px; padding: 7px 14px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.viewSwitch button[aria-pressed="true"] { background: var(--surface); color: var(--primary); font-weight: 600; box-shadow: 0 1px 4px color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.dateControl { display: flex; min-width: 0; align-items: center; gap: 4px; }
+.dateControl > :global(.field) { width: 162px; min-width: 0; }
+.dateControl :global(.field__label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.dateControl :global(.input) { min-height: 44px; }
+.dateRow > :global(.button) { margin-left: auto; }
+.searchRow > :global(.search-input) { min-width: 0; max-width: 420px; flex: 1; border-radius: 12px; }
+.searchRow > :global(.field) { min-width: 0; width: 240px; }
+.searchRow > :global(.icon-button) { flex: 0 0 44px; margin-left: auto; }
+.tableStatus { border-bottom: 1px solid var(--border-subtle); padding: 0 18px 12px; color: var(--text-secondary); font-size: 12px; }
+.worker { display: flex; min-width: 0; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--text-primary); text-align: left; font: inherit; cursor: pointer; }
+.worker > span { display: grid; min-width: 0; gap: 4px; }
+.worker strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.worker small { color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.worker > svg { flex-shrink: 0; color: var(--primary); }
+.worker:hover strong { color: var(--primary); }
+.mobileHours { display: none; }
+.clock, .hours { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.evidence { white-space: nowrap; }
+.error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 18px 12px; border-radius: 12px; padding: 12px; background: var(--warning-soft); color: var(--warning); font-size: 13px; }
+.inspector { width: min(900px, 100vw); max-width: 100%; }
+.inspectorBody { display: grid; min-width: 0; gap: 16px; padding: 18px; }
+.dayTotal { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-radius: 14px; padding: 14px; background: var(--primary-soft); color: var(--primary); }
+.dayTotal > strong { font-size: 15px; }
+.dayTotal > span { font-size: 12px; }
+.rounds { display: grid; min-width: 0; gap: 12px; }
+.rounds article { display: grid; min-width: 0; gap: 10px; border: 1px solid var(--border-subtle); border-radius: 14px; padding: 14px; }
+.rounds article > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; }
+.rounds article > span { color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.rounds dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.rounds dl > div { display: grid; gap: 4px; }
+.rounds dt { color: var(--text-secondary); font-size: 11px; }
+.rounds dd { margin: 0; color: var(--text-primary); font-size: 15px; font-variant-numeric: tabular-nums; }
+.worker:focus-visible, .viewSwitch button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+@media (max-width: 767px) {
+  .page { gap: 14px; }
+  .heading h2 { font-size: 16px; }
+  .monthSummary > header { padding: 12px 14px; }
+  .monthSummary dl { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 12px; }
+  .monthSummary dt { font-size: 11px; }
+  .monthSummary dd { font-size: 20px; }
+  .page .compactTable :global(.mobile-record-sort) { display: none; }
+  .sheet { overflow: visible; border: 0; border-radius: 0; background: transparent; }
+  .filters { gap: 10px; padding: 0 0 12px; }
+  .dateRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .viewSwitch { width: fit-content; }
+  .viewSwitch button { min-height: 44px; padding-inline: 16px; }
+  .dateControl { display: grid; grid-column: 1 / -1; grid-row: 2; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 8px; }
+  .dateControl > :global(.field) { width: auto; }
+  .dateControl > :global(.icon-button) { background: var(--surface); }
+  .dateRow > :global(.button) { grid-column: 2; grid-row: 1; }
+  .searchRow { flex-wrap: wrap; gap: 8px; }
+  .searchRow > :global(.search-input) { max-width: none; flex-basis: calc(100% - 52px); background: var(--surface); }
+  .searchRow > :global(.field) { order: 2; flex-basis: 100%; width: 100%; }
+  .searchRow > :global(.icon-button) { margin: 0; background: var(--surface); }
+  .tableStatus { border: 0; padding: 0 0 10px; }
+  .page .table:global(.data-table-shell) { border: 0; background: transparent; }
+  .page .table :global(.mobile-record-list) { gap: 12px; }
+  .page .table :global(.mobile-record.mobile-record) { gap: 12px; border: 1px solid var(--border-subtle); border-radius: 16px; padding: 14px; background: var(--surface); }
+  .page .table :global(.mobile-record__facts) { border-top: 1px solid var(--border-subtle); padding-top: 12px; }
+  .page .table :global(.mobile-record__fact dd) { font-size: 15px; }
+  .mobileHours { display: inline; color: var(--primary); }
+  .error { margin-inline: 0; }
+  .inspectorBody { padding: 14px; }
+}

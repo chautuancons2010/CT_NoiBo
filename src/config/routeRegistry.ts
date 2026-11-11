@@ -291,6 +291,7 @@ const employeeSectionLabels: Record<string, string> = {
 };
 
 const projectSectionLabels: Record<string, string> = {
+  attendance: "Bảng công công nhân",
   today: "Hôm nay",
   progress: "Thi công",
   team: "Nhân lực",
@@ -409,7 +410,7 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (projectMatch) {
     return [
       { label: "Gói / Công trường", href: "/projects" },
-      { label: /^[0-9a-f-]{36}$/i.test(projectMatch[1]) ? "Công trường" : projectMatch[1], href: `/projects/${projectMatch[1]}/today` },
+      { label: /^[0-9a-f-]{36}$/i.test(projectMatch[1]) ? "Công trường" : projectMatch[1], href: `/projects/${projectMatch[1]}/attendance` },
       { label: projectSectionLabels[projectMatch[2]] ?? "Chi tiết" }
     ];
   }
@@ -475,6 +476,6 @@ export const employeeDetailSections = Object.entries(employeeSectionLabels).map(
   ([value, label]) => ({ value, label })
 );
 
-export const projectDetailSections = Object.entries(projectSectionLabels).map(
+export const projectDetailSections = Object.entries(projectSectionLabels).filter(([value]) => value === "attendance").map(
   ([value, label]) => ({ value, label })
 );

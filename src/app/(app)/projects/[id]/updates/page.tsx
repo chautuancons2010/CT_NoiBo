@@ -1,2 +1,6 @@
-import { ProjectUpdatesPage } from "@/features/projects/pages/ProjectUpdatesPage";
-export default async function Page({ params, searchParams }: PageProps<"/projects/[id]/updates">) { const { id } = await params; return <ProjectUpdatesPage projectId={id} searchParams={await searchParams} />; }
+import { redirect } from "next/navigation";
+
+export default async function Page({ params }: PageProps<"/projects/[id]/updates">) {
+  const { id } = await params;
+  redirect(`/projects/${encodeURIComponent(id)}/attendance`);
+}

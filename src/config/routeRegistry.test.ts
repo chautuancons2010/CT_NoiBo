@@ -45,18 +45,13 @@ describe("route registry", () => {
     ]));
   });
 
-  it("uses the field-operation package workspaces in business order", () => {
+  it("exposes only the worker attendance viewer inside a package", () => {
     expect(projectDetailSections).toEqual([
-      { value: "today", label: "Hôm nay" },
-      { value: "progress", label: "Thi công" },
-      { value: "team", label: "Nhân lực" },
-      { value: "materials", label: "Vật tư" },
-      { value: "profile", label: "Thông tin" },
-      { value: "documents", label: "Tài liệu" }
+      { value: "attendance", label: "Bảng công công nhân" }
     ]);
     expect(getBreadcrumbs("/projects/package-1/documents")).toEqual([
       { label: "Gói / Công trường", href: "/projects" },
-      { label: "package-1", href: "/projects/package-1/today" },
+      { label: "package-1", href: "/projects/package-1/attendance" },
       { label: "Tài liệu" }
     ]);
   });

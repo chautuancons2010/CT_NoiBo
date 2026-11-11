@@ -21,7 +21,7 @@
 .scope svg { color: var(--text-muted); }
 .scope strong { color: var(--text-primary); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .scope small { color: var(--text-muted); font-size: 11px; }
-.table :global([data-column="name"]) { min-width: 280px; width: 37%; }
+.table :global([data-column="name"]) { min-width: 240px; width: auto; }
 .table :global([data-column="manager"]) { min-width: 170px; }
 .table :global([data-column="people"]) { width: 112px; min-width: 112px; }
 .table :global([data-column="deadline"]) { width: 160px; min-width: 160px; }

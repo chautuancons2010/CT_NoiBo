@@ -197,3 +197,12 @@
   background: var(--surface-2);
   border-radius: 12px;
 }
+.dayReviewFilters { display: flex; min-width: 0; width: 100%; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.dayReviewDate { display: flex; min-width: 0; align-items: flex-end; gap: 8px; }
+.dayReviewDate > :global(.field) { width: 172px; min-width: 0; }
+.dayReviewFilters > :global(.filter-bar) { flex: 1; min-width: 260px; border: 0; padding: 0; }
+@media (max-width: 767px) {
+  .dayReviewDate { width: 100%; }
+  .dayReviewDate > :global(.field) { flex: 1; width: auto; }
+  .dayReviewFilters > :global(.filter-bar) { width: 100%; flex-basis: 100%; min-width: 0; }
+}

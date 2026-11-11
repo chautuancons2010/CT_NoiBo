@@ -250,22 +250,6 @@ export const desktopNavigation: NavigationGroup[] = [
         mobilePriority: 1,
         exact: true
       },
-      {
-        label: "Theo dõi dự án",
-        href: "/project-monitoring",
-        icon: "ChartNoAxesCombined",
-        requiredPermission: "project_monitoring.view",
-        alternativePermissions: ["project_monitoring.view_all", "project_issue.view"],
-        mobilePriority: 2
-      },
-      {
-        label: "Điểm danh",
-        href: "/worker-attendance/today",
-        icon: "ClipboardCheck",
-        requiredPermission: "worker_attendance.view",
-        alternativePermissions: ["worker_attendance.self_scope", "worker_attendance.view_project", "worker_attendance.view_all"],
-        mobilePriority: 3
-      },
     ]
   },
   {

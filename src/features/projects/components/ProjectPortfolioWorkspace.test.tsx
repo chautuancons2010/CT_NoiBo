@@ -61,13 +61,22 @@ describe("project list tasks", () => {
     fireEvent.click(screen.getByRole("button", { name: "Xóa lọc" }));
     expect(window.location.search).toBe("?source=test");
   });
-  it("offers creation only to users allowed to create", async () => {
+  it("keeps the package selector read-only even when legacy callers supply creation permission", async () => {
     vi.mocked(fetch).mockResolvedValue(response([]) as Response);
     const { rerender } = render(<ProjectPortfolioWorkspace />);
     await screen.findByRole("heading", { name: "Chưa có gói" });
     expect(screen.queryByRole("link", { name: "Tạo gói" })).not.toBeInTheDocument();
     rerender(<ProjectPortfolioWorkspace canCreate />);
-    expect(screen.getByRole("link", { name: "Tạo gói" })).toHaveAttribute("href", "/projects/new");
+    expect(screen.queryByRole("link", { name: "Tạo gói" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Tạo|Chỉnh sửa|Phân công/ })).not.toBeInTheDocument();
+  });
+  it("opens only the worker attendance viewer from each package", async () => {
+    render(<ProjectPortfolioWorkspace canCreate />);
+    const name = await screen.findByText("Bảo trì đường ray");
+    expect(name.closest("a")).toHaveAttribute("href", "/projects/one/attendance");
+    expect(screen.getByRole("columnheader", { name: "Trạng thái" })).toBeInTheDocument();
+    for (const title of ["Phụ trách", "Nhân sự", "Hạn hoàn thành"]) expect(screen.queryByRole("columnheader", { name: title })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tạo gói" })).not.toBeInTheDocument();
   });
   it("retries failed loads without losing the search", async () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error("Mất kết nối"));
