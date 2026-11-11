@@ -77,8 +77,8 @@ export interface AttendancePhotoStampMetadata {
   version: 1;
   capturedAt: string;
   address: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface AttendanceDashboard {
@@ -167,6 +167,7 @@ export interface PendingAttendanceItem extends AttendanceRecordInput {
   photoWidth: number;
   photoHeight: number;
   requiresPhotoStamp?: boolean;
+  rawPhoto?: Blob;
   photoStamp?: AttendancePhotoStampMetadata;
   createdAt: string;
   retryCount: number;

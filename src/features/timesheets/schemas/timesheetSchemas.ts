@@ -8,7 +8,7 @@ const scopeFields = {
 const validScope = <T extends { scopeType: string; scopeId?: string }>(value: T) => value.scopeType === "company" ? !value.scopeId : Boolean(value.scopeId);
 
 export const shiftInputSchema = z.object({
-  id: z.string().uuid().optional(), code: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,29}$/),
+  id: z.string().uuid().optional(), code: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,29}$/).optional(),
   name: z.string().trim().min(2).max(100), startTime: time, endTime: time,
   breakMinutes: z.number().int().min(0).max(720), lateGraceMinutes: z.number().int().min(0).max(180),
   earlyLeaveGraceMinutes: z.number().int().min(0).max(180), checkInEarliestMinutes: z.number().int().min(0).max(720),
@@ -19,7 +19,7 @@ export const shiftInputSchema = z.object({
   if (value.id && !value.effectiveFrom) context.addIssue({ code: "custom", path: ["effectiveFrom"], message: "Cần chọn ngày áp dụng." });
   if (value.id && !value.reason) context.addIssue({ code: "custom", path: ["reason"], message: "Cần nhập lý do thay đổi." });
 });
-export const shiftAssignmentInputSchema = z.object({ ...scopeFields, shiftId: z.string().uuid(), effectiveFrom: z.string().date(), effectiveTo: z.string().date().optional(), weekdays: z.array(z.number().int().min(0).max(6)).min(1) }).refine(validScope, { message: "Phạm vi chưa hợp lệ." });
+export const shiftAssignmentInputSchema = z.object({ scopeType: z.literal("project"), scopeId: z.string().uuid(), shiftId: z.string().uuid(), effectiveFrom: z.string().date(), effectiveTo: z.string().date().optional(), weekdays: z.array(z.number().int().min(0).max(6)).min(1) }).refine(value => !value.effectiveTo || value.effectiveTo >= value.effectiveFrom, { message: "Ngày kết thúc phải từ ngày bắt đầu." });
 export const calendarDayInputSchema = z.object({ ...scopeFields, id: z.string().uuid().optional(), date: z.string().date(), name: z.string().trim().min(2).max(120), dayType: z.enum(["holiday", "company_holiday", "makeup_workday", "special"]), isWorkingDay: z.boolean(), active: z.boolean() }).refine(validScope, { message: "Phạm vi chưa hợp lệ." });
 export const periodInputSchema = z.object({ code: z.string().trim().regex(/^[A-Z0-9_-]{2,30}$/), name: z.string().trim().min(2).max(100), startDate: z.string().date(), endDate: z.string().date() }).refine(value => value.endDate >= value.startDate, { message: "Ngày kết thúc phải sau ngày bắt đầu." });
 export const periodVersionSchema = z.object({ rowVersion: z.number().int().positive() });

@@ -13,6 +13,7 @@ export interface AttendancePhotoStamp {
   address: string;
   latitude?: number;
   longitude?: number;
+  accuracy?: number;
   label?: string;
 }
 
@@ -42,10 +43,12 @@ function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
     { text: (stamp.label || "CHÂU TUẤN · ĐIỂM DANH").slice(0, 70), size: labelSize },
     ...lines.map(text => ({ text, size }))
   ];
-  if (stamp.latitude !== undefined && stamp.longitude !== undefined) content.push({ text: `GPS ${stamp.latitude.toFixed(6)}, ${stamp.longitude.toFixed(6)}`, size: labelSize });
+  if (stamp.latitude !== undefined && stamp.longitude !== undefined) content.push({ text: `GPS ${stamp.latitude.toFixed(6)}, ${stamp.longitude.toFixed(6)}${stamp.accuracy !== undefined ? ` · ±${Math.round(stamp.accuracy)} m` : ""}`, size: labelSize });
   const height = Math.min(canvas.height, content.reduce((total, line) => total + line.size * 1.4, 0) + padding * 2);
   context.fillStyle = "rgba(13,31,23,.72)";
   context.fillRect(0, canvas.height - height, canvas.width, height);
+  context.fillStyle = "#39d99a";
+  context.fillRect(0, canvas.height - height, canvas.width, Math.max(2, 3 * scale));
   context.fillStyle = "#fff"; context.textBaseline = "top";
   let y = canvas.height - height + padding;
   for (const line of content) {
@@ -88,10 +91,10 @@ function drawVideo(video: HTMLVideoElement, longestEdge: number): HTMLCanvasElem
 }
 
 export async function captureAttendancePhoto(video: HTMLVideoElement): Promise<ProcessedAttendancePhoto> {
-  const fullCanvas = drawVideo(video, 1600);
+  const fullCanvas = drawVideo(video, 1920);
   const thumbnailCanvas = drawVideo(video, 320);
   const [photo, thumbnail] = await Promise.all([
-    canvasBlob(fullCanvas, 0.82),
+    boundedPhotoBlob(fullCanvas),
     canvasBlob(thumbnailCanvas, 0.76)
   ]);
   return {
@@ -122,11 +125,19 @@ export async function processAttendanceImage(file: File, stamp?: AttendancePhoto
       stampCanvas(canvas, stamp);
       return canvas;
     };
-    const fullCanvas = draw(1600);
+    const fullCanvas = draw(1920);
     const thumbnailCanvas = draw(320);
-    const [photo, thumbnail] = await Promise.all([canvasBlob(fullCanvas, 0.82), canvasBlob(thumbnailCanvas, 0.76)]);
+    const [photo, thumbnail] = await Promise.all([boundedPhotoBlob(fullCanvas), canvasBlob(thumbnailCanvas, 0.8)]);
     return { photo, thumbnail, width: fullCanvas.width, height: fullCanvas.height, previewUrl: URL.createObjectURL(photo) };
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
+}
+
+async function boundedPhotoBlob(canvas: HTMLCanvasElement) {
+  for (const quality of [0.9, 0.84, 0.76, 0.64, 0.5]) {
+    const blob = await canvasBlob(canvas, quality);
+    if (blob.size <= 2 * 1024 * 1024) return blob;
+  }
+  throw new Error("Ảnh quá lớn. Vui lòng chụp lại.");
 }

@@ -134,3 +134,6 @@
 }
 @media (prefers-reduced-motion: reduce) { .main { scroll-behavior: auto; } }
 .rail :global(.app-rail__section-label) { display: block; margin: 16px 14px 5px; color: var(--text-secondary); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.rail :global(.app-rail__link[data-locked]) { position: relative; opacity: .55; cursor: not-allowed; }
+.rail :global(.app-rail__lock) { margin-left: auto; flex-shrink: 0; }
+.rail[data-collapsed="true"] :global(.app-rail__lock) { position: absolute; top: 4px; right: 4px; }

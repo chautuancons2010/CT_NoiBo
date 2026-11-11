@@ -20,7 +20,7 @@ function leaveDeductsBalance(row: Row, type: Row): boolean {
   return typeof snapshot?.deductsBalance === "boolean" ? snapshot.deductsBalance : Boolean(type.deducts_balance);
 }
 
-type ShiftInput = Omit<Shift, "id"> & { id?: string; effectiveFrom?: string; reason?: string };
+type ShiftInput = Omit<Shift, "id" | "code"> & { code?: string; id?: string; effectiveFrom?: string; reason?: string };
 type CalendarInput = Omit<CalendarDay, "id"> & { id?: string };
 
 function db(): SupabaseClient { const value=getSupabaseServiceClient();if(!value)throw new AppError("SERVER_ERROR","Supabase chưa được cấu hình.");return value; }
@@ -42,26 +42,44 @@ export async function listShifts(user:AuthenticatedUser){
   if(!canViewShiftSettings&&!can(user.permissions,"project.manage_team"))throw new AppError("PERMISSION_DENIED");
   const client=db();
   if(!canViewShiftSettings){const {data,error}=await client.from("shifts").select("*").eq("active",true).order("code");if(error)throw new AppError("SERVER_ERROR","Không thể đọc danh mục ca làm.");return{shifts:(data??[]).map(row=>mapShift(row as Row)),assignments:[],versions:[]};}
-  const [{data,error},{data:assignments,error:assignmentError},{data:versions,error:versionError}]=await Promise.all([client.from("shifts").select("*").order("code"),client.from("shift_assignments").select("*").order("effective_from",{ascending:false}),client.from("shift_versions").select("*").order("effective_from",{ascending:false})]);if(error||assignmentError||versionError)throw new AppError("SERVER_ERROR","Không thể đọc cấu hình ca làm.");return{shifts:(data??[]).map(row=>mapShift(row as Row)),assignments:assignments??[],versions:versions??[]};
+  const [{data,error},{data:assignments,error:assignmentError},{data:versions,error:versionError},{data:projects,error:projectError}]=await Promise.all([client.from("shifts").select("*").order("code"),client.from("shift_assignments").select("*").order("effective_from",{ascending:false}),client.from("shift_versions").select("*").order("effective_from",{ascending:false}),client.from("projects").select("id,name").order("name")]);if(error||assignmentError||versionError||projectError)throw new AppError("SERVER_ERROR","Không thể đọc cấu hình ca làm.");return{shifts:(data??[]).map(row=>mapShift(row as Row)),assignments:assignments??[],versions:versions??[],projects:projects??[]};
 }
 export async function saveShift(user:AuthenticatedUser,input:ShiftInput){
   if(!can(user.permissions,"shift.manage")&&!can(user.permissions,"shift.edit"))throw new AppError("PERMISSION_DENIED");
   const client=db(),actor=await actorId(client,user);
-  const values={code:input.code,name:input.name,start_time:input.startTime,end_time:input.endTime,break_minutes:input.breakMinutes,late_grace_minutes:input.lateGraceMinutes,early_leave_grace_minutes:input.earlyLeaveGraceMinutes,check_in_earliest_minutes:input.checkInEarliestMinutes,check_in_latest_minutes:input.checkInLatestMinutes,check_out_earliest_minutes:input.checkOutEarliestMinutes,check_out_latest_minutes:input.checkOutLatestMinutes,cross_midnight:input.crossMidnight,active:input.active};
+  const values={code:input.code ?? `SHIFT_${crypto.randomUUID().replaceAll("-", "").slice(0,20).toUpperCase()}`,name:input.name,start_time:input.startTime,end_time:input.endTime,break_minutes:input.breakMinutes,late_grace_minutes:input.lateGraceMinutes,early_leave_grace_minutes:input.earlyLeaveGraceMinutes,check_in_earliest_minutes:input.checkInEarliestMinutes,check_in_latest_minutes:input.checkInLatestMinutes,check_out_earliest_minutes:input.checkOutEarliestMinutes,check_out_latest_minutes:input.checkOutLatestMinutes,cross_midnight:input.crossMidnight,active:input.active};
   if(input.id){
     const{data:before}=await client.from("shifts").select("*").eq("id",input.id).maybeSingle();
     if(!before)throw new AppError("NOT_FOUND","Không tìm thấy ca làm.");
+    values.code=String(before.code);
     const{data,error}=await client.rpc("update_shift_with_version",{p_shift_id:input.id,p_values:values,p_effective_from:input.effectiveFrom!,p_reason:input.reason!,p_actor:actor});
     if(error||!data){if(error?.message.includes("SHIFT_EFFECTIVE_DATE_CONFLICT"))throw new AppError("CONFLICT","Ngày hiệu lực phải sau phiên bản hiện tại.");throw new AppError(error?.code==="23505"?"DUPLICATE":"SERVER_ERROR","Không thể lưu phiên bản ca làm.");}
     await recordAuditLog({actorId:actor,action:"shift.version_created",entityType:"shift",entityId:input.id,before,after:{...values,effectiveFrom:input.effectiveFrom},reason:input.reason});return mapShift((Array.isArray(data)?data[0]:data) as Row);
   }
   const{data,error}=await client.from("shifts").insert({...values,created_by:actor}).select("*").single();
   if(error||!data)throw new AppError(error?.code==="23505"?"DUPLICATE":"SERVER_ERROR","Không thể lưu ca làm.");
-  const{error:versionError}=await client.from("shift_versions").insert({shift_id:data.id,version:1,code:input.code,name:input.name,start_time:input.startTime,end_time:input.endTime,break_minutes:input.breakMinutes,late_grace_minutes:input.lateGraceMinutes,early_leave_grace_minutes:input.earlyLeaveGraceMinutes,cross_midnight:input.crossMidnight,effective_from:input.effectiveFrom??getBusinessDateKey(),changed_by:actor,reason:input.reason??"Tạo ca làm"});
+  const{error:versionError}=await client.from("shift_versions").insert({shift_id:data.id,version:1,code:values.code,name:input.name,start_time:input.startTime,end_time:input.endTime,break_minutes:input.breakMinutes,late_grace_minutes:input.lateGraceMinutes,early_leave_grace_minutes:input.earlyLeaveGraceMinutes,cross_midnight:input.crossMidnight,effective_from:input.effectiveFrom??getBusinessDateKey(),changed_by:actor,reason:input.reason??"Tạo ca làm"});
   if(versionError){await client.from("shifts").delete().eq("id",data.id);throw new AppError("SERVER_ERROR","Không thể tạo phiên bản ca làm.");}
   await recordAuditLog({actorId:actor,action:"shift.created",entityType:"shift",entityId:String(data.id),after:values});return mapShift(data as Row);
 }
-export async function saveShiftAssignment(user:AuthenticatedUser,input:{shiftId:string;scopeType:string;scopeId?:string;effectiveFrom:string;effectiveTo?:string;weekdays:number[]}){if(!can(user.permissions,"shift.manage"))throw new AppError("PERMISSION_DENIED");const client=db();const actor=await actorId(client,user);const {data,error}=await client.from("shift_assignments").insert({shift_id:input.shiftId,scope_type:input.scopeType,scope_id:input.scopeId??null,effective_from:input.effectiveFrom,effective_to:input.effectiveTo??null,weekdays:input.weekdays,created_by:actor}).select("*").single();if(error||!data)throw new AppError(error?.code==="23505"?"DUPLICATE":"SERVER_ERROR","Không thể gán ca làm.");return data;}
+export async function saveShiftAssignment(user:AuthenticatedUser,input:{shiftId:string;scopeType:string;scopeId?:string;effectiveFrom:string;effectiveTo?:string;weekdays:number[]}) {
+  if(!can(user.permissions,"shift.manage")) throw new AppError("PERMISSION_DENIED");
+  if(input.scopeType!=="project" || !input.scopeId) throw new AppError("VALIDATION_ERROR","Cần chọn gói để gán ca.");
+  const client=db(), actor=await actorId(client,user);
+  const {data,error}=await client.from("shift_assignments").insert({shift_id:input.shiftId,scope_type:"project",scope_id:input.scopeId,effective_from:input.effectiveFrom,effective_to:input.effectiveTo??null,weekdays:[...new Set(input.weekdays)],created_by:actor}).select("*").single();
+  if(error||!data) throw new AppError(error?.message.includes("SHIFT_ASSIGNMENT_OVERLAP")?"CONFLICT":"VALIDATION_ERROR",error?.message.includes("SHIFT_ASSIGNMENT_OVERLAP")?"Gói đã có ca trong thời gian và ngày làm này. Kết thúc lượt gán cũ trước.":"Không thể gán ca. Kiểm tra gói và ca làm.");
+  await recordAuditLog({actorId:actor,action:"shift.assignment_created",entityType:"shift_assignment",entityId:String(data.id),after:data}); return data;
+}
+export async function endShiftAssignment(user:AuthenticatedUser,id:string) {
+  if(!can(user.permissions,"shift.manage")) throw new AppError("PERMISSION_DENIED");
+  const client=db(),actor=await actorId(client,user),today=getBusinessDateKey();
+  const {data:before,error:readError}=await client.from("shift_assignments").select("*").eq("id",id).maybeSingle();
+  if(readError||!before) throw new AppError("NOT_FOUND","Không tìm thấy lượt gán ca.");
+  const values=String(before.effective_from)>today?{active:false}:{effective_to:before.effective_to && before.effective_to < today ? before.effective_to : today};
+  const {data,error}=await client.from("shift_assignments").update(values).eq("id",id).select("*").single();
+  if(error||!data) throw new AppError("SERVER_ERROR","Không thể kết thúc lượt gán ca.");
+  await recordAuditLog({actorId:actor,action:"shift.assignment_ended",entityType:"shift_assignment",entityId:id,before,after:data}); return data;
+}
 export async function listCalendar(user:AuthenticatedUser,from?:string,to?:string){requireAny(user,["shift.view","shift.manage"]);let query=db().from("work_calendar_days").select("*").order("calendar_date");if(from)query=query.gte("calendar_date",from);if(to)query=query.lte("calendar_date",to);const {data,error}=await query;if(error)throw new AppError("SERVER_ERROR","Không thể đọc lịch làm việc.");return(data??[]).map(row=>({id:String(row.id),date:String(row.calendar_date),name:String(row.name),dayType:row.day_type,scopeType:row.scope_type,scopeId:row.scope_id??undefined,isWorkingDay:Boolean(row.is_working_day),active:Boolean(row.active)}));}
 export async function saveCalendarDay(user:AuthenticatedUser,input:CalendarInput){if(!can(user.permissions,"shift.manage"))throw new AppError("PERMISSION_DENIED");const client=db();const actor=await actorId(client,user);const values={calendar_date:input.date,name:input.name,day_type:input.dayType,scope_type:input.scopeType,scope_id:input.scopeId??null,is_working_day:input.isWorkingDay,active:input.active};const operation=input.id?client.from("work_calendar_days").update(values).eq("id",input.id):client.from("work_calendar_days").insert({...values,created_by:actor});const {data,error}=await operation.select("*").single();if(error||!data)throw new AppError(error?.code==="23505"?"DUPLICATE":"SERVER_ERROR","Không thể lưu ngày lịch.");return data;}
 

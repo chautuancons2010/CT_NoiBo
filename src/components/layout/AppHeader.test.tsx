@@ -28,25 +28,25 @@ vi.mock("@/components/shared/UserMenu", () => ({
 const user: AuthenticatedUser = { id: "account-1", displayName: "Nguyễn Thị Thúy Hằng", username: "thuyhang", email: "hang@example.com", status: "active", permissions: [] };
 
 describe("AppHeader", () => {
-  it("renders the brand and launcher on a mobile root screen", () => {
+  it("renders the brand without a duplicate launcher on a mobile root screen", () => {
     render(<AppHeader connectionState="connected" pathname="/dashboard" user={user} />);
     expect(screen.getByText("Châu Tuấn")).toBeInTheDocument();
     expect(screen.queryByText("Đồng bộ tức thời")).not.toBeInTheDocument();
     expect(screen.getByText("Tìm kiếm")).toBeInTheDocument();
-    expect(within(document.querySelector(".app-header__mobile-leading") as HTMLElement).getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+    expect(within(document.querySelector(".app-header__mobile-leading") as HTMLElement).queryByRole("button", { name: "Mở Ứng dụng của tôi" })).not.toBeInTheDocument();
   });
 
-  it("keeps the module launcher on non-dashboard screens", () => {
+  it("omits the duplicate launcher on non-dashboard screens", () => {
     render(<AppHeader connectionState="connected" pathname="/employees" user={user} />);
     expect(screen.getByRole("navigation", { name: "Vị trí hiện tại" })).toHaveTextContent("Nhân viên");
-    expect(within(document.querySelector(".app-header__desktop-leading") as HTMLElement).getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+    expect(within(document.querySelector(".app-header__desktop-leading") as HTMLElement).queryByRole("button", { name: "Mở Ứng dụng của tôi" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Thu gọn điều hướng" })).not.toBeInTheDocument();
   });
 
   it.each(["/projects", "/projects/project-one/team", "/settings/attendance", "/worker-attendance/today"])("keeps the same mobile brand toolbar on %s", (pathname) => {
     render(<AppHeader backHrefOverride="/projects" connectionState="connected" pathname={pathname} user={user} />);
     const leading = document.querySelector(".app-header__mobile-leading") as HTMLElement;
-    expect(within(leading).getByRole("button", { name: "Mở Ứng dụng của tôi" })).toBeInTheDocument();
+    expect(within(leading).queryByRole("button", { name: "Mở Ứng dụng của tôi" })).not.toBeInTheDocument();
     expect(within(leading).getByLabelText("Châu Tuấn")).toBeInTheDocument();
     expect(within(leading).getByText("Châu Tuấn")).toBeInTheDocument();
     expect(within(leading).queryByRole("link", { name: "Quay lại" })).not.toBeInTheDocument();

@@ -207,8 +207,10 @@ async function assertProjectScope(client: SupabaseClient, user: AuthenticatedUse
   if (!data?.length) throw new AppError("PERMISSION_DENIED", "Bạn không được phân công điểm danh công trường này trong ngày đã chọn.");
 }
 
-async function personalAttendanceReady(client: SupabaseClient, employeeId: string, date: string): Promise<boolean> {
-  const { data, error } = await client.from("attendance_events").select("event_type,photo_status,attendance_status").eq("employee_id", employeeId).eq("attendance_date", date).order("effective_at", { ascending: false }).limit(1).maybeSingle();
+async function personalAttendanceReady(client: SupabaseClient, employeeId: string, date: string, capturedAt?: string): Promise<boolean> {
+  let query = client.from("attendance_events").select("event_type,photo_status,attendance_status").eq("employee_id", employeeId).eq("attendance_date", date);
+  if (capturedAt) query = query.lte("effective_at", capturedAt);
+  const { data, error } = await query.order("effective_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new AppError("SERVER_ERROR", "Không thể kiểm tra chấm công cá nhân.");
   return data?.event_type === "check_in" && data.photo_status === "uploaded" && data.attendance_status !== "rejected";
 }
@@ -277,7 +279,8 @@ export async function createWorkerSession(user: AuthenticatedUser, input: z.infe
   const actor = await identity(client, user);
   const { data: replay } = await client.from("worker_attendance_sessions").select(sessionSelect).eq("client_session_id", input.clientSessionId).maybeSingle();
   if (replay) return { session: await getWorkerSession(user, String(replay.id)), idempotentReplay: true };
-  if (input.date !== getBusinessDateKey() || !await personalAttendanceReady(client, actor.employeeId, input.date)) throw new AppError("CONFLICT", "Chụp ảnh chấm công cá nhân trước khi điểm danh công nhân.");
+  if (getBusinessDateKey(new Date(input.capturedAtClient)) !== input.date || input.date > getBusinessDateKey() || Date.now() - Date.parse(input.capturedAtClient) > 45 * 86400_000) throw new AppError("VALIDATION_ERROR", "Thời gian điểm danh không hợp lệ hoặc quá 45 ngày.");
+  if (!await personalAttendanceReady(client, actor.employeeId, input.date, input.capturedAtClient)) throw new AppError("CONFLICT", "Chụp ảnh chấm công cá nhân trước khi điểm danh công nhân.");
   await assertProjectScope(client, user, actor.employeeId, input.projectId, input.worksiteId, input.date);
   const project = await getProject(input.projectId);
   if (project.status !== "active") throw new AppError("CONFLICT", "Gói không hoạt động.");
@@ -300,7 +303,7 @@ export async function createWorkerSession(user: AuthenticatedUser, input: z.infe
     shift_code: input.shiftCode, shift_name_snapshot: roster[0]?.shiftName ?? "Ca ngày", session_type: input.sessionType,
     shift_start_snapshot: roster[0]?.shiftStart ?? null, shift_end_snapshot: roster[0]?.shiftEnd ?? null, shift_break_minutes_snapshot: roster[0]?.shiftBreakMinutes ?? 0,
     supervisor_employee_id: actor.employeeId, supervisor_name_snapshot: actor.employeeName,
-    captured_at_client: input.capturedAtClient, latitude: input.location?.latitude ?? null, longitude: input.location?.longitude ?? null,
+    captured_at_client: input.capturedAtClient, started_at: input.capturedAtClient, latitude: input.location?.latitude ?? null, longitude: input.location?.longitude ?? null,
     accuracy_meters: input.location?.accuracy ?? null, distance_meters: distance ?? null, geofence_status: geofenceStatus,
     status: "in_progress", sync_status: "syncing", selection_mode: true, safety_confirmed: false, safety_report: createWorkerSafetyReport(), minimum_photos_snapshot: Math.max(1, workerPolicy.minimumPhotos), checklist_snapshot: checklist, checklist_responses: [], created_by: actor.accountId
   }).select("id").single();
@@ -397,10 +400,10 @@ export async function submitWorkerSession(user: AuthenticatedUser, sessionId: st
   const client = db(); const actor = await identity(client, user); const session = await getWorkerSession(user, sessionId);
   if (session.status === "submitted" || session.status === "locked") return session;
   if (session.version !== version) throw new AppError("CONFLICT", "Dữ liệu đã được cập nhật từ thiết bị khác.");
-  if (session.selectionMode && !await personalAttendanceReady(client, actor.employeeId, session.date)) throw new AppError("CONFLICT", "Cần hoàn tất chấm công cá nhân có ảnh trước khi gửi điểm danh.");
+  if (session.selectionMode && !await personalAttendanceReady(client, actor.employeeId, session.date, session.capturedAtClient)) throw new AppError("CONFLICT", "Cần hoàn tất chấm công cá nhân có ảnh trước khi gửi điểm danh.");
   const errors = validateSessionForSubmit({ ...session, photoCount: session.photos.length }, await policy(client));
   if (errors.length) throw new AppError("VALIDATION_ERROR", errors.join(" "));
-  const { data, error } = await client.from("worker_attendance_sessions").update({ status: "submitted", submitted_at: new Date().toISOString(), sync_status: "synced", ...(session.selectionMode ? { supervisor_employee_id: actor.employeeId, supervisor_name_snapshot: actor.employeeName } : {}) }).eq("id", sessionId).eq("version", version).select("id").maybeSingle();
+  const { data, error } = await client.from("worker_attendance_sessions").update({ status: session.geofenceStatus === "unavailable" || session.geofenceStatus === "accuracy_low" ? "needs_review" : "submitted", submitted_at: new Date().toISOString(), sync_status: "synced", ...(session.selectionMode ? { supervisor_employee_id: actor.employeeId, supervisor_name_snapshot: actor.employeeName } : {}) }).eq("id", sessionId).eq("version", version).select("id").maybeSingle();
   if (error) throw workerCommandError(error, "Không thể gửi chấm công.");
   if (!data) throw new AppError("CONFLICT", "Phiên vừa được cập nhật từ thiết bị khác.");
   await recordAuditLog({ actorId: actor.accountId, action: "worker_attendance.submitted", entityType: "worker_attendance_session", entityId: sessionId, after: { ...countWorkerAttendance(session.entries) } });

@@ -99,6 +99,10 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
     <ListPageLayout>
       <ResponsivePageHeader
         action={
+          <>
+          <PermissionGate permissions={user.permissions} require="account.create">
+            <Link className="button button--secondary button--md" href="/settings/users">Tài khoản nhân viên</Link>
+          </PermissionGate>
           <PermissionGate permissions={user.permissions} require="employee.create">
             <Link className="button button--primary button--md" href="/employees/new">
               <span className="button__icon">
@@ -107,6 +111,7 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
               <span>Thêm nhân viên</span>
             </Link>
           </PermissionGate>
+          </>
         }
         title="Nhân viên"
         meta={<span>{result.total} nhân viên</span>}

@@ -2,6 +2,8 @@
 
 import { deleteWorkerDraft, getWorkerDraft, saveWorkerDraft, type WorkerLocalDraft } from "./workerDraftStore";
 import type { WorkerAttendanceSession } from "@/features/worker-attendance/types/workerAttendanceTypes";
+import { lookupAttendanceAddress } from "@/features/attendance/client/attendanceAddressClient";
+import { processAttendanceImage } from "@/features/attendance/client/imageProcessing";
 
 interface ApiBody<T> {
   ok: boolean;
@@ -102,6 +104,15 @@ async function syncWorkerDraftUnlocked(draft: WorkerLocalDraft): Promise<WorkerA
     session = await readWorkerResponse<WorkerAttendanceSession>(await patch());
 
     for (const localPhoto of syncing.photos.filter((photo) => !photo.uploaded)) {
+      if (localPhoto.rawPhoto && localPhoto.latitude !== undefined && localPhoto.longitude !== undefined) {
+        const resolved = await lookupAttendanceAddress({ latitude: localPhoto.latitude, longitude: localPhoto.longitude }, { retry: true, priority: true });
+        if (resolved.address) {
+          const encoded = await processAttendanceImage(new File([localPhoto.rawPhoto], "worker.jpg", { type: "image/jpeg" }), { capturedAt: localPhoto.capturedAt, address: resolved.address, latitude: localPhoto.latitude, longitude: localPhoto.longitude, accuracy: localPhoto.accuracy, label: `CHÂU TUẤN · ${session.projectName}` });
+          localPhoto.photo = encoded.photo; localPhoto.thumbnail = encoded.thumbnail; localPhoto.width = encoded.width; localPhoto.height = encoded.height; localPhoto.address = resolved.address;
+          URL.revokeObjectURL(encoded.previewUrl);
+          await saveWorkerDraft(syncing);
+        }
+      }
       const form = new FormData();
       form.set("photo", localPhoto.photo, "worker-attendance.jpg");
       form.set("thumbnail", localPhoto.thumbnail, "worker-attendance-thumbnail.jpg");
@@ -138,7 +149,7 @@ async function syncWorkerDraftUnlocked(draft: WorkerLocalDraft): Promise<WorkerA
     const latest = await getWorkerDraft(draft.id);
     const recover = latest && latest.updatedAt > draft.updatedAt ? latest : syncing;
     const localByWorker = new Map(recover.session.entries.map(entry => [entry.workerId, entry]));
-    await saveWorkerDraft({ ...recover, pendingSubmit: error instanceof WorkerSyncError && error.code !== "NETWORK_ERROR" ? false : recover.pendingSubmit, session: {
+    await saveWorkerDraft({ ...recover, pendingSubmit: error instanceof WorkerSyncError && !["NETWORK_ERROR", "PHOTO_UPLOAD", "SERVER_ERROR", "TIMEOUT", "RATE_LIMIT"].includes(error.code) ? false : recover.pendingSubmit, session: {
       ...session,
       entries: session.entries.map(entry => ({ ...entry, ...localByWorker.get(entry.workerId), id: entry.id, sessionId: session.id })),
       safetyConfirmed: recover.session.safetyConfirmed,

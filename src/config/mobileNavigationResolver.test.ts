@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+vi.mock("@/config/featureRelease", () => ({ attendanceOnlyRelease: false, isReleasedFeaturePath: () => true }));
+import { describe, expect, it, vi } from "vitest";
 
 import { activeMobileDestination, canUseWorkerAttendance, isMobileDestinationActive, isMobilePersonalRoute, resolveMobileNavigation, type MobileNavDestination } from "@/config/mobileNavigationResolver";
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";

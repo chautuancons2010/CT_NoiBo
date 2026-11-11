@@ -33,7 +33,7 @@ describe("JPEG evidence footer", () => {
       expect(text).toContain("13:20:15 · 09/11/2026");
       expect(text).toContain("12 Nguyễn Huệ, TP. Hồ Chí Minh");
       expect(text).toContain("GPS 10.776900, 106.700900");
-      expect(context.fillRect).toHaveBeenCalledOnce();
+      expect(context.fillRect).toHaveBeenCalledTimes(2);
       expect(context.fillText.mock.invocationCallOrder.at(-1)).toBeLessThan(encoded.mock.invocationCallOrder[contexts.indexOf(context)]);
     }
     expect(result.photo.type).toBe("image/jpeg");

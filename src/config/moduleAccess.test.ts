@@ -49,8 +49,8 @@ describe("module availability", () => {
 
   it("blocks routes that depend on a locked module outside their primary application", () => {
     const modules = { ...defaultSystemSettings.modules, accounting: false, warehouse: false };
-    expect(isPathEnabled("/personal/payslips/123", modules)).toBe(false);
-    expect(lockedModuleForRequestPath("/personal/payslips/123", modules)).toBe("accounting");
+    expect(isPathEnabled("/personal/payslips/123", modules)).toBe(true);
+    expect(lockedModuleForRequestPath("/personal/payslips/123", modules)).toBeNull();
     expect(lockedModuleForRequestPath("/api/v1/shipments/123/create-warehouse-receipt", modules)).toBe("warehouse");
     expect(lockedModuleForRequestPath("/api/v1/shipments/123", modules)).toBeNull();
   });

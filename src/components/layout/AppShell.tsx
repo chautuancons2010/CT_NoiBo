@@ -22,6 +22,7 @@ import { CurrentUserProvider } from "@/components/providers/CurrentUserProvider"
 import { installBackHistory } from "@/lib/navigation/backHistory";
 import { readWorkspacePreferences, type WorkspacePreferences } from "@/lib/ui/workspacePreferencesRequest";
 import chrome from "./ApplicationChrome.module.css";
+import { AttendanceConnectivity } from "./AttendanceConnectivity";
 
 const INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
@@ -219,6 +220,7 @@ function AppShellContent({ children, user, testEnvironment }: { children: ReactN
         user={user}
       />
       <div className={`${contentClassName} ${chrome.content}`}>
+        <AttendanceConnectivity accountId={user.id} pathname={pathname} />
         <AppHeader backHrefOverride={localBackHref} connectionState={connectionState} documentTitleOverride={pageTitles?.pathname === pathname ? pageTitles.documentTitle : undefined} homeHref={resolveLandingPage(user, settings.dashboard)} mobileHomeHref={resolveMobileLandingPage(user, settings.dashboard)} onSidebarToggle={() => changeSidebarState(!collapsed)} pageTitleOverride={pageTitles?.pathname === pathname ? pageTitles.pageTitle : undefined} pathname={pathname} sidebarCollapsed={collapsed} testEnvironment={testEnvironment} user={user} />
         <SystemNoticeBanner />
         <main className={`page-main ${chrome.main}`} id="main-content" ref={mainRef} tabIndex={-1}>

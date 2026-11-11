@@ -7,15 +7,14 @@ import { ChevronRight } from "lucide-react";
 import { getRouteMeta } from "@/config/routeRegistry";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { UserMenu } from "@/components/shared/UserMenu";
-import { MobileAppLauncher } from "@/components/layout/MobileAppLauncher";
 import { useBranding, useOrganizationSettings } from "@/components/providers/SystemSettingsProvider";
 import { NotificationBell } from "@/features/shared-platforms/components/NotificationBell";
 import { MessageBell } from "@/features/messaging/MessageBell";
+import { attendanceOnlyRelease } from "@/config/featureRelease";
 import { CommandPalette } from "@/features/search/components/CommandPalette";
 import type { RealtimeConnectionState } from "@/lib/realtime/coordinator";
 import { can } from "@/lib/auth/permissions";
 import { AppLogo } from "@/components/layout/AppLogo";
-import { ApplicationMenu } from "@/components/layout/ApplicationMenu";
 import { HeaderTestControl } from "@/features/testing/HeaderTestControl";
 import chrome from "./ApplicationChrome.module.css";
 
@@ -68,13 +67,11 @@ export function AppHeader({ pathname, user, connectionState, pageTitleOverride, 
   return (
     <header className={`app-header app-header--compact app-header--root ${chrome.header}`}>
       <div className="app-header__desktop-leading">
-        <ApplicationMenu />
         <nav aria-label="Vị trí hiện tại" className="app-header__context">
           {pathname === homeHref ? <span aria-current="page">Trang chủ</span> : <><Link href={homeHref}>Trang chủ</Link><ChevronRight aria-hidden="true" size={13} /><span aria-current="page" title={mobileTitle}>{mobileTitle}</span></>}
         </nav>
       </div>
       <div className="app-header__mobile-leading">
-        <MobileAppLauncher key={pathname} user={user} variant="brand" />
         <span className="app-header__mobile-logo"><AppLogo compact href={mobileHomeHref} label="Về trang chủ" /></span>
         <span className="app-header__mobile-brand">{organization.shortName}</span>
       </div>
@@ -86,7 +83,7 @@ export function AppHeader({ pathname, user, connectionState, pageTitleOverride, 
             <i aria-hidden="true" /><span>{connectionLabels[connectionState]}</span>
           </span>
         ) : null}
-        {can(user.permissions, "chat.access") ? <MessageBell /> : null}
+        {!attendanceOnlyRelease && can(user.permissions, "chat.access") ? <MessageBell /> : null}
         <NotificationBell accountId={user.id} />
         <UserMenu user={user} />
       </div>

@@ -24,6 +24,7 @@ import { countWorkerAttendance, validateSessionForSubmit } from "@/features/work
 import type { WorkerAttendanceEntry, WorkerAttendanceSession, WorkerEntryStatus, WorkerSafetyReport } from "@/features/worker-attendance/types/workerAttendanceTypes";
 import { createWorkerSafetyReport, validateWorkerSafetyReport } from "../services/workerSafetyReport";
 import { WorkerSafetyReportEditor, WorkerSafetyReportView } from "./WorkerSafetyReport";
+import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 
 import { formatBusinessDate } from "@/lib/time/timezone";
 import styles from "./WorkerAttendanceWorkspace.module.css";
@@ -38,7 +39,7 @@ const statuses: Array<{ value: WorkerEntryStatus; label: string }> = [
 ];
 const stepLabels: Record<WizardStep, string> = { roster: "Công nhân", photos: "Chụp ảnh", review: "An toàn" };
 
-function route(id: string, step: WizardStep) { return `/worker-attendance/sessions/${id}/${step}`; }
+function route(id: string, step: WizardStep) { return navigator.onLine ? `/worker-attendance/sessions/${id}/${step}` : `/worker-attendance/offline?draft=${encodeURIComponent(id)}&step=${step}`; }
 
 function DraftPhoto({ photo }: { photo: Blob }) {
   return <WorkerEvidencePhoto photo={photo} />;
@@ -46,6 +47,7 @@ function DraftPhoto({ photo }: { photo: Blob }) {
 
 export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeOptions = [] }: { sessionId: string; step: WizardStep; employeeOptions?: EmployeePickerOption[] }) {
   const router = useRouter();
+  const user = useCurrentUser();
   const [step, setStep] = useState(initialStep);
   const stepRef = useRef(initialStep);
   const [draft, setDraft] = useState<WorkerLocalDraft>();
@@ -73,7 +75,7 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     const restoreStep = () => {
-      const last = window.location.pathname.split("/").at(-1) as WizardStep;
+      const last = (new URLSearchParams(window.location.search).get("step") ?? window.location.pathname.split("/").at(-1)) as WizardStep;
       if (["roster", "review", "photos"].includes(last)) { stepRef.current = last; setStep(last); }
     };
     window.addEventListener("popstate", restoreStep);
@@ -82,7 +84,8 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
 
   const load = useCallback(async () => {
     try {
-      const stored = await getWorkerDraft(sessionId);
+      const saved = await getWorkerDraft(sessionId);
+      const stored = saved?.ownerAccountId === user.id ? saved : undefined;
       const local = stored?.session.selectionMode && !stored.session.safetyReport ? { ...stored, session: { ...stored.session, safetyReport: createWorkerSafetyReport() } } : stored;
       if (local) {
         draftRef.current = local;
@@ -96,10 +99,10 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
       if (sessionId.startsWith("local-")) throw new Error("Không tìm thấy bản nháp trên thiết bị này.");
       const session = await fetchWorkerSession(sessionId);
       if (session.submittedAt || session.status === "submitted" || session.status === "locked") { router.replace(`/worker-attendance/sessions/${session.id}`); return; }
-      const value: WorkerLocalDraft = { id: session.id, ownerAccountId: "server", clientSessionId: session.clientSessionId, session: session.selectionMode && !session.safetyReport ? { ...session, safetyReport: createWorkerSafetyReport() } : session, photos: [], pendingSubmit: false, retryCount: 0, updatedAt: new Date().toISOString() };
+      const value: WorkerLocalDraft = { id: session.id, ownerAccountId: user.id, clientSessionId: session.clientSessionId, session: session.selectionMode && !session.safetyReport ? { ...session, safetyReport: createWorkerSafetyReport() } : session, photos: [], pendingSubmit: false, retryCount: 0, updatedAt: new Date().toISOString() };
       await saveWorkerDraft(value); draftRef.current = value; setDraft(value);
     } catch (caught) { setMessage(caught instanceof Error ? caught.message : "Không thể mở phiên điểm danh."); }
-  }, [router, sessionId]);
+  }, [router, sessionId, user.id]);
   useEffect(() => {
     // Restore the device draft before falling back to the API.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -275,15 +278,19 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
     try {
       const capturedAt = new Date().toISOString();
       if (!draftRef.current.location || Date.parse(capturedAt) - locationCapturedAt.current > 15_000) await retryLocation();
-      const coordinates = draftRef.current.location;
-      if (!coordinates) throw new Error("Chưa lấy được GPS. Bật quyền vị trí rồi bấm Thử lại.");
-      const result = await lookupAttendanceAddress(coordinates);
-      if (result.status !== "resolved" || !result.address) throw new Error("Chưa lấy được địa chỉ GPS. Giữ ảnh và bấm Thử lại.");
-      const processed = await processAttendanceImage(file, { capturedAt, address: result.address, latitude: coordinates.latitude, longitude: coordinates.longitude, label: `CHÂU TUẤN · ${draftRef.current.session.projectName}` });
+      const coordinates = Date.parse(capturedAt) - locationCapturedAt.current <= 15_000 ? draftRef.current.location : undefined;
+      const result = coordinates ? await lookupAttendanceAddress(coordinates) : { address: undefined };
+      const address = result.address || (coordinates ? `GPS ${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)} · Chưa có địa chỉ` : "Chưa có GPS · Cần xác minh vị trí");
+      const processed = await processAttendanceImage(file, { capturedAt, address, latitude: coordinates?.latitude, longitude: coordinates?.longitude, accuracy: coordinates?.accuracy, label: `CHÂU TUẤN · ${draftRef.current.session.projectName}` });
       URL.revokeObjectURL(processed.previewUrl);
-      const photo: LocalWorkerPhoto = { id: crypto.randomUUID(), photo: processed.photo, thumbnail: processed.thumbnail, width: processed.width, height: processed.height, capturedAt, address: result.address, latitude: coordinates.latitude, longitude: coordinates.longitude, accuracy: coordinates.accuracy, uploaded: false };
+      const photo: LocalWorkerPhoto = { id: crypto.randomUUID(), photo: processed.photo, thumbnail: processed.thumbnail, width: processed.width, height: processed.height, capturedAt, address, latitude: coordinates?.latitude, longitude: coordinates?.longitude, accuracy: coordinates?.accuracy, uploaded: false };
+      if (!result.address) {
+        const raw = await processAttendanceImage(file);
+        photo.rawPhoto = raw.photo;
+        URL.revokeObjectURL(raw.previewUrl);
+      }
       const current = draftRef.current!;
-      await update({ ...current, location: { latitude: coordinates.latitude, longitude: coordinates.longitude, accuracy: coordinates.accuracy }, photos: [...current.photos, photo], session: { ...current.session, latitude: coordinates.latitude, longitude: coordinates.longitude, accuracyMeters: coordinates.accuracy, worksiteAddress: undefined, geofenceStatus: "valid", photoStatus: "pending_upload" }, updatedAt: new Date().toISOString() });
+      await update({ ...current, location: coordinates ? { latitude: coordinates.latitude, longitude: coordinates.longitude, accuracy: coordinates.accuracy } : undefined, photos: [...current.photos, photo], session: { ...current.session, latitude: coordinates?.latitude, longitude: coordinates?.longitude, accuracyMeters: coordinates?.accuracy, worksiteAddress: undefined, geofenceStatus: coordinates ? "valid" : "unavailable", photoStatus: "pending_upload" }, updatedAt: new Date().toISOString() });
       setPhotoFile(undefined);
     } catch (caught) { setPhotoError(caught instanceof Error ? caught.message : "Không thể xử lý ảnh."); }
     finally { setPhotoBusy(false); }
@@ -375,7 +382,7 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
       {step === "roster" && selectionMode ? <>
         <Card className="worker-roster-card">
           <div className="worker-roster-actions"><SearchInput aria-label="Tìm công nhân" onChange={event => setQuery(event.target.value)} placeholder="Tên hoặc mã công nhân" value={query} /><Button disabled={locked || !draft.session.entries.length} onClick={toggleAllSelected} size="sm">{selectedCount ? "Chọn / bỏ chọn tất cả" : "Chọn tất cả"}</Button><span role="status">Đã chọn {selectedCount}/{draft.session.entries.length}</span></div>
-          <div className={styles.workerChoices}>{visibleEntries.map(entry => <div className={styles.workerChoice} data-selected={entry.isSelected === true} key={entry.id}><Checkbox checked={entry.isSelected === true} disabled={locked || entry.exceptionReason === "approved_leave"} label={`${entry.workerName} · ${entry.employeeCode}`} onChange={event => updateEntry(entry.id, { isSelected: event.target.checked, status: event.target.checked ? "present" : "unconfirmed", exceptionReason: undefined })} />{entry.exceptionReason === "approved_leave" ? <StatusBadge tone="neutral">Nghỉ có phép</StatusBadge> : null}</div>)}</div>
+          <div className={styles.workerChoices}>{visibleEntries.map(entry => <div className={styles.workerChoice} data-selected={entry.isSelected === true} key={entry.id}><Checkbox checked={entry.isSelected === true} disabled={locked || entry.exceptionReason === "approved_leave"} label={entry.workerName} onChange={event => updateEntry(entry.id, { isSelected: event.target.checked, status: event.target.checked ? "present" : "unconfirmed", exceptionReason: undefined })} />{entry.exceptionReason === "approved_leave" ? <StatusBadge tone="neutral">Nghỉ có phép</StatusBadge> : null}</div>)}</div>
           {!visibleEntries.length ? <p className={styles.emptySelection}>{query ? "Không tìm thấy công nhân." : "Gói chưa có công nhân."}</p> : null}
         </Card>
         <div className="sticky-action-bar"><Button disabled={locked || !selectedCount} busy={busy} onClick={() => void saveAndGo("review")} size="lg" variant="primary">Tiếp tục</Button></div>
@@ -385,7 +392,7 @@ export function WorkerAttendanceWizard({ sessionId, step: initialStep, employeeO
         <div className="worker-counts"><span>Tổng <strong>{counts.total}</strong></span><span>Có mặt <strong>{counts.present}</strong></span><span>Vắng <strong>{counts.absent + counts.leave}</strong></span><span>Chưa xác nhận <strong>{counts.unconfirmed}</strong></span></div>
         <Card className="worker-roster-card">
           <div className="worker-roster-actions"><SearchInput aria-label="Tìm công nhân" onChange={event => setQuery(event.target.value)} placeholder="Tên hoặc mã công nhân" value={query} /><Button aria-pressed={onlyUnprocessed} onClick={() => setOnlyUnprocessed((value) => !value)} size="sm" variant={onlyUnprocessed ? "soft" : "secondary"}>Chưa xử lý</Button><Button disabled={busy || draft.pendingSubmit || !draft.session.entries.length} onClick={markAllPresent} size="sm" variant="primary">Có mặt tất cả</Button></div>
-          <div className="worker-roster-list">{visibleEntries.map((entry) => <article className="worker-roster-row" key={entry.id}><div><strong>{entry.workerName}</strong><small>{entry.employeeCode}</small>{entry.isUnplanned ? <span>Ngoài kế hoạch</span> : null}</div><div aria-label={`Điểm danh ${entry.workerName}`} className={styles.statusChips} role="group">{(["present", "leave", "absent", "late"] as WorkerEntryStatus[]).map((value) => <button aria-pressed={entry.status === value} data-status={value} className={entry.status === value ? "is-active" : ""} disabled={busy || draft.pendingSubmit} key={value} onClick={() => updateEntry(entry.id, { status: value, exceptionReason: value === "absent" ? "unknown" : value === "leave" ? "approved_leave" : undefined })} type="button">{entry.status === value ? <Check aria-hidden="true" size={13} /> : null}{statuses.find((item) => item.value === value)?.label}</button>)}</div>{entry.status === "absent" || entry.status === "leave" || entry.status === "transferred" ? <Select label={`Lý do ${entry.workerName}`} labelHidden className="select worker-row-reason" disabled={busy || draft.pendingSubmit} onChange={(event) => updateEntry(entry.id, { exceptionReason: event.target.value as WorkerAttendanceEntry["exceptionReason"] })} value={entry.exceptionReason ?? "unknown"} options={[{ label: "Có phép", value: "approved_leave" }, { label: "Không phép", value: "unapproved" }, { label: "Chưa rõ", value: "unknown" }, { label: "Công trường khác", value: "other_worksite" }, { label: "Khác", value: "other" }]} /> : null}</article>)}</div>
+          <div className="worker-roster-list">{visibleEntries.map((entry) => <article className="worker-roster-row" key={entry.id}><div><strong>{entry.workerName}</strong>{entry.isUnplanned ? <span>Ngoài kế hoạch</span> : null}</div><div aria-label={`Điểm danh ${entry.workerName}`} className={styles.statusChips} role="group">{(["present", "leave", "absent", "late"] as WorkerEntryStatus[]).map((value) => <button aria-pressed={entry.status === value} data-status={value} className={entry.status === value ? "is-active" : ""} disabled={busy || draft.pendingSubmit} key={value} onClick={() => updateEntry(entry.id, { status: value, exceptionReason: value === "absent" ? "unknown" : value === "leave" ? "approved_leave" : undefined })} type="button">{entry.status === value ? <Check aria-hidden="true" size={13} /> : null}{statuses.find((item) => item.value === value)?.label}</button>)}</div>{entry.status === "absent" || entry.status === "leave" || entry.status === "transferred" ? <Select label={`Lý do ${entry.workerName}`} labelHidden className="select worker-row-reason" disabled={busy || draft.pendingSubmit} onChange={(event) => updateEntry(entry.id, { exceptionReason: event.target.value as WorkerAttendanceEntry["exceptionReason"] })} value={entry.exceptionReason ?? "unknown"} options={[{ label: "Có phép", value: "approved_leave" }, { label: "Không phép", value: "unapproved" }, { label: "Chưa rõ", value: "unknown" }, { label: "Công trường khác", value: "other_worksite" }, { label: "Khác", value: "other" }]} /> : null}</article>)}</div>
           <Button leftIcon={<UserPlus size={16} />} onClick={() => setShowTemporary((value) => !value)} variant="ghost">Thêm công nhân</Button>
           {showTemporary ? <div className="worker-add-person"><section><h4>Đã có hồ sơ</h4><WorkerSelector label="Tìm công nhân" onSelect={(option) => setSelectedExistingId(option.id)} options={employeeOptions} selectedId={selectedExistingId} /><Select label="Lý do" onChange={(event) => setExistingReason(event.target.value)} options={[{ value: "mobilized", label: "Điều động" }, { value: "support", label: "Hỗ trợ" }, { value: "replacement", label: "Thay thế" }, { value: "other", label: "Khác" }]} value={existingReason} /><Button disabled={busy || !selectedExistingId} onClick={() => void addExisting()} variant="primary">Thêm vào danh sách</Button></section><section><h4>Chưa có hồ sơ</h4><form action={addTemporary} className="worker-temporary-form"><Input label="Họ tên" name="fullName" required /><Input label="Số điện thoại" name="phone" /><Input label="Nhà thầu" name="contractorName" /><Select label="Lý do" name="unplannedReason" options={[{ value: "mobilized", label: "Điều động" }, { value: "support", label: "Hỗ trợ" }, { value: "replacement", label: "Thay thế" }, { value: "other", label: "Khác" }]} required /><Button disabled={busy} type="submit" variant="primary">Tạo và thêm</Button></form></section></div> : null}
         </Card>

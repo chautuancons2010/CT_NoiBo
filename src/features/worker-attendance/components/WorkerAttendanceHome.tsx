@@ -13,7 +13,8 @@ import { Input, SearchInput, Select } from "@/components/shared/FormControls";
 import { AttendanceExport } from "@/features/attendance/components/AttendanceExport";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/States";
-import { cacheWorkerTasks, getLatestCachedWorkerTasks, listWorkerDrafts, saveWorkerDraft, type CachedWorkerTasks, type WorkerLocalDraft } from "@/features/worker-attendance/client/workerDraftStore";
+import { listPendingAttendance } from "@/features/attendance/client/attendanceQueue";
+import { cacheWorkerTasks, getCachedWorkerTasks, listWorkerDrafts, saveWorkerDraft, type CachedWorkerTasks, type WorkerLocalDraft } from "@/features/worker-attendance/client/workerDraftStore";
 import { readWorkerResponse } from "@/features/worker-attendance/client/workerAttendanceSync";
 import type { WorkerAttendanceSession, WorkerAttendanceTask } from "@/features/worker-attendance/types/workerAttendanceTypes";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
@@ -66,8 +67,12 @@ export function WorkerAttendanceToday({ projectId, worksiteId, embedded = false 
       setData(cache); setOffline(false);
       void cacheWorkerTasks(cache).catch(() => undefined);
     } catch (caught) {
-      const cached = await getLatestCachedWorkerTasks(date);
-      if (cached && cached.accountId === user.id) { setData(cached); setOffline(true); }
+      const cached = await getCachedWorkerTasks(user.id, date);
+      if (cached && cached.accountId === user.id) {
+        const pending = await listPendingAttendance(user.id).catch(() => []);
+        const latest = pending.filter(item => getBusinessDateKey(new Date(item.capturedAtClient)) === date).at(-1);
+        setData(latest ? {...cached,personalAttendanceReady:latest.intendedType === "check_in"} : cached); setOffline(true);
+      }
       else setError(caught instanceof Error ? caught.message : "Không thể tải lịch điểm danh.");
     } finally { setLoading(false); }
     })();
@@ -84,6 +89,7 @@ export function WorkerAttendanceToday({ projectId, worksiteId, embedded = false 
   useDomainReconciliation("attendance", load);
   useDomainReconciliation("timesheets", load);
 
+  function openDraft(id: string) { if (!navigator.onLine) window.location.assign(`/worker-attendance/offline?draft=${encodeURIComponent(id)}&step=roster`); else router.push(`/worker-attendance/sessions/${id}/roster`); }
   async function start(task: WorkerAttendanceTask) {
     if (task.existingSessionId && (!canCreate || !["submitted", "locked", "needs_review"].includes(task.existingStatus ?? ""))) {
       router.push(!canCreate || task.existingStatus === "submitted" || task.existingStatus === "locked" || task.existingStatus === "needs_review" ? `/worker-attendance/sessions/${task.existingSessionId}` : `/worker-attendance/sessions/${task.existingSessionId}/roster`);
@@ -92,7 +98,7 @@ export function WorkerAttendanceToday({ projectId, worksiteId, embedded = false 
     if (!canCreate) return;
     if (data?.personalAttendanceReady === false) { router.push("/attendance/quick"); return; }
     const resumable = localDrafts.find((item) => item.ownerAccountId === data?.accountId && item.session.projectId === task.projectId && item.session.worksiteId === task.worksiteId && item.session.date === task.date && item.session.shiftCode === task.shiftCode);
-    if (resumable) { router.push(`/worker-attendance/sessions/${resumable.id}/roster`); return; }
+    if (resumable) { openDraft(resumable.id); return; }
     setStarting(`${task.worksiteId}:${task.shiftCode}`);
     setError("");
     const clientSessionId = crypto.randomUUID();
@@ -100,7 +106,7 @@ export function WorkerAttendanceToday({ projectId, worksiteId, embedded = false 
     const draft: WorkerLocalDraft = { id: localSession.id, ownerAccountId: data!.accountId, clientSessionId, session: localSession, photos: [], pendingSubmit: false, retryCount: 0, updatedAt: new Date().toISOString() };
     try { await saveWorkerDraft(draft); }
     catch { setStarting(undefined); setError("Không thể lưu điểm danh trên thiết bị. Vui lòng thử lại."); return; }
-    router.push(`/worker-attendance/sessions/${localSession.id}/roster`);
+    openDraft(localSession.id);
     setStarting(undefined);
   }
 
@@ -144,7 +150,7 @@ export function WorkerAttendanceToday({ projectId, worksiteId, embedded = false 
   </div>;
 }
 
-export function WorkerAttendanceSessionList({ detailBasePath = "/worker-attendance/sessions", date, onDateChange, showExport = true }: { detailBasePath?: string; date?: string; onDateChange?: (date: string) => void; showExport?: boolean }) {
+export function WorkerAttendanceSessionList({ detailBasePath = "/worker-attendance/sessions", date, onDateChange, showExport = true, supervisorId, onClearSupervisor }: { supervisorId?: string; onClearSupervisor?: () => void; detailBasePath?: string; date?: string; onDateChange?: (date: string) => void; showExport?: boolean }) {
   const user = useCurrentUser();
   const [sessions, setSessions] = useState<WorkerAttendanceSession[]>([]);
   const [error, setError] = useState("");
@@ -153,6 +159,7 @@ export function WorkerAttendanceSessionList({ detailBasePath = "/worker-attendan
   const [localDate, setLocalDate] = useState(getBusinessDateKey);
   const selectedDate = date ?? localDate;
   const changeDate = (value: string) => { if (/^\d{4}-\d{2}-\d{2}$/.test(value)) (onDateChange ?? setLocalDate)(value); };
+  const [projectId, setProjectId] = useState("");
   const [status, setStatus] = useState("");
   const requestRef = useRef<{ date: string; controller: AbortController; pending: Promise<void> } | null>(null);
   const load = useCallback(() => {
@@ -171,9 +178,9 @@ export function WorkerAttendanceSessionList({ detailBasePath = "/worker-attendan
   }, [selectedDate]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => { window.clearTimeout(timer); requestRef.current?.controller.abort(); requestRef.current = null; }; }, [load]);
   useDomainReconciliation("worker-attendance", load);
-  const visible = useMemo(() => sessions.filter(session => session.date === selectedDate && (!status || session.status === status) && `${session.projectName} ${session.worksiteName} ${session.supervisorName} ${session.entries.filter(entry => entry.isSelected !== false).map(entry => `${entry.employeeCode} ${entry.workerName}`).join(" ")}`.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))), [selectedDate, sessions, status, query]);
+  const visible = useMemo(() => sessions.filter(session => session.date === selectedDate && (!projectId || session.projectId === projectId) && (!supervisorId || session.supervisorEmployeeId === supervisorId) && (!status || session.status === status) && `${session.projectName} ${session.worksiteName} ${session.supervisorName} ${session.entries.filter(entry => entry.isSelected !== false).map(entry => `${entry.employeeCode} ${entry.workerName}`).join(" ")}`.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))), [selectedDate, sessions, status, query, projectId, supervisorId]);
   const workerCount = new Set(visible.filter(session => session.submittedAt || ["submitted", "locked"].includes(session.status)).flatMap(session => session.entries.filter(entry => entry.isSelected !== false && ["present", "late"].includes(entry.status)).map(entry => entry.workerId))).size;
-  return <ListWorkspace label="Điểm danh công trường theo ngày" filters={<><div className={styles.dayReviewFilters}><div className={styles.dayReviewDate}><Input label="Ngày" type="date" value={selectedDate} onChange={event => changeDate(event.target.value)} /><Button onClick={() => changeDate(getBusinessDateKey())} variant="ghost">Hôm nay</Button><IconButton label="Cập nhật điểm danh" disabled={loading} onClick={() => void load()}><RefreshCw size={17} /></IconButton></div><FilterBar busy={loading}><SearchInput aria-label="Tìm điểm danh trong ngày" placeholder="Công trường, giám sát hoặc công nhân" value={query} onChange={event => setQuery(event.target.value)} /><Select label="Trạng thái" onChange={event => setStatus(event.target.value)} options={Object.entries(sessionLabels).map(([value, label]) => ({ value, label }))} placeholder="Tất cả trạng thái" value={status} /></FilterBar></div>{showExport ? <AttendanceExport month={selectedDate.slice(0, 7)} onMonthChange={month => changeDate(`${month}-01`)} /> : null}</>} status={<div className={styles.sessionToolbar}><span role="status">{workerCount} công nhân · {visible.length} lượt điểm danh · {visible.reduce((count, session) => count + session.photos.length, 0)} ảnh</span>{status || query ? <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setStatus(""); }}>Xóa bộ lọc</Button> : null}</div>}>
-    {error ? <ErrorState description={error} action={<Button onClick={() => void load()}>Thử lại</Button>} /> : loading && !visible.length ? <LoadingState title="Đang tải điểm danh trong ngày" /> : visible.length ? <WorkerSessionEvidenceCards detailBasePath={detailBasePath} sessions={visible} canViewPhotos={can(user.permissions, "worker_attendance.view_photo") || can(user.permissions, "worker_attendance.create")} /> : <EmptyState title={status || query ? "Không có điểm danh phù hợp" : "Chưa có điểm danh trong ngày"} description="" />}
+  return <ListWorkspace label="Điểm danh công trường theo ngày" filters={<><div className={styles.dayReviewFilters}><div className={styles.dayReviewDate}><Input label="Ngày" type="date" value={selectedDate} onChange={event => changeDate(event.target.value)} /><Button onClick={() => changeDate(getBusinessDateKey())} variant="ghost">Hôm nay</Button><IconButton label="Cập nhật điểm danh" disabled={loading} onClick={() => void load()}><RefreshCw size={17} /></IconButton></div><Select label="Gói công trường" placeholder="Tất cả gói" options={[...new Map(sessions.filter(s => s.date === selectedDate).map(s => [s.projectId,{value:s.projectId,label:s.projectName}])).values()]} value={projectId} onChange={event => setProjectId(event.target.value)}/>{supervisorId ? <Button variant="secondary" onClick={onClearSupervisor}>Giám sát đã chọn · Xóa lọc</Button> : null}<FilterBar busy={loading}><SearchInput aria-label="Tìm điểm danh trong ngày" placeholder="Công trường, giám sát hoặc công nhân" value={query} onChange={event => setQuery(event.target.value)} /><Select label="Trạng thái" onChange={event => setStatus(event.target.value)} options={Object.entries(sessionLabels).map(([value, label]) => ({ value, label }))} placeholder="Tất cả trạng thái" value={status} /></FilterBar></div>{showExport ? <AttendanceExport month={selectedDate.slice(0, 7)} onMonthChange={month => changeDate(`${month}-01`)} /> : null}</>} status={<div className={styles.sessionToolbar}><span role="status">{workerCount} công nhân · {visible.length} lượt điểm danh · {visible.reduce((count, session) => count + session.photos.length, 0)} ảnh</span>{status || query || projectId ? <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setStatus(""); setProjectId(""); }}>Xóa bộ lọc</Button> : null}</div>}>
+    {error ? <ErrorState description={error} action={<Button onClick={() => void load()}>Thử lại</Button>} /> : loading && !visible.length ? <LoadingState title="Đang tải điểm danh trong ngày" /> : visible.length ? <WorkerSessionEvidenceCards detailBasePath={detailBasePath} sessions={visible} canViewPhotos={can(user.permissions, "worker_attendance.view_photo") || can(user.permissions, "worker_attendance.create")} /> : <EmptyState title={status || query || projectId ? "Không có điểm danh phù hợp" : "Chưa có điểm danh trong ngày"} description="" />}
   </ListWorkspace>;
 }

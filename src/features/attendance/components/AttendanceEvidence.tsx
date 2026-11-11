@@ -25,7 +25,8 @@ function EvidenceImage({ event, employeeName, thumbnail = false, imageUrl, onLoa
 }
 
 function GpsEvidence({ event }: { event: AttendanceEvent }) {
-  if (event.photoStamp) return <a className={styles.gps} href={`https://www.google.com/maps?q=${event.photoStamp.latitude},${event.photoStamp.longitude}`} rel="noopener noreferrer" target="_blank"><MapPin aria-hidden="true" size={15} /><span>{event.photoStamp.address}</span></a>;
+  if (event.photoStamp?.latitude !== undefined && event.photoStamp.longitude !== undefined) return <a className={styles.gps} href={`https://www.google.com/maps?q=${event.photoStamp.latitude},${event.photoStamp.longitude}`} rel="noopener noreferrer" target="_blank"><MapPin aria-hidden="true" size={15} /><span>{event.photoStamp.address}</span></a>;
+  if (event.photoStamp) return <span className={styles.gps}>{event.photoStamp.address}</span>;
   return <AttendanceLocationAddress accuracyMeters={event.accuracyMeters} latitude={event.latitude} longitude={event.longitude} referenceName={event.locationName} />;
 }
 

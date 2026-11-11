@@ -477,7 +477,7 @@ export function modulesForPath(pathname: string): ModuleKey[] {
   const moduleKey = moduleForPath(pathname);
   if (!moduleKey) return [];
   if (moduleKey === "reports") return [moduleKey, "operations"];
-  if (pathname === "/personal/payslips" || pathname.startsWith("/personal/payslips/")) return [moduleKey, "accounting"];
+  if (pathname === "/personal/payslips" || pathname.startsWith("/personal/payslips/")) return [moduleKey];
   return [moduleKey];
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { WorkspaceLink as Link } from "@/components/shared/WorkspaceLink";
-import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronDown, LockKeyhole, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { attendanceOnlyRelease, isReleasedFeaturePath } from "@/config/featureRelease";
 import { useEffect, useId, useState } from "react";
 
 import { AppLogo } from "@/components/layout/AppLogo";
@@ -52,6 +53,7 @@ function RailNavigation({ groups, pathname, collapsed }: {
 
   const renderLink = (item: NavigationItem, nested = false) => {
     const Icon = navigationIconMap[item.icon];
+    if (!isReleasedFeaturePath(item.href) || attendanceOnlyRelease && item.href === "/dashboard") return <li key={item.href}><span aria-disabled="true" aria-label={`${item.label} · Đang khóa`} className={cn("app-rail__link", nested && "app-rail__child-link")} data-locked role="link">{!nested ? <Icon aria-hidden="true" size={navigationIconSizes.rail}/> : null}{!collapsed || nested ? <span>{item.label}</span> : null}<LockKeyhole aria-hidden="true" className="app-rail__lock" size={12}/></span></li>;
     const link = <Link
       aria-label={collapsed ? item.label : undefined}
       aria-current={activeHref === item.href ? "page" : undefined}

@@ -5,6 +5,7 @@ import { defaultDashboardSettings, resolveDashboardProfile, resolveMobileLanding
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { can } from "@/lib/auth/permissions";
 import { canSubmitPersonalAttendance } from "@/lib/auth/applicationAccess";
+import { attendanceOnlyRelease, isReleasedFeaturePath } from "@/config/featureRelease";
 
 export interface MobileNavDestination {
   href: string;
@@ -87,6 +88,17 @@ export function mobileApplicationDestination(application: ApplicationDefinition,
 export function resolveMobileNavigation(pathname: string, user: AuthenticatedUser, settings: MobileNavigationSettings = {}): MobileNavigationModel {
   void pathname;
   const supervisor = canUseWorkerAttendance(user);
+  if (attendanceOnlyRelease) {
+    const direct: MobileNavDestination[] = [{ href: "/personal", label: "Cá nhân", icon: "UserRound" }];
+    if (supervisor && settings.modules?.projects !== false) direct.push({ href: "/worker-attendance/today", label: "Điểm danh", icon: "UsersRound", routePrefixes: ["/worker-attendance"] });
+    else if (can(user.permissions, "attendance.view_all")) direct.push({ href: "/attendance/today", label: "Kiểm tra công", icon: "ClipboardCheck", routePrefixes: ["/attendance/today", "/employees/field-attendance"] });
+    if (supervisor && can(user.permissions, "project.view")) direct.push({ href: "/projects", label: "Gói", icon: "BriefcaseBusiness", routePrefixes: ["/projects"] });
+    else if (can(user.permissions, "timesheet.view")) direct.push({ href: "/timesheets/matrix", label: "Bảng công", icon: "CalendarRange", routePrefixes: ["/timesheets"] });
+    if (can(user.permissions, "attendance.self.view") || can(user.permissions, "attendance.self_history") || can(user.permissions, "attendance.self") || can(user.permissions, "attendance.self.create")) direct.push({ href: "/attendance/history", label: "Lịch công", icon: "CalendarRange" });
+    direct.splice(4);
+    direct.push({ href: "/applications", label: "Ứng dụng", icon: "Grid2X2", action: "applications" });
+    return { mode: supervisor ? "supervisor" : "personal", label: "Điều hướng chấm công", direct: direct.map((item,index) => ({ ...item, slot: index+1 })), secondary: filterGroupsByAccess(desktopNavigation, user.permissions, settings.modules, settings.navigation).flatMap(group => group.items).filter(item => isReleasedFeaturePath(item.href) && !direct.some(primary => primary.href === item.href)).map(destination) };
+  }
   const applications = visibleApplications(user, settings.modules).filter((application) => mobileApplicationDestination(application, user) !== undefined);
   const accessibleItems = filterGroupsByAccess(desktopNavigation, user.permissions, settings.modules, settings.navigation).flatMap((group) => group.items);
   const businessApplications = applications.filter((application) => application.id !== "attendance" && application.id !== "overview");

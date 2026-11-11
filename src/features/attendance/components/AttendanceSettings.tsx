@@ -67,11 +67,8 @@ export function AttendanceSettings({ activeTab = "policy" }: { activeTab?: "poli
           <div className={styles.policyStatus}><MapPin aria-hidden="true" size={16} /><StatusBadge tone="info">GPS không giới hạn vị trí</StatusBadge></div>
         </Card>
         <Card className={styles.panel}>
-          <header className={styles.heading}><span className={styles.headingIcon}><Clock3 aria-hidden="true" size={20} /></span><h3>Ca làm & ngưỡng</h3></header>
+          <header className={styles.heading}><span className={styles.headingIcon}><Clock3 aria-hidden="true" size={20} /></span><h3>Ngưỡng chấm công</h3></header>
           <div className={styles.fields}>
-            <div className={styles.fullWidth}><Input label="Tên ca" onChange={(event) => patchPolicy("shiftName", event.target.value)} value={policy.shiftName} /></div>
-            <Input label="Bắt đầu" onChange={(event) => patchPolicy("shiftStart", event.target.value)} type="time" value={policy.shiftStart} />
-            <Input label="Kết thúc" onChange={(event) => patchPolicy("shiftEnd", event.target.value)} type="time" value={policy.shiftEnd} />
             <Input label="Ngưỡng cảnh báo GPS (m)" min={10} onChange={(event) => patchPolicy("allowedAccuracyThresholdMeters", Number(event.target.value))} type="number" value={policy.allowedAccuracyThresholdMeters} />
             <Input label="Ngưỡng đi trễ (phút)" min={0} onChange={(event) => patchPolicy("lateThresholdMinutes", Number(event.target.value))} type="number" value={policy.lateThresholdMinutes} />
             <Input label="Cho phép chấm sớm (phút)" min={0} onChange={(event) => patchPolicy("earlyCheckinWindowMinutes", Number(event.target.value))} type="number" value={policy.earlyCheckinWindowMinutes} />

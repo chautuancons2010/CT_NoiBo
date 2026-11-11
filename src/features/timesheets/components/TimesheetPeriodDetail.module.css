@@ -26,3 +26,7 @@
   .exportPanel > div > :global(.button) { width: 100%; min-height: 44px; }
   .reconciliation li a { align-items: start; flex-wrap: wrap; gap: var(--space-1); }
 }
+
+.dateFilters { display:flex; align-items:end; gap:12px; padding:16px 20px 0; }
+.dateFilters input { min-height:44px; }
+@media(max-width:767px) { .dateFilters { padding:12px 14px 0; } }

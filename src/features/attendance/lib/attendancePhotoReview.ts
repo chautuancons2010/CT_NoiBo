@@ -9,12 +9,9 @@ export function attendanceReviewReasons(row: AttendanceAdminTodayRow): string[] 
   if (row.earlyLeaveMinutes > 0) reasons.add(`Về sớm ${row.earlyLeaveMinutes} phút`);
 
   const events = row.events ?? [];
-  const checkInCount = events.filter((event) => event.eventType === "check_in").length;
-  const checkOutCount = events.filter((event) => event.eventType === "check_out").length;
-  if (checkInCount > 1 || checkOutCount > 1) reasons.add("Nhiều lượt chấm cùng loại");
-
   for (const event of events) {
     const flags = new Set(event.anomalyFlags);
+    if (event.photoStatus === "uploaded" && !event.photoId) reasons.add("Chưa có tệp ảnh minh chứng");
     if (event.attendanceStatus === "rejected") reasons.add("Lượt chấm bị từ chối");
     else if (
       event.attendanceStatus === "needs_review" &&
@@ -29,7 +26,7 @@ export function attendanceReviewReasons(row: AttendanceAdminTodayRow): string[] 
     if (flags.has("delayed_sync_over_24h")) reasons.add("Đồng bộ trễ trên 24 giờ");
     if (event.syncStatus === "sync_failed") reasons.add("Chưa đồng bộ dữ liệu");
     if (["pending_upload", "uploading", "upload_failed"].includes(event.photoStatus)) {
-      reasons.add("Ảnh minh chứng chưa đồng bộ");
+      reasons.add(event.photoStatus === "upload_failed" ? "Gửi ảnh thất bại · Thiết bị sẽ thử lại" : "Ảnh đang chờ thiết bị gửi lên");
     }
   }
 

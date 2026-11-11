@@ -81,3 +81,12 @@
   .error { margin-inline: 0; }
   .inspectorBody { padding: 14px; }
 }
+
+.calendarToolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.calendar { border:1px solid var(--border-subtle); border-radius:16px; padding:10px; }
+.calendarWeek,.calendarDays { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; text-align:center; }
+.calendarWeek { color:var(--text-muted); padding-bottom:10px; font-size:12px; }
+.calendarDays button { min-height:52px; border:1px solid transparent; border-radius:10px; background:var(--surface-subtle); color:var(--text-primary); display:grid; place-content:center; gap:3px; cursor:pointer; }
+.calendarDays button small { font-size:11px; }
+.calendarDays button[data-recorded="true"] { background:var(--primary-soft); color:var(--primary); }
+.calendarDays button[aria-pressed="true"] { border-color:var(--primary); box-shadow:inset 0 0 0 1px var(--primary); }

@@ -60,3 +60,5 @@
   .card :global(.module-icon-card__label-desktop) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+.lock { position: absolute; top: 8px; right: 8px; color: var(--text-muted); }
+.card[data-locked] { cursor: not-allowed; opacity: .65; font: inherit; }

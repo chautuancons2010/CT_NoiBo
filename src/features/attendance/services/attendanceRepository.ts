@@ -342,7 +342,7 @@ export async function recordAttendance(
   const serverNow = new Date();
   const capturedAt = new Date(input.capturedAtClient);
   const ageMilliseconds = serverNow.getTime() - capturedAt.getTime();
-  if (!Number.isFinite(ageMilliseconds) || ageMilliseconds > 48 * 60 * 60 * 1000 || ageMilliseconds < -5 * 60 * 1000) {
+  if (!Number.isFinite(ageMilliseconds) || ageMilliseconds > (input.capturedOffline ? 45 * 24 : 48) * 60 * 60 * 1000 || ageMilliseconds < -5 * 60 * 1000) {
     throw new AppError("VALIDATION_ERROR", "Thời gian ghi nhận trên thiết bị không hợp lệ.");
   }
 
@@ -446,8 +446,9 @@ export async function uploadAttendancePhoto(
     latitude: numberValue(eventRow as Row, "latitude"),
     longitude: numberValue(eventRow as Row, "longitude"),
   });
-  const { data: existingPhoto } = await client.from("attendance_photos").select("id").eq("attendance_event_id", eventId).maybeSingle();
-  if (existingPhoto) return { event: mapEvent(eventRow as Row), idempotentReplay: true };
+  const { data: existingPhoto } = await client.from("attendance_photos").select("id,evidence_status").eq("attendance_event_id", eventId).maybeSingle();
+  if (existingPhoto?.evidence_status === "expired") throw new AppError("PHOTO_UPLOAD", "Ảnh đã hết thời hạn lưu trữ.");
+  if (existingPhoto && eventRow.photo_status === "uploaded" && eventRow.sync_status === "synced") return { event: mapEvent(eventRow as Row), idempotentReplay: true };
 
   const [extension] = await Promise.all([validatePhoto(input.photo), validatePhoto(input.thumbnail)]);
   if (!Number.isInteger(input.width) || !Number.isInteger(input.height) || input.width < 1 || input.height < 1 || input.width > 10000 || input.height > 10000) {

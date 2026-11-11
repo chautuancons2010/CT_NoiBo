@@ -1,9 +1,9 @@
 "use client";
 
-import { downloadFile } from "@/lib/files/downloadFile";
+import { AttendanceExport } from "@/features/attendance/components/AttendanceExport";
 
 import Link from "next/link";
-import { AlertTriangle, ChevronDown, ChevronRight, Download } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -16,12 +16,12 @@ import { reconcileTimesheet } from "../services/timesheetPresentation";
 import styles from "./TimesheetPeriodDetail.module.css";
 import formStyles from "./TimesheetForms.module.css";
 import { DetailPageLayout, ListWorkspace, WorkspaceMetrics } from "@/components/shared/PageLayouts";
-import { RecordHeader } from "@/components/shared/PageHeader";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ContextTabs } from "@/components/shared/Tabs";
 import { LoadingState, ErrorState } from "@/components/shared/States";
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
-import type { DailyTimesheet, ReportTemplate, TimesheetPeriod, TimesheetSummary } from "../types/timesheetTypes";
+import type { DailyTimesheet, TimesheetPeriod, TimesheetSummary } from "../types/timesheetTypes";
 import { formatBusinessDate } from "@/lib/time/timezone";
 import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 
@@ -42,8 +42,7 @@ const displayTime = (value?: string) => value ? new Date(value).toLocaleTimeStri
 export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false, canExport = false, canLock = false, canRecompute = false, canUnlock = false, canViewExceptions = false }: Props) {
   const mutationRef = useRef(false);
   const [detail, setDetail] = useState<Detail>();
-  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
-  const [templateId, setTemplateId] = useState("");
+  const [exportMonth, setExportMonth] = useState("");
   const [tab, setTab] = useState<"summary" | "daily">(employeeId ? "daily" : "summary");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -59,11 +58,7 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Không thể tải kỳ công."));
-      if (canExport) void fetch("/api/v1/report-templates").then((response) => response.json()).then((body: { data?: ReportTemplate[] }) => {
-        const items = (body.data ?? []).filter((item) => item.reportType === "timesheet");
-        setTemplates(items);
-        setTemplateId(items[0]?.id ?? "");
-      }).catch(() => {});
+
     }, 0);
     return () => window.clearTimeout(timer);
   }, [canExport, load]);
@@ -97,24 +92,12 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
     } finally { mutationRef.current=false;setBusy(false); }
   }
 
-  async function exportExcel() {
-    setBusy(true); setError("");
-    try {
-      const response = await fetch("/api/v1/report-exports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateId, periodId }) });
-      const body = await response.json() as { data?: { id: string }; error?: { message: string } };
-      if (!response.ok || !body.data) throw new Error(body.error?.message ?? "Không thể xuất tệp.");
-      await downloadFile(`/api/v1/report-exports/${body.data.id}/download`, { format: "xlsx" });
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không thể xuất tệp.");
-    } finally { setBusy(false); }
-  }
-
   if (!detail) return error ? <ErrorState description={error} action={<Button onClick={() => void load().catch(reason => setError(reason instanceof Error ? reason.message : "Không thể tải kỳ công."))}>Thử lại</Button>} /> : <LoadingState title="Đang tải kỳ công" />;
   const period = detail.period;
   const byEmployee=new Map<string,DailyTimesheet[]>();for(const item of detail.daily){const rows=byEmployee.get(item.employeeId)??[];rows.push(item);byEmployee.set(item.employeeId,rows);}
   const mismatches=detail.summaries.filter(item=>reconcileTimesheet(item,byEmployee.get(item.employeeId)??[]).mismatch||!(byEmployee.get(item.employeeId)?.length));
   const summaryColumns: DataTableColumn<TimesheetSummary>[] = [
-    { id: "employee", header: "Nhân viên", priority: "primary", sortable: true, accessor: "employeeName", cell: item => <span className="record-identity"><strong>{item.employeeName}</strong><small>{item.employeeCode}</small></span> },
+    { id: "employee", header: "Nhân viên", priority: "primary", sortable: true, accessor: "employeeName", cell: item => <span className="record-identity"><strong>{item.employeeName}</strong></span> },
     { id: "scheduled", header: "Ngày chuẩn", sortable: true, accessor: "scheduledWorkdays", align: "right", width: "compact" },
     { id: "actual", header: "Ngày công", sortable: true, accessor: "actualWorkdays", align: "right", cell: item => <strong>{item.actualWorkdays}</strong> },
     { id: "late", header: "Trễ", cell: (item) => `${item.lateDays} / ${item.lateMinutes}'`, hiddenOnMobile: true },
@@ -133,7 +116,7 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
     { id: "status", header: "Trạng thái", cell: (item) => <StatusBadge tone={item.exceptionCount ? "warning" : "neutral"}>{labels[item.status] ?? item.status}</StatusBadge> }
   ];
   return <DetailPageLayout className={styles.page}>
-    <RecordHeader title={period.name} code={`${formatBusinessDate(period.startDate)} – ${formatBusinessDate(period.endDate)}`} status={<StatusBadge tone={period.status === "locked" ? "success" : "warning"}>{labels[period.status]}</StatusBadge>} meta={<span>Phiên bản {period.version}</span>}
+    <PageHeader title={period.name} meta={<><StatusBadge tone={period.status === "locked" ? "success" : "warning"}>{labels[period.status]}</StatusBadge><span>{formatBusinessDate(period.startDate)} – {formatBusinessDate(period.endDate)}</span><span>Phiên bản {period.version}</span></>}
       action={<>
         {period.status !== "locked" && canRecompute ? <Button disabled={busy} onClick={() => void action("recompute")}>Tính lại</Button> : null}
         {period.status !== "locked" && canLock ? <Button title={mismatches.length ? "Cần đối chiếu dữ liệu công trước khi chốt" : undefined} disabled={busy || !detail.summaries.length || mismatches.length > 0 || Boolean(detail.openHighExceptionCount)} onClick={() => void action("lock")} variant="primary">Chốt kỳ công</Button> : null}
@@ -143,11 +126,11 @@ export function TimesheetPeriodDetail({ periodId, employeeId, canAdjust = false,
     {mismatches.length ? <details className={styles.reconciliation}><summary><AlertTriangle aria-hidden="true" size={18} /><span>{mismatches.length} hồ sơ thiếu chi tiết ngày hoặc lệch tổng công</span><ChevronDown aria-hidden="true" size={16} /></summary><ul>{mismatches.map(item => <li key={item.employeeId}><Link href={`/timesheets/periods/${periodId}/employees/${item.employeeId}`}><span>{item.employeeName}</span><span>{byEmployee.get(item.employeeId)?.length ? "Lệch tổng công" : "Thiếu chi tiết ngày"}<ChevronRight aria-hidden="true" size={15} /></span></Link></li>)}</ul></details> : null}
     {detail.openHighExceptionCount ? <div className={styles.warning} role="status"><AlertTriangle aria-hidden="true" size={18} /><span>{detail.openHighExceptionCount} ngoại lệ nghiêm trọng chưa xử lý</span>{canViewExceptions ? <Link href={`/timesheets/exceptions?periodId=${periodId}`}>Mở ngoại lệ</Link> : null}</div> : null}
     {error && !unlockOpen ? <p className="form-error" role="alert">{error}</p> : null}
-    {canExport ? <details className={styles.exportPanel}><summary><Download aria-hidden="true" size={16} />Tùy chọn xuất<ChevronDown aria-hidden="true" size={15} /></summary><div><Select label="Mẫu xuất" onChange={event => setTemplateId(event.target.value)} options={templates.map(item => ({ label: item.name, value: item.id }))} value={templateId} /><Button disabled={busy || !templateId} onClick={() => void exportExcel()} busy={busy}>Xuất Excel</Button></div></details> : null}
-    <ListWorkspace label="Tổng hợp công theo nhân viên" summary={<WorkspaceMetrics items={[{ label: "Nhân viên", value: summaries.length }, { label: "Công thực tế", value: Number(summaries.reduce((sum, item) => sum + item.actualWorkdays, 0).toFixed(2)) }, { label: "Phép năm", value: summaries.reduce((sum, item) => sum + item.annualLeaveDays, 0) }, { label: "Muộn / sớm", value: summaries.reduce((sum, item) => sum + item.lateDays + item.earlyLeaveDays, 0) }]} />} filters={<><FilterBar>
+    {canExport ? <AttendanceExport month={exportMonth || period.startDate.slice(0,7)} onMonthChange={setExportMonth}/> : null}
+    <ListWorkspace label="Tổng hợp công theo nhân viên" summary={<WorkspaceMetrics items={[{ label: "Nhân viên", value: summaries.length }, { label: "Công thực tế", value: Number(summaries.reduce((sum, item) => sum + item.actualWorkdays, 0).toFixed(2)) }, { label: "Phép năm", value: summaries.reduce((sum, item) => sum + item.annualLeaveDays, 0) }, { label: "Muộn / sớm", value: summaries.reduce((sum, item) => sum + item.lateDays + item.earlyLeaveDays, 0) }]} />} filters={<><div className={styles.dateFilters}><Input label="Ngày công" type="date" min={period.startDate} max={period.endDate} value={dateFilter} onChange={event => { setDateFilter(event.target.value); if(event.target.value)setTab("daily"); }} />{dateFilter ? <Button onClick={() => setDateFilter("")} variant="ghost">Cả kỳ</Button> : null}</div><FilterBar>
         <SearchInput aria-label="Tìm nhân viên trong kỳ công" placeholder="Tên hoặc mã nhân viên" value={search} onChange={event => setSearch(event.target.value)} />
         {!employeeId ? <Select label="Nhóm nhân viên" name="employeeGroup" onChange={event => setEmployeeGroup(event.target.value as "all" | "office" | "worker")} options={[{ value: "all", label: "Tất cả nhân viên" }, { value: "office", label: "Nhân viên văn phòng" }, { value: "worker", label: "Công nhân" }]} value={employeeGroup} /> : null}
-        {tab === "daily" ? <Input label="Ngày công" type="date" min={period.startDate} max={period.endDate} value={dateFilter} onChange={event => setDateFilter(event.target.value)} /> : null}
+        
       </FilterBar></>} navigation={<div className={styles.tabsBar}><ContextTabs items={[
         { label: `Tổng hợp (${summaries.length})`, active: tab === "summary", onSelect: () => setTab("summary") },
         { label: `Chi tiết (${daily.length})`, active: tab === "daily", onSelect: () => setTab("daily") },

@@ -30,7 +30,7 @@ describe("role dashboard shortcuts", () => {
   });
   it("removes shortcuts to locked modules including personal payslips", () => {
     expect(dashboardShortcutsFor(user(["employee.view", "attendance.view_all"]), "hr", { ...modules, human_resources: false })).toEqual([]);
-    expect(dashboardShortcutsFor(user(["payslip.self.view"]), "employee", { ...modules, accounting: false })).toEqual([]);
+    expect(dashboardShortcutsFor(user(["payslip.self.view"]), "employee", { ...modules, accounting: false })).toEqual(expect.arrayContaining([expect.objectContaining({href:"/personal/payslips"})]));
   });
   it("resolves reviewers and team managers to their workspaces without changing supervisor precedence", () => {
     expect(resolveDashboardProfile(user(["attendance.view_all", "dashboard.view"]), defaultDashboardSettings)).toBe("hr");

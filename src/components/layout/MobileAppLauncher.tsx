@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Check, ChevronRight, Grid2X2, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
+import { Bell, Check, ChevronRight, Grid2X2, LockKeyhole, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
+import { isReleasedApplication } from "@/config/featureRelease";
+import styles from "./MobileAppLauncher.module.css";
 import { usePathname } from "next/navigation";
 import { useState, type CSSProperties } from "react";
 
@@ -86,6 +88,7 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
               "--module-accent": application.accentColor,
               "--module-surface": application.accentSoft
             } as CSSProperties;
+            if (!isReleasedApplication(application.id)) return <button aria-label={`${application.label} · Đang khóa`} className={styles.lockedApp} disabled key={application.id} style={style} type="button"><span className="mobile-app-sheet__app-icon"><Icon aria-hidden="true" size={navigationIconSizes.rail}/></span><strong>{application.label}</strong><LockKeyhole aria-hidden="true" className={styles.lock} size={13}/></button>;
             return (
               <Link aria-current={active ? "page" : undefined} className={cn(active && "is-active")} href={href} key={application.id} onClick={close} style={style} title={application.label}>
                 <span className="mobile-app-sheet__app-icon"><Icon aria-hidden="true" size={navigationIconSizes.rail} strokeWidth={1.8} />{active ? <Check aria-hidden="true" className="mobile-app-sheet__selected" size={12} strokeWidth={3} /> : null}</span>

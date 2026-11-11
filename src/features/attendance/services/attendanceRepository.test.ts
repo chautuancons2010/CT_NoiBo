@@ -99,13 +99,13 @@ function mockAttendanceData(events: Record<string, unknown>[] = []) {
 }
 
 describe("attendance GPS evidence", () => {
-  it("rejects a second check-in after a completed daily pair", async () => {
+  it("records another daily pair after checkout and keeps the original capture time", async () => {
     const now = new Date();
     const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
     const existing = (id: string, eventType: string, ago: number) => ({ id, employee_id: "employee-1", client_event_id: id, event_type: eventType, attendance_date: date, effective_at: new Date(now.getTime() - ago).toISOString(), captured_at_client: new Date(now.getTime() - ago).toISOString(), received_at_server: now.toISOString(), geofence_status: "valid", attendance_status: "recorded", photo_status: "uploaded", sync_status: "synced", attendance_photos: [] });
     const inserts = mockAttendanceData([existing("earlier-in", "check_in", 2000), existing("earlier-out", "check_out", 1000)]);
-    await expect(recordAttendance(user, { clientEventId: "third-operation", intendedType: "check_in", capturedAtClient: now.toISOString(), capturedOffline: false, location: { latitude: 10.7769, longitude: 106.7009, accuracy: 8, capturedAt: now.toISOString() }, deviceMetadata: {} })).rejects.toMatchObject({ code: "DUPLICATE" });
-    expect(inserts).toHaveLength(0);
+    await expect(recordAttendance(user, { clientEventId: "third-operation", intendedType: "check_in", capturedAtClient: now.toISOString(), capturedOffline: false, location: { latitude: 10.7769, longitude: 106.7009, accuracy: 8, capturedAt: now.toISOString() }, deviceMetadata: {} })).resolves.toMatchObject({ event: { eventType: "check_in", capturedAtClient: now.toISOString() } });
+    expect(inserts).toHaveLength(1);
   });
 
   it("rejects a repeated check-in before checkout", async () => {

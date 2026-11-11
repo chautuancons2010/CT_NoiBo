@@ -12,7 +12,7 @@ export async function readSharedShiftCatalog(client: SupabaseClient, date: strin
   if (results.some(result => result.error)) throw new AppError("SERVER_ERROR", "Không thể đồng bộ ca làm từ Nhân sự.");
   const shifts = results[0].data ?? [], assignments = results[1].data ?? [], versions = results[2].data ?? [];
   return (input: { employeeId: string; departmentId?: string; projectIds: string[]; fallbackCode?: string }) => {
-    const rank: Record<string, number> = { employee: 4, project: 3, department: 2, company: 1 };
+    const rank: Record<string, number> = { project: 4, employee: 3, department: 2, company: 1 };
     const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
     const assignment = assignments.filter(row => Array.isArray(row.weekdays) && row.weekdays.includes(weekday) && (
       row.scope_type === "company" || row.scope_type === "employee" && row.scope_id === input.employeeId ||
@@ -32,7 +32,7 @@ export async function applyEmployeeShift(client: SupabaseClient, employeeId: str
     client.from("project_assignments").select("project_id").eq("employee_id", employeeId).eq("status", "active").lte("start_date", date).or(`end_date.is.null,end_date.gte.${date}`)
   ]);
   if (employee.error || projects.error) throw new AppError("SERVER_ERROR", "Không thể đọc phân ca của nhân viên.");
-  const shift = resolve({ employeeId, departmentId: employee.data?.department_id, projectIds: (projects.data ?? []).map(row => String(row.project_id)) });
+  const shift = resolve({ employeeId, departmentId: employee.data?.department_id, projectIds: (projects.data ?? []).map(row => String(row.project_id)), fallbackCode: "DAY" });
   const type = employee.data?.employment_types;
   const office = (Array.isArray(type) ? type[0] : type)?.worker_category === "office";
   const base = office ? { ...policy, attendanceEnabled: false, disabledReason: "Văn phòng tạm ngừng chấm công." } : policy;

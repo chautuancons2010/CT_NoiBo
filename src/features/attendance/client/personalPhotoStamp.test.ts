@@ -9,14 +9,20 @@ const location = { capturedAt: capture.capturedAtClient, latitude: 10.7769, long
 const raw = { photo: new Blob(["photo"]), thumbnail: new Blob(["thumbnail"]), width: 1600, height: 1200, previewUrl: "blob:raw" };
 beforeEach(() => { vi.clearAllMocks(); });
 describe("personal photo address validation", () => {
-  it("requires actual GPS and does not invent a worksite address", async () => {
-    await expect(preparePersonalAttendancePhoto(raw, capture)).rejects.toMatchObject({ code: "LOCATION_REQUIRED" });
-    expect(processAttendanceImage).not.toHaveBeenCalled();
+  it("keeps evidence without inventing GPS when the device has no fix", async () => {
+    vi.mocked(processAttendanceImage).mockResolvedValue(raw);
+    const result = await preparePersonalAttendancePhoto(raw, capture);
+    expect(result.stamp.latitude).toBeUndefined();
+    expect(result.stamp.address).toContain("Cần xác minh");
+    expect(result.stamp.capturedAt).toBe(capture.capturedAtClient);
   });
-  it("requires a resolved street address before encoding", async () => {
+  it("retains original GPS and capture time while offline without inventing an address", async () => {
     vi.mocked(lookupAttendanceAddress).mockResolvedValue({ status: "unavailable" });
-    await expect(preparePersonalAttendancePhoto(raw, capture, location)).rejects.toMatchObject({ code: "ADDRESS_REQUIRED" });
-    expect(processAttendanceImage).not.toHaveBeenCalled();
+    vi.mocked(processAttendanceImage).mockResolvedValue(raw);
+    const result = await preparePersonalAttendancePhoto(raw, capture, location);
+    expect(result.stamp.address).toContain("GPS 10.776900, 106.700900");
+    expect(result.stamp.capturedAt).toBe(capture.capturedAtClient);
+    expect(processAttendanceImage).toHaveBeenCalledOnce();
   });
   it("passes original capture time and real address to both-derivative processing", async () => {
     vi.mocked(lookupAttendanceAddress).mockResolvedValue({ status: "resolved", address: "12 Nguyễn Huệ, TP. Hồ Chí Minh" });

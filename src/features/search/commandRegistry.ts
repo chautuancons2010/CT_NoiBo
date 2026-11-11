@@ -1,3 +1,4 @@
+import { isReleasedFeaturePath } from "@/config/featureRelease";
 import { desktopNavigation } from "@/config/navigation";
 import { commandActions } from "@/features/dashboard/registry";
 import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
@@ -40,5 +41,5 @@ export const commandRegistry: AppCommand[] = [
 
 export function commandsForUser(user: AuthenticatedUser, query = ""): AppCommand[] {
   const normalized = query.trim().toLocaleLowerCase("vi");
-  return commandRegistry.filter((command) => can(user.permissions, command.requiredPermission) && (!normalized || `${command.label} ${command.keywords.join(" ")}`.toLocaleLowerCase("vi").includes(normalized)));
+  return commandRegistry.filter((command) => isReleasedFeaturePath(command.href) && can(user.permissions, command.requiredPermission) && (!normalized || `${command.label} ${command.keywords.join(" ")}`.toLocaleLowerCase("vi").includes(normalized)));
 }

@@ -13,11 +13,12 @@ interface StateProps {
   className?: string;
 }
 
-export function EmptyState({ title, action, className }: StateProps) {
+export function EmptyState({ title, description, action, className }: StateProps) {
   return (
     <div className={cn("state-box", "state-box--empty", className)}>
       <Inbox aria-hidden="true" size={22} />
       <h2>{title}</h2>
+      {description ? <p>{description}</p> : null}
       {action}
     </div>
   );

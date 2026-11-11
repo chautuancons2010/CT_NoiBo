@@ -41,3 +41,6 @@
   .page :global(.personal-home__label-desktop) { display: none; }
   .page :global(.personal-home__label-mobile) { display: inline; }
 }
+
+.pendingUtility { position:relative; }
+.pendingUtility > .utilityLock { position:absolute; top:7px; right:7px; width:12px; height:12px; color:var(--text-muted); background:transparent; padding:0; border-radius:0; }

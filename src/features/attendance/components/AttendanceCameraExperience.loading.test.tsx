@@ -26,7 +26,7 @@ describe("quick attendance opening", () => {
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
     expect(screen.getByLabelText("Chụp ảnh chấm công").parentElement?.parentElement).toBe(document.body);
   });
-  it("disables both daily actions after a completed in/out pair", async () => {
+  it("permits a new check-in after a completed pair while preventing a repeated checkout", async () => {
     const getUserMedia = vi.fn(() => new Promise<MediaStream>(() => undefined));
     vi.stubGlobal("isSecureContext", true);
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
@@ -38,8 +38,7 @@ describe("quick attendance opening", () => {
     const checkout = screen.getByRole("button", { name: "Chấm ra" });
     fireEvent.click(checkout);
     expect(checkout).toBeDisabled();
-    expect(screen.getByText("Hôm nay đã chấm vào.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Chấm vào" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Chấm vào" })).toBeEnabled();
   });
   it("requests the camera immediately while the dashboard request is still pending", async () => {
     const getUserMedia = vi.fn(() => new Promise<MediaStream>(() => undefined));

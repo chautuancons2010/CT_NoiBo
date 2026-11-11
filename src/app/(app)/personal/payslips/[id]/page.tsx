@@ -5,8 +5,11 @@ import { PayslipDetail } from "@/features/accounting/components/PayslipDetail";
 import { payslipListQuery } from "@/features/accounting/payslipPresentation";
 import { can } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
+import { redirect } from "next/navigation";
+import { attendanceOnlyRelease } from "@/config/featureRelease";
 
 export default async function Page({ params, searchParams }: PageProps<"/personal/payslips/[id]">) {
+  if (attendanceOnlyRelease) redirect("/personal/payslips");
   const [{ id }, query, user] = await Promise.all([params, searchParams, getRequestUser()]);
   if (!user || !can(user.permissions, "payslip.self.view")) return <PermissionDeniedState />;
   return (

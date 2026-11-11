@@ -6,7 +6,7 @@ const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 vi.mock("@/components/providers/CurrentUserProvider", () => ({ useCurrentUser: () => ({ id: "engineer-one", permissions: ["worker_attendance.create", "worker_attendance.view", "project.view"] }) }));
 vi.mock("@/lib/realtime/useDomainReconciliation", () => ({ useDomainReconciliation: vi.fn() }));
-vi.mock("../client/workerDraftStore", () => ({ cacheWorkerTasks: vi.fn(), deleteWorkerDraft: vi.fn(), getLatestCachedWorkerTasks: vi.fn(), listWorkerDrafts: async () => [], saveWorkerDraft: vi.fn() }));
+vi.mock("../client/workerDraftStore", () => ({ cacheWorkerTasks: vi.fn(), deleteWorkerDraft: vi.fn(), getCachedWorkerTasks: vi.fn(), listWorkerDrafts: async () => [], saveWorkerDraft: vi.fn() }));
 const task = { projectId: "project-one", projectName: "Công trường mẫu", worksiteId: "site-one", worksiteName: "Khu A", date: "2026-11-07", shiftCode: "DAY", shiftName: "Ca ngày", expectedWorkers: 1, checklist: [], roster: [{ workerId: "worker-one", workerName: "Công nhân", employeeCode: "CN01", assignmentRole: "worker" }] };
 const result = { accountId: "engineer-one", tasks: [task], policy: {} };
 const ok = (data: unknown) => ({ ok: true, json: async () => ({ ok: true, data }) });
@@ -47,7 +47,7 @@ describe("field attendance home", () => {
     const fetchMock = vi.fn().mockRejectedValueOnce(new Error("Mất kết nối thử nghiệm")).mockResolvedValue(ok([{ id: "session-one", ...task, status: "submitted", startedAt: "2026-11-07T01:00:00Z", entries: [], photos: [], supervisorName: "Giám sát" }]));vi.stubGlobal("fetch", fetchMock);
     render(<WorkerAttendanceSessionList date={task.date} />);
     fireEvent.click(await screen.findByRole("button", { name: "Thử lại" }));
-    await waitFor(() => expect(screen.getByText("Công trường mẫu")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Công trường mẫu" })).toBeInTheDocument());
     expect(screen.queryByText("Mất kết nối thử nghiệm")).not.toBeInTheDocument();expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

@@ -71,8 +71,8 @@ export function getAttendanceSequenceWarning(events: readonly SequenceEvent[], i
 }
 export function attendanceActionBlocked(events: readonly SequenceEvent[], intendedType: AttendanceType): string | undefined {
   const accepted = orderedAttendance(events);
-  if (accepted.some(event => event.eventType === intendedType)) return intendedType === "check_in" ? "Hôm nay đã chấm vào." : "Hôm nay đã chấm ra.";
-  if (intendedType === "check_out" && !accepted.some(event => event.eventType === "check_in")) return "Cần chấm vào trước khi chấm ra.";
+  if (accepted.at(-1)?.eventType === intendedType) return intendedType === "check_in" ? "Cần chấm ra trước khi bắt đầu lượt tiếp theo." : "Lượt gần nhất đã chấm ra.";
+  if (intendedType === "check_out" && accepted.at(-1)?.eventType !== "check_in") return "Cần chấm vào trước khi chấm ra.";
   return undefined;
 }
 

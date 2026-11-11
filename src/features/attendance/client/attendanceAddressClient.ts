@@ -8,6 +8,7 @@ let disabledUntil = 0;
 
 export function lookupAttendanceAddress(coordinates: AttendanceAddressCoordinates, options: { retry?: boolean; priority?: boolean } = {}): Promise<AttendanceAddressResult> {
   const key = coordinateLabel(coordinates);
+  if (typeof navigator !== "undefined" && !navigator.onLine) return Promise.resolve({ status: "unavailable" });
   const cached = memory.get(key);
   if (cached && cached.expiresAt > Date.now() && (!options.retry || cached.result.status === "resolved")) return Promise.resolve(cached.result);
   if (disabledUntil > Date.now() && !options.retry) return Promise.resolve({ status: "not_configured" });

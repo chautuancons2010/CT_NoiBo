@@ -26,7 +26,8 @@ describe("employee attendance summary list", () => {
     const row = within(table).getAllByRole("row")[1];
     expect(within(row).getAllByRole("cell").map(item => item.textContent)).toEqual(["22", "3", "1,5", "0,5", "2", "Cần rà soát"]);
     expect(within(row).getByRole("link", { name: /Nguyễn Minh An/ })).toHaveAttribute("href", "/timesheets/periods/period/employees/NV01");
-    expect(within(row).getByText("NV01 · Nhân sự")).toBeInTheDocument();
+    expect(within(row).getByText("Nhân sự")).toBeInTheDocument();
+    expect(within(row).queryByText(/NV01/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /01\/10\/2026/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tuần" })).not.toBeInTheDocument();
   });

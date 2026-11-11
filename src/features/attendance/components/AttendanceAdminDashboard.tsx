@@ -18,6 +18,7 @@ export function AttendanceAdminDashboard({ ownerAccountId, canViewWorkers = fals
   const [data, setData] = useState<AttendanceAdminToday>();
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [supervisorId, setSupervisorId] = useState("");
   const [source, setSource] = useState<"personal" | "field">("personal");
   const requestRef = useRef<AbortController | null>(null);
   const pendingRef = useRef<Promise<void> | null>(null);
@@ -55,12 +56,12 @@ export function AttendanceAdminDashboard({ ownerAccountId, canViewWorkers = fals
   return <div className="page-stack">
     <div className={styles.reviewToolbar}>{canViewWorkers ? <nav aria-label="Phạm vi kiểm tra công" className={styles.sourceNav} role="tablist">
       <button aria-controls="attendance-review-panel" aria-selected={source === "personal"} id="attendance-review-personal" onClick={() => setSource("personal")} role="tab" type="button"><Camera aria-hidden="true" size={17} />Ảnh cá nhân</button>
-      <button aria-controls="attendance-review-panel" aria-selected={source === "field"} id="attendance-review-field" onClick={() => setSource("field")} role="tab" type="button"><Users aria-hidden="true" size={17} />Điểm danh công trường</button>
+      <button aria-controls="attendance-review-panel" aria-selected={source === "field"} id="attendance-review-field" onClick={() => { setSupervisorId(""); setSource("field"); }} role="tab" type="button"><Users aria-hidden="true" size={17} />Điểm danh công trường</button>
     </nav> : null}<AttendanceExport month={reportMonth} onMonthChange={setReportMonth}/></div>
     <div aria-labelledby={source === "field" ? "attendance-review-field" : "attendance-review-personal"} className="page-stack" id="attendance-review-panel" role={canViewWorkers ? "tabpanel" : undefined}>
     {source === "field" && canViewWorkers
-      ? <WorkerAttendanceSessionList detailBasePath="/employees/field-attendance" date={date} onDateChange={setDate} showExport={false} />
-      : <AttendancePhotoReview data={data?.date === date ? data : undefined} date={date} error={error} onDateChange={setDate} onRefresh={load} ownerAccountId={ownerAccountId} refreshing={refreshing} />}
+      ? <WorkerAttendanceSessionList supervisorId={supervisorId} onClearSupervisor={() => setSupervisorId("")} detailBasePath="/employees/field-attendance" date={date} onDateChange={setDate} showExport={false} />
+      : <AttendancePhotoReview onViewWorkerAttendance={canViewWorkers ? (id) => { setSupervisorId(id); setSource("field"); } : undefined} data={data?.date === date ? data : undefined} date={date} error={error} onDateChange={setDate} onRefresh={load} ownerAccountId={ownerAccountId} refreshing={refreshing} />}
     </div>
   </div>;
 }

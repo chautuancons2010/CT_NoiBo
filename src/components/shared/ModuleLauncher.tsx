@@ -1,7 +1,8 @@
 "use client";
 
 import { WorkspaceLink as Link } from "@/components/shared/WorkspaceLink";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LockKeyhole } from "lucide-react";
+import { isReleasedApplication } from "@/config/featureRelease";
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { navigationIconMap, navigationIconSizes } from "@/components/layout/icons";
@@ -20,6 +21,7 @@ export function ModuleIconCard({ application }: { application: ApplicationDefini
     "--module-accent": application.accentColor,
     "--module-surface": application.accentSoft
   } as CSSProperties;
+  if (!isReleasedApplication(application.id)) return <button aria-label={`${application.label} · Đang khóa`} className={`module-icon-card ${styles.card}`} data-locked disabled style={style} type="button"><span className={`module-icon-card__icon ${styles.icon}`}><Icon aria-hidden="true" size={navigationIconSizes.module}/></span><strong>{application.label}</strong><LockKeyhole aria-hidden="true" className={styles.lock} size={13}/></button>;
 
   return (
     <Link className={`module-icon-card ${styles.card}`} href={application.defaultRoute} style={style}>

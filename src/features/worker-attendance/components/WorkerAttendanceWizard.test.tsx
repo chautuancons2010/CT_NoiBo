@@ -1,3 +1,4 @@
+vi.mock("@/components/providers/CurrentUserProvider", () => ({ useCurrentUser: () => ({id:"account-1"}) }));
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerLocalDraft } from "../client/workerDraftStore";
@@ -201,7 +202,7 @@ describe("worker selection workflow", () => {
       finishSave = () => resolve({ ...oldSession, version: 2 });
     }));
     render(<WorkerAttendanceWizard sessionId="session-1" step="roster" />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Công nhân 01 · CN01" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Công nhân 01" }));
     await waitFor(() => expect(syncWorkerDraft).toHaveBeenCalled(), { timeout: 2000 });
     fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
     await screen.findByRole("heading", { name: "An toàn lao động" });
@@ -222,7 +223,7 @@ describe("worker selection workflow", () => {
     vi.mocked(syncWorkerDraft).mockImplementation(() => new Promise(() => undefined));
     stored.session.checklist = [{ id: "safety-1", group: "Bảo hộ", content: "Đội mũ bảo hộ", required: true, sortOrder: 1 }];
     render(<WorkerAttendanceWizard sessionId="session-1" step="roster" />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Công nhân 01 · CN01" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Công nhân 01" }));
     await waitFor(() => expect(syncWorkerDraft).toHaveBeenCalled(), { timeout: 2000 });
     fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
     const safety = await screen.findByRole("checkbox", { name: "Đội mũ bảo hộ *" });
@@ -236,7 +237,7 @@ describe("worker selection workflow", () => {
 
   it("selects actual attendees, keeps unchecked workers out of the count and persists rapid changes", async () => {
     render(<WorkerAttendanceWizard sessionId="session-1" step="roster" />);
-    const first = await screen.findByRole("checkbox", { name: "Công nhân 01 · CN01" });
+    const first = await screen.findByRole("checkbox", { name: "Công nhân 01" });
     expect(first).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Tiếp tục" })).toBeDisabled();
     fireEvent.click(first);
@@ -246,7 +247,7 @@ describe("worker selection workflow", () => {
     expect(screen.queryByRole("button", { name: "Thêm công nhân" })).not.toBeInTheDocument();
     act(() => {
       fireEvent.click(first);
-      fireEvent.click(screen.getByRole("checkbox", { name: "Công nhân 02 · CN02" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Công nhân 02" }));
     });
     await waitFor(() => expect(stored.session.entries.map(entry => entry.isSelected)).toEqual([false, true]));
     fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));

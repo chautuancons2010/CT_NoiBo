@@ -30,7 +30,7 @@ export function validateSessionForSubmit(input: { entries: readonly WorkerAttend
   if (!input.selectionMode && policy.workNoteRequired && !input.workNote?.trim()) errors.push("Cần nhập nội dung công việc.");
   if (input.selectionMode && !input.safetyConfirmed) errors.push("Cần xác nhận an toàn lao động.");
   if (input.selectionMode) errors.push(...validateWorkerSafetyReport(input.safetyReport, input.workNote));
-  if (input.geofenceStatus !== "not_required" && !hasWorkerCoordinates(input)) errors.push("Chưa có tọa độ GPS. Hãy thử lại vị trí.");
+  if (input.geofenceStatus !== "not_required" && !hasWorkerCoordinates(input) && !(input.geofenceStatus === "unavailable" && input.photoCount > 0)) errors.push("Chưa có tọa độ GPS. Hãy thử lại vị trí.");
   const checked = new Set(input.checklistResponses.filter((response) => response.checked).map((response) => response.itemId));
   if (input.checklist.some((item) => item.required && !checked.has(item.id))) errors.push("Cần hoàn thành các mục checklist bắt buộc.");
   return errors;

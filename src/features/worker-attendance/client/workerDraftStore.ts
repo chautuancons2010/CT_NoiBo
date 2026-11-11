@@ -3,6 +3,7 @@
 import type { WorkerAttendancePolicy, WorkerAttendanceSession, WorkerAttendanceTask } from "@/features/worker-attendance/types/workerAttendanceTypes";
 
 export interface LocalWorkerPhoto {
+  rawPhoto?: Blob;
   address?: string;
   latitude?: number;
   longitude?: number;

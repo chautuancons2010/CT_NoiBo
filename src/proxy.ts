@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { sessionCookieNames, stagingAuthorized } from "@/lib/testing/policy.mjs";
 import { lockedModuleForRequestPath, moduleForRequestPath } from "@/config/moduleAccess";
+import { isReleasedFeaturePath } from "@/config/featureRelease";
 import { moduleLabels } from "@/config/systemSettings";
 import { readModuleSettings } from "@/services/system-settings/systemSettingsService";
 
@@ -44,6 +45,12 @@ export async function proxy(request: NextRequest) {
     return new NextResponse("Staging access required", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="CT NoiBo Staging", charset="UTF-8"', "cache-control": "no-store" } });
   }
   const requestId = request.headers.get("x-request-id")?.slice(0, 128) || randomUUID();
+  if (!isReleasedFeaturePath(request.nextUrl.pathname, request.method)) {
+    if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ ok: false, error: { code: "MODULE_LOCKED", message: "Chức năng đang khóa trong đợt triển khai chấm công.", requestId } }, { status: 423, headers: { "cache-control": "no-store" } });
+    const destination = new URL("/module-locked", request.url);
+    destination.searchParams.set("module", moduleForRequestPath(request.nextUrl.pathname) ?? "operations");
+    return NextResponse.redirect(destination);
+  }
   if (request.nextUrl.pathname.startsWith("/api/") && mutatingMethods.has(request.method)) {
     const origin = request.headers.get("origin");
     // The dev server can normalize nextUrl to localhost even when a phone

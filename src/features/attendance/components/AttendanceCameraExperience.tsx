@@ -241,6 +241,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     setLocationError(undefined);
     setLocationState("requesting");
     const pending = captureAttendanceLocation(navigator.geolocation, window.isSecureContext, {
+      maxWaitMs: navigator.onLine ? 20_000 : 8_000,
       signal: controller.signal,
       targetAccuracyMeters: locationAccuracyTarget,
       onPosition: (position) => {
@@ -407,6 +408,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
       photoHeight: processed.height,
       requiresPhotoStamp: true,
       photoStamp,
+      rawPhoto: photoStamp.address.includes("Chưa có địa chỉ") ? rawPhotoRef.current?.photo : undefined,
       createdAt: capture.capturedAtClient,
       retryCount: 0,
       syncState: "local_pending"
