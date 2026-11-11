@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { sessionCookieNames, stagingAuthorized } from "@/lib/testing/policy.mjs";
 import { lockedModuleForRequestPath, moduleForRequestPath } from "@/config/moduleAccess";
-import { isReleasedFeaturePath } from "@/config/featureRelease";
+import { hasUnrestrictedReleaseAccess, isReleasedFeaturePath } from "@/config/featureRelease";
 import { moduleLabels } from "@/config/systemSettings";
 import { readModuleSettings } from "@/services/system-settings/systemSettingsService";
 
 const mutatingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const accessCookie = sessionCookieNames().access;
 const refreshCookie = sessionCookieNames().refresh;
+const sessionCookie = sessionCookieNames().session;
 const refreshWindowSeconds = 5 * 60;
 
 function accessTokenExpiresSoon(token: string): boolean {
@@ -40,16 +41,47 @@ async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: 
   }
 }
 
+async function readReleaseRoleCodes(request: NextRequest): Promise<string[]> {
+  const sessionId = request.cookies.get(sessionCookie)?.value;
+  if (!sessionId || !request.cookies.get(accessCookie)?.value) return [];
+  const databaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!databaseUrl || !serviceKey) return [];
+  try {
+    const endpoint = new URL("/rest/v1/app_sessions", databaseUrl);
+    endpoint.searchParams.set("id", `eq.${sessionId}`);
+    endpoint.searchParams.set("revoked_at", "is.null");
+    endpoint.searchParams.set("expires_at", `gt.${new Date().toISOString()}`);
+    endpoint.searchParams.set("select", "account:app_accounts!app_sessions_account_id_fkey(status,account_roles!account_roles_account_id_fkey(roles(code)))");
+    const response = await fetch(endpoint, {
+      headers: { apikey: serviceKey, authorization: `Bearer ${serviceKey}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(2_000)
+    });
+    if (!response.ok) return [];
+    const rows = await response.json() as Array<{ account?: { status?: string; account_roles?: Array<{ roles?: { code?: string } | null }> } | null }>;
+    const account = rows[0]?.account;
+    if (account?.status !== "active") return [];
+    return (account.account_roles ?? []).map((assignment) => assignment.roles?.code).filter((code): code is string => typeof code === "string");
+  } catch {
+    return [];
+  }
+}
+
 export async function proxy(request: NextRequest) {
   if (!stagingAuthorized(request.headers.get("authorization"))) {
     return new NextResponse("Staging access required", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="CT NoiBo Staging", charset="UTF-8"', "cache-control": "no-store" } });
   }
   const requestId = request.headers.get("x-request-id")?.slice(0, 128) || randomUUID();
+  let roleCodes: string[] | undefined;
   if (!isReleasedFeaturePath(request.nextUrl.pathname, request.method)) {
-    if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ ok: false, error: { code: "MODULE_LOCKED", message: "Chức năng đang khóa trong đợt triển khai chấm công.", requestId } }, { status: 423, headers: { "cache-control": "no-store" } });
-    const destination = new URL("/module-locked", request.url);
-    destination.searchParams.set("module", moduleForRequestPath(request.nextUrl.pathname) ?? "operations");
-    return NextResponse.redirect(destination);
+    roleCodes = await readReleaseRoleCodes(request);
+    if (!isReleasedFeaturePath(request.nextUrl.pathname, request.method, roleCodes)) {
+      if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ ok: false, error: { code: "MODULE_LOCKED", message: "Chức năng đang khóa trong đợt triển khai chấm công.", requestId } }, { status: 423, headers: { "cache-control": "no-store" } });
+      const destination = new URL("/module-locked", request.url);
+      destination.searchParams.set("module", moduleForRequestPath(request.nextUrl.pathname) ?? "operations");
+      return NextResponse.redirect(destination);
+    }
   }
   if (request.nextUrl.pathname.startsWith("/api/") && mutatingMethods.has(request.method)) {
     const origin = request.headers.get("origin");
@@ -66,12 +98,15 @@ export async function proxy(request: NextRequest) {
     try {
       const locked = lockedModuleForRequestPath(request.nextUrl.pathname, await readModuleSettings({ maxAgeMs: mutatingMethods.has(request.method) ? 2_000 : 5_000, allowStaleOnError: true }));
       if (locked) {
-        if (request.nextUrl.pathname.startsWith("/api/")) {
-          return NextResponse.json({ ok: false, error: { code: "MODULE_LOCKED", message: `Module ${moduleLabels[locked]} đang tạm khóa.`, requestId } }, { status: 423, headers: { "cache-control": "no-store", "x-request-id": requestId } });
+        roleCodes ??= await readReleaseRoleCodes(request);
+        if (!hasUnrestrictedReleaseAccess(roleCodes)) {
+          if (request.nextUrl.pathname.startsWith("/api/")) {
+            return NextResponse.json({ ok: false, error: { code: "MODULE_LOCKED", message: `Module ${moduleLabels[locked]} đang tạm khóa.`, requestId } }, { status: 423, headers: { "cache-control": "no-store", "x-request-id": requestId } });
+          }
+          const destination = new URL("/module-locked", request.url);
+          destination.searchParams.set("module", locked);
+          return NextResponse.redirect(destination, { headers: { "cache-control": "no-store", "x-request-id": requestId } });
         }
-        const destination = new URL("/module-locked", request.url);
-        destination.searchParams.set("module", locked);
-        return NextResponse.redirect(destination, { headers: { "cache-control": "no-store", "x-request-id": requestId } });
       }
     } catch {
       return NextResponse.json({ ok: false, error: { code: "NETWORK_ERROR", message: "Không thể kiểm tra trạng thái module. Vui lòng thử lại.", requestId } }, { status: 503, headers: { "cache-control": "no-store", "x-request-id": requestId } });

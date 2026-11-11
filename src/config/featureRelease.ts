@@ -1,10 +1,16 @@
 /** Current rollout: attendance, HR and package attendance. */
 export const attendanceOnlyRelease = true;
-export function isReleasedApplication(id: string) {
+const unrestrictedRoleCodes = new Set(["admin", "hr", "human_resources", "human-resources"]);
+export function hasUnrestrictedReleaseAccess(roleCodes?: readonly string[]) {
+  return roleCodes?.some((code) => unrestrictedRoleCodes.has(code)) ?? false;
+}
+export function isReleasedApplication(id: string, roleCodes?: readonly string[]) {
+  if (hasUnrestrictedReleaseAccess(roleCodes)) return true;
   return ["attendance", "human-resources", "projects", "system"].includes(id);
 }
 const matches = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
-export function isReleasedFeaturePath(path: string, method = "GET") {
+export function isReleasedFeaturePath(path: string, method = "GET", roleCodes?: readonly string[]) {
+  if (hasUnrestrictedReleaseAccess(roleCodes)) return true;
   if (!attendanceOnlyRelease) return true;
   if (path.startsWith("/api/")) {
     if (path.startsWith("/api/testing/") || path.startsWith("/api/health/")) return true;

@@ -8,7 +8,7 @@ import { ACCOUNT_PASSWORD_MESSAGE, ACCOUNT_PASSWORD_PATTERN } from "@/lib/auth/p
 import { resolveLandingPage, resolveMobileLandingPage } from "@/features/dashboard/registry";
 import { readSettingsGroup } from "@/services/system-settings/systemSettingsService";
 import { requestNetworkContext, signInWithPassword, writeSessionCookies } from "@/services/auth/sessionService";
-import { attendanceOnlyRelease } from "@/config/featureRelease";
+import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess } from "@/config/featureRelease";
 import { can } from "@/lib/auth/permissions";
 
 const schema = z.object({
@@ -22,7 +22,8 @@ export async function POST(request: Request) {
       requestNetworkContext().then((context) => signInWithPassword({ ...input, ...context })),
       readSettingsGroup("dashboard")
     ]);
-    const response = NextResponse.json({ ok: true, data: { redirectTo: attendanceOnlyRelease ? can(result.user.permissions, "attendance.view_all") ? "/attendance/today" : "/personal" : resolveLandingPage(result.user, dashboardSettings), mobileRedirectTo: attendanceOnlyRelease ? "/personal" : resolveMobileLandingPage(result.user, dashboardSettings) } }, { headers: { "cache-control": "no-store" } });
+    const restrictedRelease = attendanceOnlyRelease && !hasUnrestrictedReleaseAccess(result.user.roleCodes);
+    const response = NextResponse.json({ ok: true, data: { redirectTo: restrictedRelease ? can(result.user.permissions, "attendance.view_all") ? "/attendance/today" : "/personal" : resolveLandingPage(result.user, dashboardSettings), mobileRedirectTo: restrictedRelease ? "/personal" : resolveMobileLandingPage(result.user, dashboardSettings) } }, { headers: { "cache-control": "no-store" } });
     writeSessionCookies(response.cookies, result.session, result.sessionId);
     logger.info("auth.login_succeeded", { actorId: result.user.id });
     return response;

@@ -238,6 +238,7 @@ export type AccountStatus = "pending_activation" | "active" | "disabled" | "lock
 export interface AuthenticatedUser {
   id: string;
   employeeId?: string | null;
+  roleCodes?: string[];
   displayName: string;
   username: string;
   email: string;

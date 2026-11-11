@@ -15,13 +15,13 @@ import styles from "./ModuleLauncher.module.css";
 
 const mobileLabels: Partial<Record<ApplicationDefinition["id"], string>> = { projects: "Công trường", operations: "Đơn từ" };
 
-export function ModuleIconCard({ application }: { application: ApplicationDefinition }) {
+export function ModuleIconCard({ application, roleCodes }: { application: ApplicationDefinition; roleCodes?: readonly string[] }) {
   const Icon = navigationIconMap[application.icon];
   const style = {
     "--module-accent": application.accentColor,
     "--module-surface": application.accentSoft
   } as CSSProperties;
-  if (!isReleasedApplication(application.id)) return <button aria-label={`${application.label} · Đang khóa`} className={`module-icon-card ${styles.card}`} data-locked disabled style={style} type="button"><span className={`module-icon-card__icon ${styles.icon}`}><Icon aria-hidden="true" size={navigationIconSizes.module}/></span><strong>{application.label}</strong><LockKeyhole aria-hidden="true" className={styles.lock} size={13}/></button>;
+  if (!isReleasedApplication(application.id, roleCodes)) return <button aria-label={`${application.label} · Đang khóa`} className={`module-icon-card ${styles.card}`} data-locked disabled style={style} type="button"><span className={`module-icon-card__icon ${styles.icon}`}><Icon aria-hidden="true" size={navigationIconSizes.module}/></span><strong>{application.label}</strong><LockKeyhole aria-hidden="true" className={styles.lock} size={13}/></button>;
 
   return (
     <Link className={`module-icon-card ${styles.card}`} href={application.defaultRoute} style={style}>
@@ -62,7 +62,7 @@ export function ModuleLauncher({ showHeading = true, excludePersonal = false, la
     <section aria-label={showHeading ? "Ứng dụng của tôi" : "Ứng dụng được phép sử dụng"} className={`module-launcher ${styles.launcher}`} data-layout={layout}>
       {showHeading ? <header className={`dashboard-section-heading ${styles.heading}`}><h2>Ứng dụng của tôi</h2></header> : null}
       <div className={`module-launcher__grid ${styles.grid}`}>
-        {applications.map((application) => <ModuleIconCard application={application} key={application.id} />)}
+        {applications.map((application) => <ModuleIconCard application={application} key={application.id} roleCodes={user.roleCodes} />)}
       </div>
     </section>
   );

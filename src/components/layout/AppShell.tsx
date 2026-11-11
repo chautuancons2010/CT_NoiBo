@@ -11,6 +11,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { BackLink } from "@/components/shared/BackLink";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { lockedModuleForRequestPath } from "@/config/moduleAccess";
+import { hasUnrestrictedReleaseAccess } from "@/config/featureRelease";
 import { ModuleLockedState } from "@/components/shared/ModuleLockedState";
 import { useModuleAvailability } from "@/components/layout/useModuleAvailability";
 import { SystemNoticeBanner } from "@/features/shared-platforms/components/SystemNoticeBanner";
@@ -103,7 +104,7 @@ function AppShellContent({ children, user, testEnvironment }: { children: ReactN
     };
   }, []);
 
-  const unavailableModule = lockedModuleForRequestPath(pathname, settings.modules);
+  const unavailableModule = hasUnrestrictedReleaseAccess(user.roleCodes) ? null : lockedModuleForRequestPath(pathname, settings.modules);
 
   useEffect(() => {
     let active = true;

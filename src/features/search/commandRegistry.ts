@@ -41,5 +41,5 @@ export const commandRegistry: AppCommand[] = [
 
 export function commandsForUser(user: AuthenticatedUser, query = ""): AppCommand[] {
   const normalized = query.trim().toLocaleLowerCase("vi");
-  return commandRegistry.filter((command) => isReleasedFeaturePath(command.href) && can(user.permissions, command.requiredPermission) && (!normalized || `${command.label} ${command.keywords.join(" ")}`.toLocaleLowerCase("vi").includes(normalized)));
+  return commandRegistry.filter((command) => isReleasedFeaturePath(command.href, "GET", user.roleCodes) && can(user.permissions, command.requiredPermission) && (!normalized || `${command.label} ${command.keywords.join(" ")}`.toLocaleLowerCase("vi").includes(normalized)));
 }

@@ -10,7 +10,7 @@ import { UserMenu } from "@/components/shared/UserMenu";
 import { useBranding, useOrganizationSettings } from "@/components/providers/SystemSettingsProvider";
 import { NotificationBell } from "@/features/shared-platforms/components/NotificationBell";
 import { MessageBell } from "@/features/messaging/MessageBell";
-import { attendanceOnlyRelease } from "@/config/featureRelease";
+import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess } from "@/config/featureRelease";
 import { CommandPalette } from "@/features/search/components/CommandPalette";
 import type { RealtimeConnectionState } from "@/lib/realtime/coordinator";
 import { can } from "@/lib/auth/permissions";
@@ -85,7 +85,7 @@ export function AppHeader({ pathname, user, connectionState, pageTitleOverride, 
             <i aria-hidden="true" /><span>{connectionLabels[connectionState]}</span>
           </span>
         ) : null}
-        {!attendanceOnlyRelease && can(user.permissions, "chat.access") ? <MessageBell /> : null}
+        {(!attendanceOnlyRelease || hasUnrestrictedReleaseAccess(user.roleCodes)) && can(user.permissions, "chat.access") ? <MessageBell /> : null}
         <NotificationBell accountId={user.id} />
         <UserMenu user={user} />
       </div>

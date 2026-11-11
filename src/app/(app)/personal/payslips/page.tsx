@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState, PermissionDeniedState } from "@/components/shared/States";
 import { readModuleSettings } from "@/services/system-settings/systemSettingsService";
-import { attendanceOnlyRelease } from "@/config/featureRelease";
+import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess } from "@/config/featureRelease";
 import { PayslipConsole } from "@/features/accounting/components/PayslipConsole";
 import { can } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
@@ -11,7 +11,7 @@ export default async function Page({ searchParams }: PageProps<"/personal/paysli
   const user = await getRequestUser();
   if (!user || !can(user.permissions, "payslip.self.view")) return <PermissionDeniedState />;
   const modules = await readModuleSettings();
-  if (attendanceOnlyRelease || !modules.accounting) return <div className="page-stack"><PageHeader title="Phiếu lương của tôi"/><EmptyState title="Chưa có thông tin" description="Vui lòng quay lại sau."/></div>;
+  if ((attendanceOnlyRelease && !hasUnrestrictedReleaseAccess(user.roleCodes)) || !modules.accounting) return <div className="page-stack"><PageHeader title="Phiếu lương của tôi"/><EmptyState title="Chưa có thông tin" description="Vui lòng quay lại sau."/></div>;
   return (
     <div className="page-stack">
       <PageHeader title="Phiếu lương của tôi" />

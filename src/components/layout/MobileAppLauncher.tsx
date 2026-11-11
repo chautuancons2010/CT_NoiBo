@@ -88,7 +88,7 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
               "--module-accent": application.accentColor,
               "--module-surface": application.accentSoft
             } as CSSProperties;
-            if (!isReleasedApplication(application.id)) return <button aria-label={`${application.label} · Đang khóa`} className={styles.lockedApp} disabled key={application.id} style={style} type="button"><span className="mobile-app-sheet__app-icon"><Icon aria-hidden="true" size={navigationIconSizes.rail}/></span><strong>{application.label}</strong><LockKeyhole aria-hidden="true" className={styles.lock} size={13}/></button>;
+            if (!isReleasedApplication(application.id, user.roleCodes)) return <button aria-label={`${application.label} · Đang khóa`} className={styles.lockedApp} disabled key={application.id} style={style} type="button"><span className="mobile-app-sheet__app-icon"><Icon aria-hidden="true" size={navigationIconSizes.rail}/></span><strong>{application.label}</strong><LockKeyhole aria-hidden="true" className={styles.lock} size={13}/></button>;
             return (
               <Link aria-current={active ? "page" : undefined} className={cn(active && "is-active")} href={href} key={application.id} onClick={close} style={style} title={application.label}>
                 <span className="mobile-app-sheet__app-icon"><Icon aria-hidden="true" size={navigationIconSizes.rail} strokeWidth={1.8} />{active ? <Check aria-hidden="true" className="mobile-app-sheet__selected" size={12} strokeWidth={3} /> : null}</span>

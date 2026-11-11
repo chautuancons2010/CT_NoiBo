@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { LockKeyhole } from "lucide-react";
 import { moduleLabels, type ModuleKey } from "@/config/systemSettings";
-import { attendanceOnlyRelease } from "@/config/featureRelease";
 
 export function ModuleLockedState({ module, canManage }: { module: ModuleKey; canManage: boolean }) {
   return (
@@ -12,7 +11,7 @@ export function ModuleLockedState({ module, canManage }: { module: ModuleKey; ca
       <h2>Chưa có thông tin</h2><p>Vui lòng quay lại sau.</p>
       <div className="form-actions">
         <Link className="button button--secondary button--md" href="/personal">Về Cá nhân</Link>
-        {canManage && !attendanceOnlyRelease ? <Link className="button button--primary button--md" href="/system-admin/modules">Quản lý module</Link> : null}
+        {canManage ? <Link className="button button--primary button--md" href="/system-admin/modules">Quản lý module</Link> : null}
       </div>
     </section>
   );

@@ -178,6 +178,7 @@ function mapAccount(account: StoredAccount, fallbackEmail: string): Authenticate
   return {
     id: String(account.id),
     employeeId: account.employee_id ? String(account.employee_id) : null,
+    roleCodes: rawRoles.map((item) => item.roles?.code).filter((code): code is string => typeof code === "string"),
     displayName: String(account.display_name),
     username: String(account.username),
     email: String(account.primary_email || fallbackEmail),

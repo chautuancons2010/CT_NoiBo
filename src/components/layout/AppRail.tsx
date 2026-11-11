@@ -2,7 +2,7 @@
 
 import { WorkspaceLink as Link } from "@/components/shared/WorkspaceLink";
 import { ChevronDown, LockKeyhole, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { attendanceOnlyRelease, isReleasedFeaturePath } from "@/config/featureRelease";
+import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess, isReleasedFeaturePath } from "@/config/featureRelease";
 import { useEffect, useId, useState } from "react";
 
 import { AppLogo } from "@/components/layout/AppLogo";
@@ -25,10 +25,11 @@ interface AppRailProps {
   onCollapsedChange: (collapsed: boolean) => void;
 }
 
-function RailNavigation({ groups, pathname, collapsed }: {
+function RailNavigation({ groups, pathname, collapsed, user }: {
   groups: NavigationGroup[];
   pathname: string;
   collapsed: boolean;
+  user: AuthenticatedUser;
 }) {
   const id = useId();
   // A detail/create route belongs to its closest worklist, including exact lists.
@@ -53,10 +54,10 @@ function RailNavigation({ groups, pathname, collapsed }: {
 
   const renderLink = (item: NavigationItem, nested = false) => {
     const Icon = navigationIconMap[item.icon];
-    const homeRedirect = attendanceOnlyRelease && item.href === "/dashboard";
+    const homeRedirect = attendanceOnlyRelease && !hasUnrestrictedReleaseAccess(user.roleCodes) && item.href === "/dashboard";
     const label = homeRedirect ? "Cá nhân" : item.label;
     const href = homeRedirect ? "/personal" : item.href;
-    if (!isReleasedFeaturePath(item.href)) return <li key={item.href}><span aria-disabled="true" aria-label={`${label} · Đang khóa`} className={cn("app-rail__link", nested && "app-rail__child-link")} data-locked role="link">{!nested ? <Icon aria-hidden="true" size={navigationIconSizes.rail}/> : null}{!collapsed || nested ? <span>{label}</span> : null}<LockKeyhole aria-hidden="true" className="app-rail__lock" size={12}/></span></li>;
+    if (!isReleasedFeaturePath(item.href, "GET", user.roleCodes)) return <li key={item.href}><span aria-disabled="true" aria-label={`${label} · Đang khóa`} className={cn("app-rail__link", nested && "app-rail__child-link")} data-locked role="link">{!nested ? <Icon aria-hidden="true" size={navigationIconSizes.rail}/> : null}{!collapsed || nested ? <span>{label}</span> : null}<LockKeyhole aria-hidden="true" className="app-rail__lock" size={12}/></span></li>;
     const active = activeHref === item.href || homeRedirect && pathname.startsWith("/personal");
     const link = <Link
       aria-label={collapsed ? label : undefined}
@@ -117,7 +118,7 @@ export function AppRail({ pathname, user, collapsed, onCollapsedChange }: AppRai
     <aside className={cn("app-rail", chrome.rail, collapsed && "is-collapsed")} aria-label={`Điều hướng ${application.label}`}>
       <div className="app-rail__brand"><AppLogo compact />{!collapsed ? <strong className="app-rail__brand-name">{settings.organization.shortName}</strong> : null}</div>
       <nav className="app-rail__nav" id="desktop-navigation" key={application.id}>
-        <RailNavigation collapsed={collapsed} groups={groups} pathname={pathname} />
+        <RailNavigation collapsed={collapsed} groups={groups} pathname={pathname} user={user} />
       </nav>
       <div className="app-rail__footer">
         <IconButton aria-controls="desktop-navigation" aria-expanded={!collapsed} className="app-rail__collapse"
