@@ -1,7 +1,7 @@
 /** Current rollout: attendance, HR and package attendance. */
 export const attendanceOnlyRelease = true;
 export function isReleasedApplication(id: string) {
-  return ["attendance", "human-resources", "projects"].includes(id);
+  return ["attendance", "human-resources", "projects", "system"].includes(id);
 }
 const matches = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
 export function isReleasedFeaturePath(path: string, method = "GET") {
@@ -15,5 +15,5 @@ export function isReleasedFeaturePath(path: string, method = "GET") {
     if (["GET", "HEAD", "OPTIONS"].includes(method) && ["projects", "employees", "modules", "system-settings", "system-notices", "search", "files", "branding"].some(prefix => matches(resource, prefix))) return true;
     return false;
   }
-  return ["/personal", "/attendance", "/worker-attendance", "/projects", "/timesheets", "/employees", "/leave", "/settings/attendance", "/settings/users", "/settings/roles", "/profile", "/applications", "/search", "/notifications", "/login", "/testing", "/module-locked", "/offline"].some(prefix => matches(path, prefix)) || ["/", "/dashboard", "/home", "/logout"].includes(path) || path.startsWith("/_next/") || /\.[a-z0-9]+$/i.test(path);
+  return ["/personal", "/attendance", "/worker-attendance", "/projects", "/timesheets", "/employees", "/leave", "/settings/attendance", "/settings/users", "/settings/roles", "/settings/permissions", "/system-admin", "/profile", "/applications", "/search", "/notifications", "/login", "/testing", "/module-locked", "/offline"].some(prefix => matches(path, prefix)) || ["/", "/dashboard", "/home", "/logout"].includes(path) || path.startsWith("/_next/") || /\.[a-z0-9]+$/i.test(path);
 }

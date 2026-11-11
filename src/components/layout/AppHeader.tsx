@@ -15,6 +15,7 @@ import { CommandPalette } from "@/features/search/components/CommandPalette";
 import type { RealtimeConnectionState } from "@/lib/realtime/coordinator";
 import { can } from "@/lib/auth/permissions";
 import { AppLogo } from "@/components/layout/AppLogo";
+import { ApplicationMenu } from "@/components/layout/ApplicationMenu";
 import { HeaderTestControl } from "@/features/testing/HeaderTestControl";
 import chrome from "./ApplicationChrome.module.css";
 
@@ -67,6 +68,7 @@ export function AppHeader({ pathname, user, connectionState, pageTitleOverride, 
   return (
     <header className={`app-header app-header--compact app-header--root ${chrome.header}`}>
       <div className="app-header__desktop-leading">
+        {attendanceOnlyRelease && isMobileHeaderRootScreen(pathname) ? <ApplicationMenu /> : null}
         <nav aria-label="Vị trí hiện tại" className="app-header__context">
           {pathname === homeHref ? <span aria-current="page">Trang chủ</span> : <><Link href={homeHref}>Trang chủ</Link><ChevronRight aria-hidden="true" size={13} /><span aria-current="page" title={mobileTitle}>{mobileTitle}</span></>}
         </nav>
