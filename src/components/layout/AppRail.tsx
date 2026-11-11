@@ -53,15 +53,19 @@ function RailNavigation({ groups, pathname, collapsed }: {
 
   const renderLink = (item: NavigationItem, nested = false) => {
     const Icon = navigationIconMap[item.icon];
-    if (!isReleasedFeaturePath(item.href) || attendanceOnlyRelease && item.href === "/dashboard") return <li key={item.href}><span aria-disabled="true" aria-label={`${item.label} · Đang khóa`} className={cn("app-rail__link", nested && "app-rail__child-link")} data-locked role="link">{!nested ? <Icon aria-hidden="true" size={navigationIconSizes.rail}/> : null}{!collapsed || nested ? <span>{item.label}</span> : null}<LockKeyhole aria-hidden="true" className="app-rail__lock" size={12}/></span></li>;
+    const homeRedirect = attendanceOnlyRelease && item.href === "/dashboard";
+    const label = homeRedirect ? "Cá nhân" : item.label;
+    const href = homeRedirect ? "/personal" : item.href;
+    if (!isReleasedFeaturePath(item.href)) return <li key={item.href}><span aria-disabled="true" aria-label={`${label} · Đang khóa`} className={cn("app-rail__link", nested && "app-rail__child-link")} data-locked role="link">{!nested ? <Icon aria-hidden="true" size={navigationIconSizes.rail}/> : null}{!collapsed || nested ? <span>{label}</span> : null}<LockKeyhole aria-hidden="true" className="app-rail__lock" size={12}/></span></li>;
+    const active = activeHref === item.href || homeRedirect && pathname.startsWith("/personal");
     const link = <Link
-      aria-label={collapsed ? item.label : undefined}
-      aria-current={activeHref === item.href ? "page" : undefined}
-      className={cn("app-rail__link", nested && "app-rail__child-link", activeHref === item.href && "is-active")}
-      href={item.href}
+      aria-label={collapsed ? label : undefined}
+      aria-current={active ? "page" : undefined}
+      className={cn("app-rail__link", nested && "app-rail__child-link", active && "is-active")}
+      href={href}
     >
       {!nested ? <Icon aria-hidden="true" size={navigationIconSizes.rail} /> : null}
-      {!collapsed || nested ? <span>{item.label}</span> : null}
+      {!collapsed || nested ? <span>{label}</span> : null}
       <LinkLoadingIndicator />
     </Link>;
     return <li key={item.href}>{collapsed && !nested

@@ -257,6 +257,20 @@ export const moduleSettingsSchema = z
   })
   .strict();
 
+/**
+ * Older production settings may store newly introduced optional module flags
+ * as JSON null. Treat those values like omitted legacy keys so a single
+ * unrelated flag cannot make every module-bound route unavailable.
+ */
+export function normalizeStoredModuleSettings(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const stored = { ...(value as Record<string, unknown>) };
+  for (const key of ["accounting", "operations"] as const) {
+    if (stored[key] === null) delete stored[key];
+  }
+  return stored;
+}
+
 export const payslipSettingsSchema = z.object({
   companyName: z.string().trim().min(2).max(120),
   title: z.string().trim().min(2).max(120),

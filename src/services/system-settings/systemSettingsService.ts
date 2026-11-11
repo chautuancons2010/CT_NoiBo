@@ -6,6 +6,7 @@ import {
   isSystemSettingsGroup,
   moduleSettingsSchema,
   normalizeStoredDashboardSettings,
+  normalizeStoredModuleSettings,
   normalizeStoredNavigationSettings,
   parseSystemSettingsGroup,
   systemSettingsSchemas,
@@ -54,6 +55,7 @@ function safeDefault<TGroup extends SystemSettingsGroup>(group: TGroup): SystemS
 }
 
 function normalizeStoredSettings(group: SystemSettingsGroup, value: unknown): unknown {
+  if (group === "modules") return normalizeStoredModuleSettings(value);
   if (group === "navigation") return normalizeStoredNavigationSettings(value);
   if (group === "dashboard") return normalizeStoredDashboardSettings(value);
   return value;
@@ -165,7 +167,7 @@ async function loadModuleSettings(): Promise<ModuleSettings> {
     const { data, error } = await client.from("system_settings")
       .select("value").eq("group_key", "modules").abortSignal(controller.signal).maybeSingle();
     if (error || !data) throw new Error("Module settings unavailable");
-    const parsed = moduleSettingsSchema.safeParse(data.value);
+    const parsed = moduleSettingsSchema.safeParse(normalizeStoredModuleSettings(data.value));
     if (!parsed.success) throw new Error("Invalid module settings");
     return parsed.data;
   } catch {
