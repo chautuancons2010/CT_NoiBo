@@ -26,13 +26,14 @@ describe("JPEG evidence footer", () => {
     const encoded = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (callback, type) {
       callback(new Blob(["jpeg-encoded-after-drawing"], { type }));
     });
-    const result = await processAttendanceImage(new File(["original"], "camera.jpg", { type: "image/jpeg" }), { capturedAt: "2026-11-09T06:20:15.000Z", address: "12 Nguyễn Huệ, TP. Hồ Chí Minh", latitude: 10.7769, longitude: 106.7009, label: "CHÂU TUẤN · CHẤM VÀO" });
+    const result = await processAttendanceImage(new File(["original"], "camera.jpg", { type: "image/jpeg" }), { capturedAt: "2026-11-09T06:20:15.000Z", address: "12 Nguyễn Huệ, TP. Hồ Chí Minh", latitude: 10.7769, longitude: 106.7009, label: "CHÂU TUẤN · CHẤM VÀO", capturedByName: "Nguyễn Văn An", capturedByUsername: "NV001" });
     expect(contexts).toHaveLength(2);
     for (const context of contexts) {
       const text = context.fillText.mock.calls.map(call => call[0]).join(" ");
       expect(text).toContain("13:20:15 · 09/11/2026");
       expect(text).toContain("12 Nguyễn Huệ, TP. Hồ Chí Minh");
       expect(text).toContain("GPS 10.776900, 106.700900");
+      expect(text).toContain("Người chấm: Nguyễn Văn An · @NV001");
       expect(context.fillRect).toHaveBeenCalledTimes(2);
       expect(context.fillText.mock.invocationCallOrder.at(-1)).toBeLessThan(encoded.mock.invocationCallOrder[contexts.indexOf(context)]);
     }

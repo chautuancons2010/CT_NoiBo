@@ -12,7 +12,7 @@ import { logger } from "@/lib/logger";
 import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { isJwtClockError } from "@/lib/supabase/fetchWithJwtClockRetry";
 import { resolveAccountPermissions } from "@/services/authorization/employeeAccessPolicy";
-import { productionAccountAllowed, sessionCookieNames } from "@/lib/testing/policy.mjs";
+import { productionAccountAllowed, sessionCookieNames, testSupervisorLoginOnly } from "@/lib/testing/policy.mjs";
 
 const cookieNames = sessionCookieNames();
 export const ACCESS_COOKIE = cookieNames.access;
@@ -137,6 +137,10 @@ export async function signInWithPassword(input: { username: string; password: st
     await recordLoginResult(username, input.ip, false);
     throw new AppError("ACCOUNT_DISABLED", "Tài khoản chưa hoạt động hoặc đã bị khóa.");
   }
+  if (testSupervisorLoginOnly() && !account.roleCodes?.includes("supervisor")) {
+    await recordLoginResult(username, input.ip, false);
+    throw new AppError("PERMISSION_DENIED", "Link TEST hiện chỉ cho phép tài khoản Giám sát đăng nhập.");
+  }
 
   const client = getSupabaseServiceClient();
   if (!client) throw new AppError("SERVER_ERROR");
@@ -171,8 +175,8 @@ function mapAccount(account: StoredAccount, fallbackEmail: string): Authenticate
   const rawRoles = account.account_roles || [];
   const assignedPermissions = [...new Set(rawRoles.flatMap(item => item.roles?.role_permissions || []).map(item => item.permission_key).filter((key): key is Permission => Boolean(key && validPermissions.has(key))))];
   const managementOnly = rawRoles.some((item) => item.roles?.code === "admin");
-  const resolvedPermissions = resolveAccountPermissions(assignedPermissions, account.employee_id, managementOnly);
-  const permissions = account.employees?.employment_types?.worker_category === "office"
+  const resolvedPermissions = managementOnly ? [...allFoundationPermissions] : resolveAccountPermissions(assignedPermissions, account.employee_id);
+  const permissions = !managementOnly && account.employees?.employment_types?.worker_category === "office"
     ? resolvedPermissions.filter(permission => permission !== "attendance.self" && permission !== "attendance.self.create") : resolvedPermissions;
   const status = String(account.status);
   return {

@@ -11,9 +11,9 @@ export class PersonalPhotoStampError extends Error {
   }
 }
 
-export async function preparePersonalAttendancePhoto(photo: ProcessedAttendancePhoto, capture: { capturedAtClient: string; intendedType: AttendanceType }, location?: AttendanceCoordinates, retryAddress = false): Promise<{ photo: ProcessedAttendancePhoto; stamp: AttendancePhotoStampMetadata }> {
+export async function preparePersonalAttendancePhoto(photo: ProcessedAttendancePhoto, capture: { capturedAtClient: string; intendedType: AttendanceType; capturedByName?: string; capturedByUsername?: string }, location?: AttendanceCoordinates, retryAddress = false): Promise<{ photo: ProcessedAttendancePhoto; stamp: AttendancePhotoStampMetadata }> {
   if (!location) {
-    const stamp: AttendancePhotoStampMetadata = { version: 1, capturedAt: capture.capturedAtClient, address: "Chưa có GPS · Cần xác minh vị trí" };
+    const stamp: AttendancePhotoStampMetadata = { version: 1, capturedByName: capture.capturedByName, capturedByUsername: capture.capturedByUsername, capturedAt: capture.capturedAtClient, address: "Chưa có GPS · Cần xác minh vị trí" };
     const stamped = await processAttendanceImage(new File([photo.photo], "attendance.jpg", { type: "image/jpeg" }), { ...stamp, label: `CHÂU TUẤN · ${capture.intendedType === "check_in" ? "CHẤM VÀO" : "CHẤM RA"}` });
     return { photo: stamped, stamp };
   }
@@ -23,8 +23,8 @@ export async function preparePersonalAttendancePhoto(photo: ProcessedAttendanceP
   if (!Number.isFinite(Date.parse(capture.capturedAtClient)) || !Number.isFinite(Date.parse(location.capturedAt)) || Math.abs(Date.parse(location.capturedAt) - Date.parse(capture.capturedAtClient)) > 60_000) {
     throw new PersonalPhotoStampError("CAPTURE_EXPIRED", "Vị trí không còn khớp thời điểm chụp. Chụp lại ảnh để ghi đúng thời gian và địa điểm.");
   }
-  const address = await lookupAttendanceAddress(location, { retry: retryAddress, priority: true });
-  const stamp: AttendancePhotoStampMetadata = { version: 1, capturedAt: capture.capturedAtClient, address: address.address?.trim() || `GPS ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} · Chưa có địa chỉ`, latitude: location.latitude, longitude: location.longitude };
+  const address = location.accuracy <= 100 ? await lookupAttendanceAddress(location, { retry: retryAddress, priority: true }) : { address: undefined };
+  const stamp: AttendancePhotoStampMetadata = { version: 1, capturedByName: capture.capturedByName, capturedByUsername: capture.capturedByUsername, capturedAt: capture.capturedAtClient, address: address.address?.trim() || `GPS ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} · Chưa có địa chỉ`, latitude: location.latitude, longitude: location.longitude };
   const stamped = await processAttendanceImage(new File([photo.photo], "attendance.jpg", { type: "image/jpeg" }), { ...stamp, accuracy: location.accuracy, label: `CHÂU TUẤN · ${capture.intendedType === "check_in" ? "CHẤM VÀO" : "CHẤM RA"}` });
   return { photo: stamped, stamp };
 }

@@ -27,7 +27,7 @@ export function AttendanceLocationAddress({ latitude, longitude, accuracyMeters,
   const result = lookup?.key === key ? lookup.result : undefined;
 
   useEffect(() => {
-    if (!hasCoordinates || knownAddress?.trim()) return;
+    if (!hasCoordinates || accuracyMeters !== undefined && accuracyMeters > 100) return;
     let active = true;
     let started = false;
     const start = () => {
@@ -43,19 +43,20 @@ export function AttendanceLocationAddress({ latitude, longitude, accuracyMeters,
     }, { rootMargin: "80px" });
     if (observer && root.current) observer.observe(root.current); else start();
     return () => { active = false; observer?.disconnect(); };
-  }, [hasCoordinates, latitude, longitude, knownAddress, key]);
+  }, [hasCoordinates, latitude, longitude, accuracyMeters, key]);
 
   if (!hasCoordinates) return <span className={`${styles.root} ${className ?? ""}`}><span className={styles.map}><MapPin aria-hidden="true" size={15} /><span>{emptyLabel}</span></span></span>;
-  const address = knownAddress?.trim() || (result?.status === "resolved" ? result.address : undefined);
-  const label = address || (result ? "Xem vị trí trên bản đồ" : "Đang tìm địa chỉ…");
+  const coarse = typeof accuracyMeters === "number" && accuracyMeters > 100;
+  const address = !coarse && result?.status === "resolved" ? result.address : undefined;
+  const label = coarse ? "Vị trí ước lượng" : address || "Vị trí GPS";
   const accuracy = typeof accuracyMeters === "number" && Number.isFinite(accuracyMeters) && accuracyMeters >= 0 ? `GPS ±${Math.round(accuracyMeters)} m` : "GPS";
-  const source = knownAddress?.trim() ? "Theo công trường" : address ? "Gần vị trí GPS" : undefined;
+  const source = `${latitude!.toFixed(6)}, ${longitude!.toFixed(6)}`;
 
   return <span className={`${styles.root} ${compact ? styles.compact : ""} ${className ?? ""}`} ref={root}>
     <a aria-label={`Vị trí chấm công · ${label} · ${accuracy} · mở bản đồ`} className={styles.map} href={`https://www.google.com/maps?q=${latitude},${longitude}`} rel="noopener noreferrer" target="_blank" title={`${coordinateLabel({ latitude: latitude!, longitude: longitude! })} · ${accuracy}`}>
       <MapPin aria-hidden="true" size={15} /><span className={styles.content}><span className={styles.address}>{label}</span><span className={styles.metadata}>{[source, accuracy].filter(Boolean).join(" · ")}</span></span>
     </a>
-    {referenceName && knownAddress?.trim() ? <span className={styles.reference}>{referenceName}</span> : null}
-    {!knownAddress && address && result?.attribution ? <a className={styles.attribution} href={result.attributionUrl || "https://www.openstreetmap.org/copyright"} rel="noopener noreferrer" target="_blank">{result.attribution}</a> : null}
+    {knownAddress?.trim() ? <span className={styles.reference}>Công trường · {referenceName ? `${referenceName} · ` : ""}{knownAddress}</span> : null}
+    {address && result?.attribution ? <a className={styles.attribution} href={result.attributionUrl || "https://www.openstreetmap.org/copyright"} rel="noopener noreferrer" target="_blank">{result.attribution}</a> : null}
   </span>;
 }

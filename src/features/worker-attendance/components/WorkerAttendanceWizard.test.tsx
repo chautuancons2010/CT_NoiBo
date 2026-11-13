@@ -30,13 +30,15 @@ function fixture(): WorkerLocalDraft {
 let stored: WorkerLocalDraft;
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("isSecureContext", true);
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition: vi.fn((success: PositionCallback) => success({ coords: { latitude: 10.7769, longitude: 106.7009, accuracy: 10 }, timestamp: Date.now() } as GeolocationPosition)) } });
   vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   stored = fixture();
   vi.mocked(getWorkerDraft).mockImplementation(async () => structuredClone(stored));
   vi.mocked(saveWorkerDraft).mockImplementation(async value => { stored = structuredClone(value); });
   vi.mocked(syncWorkerDraft).mockImplementation(async value => value.session);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); Reflect.deleteProperty(navigator, "geolocation"); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 async function openRoster() {
   const view = render(<WorkerAttendanceWizard sessionId="session-1" step="roster" />);
@@ -183,6 +185,17 @@ describe("worker roster status buttons", () => {
 });
 
 describe("worker selection workflow", () => {
+  it("requests location on a direct photo page and still permits capture when permission is denied", async () => {
+    const getCurrentPosition = vi.fn((_success: PositionCallback, failed: PositionErrorCallback) => failed({ code: 1 } as GeolocationPositionError));
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
+    stored.session.selectionMode = false;
+    render(<WorkerAttendanceWizard sessionId="session-1" step="photos" />);
+    await screen.findByRole("heading", { name: "Vị trí" });
+    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalled());
+    expect(screen.getByLabelText("Chụp ảnh điểm danh")).toBeEnabled();
+    expect(stored.photos).toHaveLength(0);expect(stored.location).toBeUndefined();
+    expect(await screen.findByText(/Chưa có quyền vị trí/)).toBeInTheDocument();
+  });
   beforeEach(() => {
     stored.session.selectionMode = true;
     stored.session.minimumPhotos = 1;
@@ -216,7 +229,7 @@ describe("worker selection workflow", () => {
     expect(stored.session.safetyConfirmed).toBe(true);
     expect(stored.session.safetyReport?.briefing.every(item => item.checked)).toBe(true);
     expect(stored.session.workNote).toBe("Sơn cẩu");
-    expect(screen.getByLabelText("Chụp ảnh điểm danh")).toBeEnabled();
+    await waitFor(() => expect(screen.getByLabelText("Chụp ảnh điểm danh")).toBeEnabled());
   });
 
   it("advances from selection through safety to camera while network synchronization is pending", async () => {
@@ -230,7 +243,7 @@ describe("worker selection workflow", () => {
     fireEvent.click(safety);
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận & chụp ảnh" }));
     expect(await screen.findByRole("heading", { name: "Ảnh hiện trường" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Chụp ảnh điểm danh")).toBeEnabled();
+    await waitFor(() => expect(screen.getByLabelText("Chụp ảnh điểm danh")).toBeEnabled());
     expect(stored.session.safetyConfirmed).toBe(true);
     expect(stored.session.entries[0].isSelected).toBe(true);
   });
@@ -244,7 +257,7 @@ describe("worker selection workflow", () => {
     await waitFor(() => expect(stored.session.entries[0]).toMatchObject({ isSelected: true, status: "present" }));
     expect(stored.session.entries[1]).toMatchObject({ isSelected: false, status: "unconfirmed" });
     expect(screen.getByRole("button", { name: "Tiếp tục" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Thêm công nhân" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thêm công nhân" })).toBeEnabled();
     act(() => {
       fireEvent.click(first);
       fireEvent.click(screen.getByRole("checkbox", { name: "Công nhân 02" }));

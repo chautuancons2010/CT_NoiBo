@@ -102,14 +102,29 @@ describe("worker attendance offline synchronization", () => {
 
   it("keeps worker selections and safety confirmation when the first draft synchronization fails", async () => {
     const local = draft();
-    const worker = { id: "local-entry", sessionId: localSessionId, workerId: "worker-1", employeeCode: "CN01", workerName: "Công nhân", assignmentRole: "worker", status: "present" as const, isSelected: true, dayException: "none" as const, isUnplanned: false };
+    const worker = { id: "local-entry", sessionId: localSessionId, workerId: "worker-1", employeeCode: "CN01", workerName: "Công nhân", assignmentRole: "worker", status: "present" as const, isSelected: true, checkedInAt: "2026-09-14T01:00:00.000Z", dayException: "none" as const, isUnplanned: false };
     local.session = { ...local.session, selectionMode: true, safetyConfirmed: true, entries: [worker] };
     const server = { ...session(serverSessionId, 1), selectionMode: true, safetyConfirmed: false, entries: [{ ...worker, id: "server-entry", sessionId: serverSessionId, status: "unconfirmed", isSelected: false }] };
     const fetchMock = vi.fn().mockResolvedValueOnce(apiResponse({ session: server })).mockRejectedValueOnce(new TypeError("lost draft response"));
     vi.stubGlobal("fetch", fetchMock);
     await expect(syncWorkerDraft(local)).rejects.toThrow("lost draft response");
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ safetyConfirmed: true, entries: [expect.objectContaining({ id: "server-entry", isSelected: true, status: "present" })] });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ safetyConfirmed: true, entries: [expect.objectContaining({ id: "server-entry", isSelected: true, status: "present", checkedInAt: worker.checkedInAt })] });
     const saved = vi.mocked(saveWorkerDraft).mock.calls.at(-1)?.[0];
     expect(saved?.session).toMatchObject({ safetyConfirmed: true, entries: [expect.objectContaining({ id: "server-entry", isSelected: true, status: "present" })] });
+  });
+  it("uploads and submits once when connectivity recovery wakes two queue consumers", async () => {
+    const local = { ...draft(), pendingSubmit: true };
+    const completed = { ...session(serverSessionId, 4), status: "needs_review" as const, submittedAt: "2026-09-14T03:00:00.000Z" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(apiResponse({ session: session(serverSessionId, 1) }))
+      .mockResolvedValueOnce(apiResponse(session(serverSessionId, 2)))
+      .mockResolvedValueOnce(apiResponse(session(serverSessionId, 3)))
+      .mockResolvedValueOnce(apiResponse(completed));
+    vi.stubGlobal("fetch", fetchMock);
+    const results = await Promise.all([syncWorkerDraft(local), syncWorkerDraft(local)]);
+    expect(results).toEqual([completed, completed]);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/photos"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/submit"))).toHaveLength(1);
+    expect(vi.mocked(saveWorkerDraft).mock.calls.some(([value]) => value.pendingSubmit && value.session.submittedAt)).toBe(false);
   });
 });

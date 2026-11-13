@@ -4,6 +4,8 @@ import { listPendingAttendance } from "@/features/attendance/client/attendanceQu
 import { syncAttendanceItem } from "@/features/attendance/client/attendanceSync";
 import { listWorkerDrafts } from "@/features/worker-attendance/client/workerDraftStore";
 import { syncWorkerDraft } from "@/features/worker-attendance/client/workerAttendanceSync";
+import { syncWorkerWorkQueue } from "@/features/worker-attendance/client/workerWorkQueue";
+import { syncWorkerOvertimeQueue } from "@/features/worker-attendance/client/workerOvertimeQueue";
 
 export function AttendanceConnectivity({ accountId, pathname }: { accountId: string; pathname: string }) {
   useEffect(() => {
@@ -31,6 +33,8 @@ export function AttendanceConnectivity({ accountId, pathname }: { accountId: str
         for (const draft of drafts) if (!disposed && draft.ownerAccountId === accountId && draft.pendingSubmit) {
           try { await syncWorkerDraft(draft); } catch { /* Retain the draft and all original photos. */ }
         }
+        if (!disposed) await syncWorkerWorkQueue(accountId).catch(() => { /* Retain unsent work events for review in the session. */ });
+        if (!disposed) await syncWorkerOvertimeQueue(accountId).catch(() => { /* Retain entered overtime and its original client ID. */ });
       } catch { /* Storage failures remain visible in the capture screen. */ }
       finally { busy = false; }
     }

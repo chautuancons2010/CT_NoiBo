@@ -1,6 +1,6 @@
-.export { display: flex; width: max-content; max-width: 100%; min-width: 0; flex: 0 0 auto; align-items: end; flex-wrap: nowrap; gap: 8px; }
-.export > :global(.field) { width: 160px; min-width: 0; flex: 0 0 160px; }
+.drawer { width: min(100%, 400px); }
+.export { display: grid; width: 100%; min-width: 0; align-content: start; gap: 20px; }
+.export > :global(.field) { width: 100%; min-width: 0; }
 .export :global(.input) { width: 100%; min-height: 44px; }
 .export :global(.button) { width: auto; min-height: 44px; flex: 0 0 auto; white-space: nowrap; }
 .error { flex-basis: 100%; color: var(--danger); font-size: 13px; }
-@media(max-width:767px){.export{width:100%;flex-wrap:wrap;}.export>:global(.field){flex:1 1 140px;}.export>:global(.button){flex:1 1 150px;}}

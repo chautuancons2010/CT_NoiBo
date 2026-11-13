@@ -19,6 +19,7 @@ import { rememberAttendanceDashboard } from "@/features/attendance/client/attend
 import { AttendanceEvidenceViewer } from "./AttendanceEvidence";
 import styles from "./PersonalToday.module.css";
 import { attendanceActionBlocked } from "../services/attendanceRules";
+import { requiredArrivalTime } from "@/features/timesheets/services/portSchedules";
 
 function subscribeOnline(callback: () => void) {
   window.addEventListener("online", callback);
@@ -124,9 +125,11 @@ export function PersonalToday() {
   if (!dashboard) return <section aria-busy="true" aria-label="Đang tải ca làm" className={`${styles.today} ${styles.loading}`}><span className={styles.skeleton} /></section>;
   if (captureOpen) return <AttendanceCameraExperience initialCapture initialDashboard={dashboard} initialAttendanceType={captureType} onClose={() => { setCaptureOpen(false); void load(); }} onRecorded={(updated) => { dashboardRef.current = updated; rememberAttendanceDashboard(updated); setDashboard(updated); }} />;
 
-  const checkIn = [...dashboard.todayEvents].reverse().find((event) => event.eventType === "check_in");
-  const checkOut = [...dashboard.todayEvents].reverse().find((event) => event.eventType === "check_out");
-  const latestEvent = [...dashboard.todayEvents].sort((a,b) => a.effectiveAt.localeCompare(b.effectiveAt)).at(-1);
+  const orderedEvents = [...dashboard.todayEvents].sort((a,b) => a.effectiveAt.localeCompare(b.effectiveAt));
+  const newestFirst = [...orderedEvents].reverse();
+  const checkIn = newestFirst.find((event) => event.eventType === "check_in");
+  const checkOut = newestFirst.find((event) => event.eventType === "check_out" && (!checkIn || event.effectiveAt >= checkIn.effectiveAt));
+  const latestEvent = orderedEvents.at(-1);
   const status = !dashboard.policy.attendanceEnabled ? "Tạm ngừng" : latestEvent?.eventType === "check_out" ? "Đã chấm ra" : checkIn ? "Đang trong ca" : "Chưa vào ca";
 
   return (
@@ -137,6 +140,8 @@ export function PersonalToday() {
         <div className={styles.clockFace}>
           <strong className={styles.hours}>{dashboard.policy.shiftStart} – {dashboard.policy.shiftEnd}</strong>
           <span className={styles.shift}>{dashboard.policy.shiftName}</span>
+          {dashboard.policy.isWorkingDay === false ? <span className={styles.shift}>Ngày nghỉ · Chấm công tăng ca</span> : dashboard.policy.arrivalLeadMinutes !== undefined ? <span className={styles.arrival}>Có mặt trước {requiredArrivalTime(dashboard.policy.shiftStart, dashboard.policy.arrivalLeadMinutes)}</span> : null}
+          {dashboard.policy.breakStartTime ? <span className={styles.shift}>Nghỉ {dashboard.policy.breakStartTime} – {dashboard.policy.breakEndTime}</span> : null}
         </div>
         <div className={styles.content}>
           <dl className={styles.events}>
@@ -150,6 +155,7 @@ export function PersonalToday() {
           {dashboard.todayEvents.some((event) => event.syncStatus !== "synced") ? <div><span>Chờ đồng bộ lượt chấm</span></div> : null}
         </div>
       </div>
+      {orderedEvents.length > 2 ? <details className={styles.rounds}><summary>Các lượt trong ngày <span>{orderedEvents.length}</span></summary><ol>{orderedEvents.map(event => <li key={event.id}><span>{event.eventType === "check_in" ? "Chấm vào" : "Chấm ra"}</span><time dateTime={event.effectiveAt}>{formatTime(event.effectiveAt)}</time><span>{event.syncStatus === "synced" ? "Đã đồng bộ" : "Chờ đồng bộ"}</span></li>)}</ol></details> : null}
       {historyAllowed ? <Link className={styles.history} href="/attendance/history">Lịch sử chấm công<ArrowUpRight aria-hidden="true" size={17} /></Link> : null}
       <AttendanceEvidenceViewer activeId={activePhotoId} items={dashboard.todayEvents.filter(event => event.photoId && event.photoStatus === "uploaded").map(event => ({ employeeName: user.displayName, event }))} onChange={setActivePhotoId} onClose={() => setActivePhotoId(undefined)} />
     </section>

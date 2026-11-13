@@ -6,6 +6,7 @@ const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 vi.mock("@/components/providers/CurrentUserProvider", () => ({ useCurrentUser: () => ({ id: "engineer-one", permissions: ["worker_attendance.create", "worker_attendance.view", "project.view"] }) }));
 vi.mock("@/lib/realtime/useDomainReconciliation", () => ({ useDomainReconciliation: vi.fn() }));
+vi.mock("@/features/attendance/client/attendanceQueue", () => ({ listPendingAttendance: vi.fn(async () => []) }));
 vi.mock("../client/workerDraftStore", () => ({ cacheWorkerTasks: vi.fn(), deleteWorkerDraft: vi.fn(), getCachedWorkerTasks: vi.fn(), listWorkerDrafts: async () => [], saveWorkerDraft: vi.fn() }));
 const task = { projectId: "project-one", projectName: "Công trường mẫu", worksiteId: "site-one", worksiteName: "Khu A", date: "2026-11-07", shiftCode: "DAY", shiftName: "Ca ngày", expectedWorkers: 1, checklist: [], roster: [{ workerId: "worker-one", workerName: "Công nhân", employeeCode: "CN01", assignmentRole: "worker" }] };
 const result = { accountId: "engineer-one", tasks: [task], policy: {} };
@@ -16,13 +17,13 @@ describe("field attendance home", () => {
   it("requires an explicit package selection before continuing and does not create a session on selection", async () => {
     const fetchMock = vi.fn().mockResolvedValue(ok(result));vi.stubGlobal("fetch", fetchMock);
     render(<WorkerAttendanceToday />);
-    expect(await screen.findByRole("heading", { name: "Công trường mẫu" })).toBeInTheDocument();
-    expect(screen.getByText("Ca ngày")).toBeInTheDocument();expect(screen.getByText("Chưa điểm danh")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tiếp tục" })).toBeDisabled();
+    expect(await screen.findByText("Công trường mẫu")).toBeInTheDocument();
+    expect(screen.getByText("Chưa điểm danh")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Chọn công nhân" })).not.toBeInTheDocument();
     const choice = screen.getByRole("radio", { name: "Chọn gói Công trường mẫu · Khu A · Ca ngày" });
     fireEvent.click(choice);
     expect(choice).toBeChecked();
-    expect(screen.getByRole("button", { name: "Tiếp tục" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Chọn công nhân" })).toBeEnabled();
     expect(fetchMock.mock.calls.every(([, options]) => !options?.method || options.method === "GET")).toBe(true);
   });
   it("opens the local draft without waiting for a session creation or GPS request", async () => {
@@ -30,7 +31,7 @@ describe("field attendance home", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<WorkerAttendanceToday />);
     fireEvent.click(await screen.findByRole("radio", { name: /Chọn gói/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chọn công nhân" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith(expect.stringMatching(/\/local-.*\/roster$/)));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

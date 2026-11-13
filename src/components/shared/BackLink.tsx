@@ -25,7 +25,7 @@ export function BackLink({
   href,
   label = "Trở lại",
   className = "back-link",
-  iconOnly = false,
+  iconOnly = true,
 }: BackLinkProps) {
   function navigateBack(event: MouseEvent<HTMLAnchorElement>) {
     if (isPlainPrimaryClick(event) && goBackInApp()) event.preventDefault();

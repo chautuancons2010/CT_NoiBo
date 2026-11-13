@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { employeeDetailSections, getBackHref, getBreadcrumbs, getRouteMeta, projectDetailSections } from "@/config/routeRegistry";
+import { employeeDetailSections, getBackHref, getBreadcrumbs, getRouteMeta, projectDetailSections, projectManagementSections } from "@/config/routeRegistry";
 
 describe("route registry", () => {
+  it("keeps all management destinations available without changing supervisor tabs", () => {
+    expect(projectManagementSections).toEqual(["today", "progress", "team", "materials", "profile", "documents"]);
+    expect(projectDetailSections.map(item => item.value)).toEqual(["attendance"]);
+  });
   it("keeps worker attendance steps and device drafts in their field workflow", () => {
     for (const id of ["local-device-draft", "90500000-0000-4000-8000-000000000018"]) {
       const base = `/worker-attendance/sessions/${id}`;
@@ -78,13 +82,13 @@ describe("route registry", () => {
     expect(getBackHref("/employees/NV001/contracts")).toBe("/employees/NV001/profile");
     expect(getBackHref("/warehouse/items/57/edit")).toBe("/warehouse/items/57");
     expect(getBackHref("/timesheets/periods/period-1/employees/employee-1")).toBe("/timesheets/periods/period-1");
-    expect(getBackHref("/employees")).toBeNull();
-    expect(getBackHref("/attendance/me")).toBeNull();
-    expect(getBackHref("/attendance/history")).toBeNull();
-    expect(getBackHref("/attendance/today")).toBeNull();
+    expect(getBackHref("/employees")).toBe("/personal");
+    expect(getBackHref("/attendance/me")).toBe("/personal");
+    expect(getBackHref("/attendance/history")).toBe("/personal");
+    expect(getBackHref("/attendance/today")).toBe("/personal");
     expect(getBackHref("/attendance/logs")).toBe("/attendance/today");
     expect(getBackHref("/attendance/records/event-1")).toBe("/attendance/logs");
-    expect(getBackHref("/warehouse/inventory")).toBeNull();
+    expect(getBackHref("/warehouse/inventory")).toBe("/personal");
     expect(getBackHref("/dashboard")).toBeNull();
   });
 });

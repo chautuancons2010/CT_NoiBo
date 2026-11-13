@@ -4,6 +4,8 @@ import type { AttendancePhotoStampMetadata } from "../types/attendanceTypes";
 
 export const attendancePhotoStampSchema = z.object({
   version: z.literal(1),
+  capturedByName: z.string().trim().min(1).max(255).optional(),
+  capturedByUsername: z.string().trim().min(1).max(255).optional(),
   capturedAt: z.string().datetime({ offset: true }),
   address: z.string().trim().min(3).max(1000),
   latitude: z.number().finite().min(-90).max(90).optional(),

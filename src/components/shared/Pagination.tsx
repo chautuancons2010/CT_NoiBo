@@ -15,7 +15,7 @@ export interface PaginationProps {
 export function Pagination({ page, pageCount, onPageChange, totalItems, pageSize }: PaginationProps) {
   return (
     <nav aria-label="Phân trang" className="pagination">
-      {totalItems !== undefined && pageSize ? <span className="pagination__range" role="status">{totalItems ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalItems)}` : "0"} / {totalItems} bản ghi</span> : null}
+      {totalItems !== undefined && pageSize ? <span className="pagination__range" role="status">{totalItems ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalItems)}` : "0"} / {totalItems}</span> : null}
       <div className="pagination__controls">
       <Button
         disabled={page <= 1}

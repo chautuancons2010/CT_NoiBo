@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ permissions: ["project.view", "worker_attendance.view"], getProject: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`); }, notFound: () => { throw new Error("not-found"); } }));
-vi.mock("@/services/auth/getRequestUser", () => ({ getRequestUser: async () => ({ id: "actor", status: "active", permissions: state.permissions }) }));
+vi.mock("@/services/auth/getRequestUser", () => ({ getRequestUser: async () => ({ id: "actor", roleCodes: ["admin"], status: "active", permissions: state.permissions }) }));
 vi.mock("@/features/projects/services/projectRepository", () => ({ getProject: state.getProject }));
 vi.mock("@/features/projects/components/ProjectWorkerTimesheet", () => ({ ProjectWorkerTimesheet: ({ project }: { project: { name: string } }) => <section aria-label="Bảng công gói">{project.name}</section> }));
 vi.mock("@/components/shared/PageHeader", () => ({ PageHeader: ({ title }: { title: string }) => <h1>{title}</h1> }));

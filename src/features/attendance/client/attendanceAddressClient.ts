@@ -16,12 +16,12 @@ export function lookupAttendanceAddress(coordinates: AttendanceAddressCoordinate
   if (existing) return existing;
   const lookup = async () => {
     let result: AttendanceAddressResult = { status: "unavailable" };
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < (options.priority ? 1 : 3); attempt++) {
       try {
         const response = await fetch("/api/v1/attendance/address", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ latitude: coordinates.latitude, longitude: coordinates.longitude }),
-          cache: "no-store", signal: AbortSignal.timeout(8500)
+          cache: "no-store", signal: AbortSignal.timeout(options.priority ? 2500 : 8500)
         });
         const body = await response.json() as { data?: AttendanceAddressResult };
         if (!response.ok || !body.data) break;

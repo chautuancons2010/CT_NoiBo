@@ -1,23 +1,25 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 const MOBILE_QUERY = "(max-width: 767px)";
 
-function subscribe(onChange: () => void) {
+function subscribe(query: string, onChange: () => void) {
   if (typeof window.matchMedia !== "function") {
     window.addEventListener("resize", onChange);
     return () => window.removeEventListener("resize", onChange);
   }
-  const media = window.matchMedia(MOBILE_QUERY);
+  const media = window.matchMedia(query);
   media.addEventListener("change", onChange);
   return () => media.removeEventListener("change", onChange);
 }
 
-function snapshot() {
-  return typeof window.matchMedia === "function" ? window.matchMedia(MOBILE_QUERY).matches : window.innerWidth <= 767;
+function snapshot(query: string) {
+  return typeof window.matchMedia === "function" ? window.matchMedia(query).matches : window.innerWidth <= 767;
 }
 
-export function useMobileViewport(): boolean | null {
-  return useSyncExternalStore(subscribe, snapshot, () => null);
+export function useMobileViewport(query = MOBILE_QUERY): boolean | null {
+  const listen = useCallback((onChange: () => void) => subscribe(query, onChange), [query]);
+  const read = useCallback(() => snapshot(query), [query]);
+  return useSyncExternalStore(listen, read, () => null);
 }

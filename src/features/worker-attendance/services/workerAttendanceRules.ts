@@ -20,7 +20,7 @@ export function workerLocationLabel(input: { latitude?: number; longitude?: numb
   return `${input.latitude!.toFixed(5)}, ${input.longitude!.toFixed(5)}${input.accuracyMeters !== undefined ? ` · ±${Math.round(input.accuracyMeters)} m` : ""}${input.geofenceStatus === "accuracy_low" ? " · Cần kiểm tra" : ""}`;
 }
 
-export function validateSessionForSubmit(input: { entries: readonly WorkerAttendanceEntry[]; photoCount: number; workNote?: string; geofenceStatus: string; latitude?: number; longitude?: number; checklist: readonly WorkerAttendanceChecklistItem[]; checklistResponses: readonly WorkerAttendanceChecklistResponse[]; selectionMode?: boolean; safetyConfirmed?: boolean; safetyReport?: WorkerSafetyReport; minimumPhotos?: number }, policy: WorkerAttendancePolicy): string[] {
+export function validateSessionForSubmit(input: { entries: readonly WorkerAttendanceEntry[]; photoCount: number; workNote?: string; geofenceStatus: string; latitude?: number; longitude?: number; accuracyMeters?: number; allowedAccuracyThresholdMeters?: number; checklist: readonly WorkerAttendanceChecklistItem[]; checklistResponses: readonly WorkerAttendanceChecklistResponse[]; selectionMode?: boolean; safetyConfirmed?: boolean; safetyReport?: WorkerSafetyReport; minimumPhotos?: number }, policy: WorkerAttendancePolicy): string[] {
   const errors: string[] = [];
   const selected = input.entries.filter((entry) => entry.isSelected !== false);
   if (input.selectionMode && !selected.length) errors.push("Chọn ít nhất một công nhân.");
@@ -30,7 +30,6 @@ export function validateSessionForSubmit(input: { entries: readonly WorkerAttend
   if (!input.selectionMode && policy.workNoteRequired && !input.workNote?.trim()) errors.push("Cần nhập nội dung công việc.");
   if (input.selectionMode && !input.safetyConfirmed) errors.push("Cần xác nhận an toàn lao động.");
   if (input.selectionMode) errors.push(...validateWorkerSafetyReport(input.safetyReport, input.workNote));
-  if (input.geofenceStatus !== "not_required" && !hasWorkerCoordinates(input) && !(input.geofenceStatus === "unavailable" && input.photoCount > 0)) errors.push("Chưa có tọa độ GPS. Hãy thử lại vị trí.");
   const checked = new Set(input.checklistResponses.filter((response) => response.checked).map((response) => response.itemId));
   if (input.checklist.some((item) => item.required && !checked.has(item.id))) errors.push("Cần hoàn thành các mục checklist bắt buộc.");
   return errors;

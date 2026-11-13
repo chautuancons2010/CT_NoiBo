@@ -1,7 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { isReleasedFeaturePath, isReleasedApplication } from "./featureRelease";
+import { bypassStoredModuleLock, hasUnrestrictedReleaseAccess, isReleasedFeaturePath, isReleasedApplication, releaseModuleSettings } from "./featureRelease";
+import { defaultSystemSettings, moduleKeys } from "./systemSettings";
 import { resolveMobileNavigation } from "./mobileNavigationResolver";
 describe("attendance release boundary", () => {
+  it.each(["hr", "human_resources", "human-resources"])("removes extra release and module locks from %s without granting admin authority", role => {
+    expect(hasUnrestrictedReleaseAccess([role])).toBe(false);
+    for (const app of ["attendance", "human-resources"]) expect(isReleasedApplication(app, [role])).toBe(true);
+    for (const app of ["overview", "projects", "warehouse", "accounting", "import-export", "system", "operations", "messaging"]) expect(isReleasedApplication(app, [role])).toBe(true);
+    for (const path of ["/employees/new", "/attendance/today", "/employees/field-attendance/session", "/timesheets/matrix", "/settings/leave", "/personal", "/personal/payslips", "/settings/users"]) {
+      expect(isReleasedFeaturePath(path, "GET", [role])).toBe(true);
+      expect(bypassStoredModuleLock(path, "GET", [role])).toBe(true);
+    }
+    for (const path of ["/projects", "/warehouse", "/accounting", "/messages", "/system-admin", "/reports"]) expect(isReleasedFeaturePath(path, "GET", [role])).toBe(true);
+    expect(isReleasedFeaturePath("/api/v1/worker-attendance/sessions", "GET", [role])).toBe(true);
+    expect(isReleasedFeaturePath("/api/v1/worker-attendance/sessions", "POST", [role])).toBe(true);
+    expect(isReleasedFeaturePath("/api/v1/projects", "GET", [role])).toBe(true);
+    expect(isReleasedFeaturePath("/api/v1/projects", "POST", [role])).toBe(true);
+    const allLocked = Object.fromEntries(moduleKeys.map(key => [key, false])) as typeof defaultSystemSettings.modules;
+    expect(Object.values(releaseModuleSettings(allLocked, [role])).every(Boolean)).toBe(true);
+  });
+  it("keeps every admin module open independently of HR membership and saved module locks", () => {
+    const locked = Object.fromEntries(moduleKeys.map(key => [key, false])) as typeof defaultSystemSettings.modules;
+    expect(Object.values(releaseModuleSettings(locked, ["hr", "admin"])).every(Boolean)).toBe(true);
+    for (const path of ["/system-admin", "/accounting", "/warehouse", "/messages", "/api/v1/projects", "/api/v1/accounting/payroll"]) {
+      expect(isReleasedFeaturePath(path, "POST", ["admin"])).toBe(true);
+      expect(bypassStoredModuleLock(path, "POST", ["admin"])).toBe(true);
+    }
+  });
   it("blocks writes and direct pages for unopened business functions", () => {
     for (const path of ["/warehouse", "/accounting/payroll", "/api/v1/payroll-periods", "/api/v1/projects"]) expect(isReleasedFeaturePath(path, "POST")).toBe(false);
     expect(isReleasedFeaturePath("/api/v1/projects", "GET")).toBe(true);

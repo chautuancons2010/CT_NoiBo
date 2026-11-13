@@ -12,7 +12,7 @@ describe("attendance address display", () => {
     render(<AttendanceLocationAddress accuracyMeters={12.4} latitude={10.7769} longitude={106.7009} referenceName="Văn phòng" />);
     expect(await screen.findByText("86 Lê Thánh Tôn, Sài Gòn, Thành phố Hồ Chí Minh")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Vị trí chấm công.*86 Lê Thánh Tôn.*GPS ±12 m/ })).toHaveAttribute("href", "https://www.google.com/maps?q=10.7769,106.7009");
-    expect(screen.getByText("Gần vị trí GPS · GPS ±12 m")).toBeInTheDocument();
+    expect(screen.getByText("10.776900, 106.700900 · GPS ±12 m")).toBeInTheDocument();
     expect(screen.queryByText("Văn phòng", { exact: true })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "© OpenStreetMap" })).toHaveAttribute("href", "https://www.openstreetmap.org/copyright");
     expect(screen.queryByText("10.77690, 106.70090")).not.toBeInTheDocument();
@@ -21,17 +21,17 @@ describe("attendance address display", () => {
   it("does not present a nearby reference name as an exact address when the provider is unavailable", async () => {
     lookup.mockResolvedValue({ status: "unavailable" });
     render(<AttendanceLocationAddress latitude={0} longitude={0} referenceName="Văn phòng tham chiếu" />);
-    expect(await screen.findByText("Xem vị trí trên bản đồ")).toBeInTheDocument();
+    expect(await screen.findByText("Vị trí GPS")).toBeInTheDocument();
     expect(screen.queryByText("Văn phòng tham chiếu", { exact: true })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Vị trí chấm công/ })).toHaveAttribute("href", "https://www.google.com/maps?q=0,0");
   });
 
-  it("uses verified worksite addresses without sending GPS externally", () => {
+  it("keeps the worksite reference separate from the current coordinate and map address", async () => {
     render(<AttendanceLocationAddress accuracyMeters={20} knownAddress="Công trường, Đường số 2" latitude={10.77} longitude={106.7} referenceName="Gói A" />);
-    expect(screen.getByText("Công trường, Đường số 2")).toBeInTheDocument();
-    expect(screen.getByText("Theo công trường · GPS ±20 m")).toBeInTheDocument();
-    expect(screen.getByText("Gói A")).toBeInTheDocument();
-    expect(lookup).not.toHaveBeenCalled();
+    expect(screen.getByText("Công trường · Gói A · Công trường, Đường số 2")).toBeInTheDocument();
+    expect(await screen.findByText("86 Lê Thánh Tôn, Sài Gòn, Thành phố Hồ Chí Minh")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Vị trí chấm công/ })).toHaveAttribute("href", "https://www.google.com/maps?q=10.77,106.7");
+    expect(lookup).toHaveBeenCalled();
   });
 
   it("does not geocode missing or invalid coordinates", () => {

@@ -451,10 +451,10 @@ export function getBackHref(pathname: string): string | null {
   ]);
   // Primary destinations already have a persistent navigation entry. Reserve
   // the return control for a child record or a task within that destination.
-  if (pathname === "/dashboard") return null;
+  if (["/dashboard", "/personal", "/applications", "/home"].includes(pathname)) return null;
   if (pathname === "/attendance/logs") return "/attendance/today";
   if (/^\/attendance\/records\/[^/]+$/.test(pathname)) return "/attendance/logs";
-  if (functionRoutes.has(pathname)) return null;
+  if (functionRoutes.has(pathname)) return "/personal";
 
   const breadcrumbParent = [...getBreadcrumbs(pathname)]
     .reverse()
@@ -479,3 +479,5 @@ export const employeeDetailSections = Object.entries(employeeSectionLabels).map(
 export const projectDetailSections = Object.entries(projectSectionLabels).filter(([value]) => value === "attendance").map(
   ([value, label]) => ({ value, label })
 );
+
+export const projectManagementSections = ["today", "progress", "team", "materials", "profile", "documents"] as const;

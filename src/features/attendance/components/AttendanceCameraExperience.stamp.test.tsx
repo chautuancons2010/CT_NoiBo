@@ -28,12 +28,24 @@ beforeEach(() => {
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
   vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
   mocks.capture.mockResolvedValue(photo);
-  mocks.location.mockResolvedValue(undefined);
+  mocks.location.mockImplementation(async () => ({ latitude: 10.7769, longitude: 106.7009, accuracy: 12, capturedAt: new Date().toISOString() }));
   mocks.save.mockResolvedValue(undefined);
 });
 afterEach(() => { cleanup(); Reflect.deleteProperty(navigator, "mediaDevices"); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("personal capture stamp gate", () => {
+  it("stamps and saves offline evidence even when location permission is unavailable", async () => {
+    mocks.location.mockRejectedValue(new Error("Permission denied"));
+    mocks.stamp.mockImplementation(async (image, capture) => ({ photo: image, stamp: { version: 1, capturedAt: capture.capturedAtClient, address: "Chưa có GPS · Cần xác minh vị trí" } }));
+    render(<CurrentUserProvider user={{ id: "stamp-camera", username: "camera", displayName: "Giám sát", email: "camera@example.invalid", status: "active", permissions: ["attendance.self.create"] }}><AttendanceCameraExperience initialCapture initialDashboard={dashboard} /></CurrentUserProvider>);
+    const shutter = await screen.findByRole("button", { name: "Chụp và chấm vào" });
+    await waitFor(() => expect(shutter).toBeEnabled());fireEvent.click(shutter);
+    await screen.findByText("Ảnh chưa được gửi");fireEvent.click(screen.getByRole("button", { name: "Ghi nhận chấm vào" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
+    expect(mocks.save.mock.calls[0][0]).toMatchObject({ location: undefined, capturedOffline: true, syncState: "local_pending", photoStamp: { address: "Chưa có GPS · Cần xác minh vị trí" } });
+    expect(mocks.save.mock.calls[0][0].capturedAtClient).toBe(mocks.stamp.mock.calls[0][1].capturedAtClient);
+    expect(mocks.sync).not.toHaveBeenCalled();
+  });
   it.each(["Chưa có GPS", "Chưa lấy được địa chỉ", "Không thể ghi thông tin lên ảnh"])("retains the original image and never queues or uploads on %s", async message => {
     mocks.stamp.mockRejectedValueOnce(new Error(message));
     render(<CurrentUserProvider user={{ id: "stamp-camera", username: "camera", displayName: "Giám sát", email: "camera@example.invalid", status: "active", permissions: ["attendance.self.create"] }}><AttendanceCameraExperience initialCapture initialDashboard={dashboard} /></CurrentUserProvider>);

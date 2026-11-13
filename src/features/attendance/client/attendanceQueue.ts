@@ -1,6 +1,7 @@
 "use client";
 
 import type { PendingAttendanceItem } from "@/features/attendance/types/attendanceTypes";
+import { decodeDurableImage, encodeDurableImage } from "./durableImage";
 
 const DATABASE_NAME = "chau-tuan-attendance";
 const DATABASE_VERSION = 1;
@@ -40,9 +41,10 @@ async function transactStore<T>(
   });
 }
 
-export function savePendingAttendance(item: PendingAttendanceItem): Promise<void> {
+export async function savePendingAttendance(item: PendingAttendanceItem): Promise<void> {
+  const stored = { ...item, photo: await encodeDurableImage(item.photo), thumbnail: await encodeDurableImage(item.thumbnail), rawPhoto: item.rawPhoto ? await encodeDurableImage(item.rawPhoto) : undefined };
   return transactStore("readwrite", (store, resolve, reject) => {
-    const request = store.put(item);
+    const request = store.put(stored);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
@@ -57,11 +59,11 @@ export function removePendingAttendance(clientEventId: string): Promise<void> {
 }
 
 export function listPendingAttendance(accountId: string): Promise<PendingAttendanceItem[]> {
-  return transactStore("readonly", (store, resolve, reject) => {
+  return transactStore<PendingAttendanceItem[]>("readonly", (store, resolve, reject) => {
     const request = store.index("ownerAccountId").getAll(accountId);
     request.onsuccess = () => resolve(sortPendingAttendance((request.result ?? []) as PendingAttendanceItem[]));
     request.onerror = () => reject(request.error);
-  });
+  }).then(items => items.map(item => ({ ...item, photo: decodeDurableImage(item.photo), thumbnail: decodeDurableImage(item.thumbnail), rawPhoto: item.rawPhoto ? decodeDurableImage(item.rawPhoto) : undefined })));
 }
 
 export function sortPendingAttendance(items: PendingAttendanceItem[]): PendingAttendanceItem[] {

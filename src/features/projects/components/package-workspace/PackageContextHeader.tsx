@@ -13,6 +13,7 @@ import type { ProjectDetail, ProjectStatus } from "@/features/projects/types/pro
 import { formatBusinessDate } from "@/lib/time/timezone";
 
 import { WorksiteEditor } from "../WorksiteEditor";
+import { ProjectActions } from "../ProjectActions";
 import styles from "./PackageWorkspace.module.css";
 
 const statusMap: Record<ProjectStatus, { label: string; tone: "info" | "success" | "warning" | "neutral" }> = {
@@ -27,11 +28,13 @@ export function PackageContextHeader({
   project,
   selectedWorksiteId,
   onWorksiteChange,
-  canManageWorksites
+  canManageWorksites,
+  canEditProject = false
 }: {
   project: ProjectDetail;
   completionPercent?: number;
   canManageWorksites: boolean;
+  canEditProject?: boolean;
   canUpdateHealth: boolean;
   selectedWorksiteId?: string;
   onWorksiteChange: (worksiteId?: string) => void;
@@ -51,7 +54,7 @@ export function PackageContextHeader({
         className={styles.contextHeader}
         code={`Gói ${project.code}`}
         title={<span className={styles.contextTitle}><span>{project.name}</span><StatusBadge tone={status.tone}>{status.label}</StatusBadge></span>}
-        action={canManageWorksites && project.status !== "closed" ? <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => { setEditorVersion(current => current + 1); setAddingWorksite(true); }} variant="secondary">Thêm công trường</Button> : undefined}
+        action={<>{canEditProject ? <ProjectActions project={project} onSaved={() => router.refresh()} onDeleted={() => router.push("/projects")} /> : null}{canManageWorksites && project.status !== "closed" ? <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => { setEditorVersion(current => current + 1); setAddingWorksite(true); }} variant="secondary">Thêm công trường</Button> : null}</>}
         meta={<div className={styles.contextToolbar}>
           <dl className={styles.contextMeta}>
             <div>

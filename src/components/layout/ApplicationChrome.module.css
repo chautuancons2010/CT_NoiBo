@@ -19,8 +19,14 @@
   scroll-padding: 20px; scrollbar-gutter: stable; transform: none;
 }
 .main:focus { outline: none; }
-.main > :global(.page-context-navigation) { display: flex; min-height: 28px; margin: 0 0 4px; padding: 0; }
-.main :global(.page-context-navigation .back-link) { display: inline-flex; width: auto; min-height: 28px; align-items: center; gap: 8px; margin: 0; border: 0; border-radius: 4px; padding: 0; background: transparent; color: var(--text-secondary); font-size: 12px; box-shadow: none; }
+.main:has(> :global(.page-context-navigation)), .main:has(> :global(.page-stack > .back-link)) { padding-top: 8px; }
+.main > :global(.page-context-navigation) { display: flex; width: fit-content; min-height: 36px; align-items: center; justify-content: flex-start; margin: 0; padding: 0; }
+.main :global(.page-context-navigation .back-link), .main :global(.page-stack > .back-link) { display: inline-flex; width: 36px; height: 36px; min-height: 36px; align-items: center; justify-content: center; justify-self: start; flex: 0 0 auto; margin: 0; border: 0; border-radius: 4px; padding: 0; background: transparent; color: var(--text-secondary); box-shadow: none; }
+.main:has(> :global(.page-context-navigation + .page-stack > .page-header:first-child)) > :global(.page-context-navigation) { position: absolute; top: 12px; left: var(--page-padding-inline); }
+.main:has(> :global(.page-context-navigation)) > :global(.page-stack > .page-header:first-child) { padding-left: 44px; }
+.main > :global(.page-stack:has(> .back-link + .page-header)) { position: relative; }
+.main :global(.page-stack > .back-link:has(+ .page-header)) { position: absolute; top: 4px; left: 0; }
+.main :global(.page-stack > .back-link + .page-header) { padding-left: 44px; }
 .rail {
   position: relative; inset: auto; display: flex; width: 100%; min-width: 0; max-width: 100%;
   height: 100%; min-height: 0; flex-direction: column; overflow: hidden; align-self: stretch;
@@ -117,6 +123,9 @@
   .rail { display: none; }
   .main { padding: 16px 12px max(20px, env(safe-area-inset-bottom)); scrollbar-gutter: auto; }
   .main > :global(.page-context-navigation) { display: flex; min-height: 44px; }
+  .main :global(.page-context-navigation .back-link), .main :global(.page-stack > .back-link) { width: 44px; height: 44px; }
+  .main:has(> :global(.page-context-navigation + .page-stack > .page-header:first-child)) > :global(.page-context-navigation) { top: 8px; left: 12px; }
+  .main :global(.page-stack > .back-link:has(+ .page-header)) { top: 0; }
   .main :global([data-ui="back-control"]), .main :global(.back-link) { display: inline-flex; min-height: 44px; align-items: center; }
   .header { display: flex; height: var(--topbar-height); min-height: var(--topbar-height); align-items: center; gap: 8px; padding: 0 12px; }
   .header :global(.app-header__desktop-leading), .header :global(.app-header__search) { display: none; }

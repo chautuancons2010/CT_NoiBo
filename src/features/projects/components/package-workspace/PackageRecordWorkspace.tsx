@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Button, IconButton } from "@/components/shared/Button";
-import { Input } from "@/components/shared/FormControls";
 import { Modal } from "@/components/shared/Overlays";
 import { EmptyState } from "@/components/shared/States";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -13,6 +12,7 @@ import { WorksiteEditor } from "../WorksiteEditor";
 import { ProjectHealthControl } from "@/features/projects/components/ProjectHealthControl";
 import type { ProjectDetail, ProjectHealth, ProjectUpdate, Worksite } from "@/features/projects/types/projectTypes";
 import { formatBusinessDate } from "@/lib/time/timezone";
+import { ProjectActions } from "../ProjectActions";
 
 import styles from "./PackageWorkspace.module.css";
 import type { PackageWorkspaceSection } from "./WorkspaceNav";
@@ -46,10 +46,6 @@ export function PackageRecordWorkspace({
   const [addingWorksite, setAddingWorksite] = useState(false);
   const [worksiteBusy, setWorksiteBusy] = useState(false);
   const [editingWorksite, setEditingWorksite] = useState<Worksite>();
-  const [editingName, setEditingName] = useState(false);
-  const [projectName, setProjectName] = useState(project.name);
-  const [nameBusy, setNameBusy] = useState(false);
-  const [nameError, setNameError] = useState("");
   const documents = useMemo(() => updates.flatMap((update) => update.attachments
     .filter((attachment) => attachment.attachmentType !== "image")
     .map((attachment) => ({ ...attachment, updateTitle: update.title, updatedAt: update.updatedAt }))), [updates]);
@@ -59,7 +55,7 @@ export function PackageRecordWorkspace({
     <section className={styles.recordsWorkspace}>
       <header className={styles.workspaceHeading}>
         <div><h2>Thông tin gói</h2></div>
-        {canEditProject ? <Button leftIcon={<Pencil aria-hidden="true" size={16} />} onClick={() => { setProjectName(project.name); setNameError(""); setEditingName(true); }}>Đổi tên gói</Button> : null}
+        {canEditProject ? <ProjectActions project={project} onSaved={() => router.refresh()} onDeleted={() => router.push("/projects")} /> : null}
         {canManageWorksites && project.status !== "closed" ? (
           <Button leftIcon={<Plus aria-hidden="true" size={16} />} onClick={() => { setEditingWorksite(undefined); setAddingWorksite(true); }} variant="secondary">
             Thêm công trường
@@ -118,23 +114,6 @@ export function PackageRecordWorkspace({
           </section> : null}
         </aside>
       </div>
-      <Modal onClose={() => { if (!nameBusy) setEditingName(false); }} open={editingName} title="Đổi tên gói">
-        <form className="drawer-form" onSubmit={async event => {
-          event.preventDefault(); if (nameBusy) return;
-          setNameBusy(true); setNameError("");
-          try {
-            const response = await fetch(`/api/v1/projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: projectName, rowVersion: project.rowVersion }) });
-            const body = await response.json() as { error?: { message?: string } };
-            if (!response.ok) throw new Error(body.error?.message ?? "Không thể đổi tên gói.");
-            setEditingName(false); router.refresh();
-          } catch (error) { setNameError(error instanceof Error ? error.message : "Không thể đổi tên gói."); }
-          finally { setNameBusy(false); }
-        }}>
-          <Input disabled={nameBusy} label="Tên gói" maxLength={180} minLength={3} onChange={event => setProjectName(event.target.value)} required value={projectName} />
-          {nameError ? <p className="form-error" role="alert">{nameError}</p> : null}
-          <div className="form-actions"><Button disabled={nameBusy} onClick={() => setEditingName(false)}>Hủy</Button><Button busy={nameBusy} disabled={nameBusy} type="submit" variant="primary">Lưu tên gói</Button></div>
-        </form>
-      </Modal>
       <Modal onClose={() => { if (!worksiteBusy) setAddingWorksite(false); }} open={addingWorksite} title={editingWorksite ? "Chỉnh sửa công trường" : "Thêm công trường"}>
         <WorksiteEditor initial={editingWorksite} key={editingWorksite?.id ?? "new"} onBusyChange={setWorksiteBusy} onCancel={() => setAddingWorksite(false)} onSaved={() => { setAddingWorksite(false); router.refresh(); }} projectId={project.id}/>
       </Modal>

@@ -4,7 +4,8 @@ export type TimesheetSource="SELF_ATTENDANCE"|"SUPERVISOR_ROSTER"|"APPROVED_LEAV
 export type TimesheetExceptionType="missing_check_in"|"missing_check_out"|"attendance_leave_conflict"|"gps_issue"|"photo_pending"|"offline_sync_pending"|"worker_roster_conflict"|"duplicate_source_conflict";
 export type TimesheetAdjustmentType="add_missing_check_in"|"add_missing_check_out"|"adjust_effective_time"|"mark_leave"|"mark_business_trip"|"correct_status"|"correct_work_fraction"|"note_only"|"other";
 
-export interface Shift{ id:string;code:string;name:string;startTime:string;endTime:string;breakMinutes:number;lateGraceMinutes:number;earlyLeaveGraceMinutes:number;checkInEarliestMinutes:number;checkInLatestMinutes:number;checkOutEarliestMinutes:number;checkOutLatestMinutes:number;crossMidnight:boolean;active:boolean; }
+export interface ShiftScheduleRules { breakStartTime: string; breakEndTime: string; arrivalLeadMinutes: number; }
+export interface Shift{ id:string;code:string;name:string;startTime:string;endTime:string;breakMinutes:number;lateGraceMinutes:number;earlyLeaveGraceMinutes:number;checkInEarliestMinutes:number;checkInLatestMinutes:number;checkOutEarliestMinutes:number;checkOutLatestMinutes:number;crossMidnight:boolean;active:boolean;scheduleRules?:ShiftScheduleRules; }
 export interface CalendarDay{ id:string;date:string;name:string;dayType:"holiday"|"company_holiday"|"makeup_workday"|"special";scopeType:"company"|"department"|"project"|"employee";scopeId?:string;isWorkingDay:boolean;active:boolean; }
 export interface TimesheetEventInput{id:string;eventType:"check_in"|"check_out";effectiveAt:string;geofenceStatus:string;photoStatus:string;syncStatus:string;locationName?:string;photoId?:string;}
 export interface TimesheetWorkerObservation{status:string;checkedInAt?:string;checkedOutAt?:string;dayException?:string;sessionId?:string;observedAt?:string;breakMinutes?:number;}
@@ -17,6 +18,9 @@ export interface TimesheetPeriod{id:string;code:string;name:string;startDate:str
 export interface TimesheetException{id:string;periodId:string;dailyTimesheetId:string;employeeId:string;employeeCode:string;employeeName:string;workDate:string;type:TimesheetExceptionType;severity:"warning"|"high";status:"open"|"resolved"|"ignored";details:Record<string,unknown>;resolutionNote?:string;}
 
 export type ReportType="timesheet"|"employee_list"|"employee_profile";
+export interface DailyTimesheet { outsideMinutes?: number; overtimeMinutes?: number; pendingOvertimeMinutes?: number; arrivalLateMinutes?: number; rainPauseMinutes?: number; }
+export interface TimesheetSummary { overtimeMinutes?: number; pendingOvertimeMinutes?: number; rainPauseMinutes?: number; }
+export interface TimesheetWorkerInput { rainIntervals?: Array<{checkedInAt:string;checkedOutAt:string}>; }
 export interface ReportSheetDefinition{key:string;name:string;enabled:boolean;columns?:Array<{key:string;label:string;enabled:boolean;order:number}>;}
 export interface ReportTemplate{id:string;code:string;name:string;reportType:ReportType;definition:{freezeHeader:boolean;autoFilter:boolean;includeBranding?:boolean;sheets:ReportSheetDefinition[]};version:number;active:boolean;}
 export interface ReportExport{id:string;reportType:ReportType;templateId:string;templateVersion:number;periodId?:string;periodVersion?:number;status:"queued"|"processing"|"completed"|"failed";requestedAt:string;completedAt?:string;fileId?:string;fileName?:string;errorMessage?:string;}

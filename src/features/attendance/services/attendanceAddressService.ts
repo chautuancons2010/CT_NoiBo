@@ -37,11 +37,14 @@ export async function resolveAttendanceAddress(user: AuthenticatedUser, coordina
   const actor = await resolvePlatformIdentity(client, user);
   const providerKey = digest(`${config.provider}:${config.endpoint.href}`);
   const normalized = { latitude: Number(coordinates.latitude.toFixed(5)), longitude: Number(coordinates.longitude.toFixed(5)) };
-  const cacheKey = digest(`${providerKey}:${coordinateLabel(normalized)}`);
+  const cacheKey = digest(`gps-address-v2:${providerKey}:${coordinateLabel(normalized)}`);
   const { data: claim, error: claimError } = await client.rpc("claim_attendance_address_lookup", { p_provider_key: providerKey, p_cache_key: cacheKey, p_actor_id: actor.accountId });
   // Missing cache/rate infrastructure fails closed to external calls, but never blocks attendance.
   if (claimError || !claim) return { status: "unavailable" };
-  if (claim.status !== "claimed") return { ...claim, ...(claim.status === "resolved" ? attribution : {}) } as AttendanceAddressResult;
+  if (claim.status !== "claimed") {
+    if (claim.status === "resolved" && (!validAddressCoordinates({ latitude: claim.matchedLatitude, longitude: claim.matchedLongitude }) || distanceInMeters(normalized, { latitude: claim.matchedLatitude, longitude: claim.matchedLongitude }) > 30)) return { status: "not_found" };
+    return { ...claim, ...(claim.status === "resolved" ? attribution : {}) } as AttendanceAddressResult;
+  }
 
   let result: AttendanceAddressResult = { status: "unavailable" };
   let retrySeconds = 0;
@@ -74,7 +77,7 @@ export async function resolveAttendanceAddress(user: AuthenticatedUser, coordina
         if (content.length <= 100_000) {
           result = config.provider === "photon" ? parsePhotonAddress(JSON.parse(content)) : parseNominatimAddress(JSON.parse(content));
           // A provider returning a town centroid kilometres away is not the address at this GPS point.
-          if (result.status === "resolved" && distanceInMeters(normalized, { latitude: result.matchedLatitude!, longitude: result.matchedLongitude! }) > 250) result = { status: "not_found" };
+          if (result.status === "resolved" && distanceInMeters(normalized, { latitude: result.matchedLatitude!, longitude: result.matchedLongitude! }) > 30) result = { status: "not_found" };
         }
       }
     }

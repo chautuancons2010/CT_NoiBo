@@ -34,6 +34,10 @@ export function assertTestEnvironment(env = process.env) {
 export function testToolsAvailable(env = process.env) {
   try { return assertTestEnvironment(env); } catch { return null; }
 }
+export function testSupervisorLoginOnly(env = process.env) {
+  if (env.APP_ENV !== "test" || env.RELEASE_ENVIRONMENT !== "test" || env.APP_BASE_URL !== "https://ct-noi-bo-test-chau-tuan.vercel.app") return false;
+  return testToolsAvailable(env)?.environment === "test";
+}
 export function publicTesterAccess(env = process.env) {
   return env.APP_ENV === "test" && env.RELEASE_ENVIRONMENT === "test"
     && env.TEST_TOOLS_PUBLIC_ACCESS === "true" && Boolean(testToolsAvailable(env));

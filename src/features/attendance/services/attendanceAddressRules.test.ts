@@ -9,7 +9,7 @@ describe("attendance address parsing", () => {
   });
 
   it("builds a readable Vietnamese Photon address, deduplicating repeated administrative names", () => {
-    expect(parsePhotonAddress({ features: [{ geometry: { coordinates: [106.7009, 10.7769] }, properties: { name: "Ủy ban nhân dân", housenumber: "86", street: "Lê Thánh Tôn", district: "Sài Gòn", city: "Thành phố Hồ Chí Minh", state: "Thành phố Hồ Chí Minh", country: "Việt Nam" } }] })).toEqual({ status: "resolved", address: "Ủy ban nhân dân, 86 Lê Thánh Tôn, Sài Gòn, Thành phố Hồ Chí Minh, Việt Nam", matchedLatitude: 10.7769, matchedLongitude: 106.7009 });
+    expect(parsePhotonAddress({ features: [{ geometry: { coordinates: [106.7009, 10.7769] }, properties: { name: "Ủy ban nhân dân", housenumber: "86", street: "Lê Thánh Tôn", district: "Sài Gòn", city: "Thành phố Hồ Chí Minh", state: "Thành phố Hồ Chí Minh", country: "Việt Nam" } }] })).toEqual({ status: "resolved", address: "86 Lê Thánh Tôn, Sài Gòn, Thành phố Hồ Chí Minh, Việt Nam", matchedLatitude: 10.7769, matchedLongitude: 106.7009 });
   });
 
   it("rejects a Photon result without a valid returned point or a named address", () => {

@@ -10,6 +10,7 @@
 .clockFace { display: grid; min-width: 0; align-content: center; justify-items: start; gap: 8px; padding: 22px 24px 18px; }
 .hours { color: var(--text-primary); font-size: clamp(28px, 7.7vw, 40px); font-weight: 600; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .shift { color: var(--text-secondary); font-size: 13px; }
+.arrival { border: 1px solid var(--color-primary-border); border-radius: var(--radius-pill); padding: 4px 10px; background: var(--primary-soft); color: var(--color-primary-active); font-size: 13px; font-weight: 500; }
 .content { display: grid; min-width: 0; align-content: center; gap: 16px; padding: 0 24px 20px; }
 .events { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; min-width: 0; margin: 0; }
 .events > div { display: grid; min-width: 0; gap: 6px; border: 1px solid var(--border-subtle); border-radius: 14px; padding: 12px; background: var(--surface-2); }
@@ -35,6 +36,13 @@
 .eventCount { font-variant-numeric: tabular-nums; }
 .history { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-subtle); border-radius: 14px; padding: 12px 16px; background: var(--surface); color: var(--text-secondary); font-size: 14px; text-decoration: none; }
 .history:hover { color: var(--primary); }
+.rounds { min-width: 0; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); }
+.rounds summary { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
+.rounds summary > span { border-radius: var(--radius-pill); padding: 2px 8px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
+.rounds ol { display: grid; gap: 0; margin: 0; padding: 0 16px 8px; list-style: none; }
+.rounds li { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; border-top: 1px solid var(--border-subtle); padding-block: 12px; font-size: 12px; }
+.rounds li > span:last-child { color: var(--text-secondary); text-align: right; }
+.rounds time { font-weight: 600; font-variant-numeric: tabular-nums; }
 .action > button:focus-visible, .photoLink:focus-visible, .history:focus-visible, .error button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .loading, .error { min-height: 300px; align-content: center; border: 1px solid var(--border-subtle); border-radius: 18px; padding: 24px; background: var(--surface); }
 .skeleton { display: block; height: 220px; border-radius: 16px; background: linear-gradient(130deg, var(--primary-soft), var(--surface-2)); }

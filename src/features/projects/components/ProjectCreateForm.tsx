@@ -47,7 +47,7 @@ export function ProjectCreateForm() {
   return <div className={styles.page}><Card className={styles.card}>
     <InlineForm className={styles.form} onSubmit={submit}>
       <fieldset className="form-fieldset" disabled={saving}><FieldGroup title="Thông tin gói"><Input label="Mã gói" maxLength={40} minLength={2} name="code" required />
-<Select label="Trạng thái" name="status" options={[{ label: "Chuẩn bị", value: "preparing" }, { label: "Đang thực hiện", value: "active" }]} />
+<Select label="Trạng thái" name="status" options={[{ label: "Đang thực hiện", value: "active" }, { label: "Chuẩn bị", value: "preparing" }]} />
 <Input label="Tên gói" maxLength={180} minLength={3} name="name" required />
 <Input label="Khách hàng" maxLength={160} name="customerName" /></FieldGroup><FieldGroup title="Tiến độ dự kiến"><Input label="Ngày bắt đầu" name="startDate" onChange={event => setStartDate(event.target.value)} required type="date" value={startDate} />
 <Input label="Kết thúc dự kiến" min={startDate || undefined} name="expectedEndDate" type="date" /></FieldGroup><FieldGroup title="Thông tin bổ sung" columns={1}><Textarea label="Tóm tắt" maxLength={500} name="summary" /></FieldGroup></fieldset>

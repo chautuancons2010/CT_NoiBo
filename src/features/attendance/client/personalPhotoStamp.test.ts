@@ -4,7 +4,7 @@ import { lookupAttendanceAddress } from "./attendanceAddressClient";
 import { processAttendanceImage } from "./imageProcessing";
 vi.mock("./attendanceAddressClient", () => ({ lookupAttendanceAddress: vi.fn() }));
 vi.mock("./imageProcessing", () => ({ processAttendanceImage: vi.fn() }));
-const capture = { capturedAtClient: "2026-11-09T06:20:15.000Z", intendedType: "check_in" as const };
+const capture = { capturedAtClient: "2026-11-09T06:20:15.000Z", intendedType: "check_in" as const, capturedByName: "Nguyễn Văn An", capturedByUsername: "NV001" };
 const location = { capturedAt: capture.capturedAtClient, latitude: 10.7769, longitude: 106.7009, accuracy: 8 };
 const raw = { photo: new Blob(["photo"]), thumbnail: new Blob(["thumbnail"]), width: 1600, height: 1200, previewUrl: "blob:raw" };
 beforeEach(() => { vi.clearAllMocks(); });
@@ -15,6 +15,7 @@ describe("personal photo address validation", () => {
     expect(result.stamp.latitude).toBeUndefined();
     expect(result.stamp.address).toContain("Cần xác minh");
     expect(result.stamp.capturedAt).toBe(capture.capturedAtClient);
+    expect(result.stamp).toMatchObject({ capturedByName: "Nguyễn Văn An", capturedByUsername: "NV001" });
   });
   it("retains original GPS and capture time while offline without inventing an address", async () => {
     vi.mocked(lookupAttendanceAddress).mockResolvedValue({ status: "unavailable" });

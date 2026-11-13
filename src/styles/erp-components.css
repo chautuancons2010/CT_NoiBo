@@ -222,6 +222,14 @@ body { overflow-x: hidden; background: var(--workspace-canvas); }
   transition: border-color var(--motion-control) ease, box-shadow var(--motion-control) ease;
 }
 :where(.textarea) { min-height: 88px; resize: vertical; }
+/* Native Safari date controls must fit the field's content box, including in sheets. */
+.input:where([type="date"], [type="time"], [type="datetime-local"], [type="month"]) {
+  display: block; box-sizing: border-box; appearance: none; -webkit-appearance: none;
+  width: 100%; min-width: 0; max-width: 100%; min-inline-size: 0; max-inline-size: 100%;
+  overflow: hidden; text-align: left;
+}
+.input::-webkit-date-and-time-value { min-width: 0; min-height: 1.5em; text-align: left; }
+.input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 :where(.input, .select, .textarea, .select-control__trigger):focus-visible { border-color: var(--color-primary); outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
 :where(.field--invalid .input, .field--invalid .select-control__trigger) { border-color: var(--danger); }
 :where(.field__required) { margin-left: 3px; color: var(--danger); }
@@ -326,6 +334,14 @@ body { overflow-x: hidden; background: var(--workspace-canvas); }
 :where(.filter-chip > .icon-button) { width: 28px; height: 28px; min-width: 28px; min-height: 28px; border: 0; background: transparent; }
 :where(.filter-bar__tools) { flex: 1 1 auto; }
 :where(.filter-bar__actions, .filter-bar__compact-actions) { width: max-content; flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; border: 0; padding: 0; }
+@media (max-width: 767px) {
+  :where(.mobile-filter-bar[data-has-search="true"]:not(:has(.mobile-filter-bar__actions))) { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; }
+  :where(.mobile-filter-bar__primary) { display: flex; min-width: 0; width: auto; align-items: center; gap: 8px; }
+  :where(.mobile-filter-bar__primary > .search-input) { width: 100%; min-width: 0; flex: 1 1 0; }
+  :where(.mobile-filter-bar__primary > .button:has(.button__icon)) { width: 44px; height: 44px; min-height: 44px; flex: 0 0 44px; gap: 0; padding-inline: 12px; }
+  :where(.mobile-filter-bar__primary > .button:has(.button__icon) > span:not(.button__icon)) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  :where(.mobile-filter-bar[data-has-search="true"]:not(:has(.mobile-filter-bar__actions)) > .mobile-filter-bar__tools) { display: flex; width: auto; min-width: 0; flex: 0 0 auto; }
+}
 :where(.context-tabs[data-ui="context-tabs"]) { min-width: 0; border: 0; border-bottom: 1px solid var(--border-subtle); border-radius: var(--radius-card) var(--radius-card) 0 0; padding: 0; background: var(--surface); box-shadow: none; }
 :where(.context-tabs__scroller) { display: flex; min-width: 0; align-items: center; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 0 16px; }
 :where(.context-tabs .tabs__item) { display: inline-flex; min-height: 48px; align-items: center; flex: 0 0 auto; gap: 8px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: 12px 14px 9px; background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500; line-height: 1.5; box-shadow: none; }
@@ -349,7 +365,7 @@ body { overflow-x: hidden; background: var(--workspace-canvas); }
 :where(.overlay--drawer) { place-items: stretch end; padding: 0; }
 :where(.overlay--lightbox) { padding: 12px; }
 :where(.overlay__header) { position: sticky; top: 0; z-index: 1; display: flex; min-height: 72px; align-items: center; justify-content: space-between; flex: 0 0 auto; gap: 16px; border-bottom: 1px solid var(--border-subtle); padding: 16px 24px; background: var(--surface); }
-:where(.overlay__header h2) { margin: 0; padding: 0; font-size: 18px; font-weight: 600; line-height: 1.5; }
+:where(.overlay__header h2) { min-width: 0; margin: 0; padding: 0; font-size: 18px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 :where(.overlay__header)::before { content: none; }
 :where(.modal, .drawer) { border: 1px solid var(--border-subtle); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-floating); }
 :where(.modal) { position: relative; display: flex; width: min(680px, 100%); min-width: 0; max-width: 100%; height: auto; max-height: calc(100dvh - 48px); align-self: center; justify-self: center; flex-direction: column; overflow: hidden; margin: 0; padding: 0; }
@@ -361,7 +377,7 @@ body { overflow-x: hidden; background: var(--workspace-canvas); }
 .drawer:where(:has(> .sectioned-form)) { width: min(var(--drawer-form-width), 100%); }
 .modal:where(:has(> .sectioned-form)) { width: min(var(--drawer-form-width), 100%); }
 :where(.drawer)::before { position: static; inset: auto; transform: none; content: none; }
-:where(.drawer > :not(.overlay__header)) { min-height: 0; align-content: start; }
+:where(.drawer > :not(.overlay__header)) { min-width: 0; min-height: 0; align-content: start; }
 :where(.mobile-filter-sheet) { display: grid; min-height: 0; flex: 1 1 auto; align-content: start; gap: 16px; overflow-y: auto; padding: 20px; }
 :where(.mobile-filter-sheet__actions) { display: flex; min-height: 64px; align-items: center; justify-content: flex-end; flex: 0 0 auto; gap: 8px; border-top: 1px solid var(--border-subtle); padding: 12px 16px; background: var(--surface); }
 :where(.mobile-filter-sheet__actions .button) { height: 40px; min-height: 40px; }

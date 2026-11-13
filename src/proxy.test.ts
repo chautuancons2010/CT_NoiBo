@@ -1,4 +1,4 @@
-vi.mock("@/config/featureRelease", () => ({ attendanceOnlyRelease: false, isReleasedFeaturePath: () => true }));
+vi.mock("@/config/featureRelease", async (importOriginal) => ({ ...await importOriginal<typeof import("@/config/featureRelease")>(), isReleasedFeaturePath: () => true }));
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -6,7 +6,7 @@ import { defaultSystemSettings } from "@/config/systemSettings";
 
 const mocks = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock("@/services/system-settings/systemSettingsService", () => ({ readModuleSettings: mocks.read }));
-vi.mock("@/lib/testing/policy.mjs", () => ({ stagingAuthorized: () => true, sessionCookieNames: () => ({ access: "test-access", refresh: "test-refresh" }) }));
+vi.mock("@/lib/testing/policy.mjs", () => ({ testSupervisorLoginOnly: () => false, stagingAuthorized: () => true, sessionCookieNames: () => ({ access: "test-access", refresh: "test-refresh", session: "test-session" }) }));
 import { proxy } from "@/proxy";
 
 describe("module request gate", () => {

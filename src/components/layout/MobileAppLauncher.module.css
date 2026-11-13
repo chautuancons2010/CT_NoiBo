@@ -1,3 +1,19 @@
 .lockedApp { position: relative; display: flex; min-width: 0; min-height: 100px; align-items: center; justify-content: center; flex-direction: column; gap: 9px; border: 1px solid var(--border-subtle); border-radius: 18px; padding: 12px 4px; background: var(--surface); color: var(--text-secondary); font: inherit; opacity: .65; cursor: not-allowed; }
 .lockedApp strong { font-size: 12px; font-weight: 600; }
 .lock { position: absolute; top: 8px; right: 8px; color: var(--text-muted); }
+.sheet :global(.mobile-app-sheet__body) { gap: 16px; }
+.sheet :global(.mobile-app-sheet__grid) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.sheet :global(.mobile-app-sheet__grid) > :is(a, button) { min-height: 80px; border-radius: 14px; padding: 12px; gap: 8px; }
+.sheet :global(.mobile-app-sheet__grid) strong { min-height: 0; font-size: 13px; line-height: 1.4; }
+.sheet :global(.mobile-app-sheet__grid):has(> :nth-child(5)) { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.sheet :global(.mobile-app-sheet__section) { padding-top: 14px; }
+.sheet :global(.mobile-app-sheet__links) { gap: 8px; }
+.sheet :global(.mobile-app-sheet__links) a { min-height: 48px; }
+.sheet :global(.mobile-app-sheet__section--context) :global(.mobile-app-sheet__links) a { padding-block: 8px; }
+.sheet :global(.mobile-app-sheet__search) { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+.sheet :global(.mobile-app-sheet__search) input { font-size: 16px; }
+@media (max-width: 767px) {
+  .sheet { max-height: calc(100dvh - max(20px,env(safe-area-inset-top))); }
+  .sheet :global(.overlay__header) { min-height: 64px; padding-top: 16px; }
+  .sheet :global(.mobile-app-sheet__section--context) :global(.mobile-app-sheet__links) a { font-size: 14px; }
+}

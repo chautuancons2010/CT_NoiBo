@@ -9,7 +9,7 @@ describe("worker attendance rules", () => {
     expect(countWorkerAttendance([entry("present"), entry("absent"), entry("present", true)])).toMatchObject({ total: 3, present: 2, absent: 1, unplanned: 1 });
   });
   it("blocks submit with unconfirmed workers or missing photos", () => {
-    const errors = validateSessionForSubmit({ entries: [entry("unconfirmed")], photoCount: 0, geofenceStatus: "valid", latitude: 10, longitude: 106, checklist: [], checklistResponses: [] }, { minimumPhotos: 1, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 });
+    const errors = validateSessionForSubmit({ entries: [entry("unconfirmed")], photoCount: 0, geofenceStatus: "valid", latitude: 10, longitude: 106, accuracyMeters: 20, checklist: [], checklistResponses: [] }, { minimumPhotos: 1, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 });
     expect(errors).toHaveLength(2);
   });
   it("detects overlapping effective assignments", () => {
@@ -17,14 +17,15 @@ describe("worker attendance rules", () => {
   });
 
   it.each(["valid", "outside", "accuracy_low", "unavailable"])("allows a session with actual GPS and historical status %s", (geofenceStatus) => {
-    expect(validateSessionForSubmit({ entries: [entry("present")], photoCount: 1, geofenceStatus, latitude: 21.0278, longitude: 105.8342, checklist: [], checklistResponses: [] }, { minimumPhotos: 1, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 })).toEqual([]);
+    expect(validateSessionForSubmit({ entries: [entry("present")], photoCount: 1, geofenceStatus, latitude: 21.0278, longitude: 105.8342, accuracyMeters: 20, checklist: [], checklistResponses: [] }, { minimumPhotos: 1, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 })).toEqual([]);
   });
 
-  it("requires coordinates for GPS sessions while preserving the optional GPS policy", () => {
+  it("requires coordinates even when a legacy site marked GPS as optional", () => {
     const input = { entries: [entry("present")], photoCount: 1, geofenceStatus: "valid", checklist: [], checklistResponses: [] };
     const policy = { minimumPhotos: 1, workNoteRequired: false, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 };
-    expect(validateSessionForSubmit(input, policy)).toEqual(["Chưa có tọa độ GPS. Hãy thử lại vị trí."]);
+    expect(validateSessionForSubmit(input, policy)).toEqual([]);
     expect(validateSessionForSubmit({ ...input, geofenceStatus: "not_required" }, policy)).toEqual([]);
+    expect(validateSessionForSubmit({ ...input, latitude: 10, longitude: 106, accuracyMeters: 20000 }, policy)).toEqual([]);
   });
 
   it("shows coordinate accuracy for review instead of an outside-radius error", () => {
@@ -37,7 +38,7 @@ describe("worker attendance rules", () => {
   });
 
   it("allows selection submit with unchecked candidates and no work note", () => {
-    expect(validateSessionForSubmit({ selectionMode: true, safetyConfirmed: true, entries: [{ ...entry("present"), isSelected: true }, { ...entry("unconfirmed"), isSelected: false }], photoCount: 1, geofenceStatus: "not_required", checklist: [], checklistResponses: [] }, { minimumPhotos: 0, workNoteRequired: true, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 })).toEqual([]);
+    expect(validateSessionForSubmit({ selectionMode: true, safetyConfirmed: true, entries: [{ ...entry("present"), isSelected: true }, { ...entry("unconfirmed"), isSelected: false }], photoCount: 1, geofenceStatus: "valid", latitude: 10, longitude: 106, accuracyMeters: 20, checklist: [], checklistResponses: [] }, { minimumPhotos: 0, workNoteRequired: true, endOfDayRequired: false, offlineEnabled: true, editWindowMinutes: 120 })).toEqual([]);
   });
 
   it("requires a selected worker, a photo and the safety confirmation even with a relaxed legacy policy", () => {

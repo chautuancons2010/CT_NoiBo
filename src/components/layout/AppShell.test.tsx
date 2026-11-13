@@ -7,6 +7,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { defaultSystemSettings } from "@/config/systemSettings";
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 
+vi.mock("@/config/featureRelease", async (importOriginal) => ({ ...await importOriginal<typeof import("@/config/featureRelease")>(), isReleasedFeaturePath: () => true }));
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/accounting/payroll",
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() })

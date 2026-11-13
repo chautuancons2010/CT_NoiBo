@@ -69,15 +69,13 @@ describe("request session resolution", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it.each([null, "employee-id"])("keeps admin management access and own account security without personal attendance (employee: %s)", async (employeeId) => {
+  it.each([null, "employee-id"])("keeps every admin permission even when stored grants are incomplete (employee: %s)", async (employeeId) => {
     const session = activeSession(employeeId, "admin");
     session.account.account_roles[0].roles.role_permissions = ["attendance.self", "attendance.self.create", "attendance.view_all", "attendance.manage", "payslip.self.view", "payroll.view"].map((permission_key) => ({ permission_key }));
     mockSession(session);
     const user = await resolveRequestUser();
     expect(user?.permissions).toEqual(expect.arrayContaining(["profile.view", "attendance.view_all", "attendance.manage", "payroll.view"]));
-    expect(user?.permissions).not.toContain("attendance.self");
-    expect(user?.permissions).not.toContain("attendance.self.create");
-    expect(user?.permissions).not.toContain("payslip.self.view");
+    expect(user?.permissions).toEqual(expect.arrayContaining(["attendance.self", "attendance.self.create", "payslip.self.view", "module.manage", "system_admin.access", "warehouse.master.manage", "integration.manage"]));
     expect(user?.employeeId).toBe(employeeId);
   });
 

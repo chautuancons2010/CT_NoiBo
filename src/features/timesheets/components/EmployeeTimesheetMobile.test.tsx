@@ -52,7 +52,7 @@ describe("individual employee attendance calendar", () => {
     render(<EmployeeTimesheetMobile periodId="period" employeeId="NV01" canAdjust/>);
     fireEvent.click(await screen.findByRole("button", { name: "01/10/2026: Chưa có dữ liệu" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Chưa có bản ghi công cho ngày này")).toBeInTheDocument();
+    expect(within(dialog).getByText("Chưa có công ngày này")).toBeInTheDocument();
     expect(within(dialog).queryByText("Ca làm")).not.toBeInTheDocument();
     const metrics = screen.getByText("Ngày công").closest("dl")!;
     expect(within(metrics).getByText("22")).toBeInTheDocument();

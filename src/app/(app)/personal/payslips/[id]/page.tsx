@@ -6,12 +6,12 @@ import { payslipListQuery } from "@/features/accounting/payslipPresentation";
 import { can } from "@/lib/auth/permissions";
 import { getRequestUser } from "@/services/auth/getRequestUser";
 import { redirect } from "next/navigation";
-import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess } from "@/config/featureRelease";
+import { attendanceOnlyRelease, hasReleaseAvailabilityAccess } from "@/config/featureRelease";
 
 export default async function Page({ params, searchParams }: PageProps<"/personal/payslips/[id]">) {
   const [{ id }, query, user] = await Promise.all([params, searchParams, getRequestUser()]);
   if (!user || !can(user.permissions, "payslip.self.view")) return <PermissionDeniedState />;
-  if (attendanceOnlyRelease && !hasUnrestrictedReleaseAccess(user.roleCodes)) redirect("/personal/payslips");
+  if (attendanceOnlyRelease && !hasReleaseAvailabilityAccess(user.roleCodes)) redirect("/personal/payslips");
   return (
     <div className="page-stack">
       <BackLink href={`/personal/payslips${payslipListQuery(query.month, query.receipt)}`} label="Trở lại phiếu lương" />

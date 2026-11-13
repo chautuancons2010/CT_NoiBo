@@ -28,6 +28,8 @@
 .legend > div > span { display: inline-flex; align-items: center; gap: 5px; }
 .legend b { font-size: 11px; font-weight: 600; }
 .dayDetail { display: grid; min-width: 0; align-content: start; gap: 16px; }
+.daySheet { width: min(520px, 100%); }
+.daySheet .dayDetail { flex: 0 0 auto; padding: 20px 24px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 .dayHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .dayHeading > strong { font-size: 14px; font-weight: 600; }
 .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; border: 0; padding: 0; background: transparent; }
@@ -48,4 +50,7 @@
   .period { width: 100%; }
   .calendarHeading > :global(.button) { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
   .legend summary { min-height: 44px; display: flex; align-items: center; }
+  .daySheet .dayDetail { padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .daySheet .actions { position: sticky; bottom: 0; padding-block: 12px; background: var(--surface); }
+  .daySheet .actions > :global(.button) { flex: 1; min-height: 44px; }
 }

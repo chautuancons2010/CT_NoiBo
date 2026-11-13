@@ -32,6 +32,7 @@ function mockDatabase(accountResult: Promise<{ data: typeof account | null; erro
         select: () => query,
         eq: () => query,
         lte: () => query,
+        gte: () => query,
         or: () => query,
         limit: () => query,
         order: () => query,
@@ -76,12 +77,12 @@ describe("attendance dashboard reads", () => {
 
 const office = { id: "office-1", name: "Văn phòng", latitude: 10.7769, longitude: 106.7009, radius_meters: 10, active: true };
 
-function mockAttendanceData(events: Record<string, unknown>[] = []) {
+function mockAttendanceData(events: Record<string, unknown>[] = [], options: { employees?: Record<string, unknown>[]; category?: string } = {}) {
   const inserts: Record<string, unknown>[] = [];
   getSupabaseServiceClient.mockReturnValue({
     from(table: string) {
       let values: Record<string, unknown> | undefined;
-      const rows = table === "attendance_events" ? events : table === "employees" ? [{ id: "employee-1", employee_code: "NV01", full_name: "Nhân viên", department_id: "department-1" }] : table === "departments" ? [{ id: "department-1", name: "Nhân sự" }] : table === "attendance_locations" ? [office] : [];
+      const rows = table === "attendance_events" ? events : table === "employees" ? options.employees ?? [{ id: "employee-1", employee_code: "NV01", full_name: "Nhân viên", department_id: "department-1" }] : table === "departments" ? [{ id: "department-1", name: "Nhân sự" }] : table === "attendance_locations" ? [office] : [];
       const response = { data: rows, error: null };
       const query = {
         select: () => query, eq: () => query, in: () => query, lte: () => query,
@@ -89,7 +90,7 @@ function mockAttendanceData(events: Record<string, unknown>[] = []) {
         range: () => Promise.resolve(response),
         insert: (input: Record<string, unknown>) => { values = input; if (table === "attendance_events") inserts.push(input); return query; },
         single: () => Promise.resolve({ data: values ? { ...values, id: "event-1", attendance_photos: [] } : null, error: null }),
-        maybeSingle: () => Promise.resolve({ data: table === "app_accounts" ? account : table === "attendance_policies" ? policy : null, error: null }),
+        maybeSingle: () => Promise.resolve({ data: table === "app_accounts" ? { ...account, employees: { ...account.employees, employment_types: { worker_category: options.category ?? "office" } } } : table === "attendance_policies" ? policy : null, error: null }),
         then(onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) { return Promise.resolve(response).then(onFulfilled, onRejected); }
       };
       return query;
@@ -99,6 +100,11 @@ function mockAttendanceData(events: Record<string, unknown>[] = []) {
 }
 
 describe("attendance GPS evidence", () => {
+  it("does not create a personal attendance event for a worker who must be recorded by a supervisor", async () => {
+    const inserts = mockAttendanceData([], { category: "worker" });
+    await expect(recordAttendance(user, { clientEventId: "worker-self", capturedAtClient: new Date().toISOString(), capturedOffline: false, deviceMetadata: {} })).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    expect(inserts).toHaveLength(0);
+  });
   it("records another daily pair after checkout and keeps the original capture time", async () => {
     const now = new Date();
     const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
@@ -124,24 +130,32 @@ describe("attendance GPS evidence", () => {
     expect(inserts[0].distance_meters).toBeGreaterThan(1_000_000);
   });
 
-  it("records low accuracy coordinates for HR review instead of rejecting them", async () => {
+  it("records low accuracy as reviewable evidence with the original capture time", async () => {
     const inserts = mockAttendanceData();
     const now = new Date().toISOString();
-    const result = await recordAttendance(user, { clientEventId: "capture-2", capturedAtClient: now, capturedOffline: false, location: { latitude: 10.7769, longitude: 106.7009, accuracy: 20000, capturedAt: now }, deviceMetadata: {} });
-
-    expect(result.event).toMatchObject({ geofenceStatus: "accuracy_low", attendanceStatus: "needs_review", anomalyFlags: ["gps_accuracy_low"] });
-    expect(inserts[0].accuracy_meters).toBe(20000);
+    await expect(recordAttendance(user, { clientEventId: "capture-2", capturedAtClient: now, capturedOffline: false, location: { latitude: 10.7769, longitude: 106.7009, accuracy: 20000, capturedAt: now }, deviceMetadata: {} })).resolves.toMatchObject({ event: { geofenceStatus: "accuracy_low", attendanceStatus: "needs_review", effectiveAt: now } });
+    expect(inserts).toHaveLength(1);
   });
 
-  it("retains attendance without GPS for HR review with an explicit anomaly", async () => {
+  it("records attendance without GPS for review without fabricating coordinates", async () => {
     const inserts = mockAttendanceData();
-    const result = await recordAttendance(user, { clientEventId: "capture-3", capturedAtClient: new Date().toISOString(), capturedOffline: false, deviceMetadata: {} });
-    expect(result.event).toMatchObject({ geofenceStatus: "unavailable", attendanceStatus: "needs_review", anomalyFlags: ["gps_unavailable"] });
+    await expect(recordAttendance(user, { clientEventId: "capture-3", capturedAtClient: new Date().toISOString(), capturedOffline: false, deviceMetadata: {} })).resolves.toMatchObject({ event: { geofenceStatus: "unavailable", attendanceStatus: "needs_review" } });
     expect(inserts).toHaveLength(1);
   });
 });
 
 describe("HR daily evidence", () => {
+  it("counts office staff and supervisors in personal photos, excluding workers regardless of their department", async () => {
+    const person = { employee_code: "NV01", full_name: "Nhân viên", department_id: "department-1" };
+    mockAttendanceData([], { employees: [
+      { ...person, id: "office", employment_types: { worker_category: "office" } },
+      { ...person, id: "supervisor", employment_types: [{ worker_category: "supervisor" }] },
+      { ...person, id: "worker", employment_types: { worker_category: "worker" } }
+    ] });
+    const result = await getAttendanceAdminToday({ ...user, permissions: ["attendance.view_all"] }, "2026-11-13");
+    expect(result.rows.map(row => row.employeeId)).toEqual(["office", "supervisor"]);
+    expect(result).toMatchObject({ totalEmployees: 2, notChecked: 2 });
+  });
   it("returns every event and photo with GPS while rejected events do not affect worked time", async () => {
     const date = "2026-10-01";
     const makeEvent = (id: string, eventType: string, clock: string, attendanceStatus = "recorded") => ({ id, employee_id: "employee-1", client_event_id: id, event_type: eventType, attendance_date: date, effective_at: `${date}T${clock}:00+07:00`, captured_at_client: `${date}T${clock}:00+07:00`, received_at_server: `${date}T${clock}:00+07:00`, geofence_status: "valid", attendance_status: attendanceStatus, photo_status: "uploaded", sync_status: "synced", latitude: 10.7769, longitude: 106.7009, accuracy_meters: 12, attendance_photos: [{ id: `photo-${id}` }] });

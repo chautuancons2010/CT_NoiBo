@@ -4,13 +4,13 @@ import { useRef, useState } from "react";
 import { LockKeyhole, LockKeyholeOpen } from "lucide-react";
 import { Button } from "@/components/shared/Button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
+import { useStoredSystemSettings } from "@/components/providers/SystemSettingsProvider";
 import { moduleKeys, moduleLabels, moduleSettingsSchema, type ModuleKey } from "@/config/systemSettings";
 import { AdminPage } from "@/features/system-admin/components/AdminPage";
 import styles from "./ModulesPage.module.css";
 
 export function ModulesPage() {
-  const { settings, updateGroup } = useSystemSettings();
+  const { settings, updateGroup } = useStoredSystemSettings();
   const [saving, setSaving] = useState<ModuleKey | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; error: boolean } | null>(null);
   const pending = useRef(false);

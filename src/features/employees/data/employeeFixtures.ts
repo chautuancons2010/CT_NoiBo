@@ -105,7 +105,7 @@ export const employmentTypes: EmploymentType[] = [
     code: "engineer",
     name: "Giám sát",
     workerCategory: "engineer",
-    active: true,
+    active: false,
     sortOrder: 20
   },
   {
@@ -169,7 +169,7 @@ export const employeeRecords: EmployeeRecord[] = [
     country: "Việt Nam",
     departmentId: "10000000-0000-4000-8000-000000000003",
     positionId: "20000000-0000-4000-8000-000000000003",
-    employmentTypeId: "30000000-0000-4000-8000-000000000002",
+    employmentTypeId: "30000000-0000-4000-8000-000000000003",
     managerEmployeeId: "40000000-0000-4000-8000-000000000003",
     joinDate: "2024-03-15",
     probationStartDate: "2024-03-15",

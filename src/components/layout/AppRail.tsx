@@ -2,7 +2,7 @@
 
 import { WorkspaceLink as Link } from "@/components/shared/WorkspaceLink";
 import { ChevronDown, LockKeyhole, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess, isReleasedFeaturePath } from "@/config/featureRelease";
+import { attendanceOnlyRelease, hasReleaseAvailabilityAccess, isReleasedFeaturePath } from "@/config/featureRelease";
 import { useEffect, useId, useState } from "react";
 
 import { AppLogo } from "@/components/layout/AppLogo";
@@ -54,7 +54,7 @@ function RailNavigation({ groups, pathname, collapsed, user }: {
 
   const renderLink = (item: NavigationItem, nested = false) => {
     const Icon = navigationIconMap[item.icon];
-    const homeRedirect = attendanceOnlyRelease && !hasUnrestrictedReleaseAccess(user.roleCodes) && item.href === "/dashboard";
+    const homeRedirect = attendanceOnlyRelease && !hasReleaseAvailabilityAccess(user.roleCodes) && item.href === "/dashboard";
     const label = homeRedirect ? "Cá nhân" : item.label;
     const href = homeRedirect ? "/personal" : item.href;
     if (!isReleasedFeaturePath(item.href, "GET", user.roleCodes)) return <li key={item.href}><span aria-disabled="true" aria-label={`${label} · Đang khóa`} className={cn("app-rail__link", nested && "app-rail__child-link")} data-locked role="link">{!nested ? <Icon aria-hidden="true" size={navigationIconSizes.rail}/> : null}{!collapsed || nested ? <span>{label}</span> : null}<LockKeyhole aria-hidden="true" className="app-rail__lock" size={12}/></span></li>;

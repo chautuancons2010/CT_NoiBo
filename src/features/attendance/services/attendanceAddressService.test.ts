@@ -42,8 +42,14 @@ describe("attendance reverse geocoding service", () => {
 
   it("returns cached addresses without a provider request", async () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
-    rpc.mockResolvedValue({ data: { status: "resolved", address: "Đường Nguyễn Huệ", matchedLatitude: 10.77, matchedLongitude: 106.7 }, error: null });
+    rpc.mockResolvedValue({ data: { status: "resolved", address: "Đường Nguyễn Huệ", matchedLatitude: 10.7769, matchedLongitude: 106.7009 }, error: null });
     expect(await resolveAttendanceAddress(user, coordinates)).toMatchObject({ status: "resolved", address: "Đường Nguyễn Huệ", attribution: "© OpenStreetMap" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("does not present an 80-metre nearby address from cache as the current point", async () => {
+    const fetch = vi.fn();vi.stubGlobal("fetch",fetch);
+    rpc.mockResolvedValue({ data: { status:"resolved",address:"Địa điểm lân cận",matchedLatitude:10.7777,matchedLongitude:106.7009 },error:null });
+    expect(await resolveAttendanceAddress(user,coordinates)).toEqual({status:"not_found"});
     expect(fetch).not.toHaveBeenCalled();
   });
 

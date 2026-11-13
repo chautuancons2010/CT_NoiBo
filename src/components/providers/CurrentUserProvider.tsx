@@ -15,3 +15,7 @@ export function useCurrentUser(): AuthenticatedUser {
   if (!user) throw new Error("useCurrentUser must be used inside CurrentUserProvider");
   return user;
 }
+
+export function useOptionalCurrentUser(): AuthenticatedUser | null {
+  return useContext(CurrentUserContext);
+}

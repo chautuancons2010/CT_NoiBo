@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Bell, Check, ChevronRight, Grid2X2, LockKeyhole, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
-import { isReleasedApplication } from "@/config/featureRelease";
+import { isReleasedApplication, isReleasedFeaturePath } from "@/config/featureRelease";
 import styles from "./MobileAppLauncher.module.css";
 import { usePathname } from "next/navigation";
 import { useState, type CSSProperties } from "react";
@@ -31,7 +31,9 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
   const navigation = useOptionalMobileNavigation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const applications = visibleApplications(user, settings.modules).filter((application) => mobileApplicationDestination(application, user) !== undefined);
+  const applications = visibleApplications(user, settings.modules)
+    .filter((application) => mobileApplicationDestination(application, user) !== undefined && (application.id !== "overview" || isReleasedApplication(application.id, user.roleCodes)))
+    .sort((first, second) => Number(isReleasedApplication(second.id, user.roleCodes)) - Number(isReleasedApplication(first.id, user.roleCodes)));
   const currentApplication = applicationForPath(pathname);
   const personal = isMobilePersonalRoute(pathname, user) && !pathname.startsWith("/worker-attendance");
   const contextApplication = personal ? applications.find((application) => application.id === "attendance") : applications.find((application) => application.id === currentApplication.id);
@@ -46,7 +48,8 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
       .filter((item) => !item.href.startsWith("/worker-attendance") || can(user.permissions, "worker_attendance.view"))
       .map((item) => ({ href: item.href, label: item.href === "/attendance/notifications" ? "Thông báo công" : item.mobileLabel ?? item.label, icon: item.icon })) : [];
   const missingPersonalUtilities = personalUtilities.filter(item => !contextualShortcuts.some(shortcut => shortcut.href === item.href));
-  const shortcuts = personal ? [...contextualShortcuts, ...missingPersonalUtilities] : contextualShortcuts;
+  const shortcuts = (personal ? [...contextualShortcuts, ...missingPersonalUtilities] : contextualShortcuts).filter(item => isReleasedFeaturePath(item.href, "GET", user.roleCodes));
+  const messagingAllowed = can(user.permissions, "chat.access") && isReleasedFeaturePath("/messages", "GET", user.roleCodes);
   const contextLabel = workspaceItems?.length ? "Công trường đang mở" : contextApplication?.label;
   const normalize = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[đĐ]/g, (letter) => letter === "Đ" ? "D" : "d").toLocaleLowerCase("vi");
   const query = normalize(search.trim());
@@ -57,7 +60,7 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
   const visibleUtilities = [
     matches("Tìm kiếm"),
     !applications.some((application) => application.id === "attendance") && matches("Cá nhân"),
-    can(user.permissions, "chat.access") && matches("Tin nhắn"),
+    messagingAllowed && matches("Tin nhắn"),
     !shortcuts.some((item) => item.href === "/notifications") && matches("Thông báo"),
     can(user.permissions, "profile.view") && matches("Tài khoản")
   ].some(Boolean);
@@ -75,7 +78,7 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
       >
         {variant === "nav" ? <><span className="mobile-bottom-nav__icon"><Grid2X2 aria-hidden="true" size={22} strokeWidth={1.8} /></span><span className="mobile-bottom-nav__label">Ứng dụng</span></> : variant === "brand" ? <Grid2X2 aria-hidden="true" size={21} strokeWidth={1.8} /> : <Menu aria-hidden="true" size={21} strokeWidth={1.8} />}
       </button>
-      <Drawer className="mobile-app-sheet" onClose={close} open={open} title="Ứng dụng của tôi">
+      <Drawer className={cn("mobile-app-sheet", styles.sheet)} onClose={close} open={open} title="Ứng dụng của tôi">
         <div className="mobile-app-sheet__body">
         <label className="mobile-app-sheet__search"><Search aria-hidden="true" size={19} /><input aria-label="Tìm ứng dụng" autoComplete="off" onChange={(event) => setSearch(event.target.value)} placeholder="Tìm ứng dụng" type="search" value={search} />{search ? <button aria-label="Xóa tìm kiếm" onClick={() => setSearch("")} type="button"><X aria-hidden="true" size={17} /></button> : null}</label>
         {visibleApps.length ? <nav aria-label="Ứng dụng được phép sử dụng" className="mobile-app-launcher__list mobile-app-sheet__grid">
@@ -113,7 +116,7 @@ export function MobileAppLauncher({ user, variant = "brand", pathname: pathnameO
         {visibleUtilities ? <section className="mobile-app-sheet__section"><h3>Tiện ích</h3><nav aria-label="Tiện ích cá nhân" className="mobile-app-sheet__links">
           {matches("Tìm kiếm") ? <Link href="/search" onClick={close}><span className="mobile-app-sheet__link-icon"><Search aria-hidden="true" size={20} /></span><span>Tìm kiếm</span><ChevronRight aria-hidden="true" size={16} /></Link> : null}
           {!applications.some((application) => application.id === "attendance") && matches("Cá nhân") ? <Link href="/personal" onClick={close}><span className="mobile-app-sheet__link-icon"><UserRound aria-hidden="true" size={20} /></span><span>Cá nhân</span><ChevronRight aria-hidden="true" size={17} /></Link> : null}
-          {can(user.permissions, "chat.access") && matches("Tin nhắn") ? <Link href="/messages" onClick={close}><span className="mobile-app-sheet__link-icon"><MessageCircle aria-hidden="true" size={20} /></span><span>Tin nhắn</span><ChevronRight aria-hidden="true" size={17} /></Link> : null}
+          {messagingAllowed && matches("Tin nhắn") ? <Link href="/messages" onClick={close}><span className="mobile-app-sheet__link-icon"><MessageCircle aria-hidden="true" size={20} /></span><span>Tin nhắn</span><ChevronRight aria-hidden="true" size={17} /></Link> : null}
           {!shortcuts.some((item) => item.href === "/notifications") && matches("Thông báo") ? <Link href="/notifications" onClick={close}><span className="mobile-app-sheet__link-icon"><Bell aria-hidden="true" size={20} /></span><span>Thông báo</span><ChevronRight aria-hidden="true" size={17} /></Link> : null}
           {can(user.permissions, "profile.view") && matches("Tài khoản") ? <Link href="/profile" onClick={close}><span className="mobile-app-sheet__link-icon"><UserRound aria-hidden="true" size={20} /></span><span>Tài khoản</span><ChevronRight aria-hidden="true" size={17} /></Link> : null}
         </nav></section>

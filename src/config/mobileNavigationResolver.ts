@@ -5,7 +5,7 @@ import { defaultDashboardSettings, resolveDashboardProfile, resolveMobileLanding
 import type { AuthenticatedUser } from "@/lib/auth/permissions";
 import { can } from "@/lib/auth/permissions";
 import { canSubmitPersonalAttendance } from "@/lib/auth/applicationAccess";
-import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess, isReleasedFeaturePath } from "@/config/featureRelease";
+import { attendanceOnlyRelease, hasHumanResourcesReleaseAccess, hasUnrestrictedReleaseAccess, isReleasedFeaturePath } from "@/config/featureRelease";
 
 export interface MobileNavDestination {
   href: string;
@@ -87,7 +87,16 @@ export function mobileApplicationDestination(application: ApplicationDefinition,
 
 export function resolveMobileNavigation(pathname: string, user: AuthenticatedUser, settings: MobileNavigationSettings = {}): MobileNavigationModel {
   void pathname;
-  const supervisor = canUseWorkerAttendance(user);
+  if (attendanceOnlyRelease && hasHumanResourcesReleaseAccess(user.roleCodes) && !hasUnrestrictedReleaseAccess(user.roleCodes)) {
+    const direct: MobileNavDestination[] = [];
+    if (can(user.permissions, "attendance.view_all") || can(user.permissions, "attendance.manage")) direct.push({ href: "/attendance/today", label: "Kiểm tra công", icon: "ClipboardCheck", routePrefixes: ["/attendance/today", "/employees/field-attendance"] });
+    if (can(user.permissions, "employee.view")) direct.push({ href: "/employees", label: "Nhân sự", icon: "UsersRound", exact: true });
+    direct.push({ href: "/personal", label: "Cá nhân", icon: "UserRound" });
+    if (can(user.permissions, "timesheet.view_all") || can(user.permissions, "timesheet.view_team")) direct.push({ href: "/timesheets/matrix", label: "Bảng công", icon: "CalendarRange", routePrefixes: ["/timesheets"] });
+    direct.push({ href: "/applications", label: "Ứng dụng", icon: "Grid2X2", action: "applications" });
+    return { mode: "work", label: "Điều hướng nhân sự", direct: direct.map((item, index) => ({ ...item, slot: index + 1 })), secondary: [] };
+  }
+  const supervisor = canUseWorkerAttendance(user) && !hasUnrestrictedReleaseAccess(user.roleCodes);
   if (attendanceOnlyRelease && !hasUnrestrictedReleaseAccess(user.roleCodes)) {
     const direct: MobileNavDestination[] = [{ href: "/personal", label: "Cá nhân", icon: "UserRound" }];
     if (supervisor && settings.modules?.projects !== false) direct.push({ href: "/worker-attendance/today", label: "Điểm danh", icon: "UsersRound", routePrefixes: ["/worker-attendance"] });

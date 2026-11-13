@@ -4,8 +4,10 @@ import { listPendingAttendance } from "./attendanceQueue";
 import { getNextAttendanceAction } from "@/features/attendance/services/attendanceRules";
 import type { AttendanceDashboard, AttendanceEvent, PendingAttendanceItem } from "@/features/attendance/types/attendanceTypes";
 import { getBusinessDateKey } from "@/lib/time/timezone";
+import { hasAccurateLocation } from "../services/locationEvidence";
 
 export function pendingAttendanceEvent(item: PendingAttendanceItem, employeeId: string): AttendanceEvent {
+  const geofenceStatus = !item.location ? "unavailable" : hasAccurateLocation(item.location) ? "valid" : "accuracy_low";
   return {
     id: item.serverEventId ?? item.clientEventId,
     clientEventId: item.clientEventId,
@@ -18,12 +20,12 @@ export function pendingAttendanceEvent(item: PendingAttendanceItem, employeeId: 
     latitude: item.location?.latitude,
     longitude: item.location?.longitude,
     accuracyMeters: item.location?.accuracy,
-    geofenceStatus: item.location ? "valid" : "unavailable",
-    attendanceStatus: "recorded",
+    geofenceStatus,
+    attendanceStatus: geofenceStatus === "valid" ? "recorded" : "needs_review",
     photoStatus: "pending_upload",
     photoStamp: item.photoStamp,
     syncStatus: item.syncState,
-    anomalyFlags: []
+    anomalyFlags: geofenceStatus === "valid" ? [] : [`gps_${geofenceStatus}`]
   };
 }
 

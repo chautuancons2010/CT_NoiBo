@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useMobileViewport } from "@/lib/ui/useMobileViewport";
 
 import {
+  ArrowLeft,
   ArrowUpRight,
   CalendarDays,
   Camera,
@@ -44,6 +45,7 @@ import type { AttendanceCoordinates, AttendanceDashboard, AttendanceEvent, Atten
 import { useDomainReconciliation } from "@/lib/realtime/useDomainReconciliation";
 import styles from "./AttendanceCameraExperience.module.css";
 import { AttendanceLocationAddress } from "./AttendanceLocationAddress";
+import { attendanceAccuracyLimit } from "../services/locationEvidence";
 
 type CaptureStep = "home" | "camera" | "preview" | "saving" | "success";
 type PermissionState = "idle" | "requesting" | "ready" | "denied" | "unavailable" | "insecure";
@@ -88,7 +90,7 @@ interface AttendanceCameraProps {
 }
 
 export function AttendanceCameraExperience({ initialCapture = false, initialDashboard, initialAttendanceType, returnHref, onClose, onRecorded }: AttendanceCameraProps = {}) {
-  const mobile = useMobileViewport();
+  const mobile = useMobileViewport("(max-width: 767px), (max-width: 1023px) and (max-height: 500px)");
   const router = useRouter();
   const user = useCurrentUser();
   const canSubmit = canSubmitPersonalAttendance(user.permissions);
@@ -111,7 +113,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
   const syncBusyRef = useRef(false);
   const dashboardRequestRef = useRef<{ promise: Promise<void>; controller: AbortController } | undefined>(undefined);
   const [dashboard, setDashboard] = useState<AttendanceDashboard | undefined>(initialDashboard);
-  const locationAccuracyTarget = Math.max(1, dashboard?.policy.allowedAccuracyThresholdMeters ?? 100);
+  const locationAccuracyTarget = attendanceAccuracyLimit(dashboard?.policy.allowedAccuracyThresholdMeters);
   const [loadError, setLoadError] = useState<string>();
   const [step, setStep] = useState<CaptureStep>(initialCapture ? "camera" : "home");
   const [activePhotoId, setActivePhotoId] = useState<string>();
@@ -241,14 +243,14 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     setLocationError(undefined);
     setLocationState("requesting");
     const pending = captureAttendanceLocation(navigator.geolocation, window.isSecureContext, {
-      maxWaitMs: navigator.onLine ? 20_000 : 8_000,
+      maxWaitMs: 12_000,
       signal: controller.signal,
-      targetAccuracyMeters: locationAccuracyTarget,
+      targetAccuracyMeters: Math.min(30, locationAccuracyTarget),
       onPosition: (position) => {
         if (locationRequestRef.current !== requestId || controller.signal.aborted) return;
         coordinatesRef.current = position;
         setCoordinates(position);
-        void lookupAttendanceAddress(position, { priority: true });
+        if (position.accuracy <= 100) void lookupAttendanceAddress(position, { priority: true });
       }
     }).then((location) => {
       if (locationRequestRef.current !== requestId || controller.signal.aborted) return undefined;
@@ -258,6 +260,8 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
       return location;
     }).catch((error: unknown) => {
       if (locationRequestRef.current !== requestId || controller.signal.aborted) return undefined;
+      coordinatesRef.current = undefined;
+      setCoordinates(undefined);
       setLocationState(error instanceof AttendanceLocationError && error.code === "insecure" ? "insecure" : error instanceof AttendanceLocationError && error.code === "denied" ? "denied" : "unavailable");
       setLocationError(errorMessage(error));
       return undefined;
@@ -367,23 +371,14 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     setNotice(undefined);
     // Freeze capture time and event ID before image processing, GPS, or uploads.
     let location = coordinatesRef.current;
-    if (retry && (!location || Math.abs(Date.parse(location.capturedAt) - Date.parse(capture.capturedAtClient)) > 60_000)) location = await requestLocation();
-    if ((!location || location.accuracy > locationAccuracyTarget) && locationPromiseRef.current) {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        location = await Promise.race([
-          locationPromiseRef.current,
-          new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), location ? 6_000 : 10_000); })
-        ]);
-      } finally { clearTimeout(timer); }
-    }
-    if (captureIdentityRef.current !== capture) { submitBusyRef.current = false; return; }
-    location = coordinatesRef.current ?? location;
+    // GPS keeps refining while the camera is open. Saving never waits for it:
+    // the photo and original capture time must survive a denied permission or outage.
     if (location && Math.abs(Date.parse(location.capturedAt) - Date.parse(capture.capturedAtClient)) > 60_000) location = undefined;
+    if (captureIdentityRef.current !== capture) { submitBusyRef.current = false; return; }
     locationAbortRef.current?.abort();
     let photoStamp: AttendancePhotoStampMetadata;
     try {
-      const prepared = await preparePersonalAttendancePhoto(processed, capture, location, retry);
+      const prepared = await preparePersonalAttendancePhoto(processed, { ...capture, capturedByName: dashboard.employeeName || user.displayName, capturedByUsername: user.username }, location, retry);
       if (captureIdentityRef.current !== capture) { URL.revokeObjectURL(prepared.photo.previewUrl); submitBusyRef.current = false; return; }
       processed = prepared.photo;
       photoStamp = prepared.stamp;
@@ -462,7 +457,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
     ? <AttendanceLocationAddress compact accuracyMeters={coordinates.accuracy} latitude={coordinates.latitude} longitude={coordinates.longitude} />
     : locationState === "requesting" ? "Đang xác định vị trí..." : locationError ?? "Chưa có GPS";
   const firstCheckIn = dashboard?.todayEvents.find(event => event.eventType === "check_in" && event.attendanceStatus !== "rejected");
-  const lateMinutes = successEvent?.eventType === "check_in" && dashboard && (!firstCheckIn || firstCheckIn.clientEventId === successEvent.clientEventId) ? getAttendanceLateMinutes(successEvent.effectiveAt, dashboard.policy) : 0;
+  const lateMinutes = successEvent?.eventType === "check_in" && dashboard && (!firstCheckIn || firstCheckIn.clientEventId === successEvent.clientEventId) ? getAttendanceLateMinutes(successEvent.effectiveAt, dashboard.policy,successEvent.attendanceDate) : 0;
   const nextLabel = !dashboard ? "Chấm công" : captureType === "check_in" ? "Chấm vào" : "Chấm ra";
   const attendanceStatus = !dashboard?.policy.attendanceEnabled ? "Tạm ngừng" : `${dashboard.todayEvents.length} lượt hôm nay`;
   const sequenceWarning = dashboard ? attendanceActionBlocked(dashboard.todayEvents, captureType) : undefined;
@@ -508,10 +503,11 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
 
       {step === "camera" ? (
         <section className={styles.capture} aria-label="Chụp ảnh chấm công" data-camera-state={cameraState} data-facing={facingMode}>
-          <div className={styles.cameraToolbar}><div className={styles.attendanceChoice} aria-label="Loại chấm công" role="group">{(["check_in", "check_out"] as const).map(type => <button aria-pressed={captureType === type} disabled={Boolean(dashboard && attendanceActionBlocked(dashboard.todayEvents, type))} key={type} onClick={() => setSelectedType(type)} type="button">{type === "check_in" ? "Chấm vào" : "Chấm ra"}</button>)}</div><IconButton label="Đóng camera" onClick={closeCapture}><X size={20} /></IconButton></div>
+          <div className={styles.cameraToolbar}><button aria-label="Trở lại" className={styles.cameraBack} onClick={closeCapture} type="button"><ArrowLeft aria-hidden="true" size={21}/></button><div className={styles.attendanceChoice} aria-label="Loại chấm công" role="group">{(["check_in", "check_out"] as const).map(type => <button aria-pressed={captureType === type} disabled={Boolean(dashboard && attendanceActionBlocked(dashboard.todayEvents, type))} key={type} onClick={() => setSelectedType(type)} type="button">{type === "check_in" ? "Chấm vào" : "Chấm ra"}</button>)}</div></div>
+          <div className={styles.captureIdentity}><span className={styles.captureAvatar}>{(dashboard?.employeeName || user.displayName).trim().split(/\s+/).slice(-2).map(part=>part[0]).join("")}</span><span><strong>{dashboard?.employeeName || user.displayName}</strong><small>@{user.username} · {dashboard?.policy.shiftName || "Chấm công"}</small></span><span className={styles.networkStatus} data-online={online}>{online ? <Cloud aria-hidden="true" size={15}/> : <CloudOff aria-hidden="true" size={15}/>}</span></div>
           <div className={styles.livePreview}>
             <video aria-label="Camera chấm công" muted playsInline ref={videoRef} />
-            {cameraState === "ready" ? <><div className={styles.cameraOverlay}><span><i />{captureType === "check_in" ? "CHẤM VÀO" : "CHẤM RA"}</span><time>{formatTime(now)}</time></div><div aria-hidden="true" className={styles.viewfinder}><i /><i /><i /><i /></div><div className={styles.photoMarkPreview}><span>CHÂU TUẤN</span><strong>{formatTime(now)} <small>· {new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(now ?? undefined)}</small></strong><span><MapPin aria-hidden="true" size={13} />{locationLabel}</span></div></> : null}
+            {cameraState === "ready" ? <><div className={styles.cameraOverlay}><span><i />{captureType === "check_in" ? "CHẤM VÀO" : "CHẤM RA"}</span><time>{formatTime(now)}</time></div><div aria-hidden="true" className={styles.viewfinder}><i /><i /><i /><i /></div><div className={styles.photoMarkPreview}><span>CHÂU TUẤN · {dashboard?.employeeName || user.displayName}</span><strong>{formatTime(now)} <small>· {new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(now ?? undefined)}</small></strong></div></> : null}
             {sequenceWarning ? <div className={styles.sequenceWarning} role="status">{sequenceWarning}</div> : null}
             {cameraState !== "ready" ? <div className={styles.cameraState}><span className={styles.cameraStateIcon}>{cameraState === "requesting" ? <Camera aria-hidden="true" size={30} /> : <CameraOff aria-hidden="true" size={30} />}</span><strong>{cameraState === "insecure" ? "Cần kết nối HTTPS" : cameraState === "requesting" ? "Đang mở camera" : "Chưa mở được camera"}</strong>{cameraError ? <span>{cameraError}</span> : null}{cameraState === "insecure" && mobileHttpsUrl ? <a className="button button--primary" href={`${mobileHttpsUrl}/attendance/quick`}>Mở bản HTTPS</a> : cameraState !== "requesting" && cameraState !== "insecure" ? <Button onClick={() => void startCamera()} variant="primary">Thử lại camera</Button> : null}</div> : null}
           </div>
@@ -522,7 +518,7 @@ export function AttendanceCameraExperience({ initialCapture = false, initialDash
           <div className={styles.captureActions}>
             <Button className={styles.cameraUtility} disabled={cameraState !== "ready"} leftIcon={<SwitchCamera aria-hidden="true" size={20} />} onClick={() => { const next = facingMode === "user" ? "environment" : "user"; setFacingMode(next); void startCamera(next); }} variant="ghost">Đổi camera</Button>
             <button aria-label={`Chụp và ${nextLabel.toLowerCase()}`} className={styles.shutter} disabled={cameraState !== "ready" || !dashboard || !dashboard.policy.attendanceEnabled || Boolean(sequenceWarning)} onClick={() => void takePhoto()} type="button"><span /><b>{nextLabel}</b></button>
-            <Button className={styles.cameraUtility} disabled={locationState === "requesting" || locationState === "insecure"} leftIcon={<RefreshCcw aria-hidden="true" size={20} />} onClick={() => void requestLocation()} variant="ghost">Lấy lại GPS</Button>
+            <Button className={styles.cameraUtility} disabled={locationState === "insecure"} leftIcon={<RefreshCcw aria-hidden="true" size={20} />} onClick={() => { if (locationState === "requesting") { locationRequestRef.current++; locationAbortRef.current?.abort(); setLocationState(coordinatesRef.current ? "ready" : "unavailable"); } else void requestLocation(); }} variant="ghost">{locationState === "requesting" ? "Dừng lấy GPS" : "Lấy lại GPS"}</Button>
           </div>
           {!dashboard ? <div className={styles.captureLoadStatus} role="status">{loadError ?? "Đang tải ca làm…"}{loadError ? <Button onClick={() => void loadDashboard()} size="sm">Thử lại</Button> : null}</div> : null}
         </section>

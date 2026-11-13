@@ -1,8 +1,12 @@
 "use client";
+import { workerRainEvidence } from "../services/workerRainEvidence";
+
+import { WorkerOvertimeEntry } from "./WorkerOvertimeEntry";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { BackLink } from "@/components/shared/BackLink";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
@@ -24,6 +28,9 @@ import { can } from "@/lib/auth/permissions";
 
 import styles from "./WorkerAttendanceSessionDetail.module.css";
 import workspaceStyles from "./WorkerAttendanceWorkspace.module.css";
+import { WorkerWorkControls } from "./WorkerWorkControls";
+import { OvertimeReview } from "./OvertimeReview";
+import { workerWorkState } from "../services/workerWorkIntervals";
 import { SectionedForm, FormFields, FormActions } from "@/components/shared/FormLayout";
 import { WorkerSafetyReportView } from "./WorkerSafetyReport";
 
@@ -31,6 +38,7 @@ const labels: Record<string, string> = { unconfirmed: "Chưa xác nhận", prese
 
 export function WorkerAttendanceSessionDetail({ sessionId, reviewOnly = false, initialPhotoId, embedded = false, readOnly = false }: { sessionId: string; reviewOnly?: boolean; initialPhotoId?: string; embedded?: boolean; readOnly?: boolean }) {
   const user = useCurrentUser();
+  const router = useRouter();
   const [session, setSession] = useState<WorkerAttendanceSession>();
   const [selectedPhoto, setSelectedPhoto] = useState<string | undefined>(initialPhotoId);
   const [editingEntry, setEditingEntry] = useState<string>();
@@ -78,32 +86,35 @@ export function WorkerAttendanceSessionDetail({ sessionId, reviewOnly = false, i
   const canContinue = !readOnly && !reviewOnly && can(user.permissions, "worker_attendance.create") && !session.submittedAt && session.status !== "locked";
   const canAdjust = !readOnly && can(user.permissions, "worker_attendance.adjust");
   const canViewPhotos = can(user.permissions, "worker_attendance.view_photo") || can(user.permissions, "worker_attendance.create");
-  const canCloseDay = !readOnly && !reviewOnly && Boolean(session.submittedAt) && !session.dayClosedAt && session.status !== "locked" && (can(user.permissions, "worker_attendance.create") || canAdjust);
+  const canCloseDay = !session.entries.some(entry => entry.checkedInAt) && !readOnly && !reviewOnly && session.sessionType !== "overtime" && Boolean(session.submittedAt) && !session.dayClosedAt && session.status !== "locked" && (can(user.permissions, "worker_attendance.create") || canAdjust);
   const editedEntry = session.entries.find((entry) => entry.id === editingEntry);
   return <div className={workspaceStyles.detail}>
     {!embedded ? <BackLink href={reviewOnly ? "/employees/field-attendance" : "/worker-attendance"} /> : null}
     <div className="worker-wizard__title"><div><h1>{session.projectName}</h1><span>{session.worksiteName} · {new Date(`${session.date}T00:00:00`).toLocaleDateString("vi-VN")}</span></div><StatusBadge status={session.status}>{labels[session.status]}</StatusBadge></div>
-    <div className={styles.actions}>{canContinue ? <Link className="button button--primary button--lg" href={`/worker-attendance/sessions/${session.id}/roster`}>Tiếp tục điểm danh</Link> : null}{session.dayClosedAt ? <StatusBadge tone="success">Đã chấm ra · {new Date(session.dayClosedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" })}</StatusBadge> : canCloseDay ? <Button onClick={openDayClose} variant="secondary">Chấm ra công nhân</Button> : null}</div>
+    <div className={styles.actions}>{!readOnly && !reviewOnly && session.sessionType !== "overtime" && can(user.permissions,"worker_attendance.create") ? <WorkerOvertimeEntry task={{...session,roster:session.entries.map(entry=>({workerId:entry.workerId,workerName:entry.workerName,employeeCode:entry.employeeCode,assignmentRole:entry.assignmentRole}))}} initialWorkerIds={session.entries.filter(entry=>entry.isSelected!==false&&["present","late"].includes(entry.status)).map(entry=>entry.workerId)} onSaved={actual=>{router.push(`/worker-attendance/sessions/${actual.id}`);}} /> : null}{canContinue ? <Link className="button button--primary button--lg" href={`/worker-attendance/sessions/${session.id}/roster`}>Tiếp tục điểm danh</Link> : null}{session.dayClosedAt ? <StatusBadge tone="success">Đã chấm ra · {new Date(session.dayClosedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" })}</StatusBadge> : canCloseDay ? <Button onClick={openDayClose} variant="secondary">Chấm ra công nhân</Button> : null}</div>
     {message ? <div className="form-message form-message--info">{message}</div> : null}
     <div className={workspaceStyles.reviewGrid}><span>Tổng<strong>{counts.total}</strong></span><span>Có mặt<strong>{counts.present}</strong></span><span>Đi trễ<strong>{counts.late}</strong></span><span>Vắng / nghỉ<strong>{counts.absent + counts.leave}</strong></span><span>Ảnh<strong>{session.photos.length}</strong></span><span>Vị trí<strong><AttendanceLocationAddress accuracyMeters={session.accuracyMeters} emptyLabel={session.geofenceStatus === "not_required" ? "Không yêu cầu" : "Chưa có GPS"} knownAddress={session.worksiteAddress} latitude={session.latitude} longitude={session.longitude} referenceName={session.worksiteName} /></strong></span></div>
     {session.selectionMode ? <StatusBadge tone={session.safetyConfirmed ? "success" : "warning"}>{session.safetyConfirmed ? "An toàn lao động · Đã xác nhận" : "An toàn lao động · Chưa xác nhận"}</StatusBadge> : null}
-    {session.safetyReport ? <WorkerSafetyReportView session={session} /> : null}
-    <Card><h2 className="section-title">Điểm danh công nhân</h2><div className="worker-detail-table"><div className="worker-detail-table__head"><span>Công nhân</span><span>Trạng thái</span><span></span></div>{session.entries.map((entry) => <div className="worker-detail-table__row" key={entry.id}><span><strong>{entry.workerName}</strong></span><StatusBadge status={entry.status}>{labels[entry.status]}</StatusBadge>{canAdjust ? <Button aria-label={`Điều chỉnh ${entry.workerName}`} onClick={() => { setActionError(""); setAdjustmentStatus(entry.status === "unconfirmed" ? "present" : entry.status); setAdjustmentReason(""); setEditingEntry(entry.id); }} size="sm" variant="ghost">Điều chỉnh</Button> : null}</div>)}</div></Card>
+    {session.safetyReport && session.overtimeRecordingMode !== "time_entry" ? <WorkerSafetyReportView session={session} /> : null}
+    <OvertimeReview session={session} onChanged={setSession}/>
+    {!readOnly && !reviewOnly && session.submittedAt && session.status !== "locked" && can(user.permissions,"worker_attendance.create") ? <WorkerWorkControls session={session} onChanged={setSession}/> : null}
+    <Card><h2 className="section-title">Điểm danh công nhân</h2><DataTable ariaLabel="Điểm danh và giờ công công nhân" columns={[
+      { id: "worker", header: "Công nhân", priority: "primary", accessor: "workerName" },
+      { id: "status", header: "Trạng thái", cell: entry => <StatusBadge status={entry.status}>{entry.workEvents?.length ? ({working:"Đang làm",paused:"Đang tạm nghỉ",finished:"Đã kết thúc",unconfirmed:"Chưa bắt đầu"} as const)[workerWorkState(entry)] : labels[entry.status]}</StatusBadge> },
+      { id: "checkIn", header: "Giờ vào", cell: entry => workerClockLabel(entry.checkedInAt,session.date) || "—" },
+      { id: "checkOut", header: "Giờ ra", cell: entry => workerClockLabel(entry.checkedOutAt,session.date) || "Chưa chấm ra" },
+      { id: "hours", header: "Giờ công", cell: entry => { const clock = workerClock(entry, session); return clock.workMinutes === undefined ? "—" : (clock.workMinutes / 60).toFixed(2); } }
+    ]} data={session.entries.filter(entry => entry.isSelected !== false)} getRowId={entry => entry.id} pageSize={20} emptyDescription="" emptyTitle="Chưa có công nhân" actions={canAdjust ? entry => <Button aria-label={`Điều chỉnh ${entry.workerName}`} onClick={() => { setActionError(""); setAdjustmentStatus(entry.status === "unconfirmed" ? "present" : entry.status); setAdjustmentReason(""); setEditingEntry(entry.id); }} size="sm" variant="ghost">Điều chỉnh</Button> : undefined} /></Card>
     <Drawer onClose={() => { if (!saving) setEditingEntry(undefined); }} open={Boolean(editedEntry)} title={editedEntry ? `Điểm danh · ${editedEntry.workerName}` : "Điều chỉnh điểm danh"}>{editedEntry ? <SectionedForm action={adjust} className={styles.form} key={editedEntry.id}>
 <FormFields><Select disabled={saving} onChange={(event) => setAdjustmentStatus(event.target.value as WorkerAttendanceEntry["status"])} value={adjustmentStatus} label="Trạng thái" name="status" options={[{ value: "present", label: "Có mặt" }, { value: "late", label: "Đi trễ" }, { value: "absent", label: "Vắng" }, { value: "leave", label: "Nghỉ phép" }, { value: "transferred", label: "Điều chuyển" }]} required /><Input label="Lý do điều chỉnh" minLength={3} disabled={saving} name="reason" onChange={(event) => setAdjustmentReason(event.target.value)} required value={adjustmentReason} />{actionError ? <p className="form-message form-message--error" role="alert">{actionError}</p> : null}</FormFields>
 <FormActions className={styles.footer}><Button disabled={saving} onClick={() => setEditingEntry(undefined)}>Hủy</Button><Button busy={saving} type="submit" variant="primary">Lưu điểm danh</Button></FormActions></SectionedForm> : null}</Drawer>
     <Drawer onClose={() => { if (!saving) setClosingDay(false); }} open={closingDay} title="Chấm ra công nhân"><SectionedForm action={closeDay} className={styles.form}>
 <FormFields>{Object.entries(dayChanges).map(([id, value]) => { const entry = session.entries.find((item) => item.id === id); if (!entry) return null; return <fieldset className={styles.dayRow} key={id}><legend>{entry.workerName}</legend><Select label="Ngoại lệ" onChange={(event) => setDayChanges((current) => ({ ...current, [id]: { ...current[id], dayException: event.target.value as WorkerAttendanceEntry["dayException"], exceptionTime: event.target.value === "none" ? undefined : current[id].exceptionTime } }))} options={[{ value: "none", label: "Không có" }, { value: "early_leave", label: "Về sớm" }, { value: "transferred", label: "Điều chuyển" }, { value: "half_day", label: "Nửa ngày" }, { value: "overtime", label: "Làm thêm" }, { value: "left_worksite", label: "Rời công trường" }]} value={value.dayException} /><Input disabled={value.dayException === "none"} label="Thời gian" onChange={(event) => setDayChanges((current) => ({ ...current, [id]: { ...current[id], exceptionTime: event.target.value } }))} type="time" value={value.exceptionTime ?? ""} /></fieldset>; })}<Input defaultValue="Chấm ra công nhân" label="Lý do" minLength={3} name="reason" required />{actionError ? <p className="form-message form-message--error" role="alert">{actionError}</p> : null}</FormFields>
 <FormActions className={styles.footer}><Button disabled={saving} onClick={() => setClosingDay(false)}>Hủy</Button><Button busy={saving} type="submit" variant="primary">Lưu giờ ra</Button></FormActions></SectionedForm></Drawer>
-    {session.photos.length && canViewPhotos ? <Card><div className="worker-photo-grid">{session.photos.map((photo, index) => photo.evidenceStatus === "expired" ? <div className="worker-photo-expired" key={photo.id}>Ảnh đã hết hạn lưu 45 ngày</div> : <button aria-label={`Xem ảnh điểm danh ${index + 1}`} className="worker-photo-button" key={photo.id} onClick={() => setSelectedPhoto(photo.id)} type="button"><Image alt={`Ảnh điểm danh ${index + 1}`} className={styles.evidenceImage} height={240} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320} /></button>)}</div></Card> : null}
+    {session.photos.some(photo => photo.purpose !== "rain_pause") && canViewPhotos ? <Card><div className="worker-photo-grid">{session.photos.filter(photo => photo.purpose !== "rain_pause").map((photo, index) => photo.evidenceStatus === "expired" ? <div className="worker-photo-expired" key={photo.id}>Ảnh đã hết hạn lưu 45 ngày</div> : <button aria-label={`Xem ảnh điểm danh ${index + 1}`} className="worker-photo-button" key={photo.id} onClick={() => setSelectedPhoto(photo.id)} type="button"><Image alt={`Ảnh điểm danh ${index + 1}`} className={styles.evidenceImage} height={240} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320} /></button>)}</div></Card> : null}
+    {workerRainEvidence(session).map(group => <Card key={group.batchId}><h3 className="section-title">Nghỉ mưa · {workerClockLabel(group.effectiveAt, session.date)}</h3><span>{group.workers.size} công nhân</span>{group.photos.length && canViewPhotos ? <div className="worker-photo-grid">{group.photos.map(photo => photo.evidenceStatus === "expired" ? <span key={photo.id}>Ảnh đã hết hạn lưu</span> : <button aria-label="Xem ảnh minh chứng mưa" className="worker-photo-button" key={photo.id} onClick={() => setSelectedPhoto(photo.id)} type="button"><Image alt="Minh chứng nghỉ mưa" className={styles.evidenceImage} height={240} src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={320}/></button>)}</div> : <span>{group.evidencePending ? "Ảnh trên thiết bị · Chờ đồng bộ" : group.photos.length ? "Ảnh theo quyền truy cập" : "Chưa có ảnh minh chứng"}</span>}</Card>)}
     {session.workNote ? <Card><h3 className="section-title">Nội dung công việc</h3><p className="worker-note">{session.workNote}</p></Card> : null}
     {session.adjustments.length ? <Card><h3 className="section-title">Lịch sử điều chỉnh</h3><ol className="worker-adjustments">{session.adjustments.map((item) => <li key={item.id}><span>{new Date(item.createdAt).toLocaleString("vi-VN")}</span><strong>{item.reason}</strong></li>)}</ol></Card> : null}
-    <Card><h2 className="section-title">Giờ công từng công nhân</h2><DataTable ariaLabel="Giờ công từng công nhân" columns={[
-      { id: "worker", header: "Công nhân", priority: "primary", accessor: "workerName" },
-      { id: "checkIn", header: "Giờ vào", cell: entry => workerClockLabel(entry.checkedInAt) || "—" },
-      { id: "checkOut", header: "Giờ ra", cell: entry => workerClockLabel(entry.checkedOutAt) || "Chưa chấm ra" },
-      { id: "hours", header: "Giờ công", cell: entry => { const clock = workerClock(entry, session); return clock.workMinutes === undefined ? "—" : (clock.workMinutes / 60).toFixed(2); } }
-    ]} data={session.entries.filter(entry => entry.isSelected !== false)} getRowId={entry => entry.id} pageSize={20} emptyDescription="" emptyTitle="Chưa có công nhân" /></Card>
     {selectedPhoto && session.photos.some(photo => photo.id === selectedPhoto && photo.evidenceStatus === "expired") ? <p role="status">Ảnh đã hết hạn lưu 45 ngày.</p> : null}
     <ImageLightbox key={selectedPhoto ?? "closed"} images={images} initialImageId={selectedPhoto} onClose={() => setSelectedPhoto(undefined)} open={Boolean(selectedPhoto && images.some(photo => photo.id === selectedPhoto))} />
   </div>;

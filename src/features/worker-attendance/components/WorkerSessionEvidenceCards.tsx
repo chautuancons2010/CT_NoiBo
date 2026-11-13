@@ -6,6 +6,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { WorkerAttendanceSession } from "../types/workerAttendanceTypes";
 import styles from "./WorkerSessionEvidenceCards.module.css";
+import { overtimeStatusLabels } from "../services/overtimeRules";
 
 const labels: Record<string, string> = { draft: "Nháp", in_progress: "Đang điểm danh", submitted: "Đã gửi", locked: "Đã khóa", needs_review: "Cần rà soát" };
 const time = (value: string) => new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
@@ -30,7 +31,7 @@ export function WorkerSessionEvidenceCards({ sessions, canViewPhotos, detailBase
         const photos = round.photos.filter(photo => photo.evidenceStatus !== "expired");
         const href = `${detailBasePath}/${round.id}`;
         return <details className={styles.round} key={round.id} open={rounds.length === 1 ? true : undefined}>
-          <summary><strong>Lượt {index + 1} · <time dateTime={round.startedAt}>{time(round.startedAt)}</time></strong><StatusBadge tone={round.status === "needs_review" ? "warning" : round.submittedAt ? "success" : "neutral"}>{labels[round.status]}</StatusBadge><span>{selected.length} người · {round.photos.length} ảnh</span></summary>
+          <summary><strong>{round.sessionType === "overtime" ? "Tăng ca" : "Lượt"} {index + 1} · <time dateTime={round.startedAt}>{time(round.startedAt)}</time></strong><StatusBadge tone={round.sessionType === "overtime" && round.overtimeStatus !== "confirmed" || round.status === "needs_review" ? "warning" : round.submittedAt ? "success" : "neutral"}>{round.sessionType === "overtime" ? overtimeStatusLabels[round.overtimeStatus ?? "recording"] : labels[round.status]}</StatusBadge><span>{selected.length} người · {round.photos.length} ảnh</span></summary>
           <div className={styles.roundContent}><span className={styles.supervisor}>Giám sát · {round.supervisorName}</span>
           {canViewPhotos && photos.length ? <Link aria-label={`Xem ảnh lượt ${index + 1} · ${round.projectName}`} className={styles.photos} href={href}>{photos.slice(0, 3).map((photo, photoIndex) => <span key={photo.id}><Image alt={`Ảnh hiện trường lượt ${index + 1}, ảnh ${photoIndex + 1}`} height={180} loading="lazy" src={`/api/v1/worker-attendance/photos/${photo.id}?size=thumbnail`} unoptimized width={240} />{photoIndex === 2 && photos.length > 3 ? <b>+{photos.length - 3}</b> : null}</span>)}</Link> : <div className={styles.noPhoto}><Camera aria-hidden="true" size={20} />{!canViewPhotos ? "Ảnh theo quyền truy cập" : round.photos.length ? "Ảnh đã hết hạn lưu" : "Chưa có ảnh hiện trường"}</div>}
           <div className={styles.names}>{selected.map(entry => <span key={entry.id}>{entry.workerName}</span>)}</div>

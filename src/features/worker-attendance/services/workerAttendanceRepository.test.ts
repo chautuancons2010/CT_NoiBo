@@ -9,13 +9,13 @@ vi.mock("@/features/projects/services/projectRepository", () => ({ getProject, g
 vi.mock("@/services/audit/auditLog", () => ({ recordAuditLog: vi.fn() }));
 vi.mock("@/features/shared-platforms/services/notificationRepository", () => ({ publishNotificationEvent: vi.fn() }));
 
-import { adjustWorkerEntry, closeWorkerSessionDay, createWorkerSession, getWorkerSession, listTodayTasks, saveWorkerSessionDraft, submitWorkerSession } from "./workerAttendanceRepository";
+import { adjustWorkerEntry, closeWorkerSessionDay, createWorkerSession, getWorkerSession, listTodayTasks, recordWorkerWorkOperation, saveWorkerSessionDraft, submitWorkerSession, uploadWorkerPhoto } from "./workerAttendanceRepository";
 
 const user: AuthenticatedUser = { id: "11111111-1111-4111-8111-111111111111", username: "test.supervisor", email: "supervisor@example.com", displayName: "Giám sát", status: "active", permissions: ["worker_attendance.create", "worker_attendance.view_all"] };
 const sessionRow = { id: "session-1", client_session_id: "capture-1", project_id: "project-1", project_name_snapshot: "Dự án", worksite_id: "site-1", worksite_name_snapshot: "Công trường", attendance_date: "2026-10-05", shift_code: "DAY", shift_name_snapshot: "Ca ngày", session_type: "morning", supervisor_employee_id: "employee-1", supervisor_name_snapshot: "Giám sát", started_at: "2026-10-05T01:00:00Z", captured_at_client: "2026-10-05T01:00:00Z", geofence_status: "outside", latitude: 21.0278, longitude: 105.8342, accuracy_meters: 20, status: "in_progress", sync_status: "synced", photo_status: "uploaded", version: 1, worker_attendance_entries: [], worker_attendance_photos: [], worker_attendance_adjustments: [], checklist_snapshot: [], checklist_responses: [] };
 
 type Row = Record<string, unknown>;
-function database({ existing = true, referenceCoordinates = true, sessionPatch = {}, commandError, siteRows = [], personalReady = true }: { existing?: boolean; referenceCoordinates?: boolean; sessionPatch?: Row; commandError?: { message: string; code?: string }; siteRows?: Row[]; personalReady?: boolean } = {}) {
+function database({ existing = true, referenceCoordinates = true, sessionPatch = {}, commandError, siteRows = [], directoryRows = [], shiftRows = [], personalReady = true }: { existing?: boolean; referenceCoordinates?: boolean; sessionPatch?: Row; commandError?: { message: string; code?: string }; siteRows?: Row[]; directoryRows?: Row[]; shiftRows?: Row[]; personalReady?: boolean } = {}) {
   let saved: Row | undefined = existing ? { ...sessionRow, ...sessionPatch } : undefined;
   const mutations: Record<string, unknown>[] = [];
   const tablesRead: string[] = [];
@@ -34,14 +34,14 @@ function database({ existing = true, referenceCoordinates = true, sessionPatch =
       tablesRead.push(table);
       let clientReplay = false;
       const query = {
-        select: () => query, limit: () => query, order: () => query,
-        in: () => query, lte: () => query, or: () => query,
+        select: () => query, limit: () => query, order: () => query, range: () => query,
+        in: () => query, is: () => query, lte: () => query, gte: () => query, or: () => query,
         eq: (column: string) => { if (column === "client_session_id") clientReplay = true; return query; },
         insert: (values: Record<string, unknown>) => { if (table === "worker_attendance_sessions") { mutations.push(values); saved = { ...sessionRow, ...values }; } return query; },
         update: (values: Record<string, unknown>) => { mutations.push(values); saved = { ...saved, ...values }; return query; },
         single: async () => ({ data: table === "worksites" ? { latitude: referenceCoordinates ? 10.7769 : null, longitude: referenceCoordinates ? 106.7009 : null, allowed_accuracy_threshold_meters: 100 } : { id: "session-1" }, error: null }),
         maybeSingle: async () => ({ data: table === "attendance_events" ? personalReady ? { event_type: "check_in", photo_status: "uploaded", attendance_status: "recorded" } : null : table === "app_accounts" ? { id: user.id, employee_id: "employee-1", status: "active", employees: { full_name: "Giám sát" } } : table === "worker_attendance_policies" ? { minimum_photos: 0, work_note_required: false, end_of_day_required: false, offline_enabled: true, edit_window_minutes: 120 } : table === "worker_attendance_sessions" ? clientReplay ? null : saved : null, error: null }),
-        then(onFulfilled: (value: unknown) => unknown) { return Promise.resolve({ data: table === "worksites" ? siteRows : [], error: null }).then(onFulfilled); }
+        then(onFulfilled: (value: unknown) => unknown) { return Promise.resolve({ data: table === "worksites" ? siteRows : table === "employees" ? directoryRows : table === "shifts" ? shiftRows : [], error: null }).then(onFulfilled); }
       };
       return query;
     }
@@ -62,6 +62,22 @@ afterEach(() => vi.useRealTimers());
 const entryRow = { id: "33333333-3333-4333-8333-333333333333", session_id: "session-1", worker_id: "employee-2", employee_code_snapshot: "NV002", worker_name_snapshot: "Công nhân", assignment_role_snapshot: "worker", status: "present", day_exception: "none" };
 
 describe("worker attendance command boundaries", () => {
+  it("does not accept unrelated session photos as evidence of a new rain operation", async () => {
+    const writes = database({ sessionPatch: { worker_attendance_photos: [{ id:"other-photo",session_id:"session-1",captured_at:"2026-10-05T01:00:00Z",sort_order:0,metadata:{purpose:"rain_pause",workBatchId:"other-batch"} }] } });
+    await expect(recordWorkerWorkOperation(user,"session-1",{ownerAccountId:user.id,batchId:"new-batch",entryIds:[entryRow.id],eventType:"pause",effectiveAt:"2026-10-05T01:00:00Z",reason:"rain",evidenceRequired:true,evidencePhotoIds:["other-photo"]})).rejects.toMatchObject({code:"VALIDATION_ERROR"});
+    expect(writes.commands).not.toHaveBeenCalled();
+  });
+  it.each([
+    { latitude: undefined, longitude: undefined, accuracy: undefined, code: "LOCATION_UNAVAILABLE" },
+    { latitude: 10, longitude: 106, accuracy: 20000, code: "LOCATION_ACCURACY_LOW" },
+    { latitude: 10, longitude: 106, accuracy: undefined, code: "LOCATION_ACCURACY_LOW" }
+  ])("continues to validate image contents when GPS needs review: $code", async ({ latitude, longitude, accuracy }) => {
+    const writes = database();
+    const file = new File(["jpeg"], "photo.jpg", { type: "image/jpeg" });
+    Object.defineProperty(file, "slice", { value: () => ({ arrayBuffer: async () => new TextEncoder().encode("jpeg").buffer }) });
+    await expect(uploadWorkerPhoto(user, "session-1", { photoId: "photo-1", photo: file, thumbnail: file, width: 100, height: 100, capturedAt: new Date().toISOString(), latitude, longitude, accuracy })).rejects.toMatchObject({ code: "PHOTO_UPLOAD" });
+    expect(writes).toHaveLength(0);
+  });
   it("returns workers in the same code order regardless of database row order", async () => {
     database({ sessionPatch: { worker_attendance_entries: [{ ...entryRow, id: "entry-10", employee_code_snapshot: "CN10", status: "unconfirmed" }, { ...entryRow, id: "entry-2", employee_code_snapshot: "CN2", status: "present" }] } });
     const session = await getWorkerSession(user, "session-1");
@@ -129,6 +145,12 @@ describe("worker attendance command boundaries", () => {
 });
 
 describe("worker attendance GPS evidence", () => {
+  it("returns a submitted review session unchanged when the final response is retried", async () => {
+    const submittedAt = "2026-10-05T01:00:00Z";
+    const writes = database({ sessionPatch: { status: "needs_review", submitted_at: submittedAt, version: 7, geofence_status: "unavailable" } });
+    await expect(submitWorkerSession(user, "session-1", 6)).resolves.toMatchObject({ status: "needs_review", submittedAt, version: 7 });
+    expect(writes).toHaveLength(0);
+  });
   it.each([true, false])("accepts captured GPS regardless of reference radius or missing site coordinates (%s)", async (referenceCoordinates) => {
     const writes = database({ existing: false, referenceCoordinates });
     const result = await createWorkerSession(user, { clientSessionId: "capture-1", projectId: "project-1", worksiteId: "site-1", date: "2026-10-05", shiftCode: "DAY", sessionType: "morning", capturedAtClient: "2026-10-05T01:00:00Z", location: { latitude: 21.0278, longitude: 105.8342, accuracy: 20 } });
@@ -153,6 +175,19 @@ describe("worker attendance GPS evidence", () => {
 describe("package and worker selection", () => {
   const supervisor = { ...user, permissions: ["worker_attendance.view", "worker_attendance.create"] as AuthenticatedUser["permissions"] };
   const site = { id: "site-1", project_id: "project-1", name: "Khu A", status: "active", gps_required: false, allowed_accuracy_threshold_meters: 100, projects: { name: "Gói A", status: "active" } };
+
+  it("offers eligible workers without package membership and preserves the selected port in a preparing package", async () => {
+    const directoryRows = [{ id: "worker-free", employee_code: "CN02", full_name: "Công nhân luân phiên" }];
+    const shiftRows = [{ id: "port", code: "PORT_GENERAL", name: "Cảng tổng hợp", start_time: "07:30", end_time: "17:00", break_minutes: 90 }];
+    database({ existing: false, siteRows: [{ ...site, projects: { name: "Gói A", status: "preparing" } }], directoryRows, shiftRows });
+    const tasks = await listTodayTasks(supervisor, "2026-10-05");
+    expect(tasks.tasks[0]).toMatchObject({ expectedWorkers: 1, roster: [{ workerId: "worker-free" }] });
+    const writes = database({ existing: false, directoryRows, shiftRows });
+    getProject.mockResolvedValue({ id: "project-1", name: "Gói A", status: "preparing", worksites: [{ id: "site-1", name: "Khu A", status: "active", gpsRequired: false }] });
+    await createWorkerSession(supervisor, { clientSessionId: "capture-1", projectId: "project-1", worksiteId: "site-1", date: "2026-10-05", shiftCode: "PORT_GENERAL", sessionType: "morning", capturedAtClient: "2026-10-05T01:00:00Z" });
+    expect(writes[0]).toMatchObject({ shift_code: "PORT_GENERAL", shift_start_snapshot: "07:30", shift_end_snapshot: "17:00", shift_break_minutes_snapshot: 90 });
+    expect(writes.tablesRead).not.toContain("project_assignments");
+  });
 
   it("offers active packages to a rotating supervisor without a supervisor assignment", async () => {
     const writes = database({ existing: false, siteRows: [site] });
@@ -185,10 +220,10 @@ describe("package and worker selection", () => {
     expect(writes.tablesRead).not.toContain("project_assignments");
   });
 
-  it("requires personal check-in with an uploaded photo before creating a worker session", async () => {
+  it("allows a worker session while the personal check-in is still pending offline synchronization", async () => {
     const writes = database({ existing: false, personalReady: false });
-    await expect(createWorkerSession(supervisor, { clientSessionId: "capture-1", projectId: "project-1", worksiteId: "site-1", date: "2026-10-05", shiftCode: "DAY", sessionType: "morning", capturedAtClient: "2026-10-05T01:00:00Z" })).rejects.toMatchObject({ code: "CONFLICT" });
-    expect(writes).toHaveLength(0);
+    await expect(createWorkerSession(supervisor, { clientSessionId: "capture-1", projectId: "project-1", worksiteId: "site-1", date: "2026-10-05", shiftCode: "DAY", sessionType: "morning", capturedAtClient: "2026-10-05T01:00:00Z" })).resolves.toMatchObject({ session: { status: "in_progress" } });
+    expect(writes).toHaveLength(1);
   });
 
   it("keeps unchecked candidates in a draft but omits them from a submitted attendance record", async () => {

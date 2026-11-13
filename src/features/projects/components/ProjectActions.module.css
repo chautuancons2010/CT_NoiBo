@@ -1,0 +1,4 @@
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; }
+.actions > button { min-width: 68px; min-height: 44px; }
+.actions > :global(.button--danger) { border-color: var(--border-subtle); background: var(--surface); color: var(--danger); box-shadow: none; }
+.actions > :global(.button--danger:hover:not(:disabled)) { border-color: var(--danger); background: var(--danger-soft); }

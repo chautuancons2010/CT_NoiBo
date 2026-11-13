@@ -40,6 +40,9 @@ export function syncWorkerDraft(draft: WorkerLocalDraft): Promise<WorkerAttendan
   const key = draft.clientSessionId;
   const prior = pendingWrites.get(key);
   const pending = (prior ? prior.catch(() => undefined) : Promise.resolve(undefined)).then(async previous => {
+    // Connectivity recovery can wake both the global queue and the open wizard.
+    // A completed submission is the result for every queued caller of this round.
+    if (previous?.submittedAt) return previous;
     const stored = await getWorkerDraft(draft.id);
     const latest = stored && stored.updatedAt > draft.updatedAt && !draft.pendingSubmit ? stored : draft;
     const value = previous && previous.version > latest.session.version ? { ...latest, session: { ...latest.session, id: previous.id, version: previous.version, entries: previous.entries.map(entry => ({ ...entry, ...latest.session.entries.find(local => local.workerId === entry.workerId), id: entry.id, sessionId: previous.id })) } } : latest;
@@ -67,6 +70,7 @@ async function syncWorkerDraftUnlocked(draft: WorkerLocalDraft): Promise<WorkerA
           date: session.date,
           shiftCode: session.shiftCode,
           sessionType: session.sessionType,
+          overtimeConsentConfirmed: session.overtimeConsentConfirmed,
           capturedAtClient: session.capturedAtClient,
           location: syncing.location
         })
@@ -90,6 +94,7 @@ async function syncWorkerDraftUnlocked(draft: WorkerLocalDraft): Promise<WorkerA
         id: entry.id,
         status: local?.status ?? entry.status,
         isSelected: local?.isSelected ?? entry.isSelected,
+        checkedInAt: local?.checkedInAt ?? entry.checkedInAt,
         exceptionReason: local?.exceptionReason ?? null,
         dayException: local?.dayException ?? "none",
         exceptionTime: local?.exceptionTime ?? null,
@@ -104,10 +109,10 @@ async function syncWorkerDraftUnlocked(draft: WorkerLocalDraft): Promise<WorkerA
     session = await readWorkerResponse<WorkerAttendanceSession>(await patch());
 
     for (const localPhoto of syncing.photos.filter((photo) => !photo.uploaded)) {
-      if (localPhoto.rawPhoto && localPhoto.latitude !== undefined && localPhoto.longitude !== undefined) {
+      if (localPhoto.rawPhoto && localPhoto.latitude !== undefined && localPhoto.longitude !== undefined && (localPhoto.accuracy ?? Infinity) <= 100) {
         const resolved = await lookupAttendanceAddress({ latitude: localPhoto.latitude, longitude: localPhoto.longitude }, { retry: true, priority: true });
         if (resolved.address) {
-          const encoded = await processAttendanceImage(new File([localPhoto.rawPhoto], "worker.jpg", { type: "image/jpeg" }), { capturedAt: localPhoto.capturedAt, address: resolved.address, latitude: localPhoto.latitude, longitude: localPhoto.longitude, accuracy: localPhoto.accuracy, label: `CHÂU TUẤN · ${session.projectName}` });
+          const encoded = await processAttendanceImage(new File([localPhoto.rawPhoto], "worker.jpg", { type: "image/jpeg" }), { capturedAt: localPhoto.capturedAt, address: resolved.address, latitude: localPhoto.latitude, longitude: localPhoto.longitude, accuracy: localPhoto.accuracy, capturedByName: localPhoto.capturedByName, capturedByUsername: localPhoto.capturedByUsername, label: `CHÂU TUẤN · ${session.projectName}` });
           localPhoto.photo = encoded.photo; localPhoto.thumbnail = encoded.thumbnail; localPhoto.width = encoded.width; localPhoto.height = encoded.height; localPhoto.address = resolved.address;
           URL.revokeObjectURL(encoded.previewUrl);
           await saveWorkerDraft(syncing);
@@ -120,6 +125,7 @@ async function syncWorkerDraftUnlocked(draft: WorkerLocalDraft): Promise<WorkerA
       form.set("width", String(localPhoto.width));
       form.set("height", String(localPhoto.height));
       form.set("capturedAt", localPhoto.capturedAt);
+      if (localPhoto.checkpoint) form.set("checkpoint", localPhoto.checkpoint);
       if (localPhoto.address) form.set("address", localPhoto.address);
       if (localPhoto.latitude !== undefined) form.set("latitude", String(localPhoto.latitude));
       if (localPhoto.longitude !== undefined) form.set("longitude", String(localPhoto.longitude));
@@ -140,8 +146,8 @@ async function syncWorkerDraftUnlocked(draft: WorkerLocalDraft): Promise<WorkerA
     const hasNewEdits = latest && latest.updatedAt > draft.updatedAt && !syncing.pendingSubmit;
     const latestByWorker = new Map(latest?.session.entries.map(entry => [entry.workerId, entry]));
     const merged = hasNewEdits ? { ...session, entries: session.entries.map(entry => ({ ...entry, ...latestByWorker.get(entry.workerId), id: entry.id, sessionId: session.id, checkedInAt: entry.checkedInAt, checkedOutAt: entry.checkedOutAt })), checklistResponses: latest.session.checklistResponses, safetyConfirmed: latest.session.safetyConfirmed, safetyReport: latest.session.safetyReport, workNote: latest.session.workNote } : session;
-    if (draft.id !== session.id || session.status === "submitted" || session.status === "locked") await deleteWorkerDraft(draft.id);
-    if (session.status !== "submitted" && session.status !== "locked") {
+    if (draft.id !== session.id || session.submittedAt || session.status === "submitted" || session.status === "locked") await deleteWorkerDraft(draft.id);
+    if (!session.submittedAt && session.status !== "submitted" && session.status !== "locked") {
       await saveWorkerDraft({ ...(hasNewEdits ? latest : syncing), id: session.id, session: merged, photos: hasNewEdits ? latest.photos.filter(photo => !photo.uploaded && !session.photos.some(saved => saved.id === photo.id)) : [], retryCount: 0, updatedAt: hasNewEdits ? latest.updatedAt : draft.updatedAt });
     }
     return session;

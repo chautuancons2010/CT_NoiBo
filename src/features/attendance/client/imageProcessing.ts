@@ -15,6 +15,8 @@ export interface AttendancePhotoStamp {
   longitude?: number;
   accuracy?: number;
   label?: string;
+  capturedByName?: string;
+  capturedByUsername?: string;
 }
 
 function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
@@ -41,6 +43,7 @@ function stampCanvas(canvas: HTMLCanvasElement, stamp?: AttendancePhotoStamp) {
   const content = [
     { text: `${time} · ${date}`, size: timeSize },
     { text: (stamp.label || "CHÂU TUẤN · ĐIỂM DANH").slice(0, 70), size: labelSize },
+    ...(stamp.capturedByName ? [{ text: `Người chấm: ${stamp.capturedByName}${stamp.capturedByUsername ? ` · @${stamp.capturedByUsername}` : ""}`, size }] : []),
     ...lines.map(text => ({ text, size }))
   ];
   if (stamp.latitude !== undefined && stamp.longitude !== undefined) content.push({ text: `GPS ${stamp.latitude.toFixed(6)}, ${stamp.longitude.toFixed(6)}${stamp.accuracy !== undefined ? ` · ±${Math.round(stamp.accuracy)} m` : ""}`, size: labelSize });

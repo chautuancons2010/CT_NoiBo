@@ -20,7 +20,7 @@ export function parsePhotonAddress(body: unknown): AttendanceAddressResult {
   const position = feature.geometry?.coordinates;
   if (!properties || !Array.isArray(position) || !validAddressCoordinates({ latitude: position[1], longitude: position[0] })) return { status: "unavailable" };
   const street = [text(properties.housenumber), text(properties.street)].filter(Boolean).join(" ");
-  const address = unique([text(properties.name), street, text(properties.district), text(properties.city), text(properties.county), text(properties.state), text(properties.country)]).join(", ").slice(0, 800);
+  const address = unique([street || text(properties.name), text(properties.district), text(properties.city), text(properties.county), text(properties.state), text(properties.country)]).join(", ").slice(0, 800);
   if (!address) return { status: "not_found" };
   return { status: "resolved", address, matchedLatitude: position[1], matchedLongitude: position[0] };
 }

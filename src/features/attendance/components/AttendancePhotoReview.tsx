@@ -13,13 +13,13 @@ import { useAttendancePhotoReview } from "@/features/attendance/hooks/useAttenda
 import { attendanceEvidenceFingerprint, attendanceReviewReasons, hasReviewablePhotos } from "@/features/attendance/lib/attendancePhotoReview";
 import type { AttendanceAdminToday, AttendanceAdminTodayRow, AttendanceEvent, AttendanceType } from "@/features/attendance/types/attendanceTypes";
 import styles from "./AttendancePhotoReview.module.css";
+import { AttendanceDayPicker } from "./AttendanceDayPicker";
 import { AttendanceLocationAddress } from "./AttendanceLocationAddress";
 
 const EvidenceViewer = dynamic(() => import("./AttendanceEvidence").then((module) => module.AttendanceEvidenceViewer));
 const labels = { present: "Có mặt", late: "Đi muộn", leave: "Nghỉ", not_checked: "Chưa chấm", missing_check: "Thiếu lượt" } as const;
 const photoLabels = { not_required: "Không có ảnh", pending_upload: "Chờ đồng bộ ảnh", uploading: "Đang tải ảnh", uploaded: "Đã có ảnh", upload_failed: "Đồng bộ ảnh lỗi" } as const;
 const time = (value?: string) => value ? new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value)) : "—";
-const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const duration = (minutes: number) => minutes ? [Math.floor(minutes / 60) ? `${Math.floor(minutes / 60)} giờ` : "", minutes % 60 ? `${minutes % 60} phút` : ""].filter(Boolean).join(" ") : "—";
 const uploadedEvents = (row: AttendanceAdminTodayRow) => (row.events ?? []).filter((event) => event.photoId && event.photoStatus === "uploaded");
 const evidenceKey = (event: AttendanceEvent) => `${event.id}:${event.photoId}:${event.effectiveAt}`;
@@ -224,11 +224,7 @@ export function AttendancePhotoReview({ date, data, error, refreshing, ownerAcco
     setAnnouncement("");
     onDateChange(value);
   };
-  const stepDay = (delta: number) => {
-    const day = new Date(`${date}T12:00:00Z`);
-    day.setUTCDate(day.getUTCDate() + delta);
-    changeDate(day.toISOString().slice(0, 10));
-  };
+
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -263,9 +259,9 @@ export function AttendancePhotoReview({ date, data, error, refreshing, ownerAcco
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canViewPhotos, date, activeRow?.employeeId, queue[activeIndex + 1]?.employeeId, unseenPhotoCount, resolvePhotoUrl]);
 
-  return <div className={styles.workspace} ref={rootRef}>
+  return <div className={styles.workspace} data-ui="attendance-review" ref={rootRef}>
     <header className={styles.toolbar}>
-      <div className={styles.toolbarMain} data-ui="filter-controls"><div className={styles.dayNav}><Button aria-label="Ngày trước" onClick={() => stepDay(-1)} size="sm" variant="ghost"><ChevronLeft aria-hidden="true" size={18} /></Button><Input className={styles.dateInput} label="Ngày" labelHidden onChange={(event) => changeDate(event.target.value)} type="date" value={date} /><Button aria-label="Ngày sau" onClick={() => stepDay(1)} size="sm" variant="ghost"><ChevronRight aria-hidden="true" size={18} /></Button></div>{date !== today() ? <Button onClick={() => changeDate(today())} size="sm" variant="ghost">Hôm nay</Button> : null}</div>
+      <div className={styles.toolbarMain} data-ui="filter-controls"><AttendanceDayPicker date={date} onChange={changeDate}/></div>
       <div className={styles.toolbarActions} data-ui="actions">{reviewableRows.length ? <span aria-label="Tiến độ xem ảnh" aria-valuemax={reviewableRows.length} aria-valuemin={0} aria-valuenow={reviewedCount} aria-valuetext={`${reviewedCount}/${reviewableRows.length} đã xem`} className={styles.progress} role="progressbar">{reviewedCount}/{reviewableRows.length} đã xem</span> : null}<Button aria-label="Bộ lọc" aria-expanded={showFilters} aria-controls="attendance-photo-filters" className={styles.filterButton} data-active={hasFilters || undefined} leftIcon={<ListFilter aria-hidden="true" size={16} />} onClick={() => setShowFilters((value) => !value)} size="sm" title="Bộ lọc" variant="ghost">Lọc{hasFilters ? " •" : ""}</Button><Button aria-label="Làm mới ảnh chấm công" busy={refreshing} className={styles.refreshButton} onClick={() => void onRefresh()} size="sm" title="Làm mới" variant="ghost"><RefreshCcw aria-hidden="true" size={17} /></Button></div>
     </header>
     {showFilters ? <div aria-label="Bộ lọc chấm công" className={styles.filters} data-ui="filter-controls" id="attendance-photo-filters"><Select label="Phòng ban" onChange={(event) => { setDepartmentId(event.target.value); setQueueLimit(40); }} options={[{ label: "Tất cả", value: "" }, ...departments.map(([id, name]) => ({ label: name, value: id }))]} value={departmentId} /><Select label="Ca" onChange={(event) => setShiftId(event.target.value)} options={[{ label: "Tất cả", value: "" }, ...shifts.map(([id, name]) => ({ label: name, value: id }))]} value={shiftId} /><Select label="Trạng thái" onChange={(event) => setStatus(event.target.value)} options={[{ label: "Tất cả", value: "" }, ...Object.entries(labels).map(([key, value]) => ({ label: value, value: key }))]} value={status} /><Select label="Minh chứng" onChange={(event) => { setEvidenceFilter(event.target.value); setTab("all"); }} options={[{ label: "Tất cả", value: "" }, { label: "Có ảnh", value: "uploaded" }, { label: "Ảnh chưa đồng bộ", value: "pending" }, { label: "Thiếu ảnh", value: "missing" }, { label: "Bất thường", value: "review" }]} value={evidenceFilter} />{hasFilters ? <Button onClick={() => { setDepartmentId(""); setShiftId(""); setStatus(""); setEvidenceFilter(""); }} size="sm">Xóa lọc</Button> : null}</div> : null}

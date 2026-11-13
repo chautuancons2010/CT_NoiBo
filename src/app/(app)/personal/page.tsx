@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, CalendarOff, CalendarRange, ChevronRight, LockKeyhole, UserRound, UsersRound, WalletCards } from "lucide-react";
+import { ArrowUpRight, CalendarOff, CalendarRange, ChevronRight, UserRound, UsersRound, WalletCards } from "lucide-react";
 
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 import { useSystemSettings } from "@/components/providers/SystemSettingsProvider";
@@ -13,14 +13,14 @@ import { LogoutButton } from "@/features/auth/components/LogoutButton";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { getBusinessDateKey } from "@/lib/time/timezone";
 import styles from "./PersonalHome.module.css";
-import { attendanceOnlyRelease, hasUnrestrictedReleaseAccess } from "@/config/featureRelease";
+import { isReleasedApplication } from "@/config/featureRelease";
 import { WorkerAttendanceToday } from "@/features/worker-attendance/components/WorkerAttendanceHome";
 
 export default function PersonalPage() {
   const user = useCurrentUser();
   const { settings } = useSystemSettings();
   const canViewAttendance = settings.modules.attendance && canOpenPersonalAttendance(user.permissions);
-  const canReviewWorkers = canUseWorkerAttendance(user);
+  const canReviewWorkers = canUseWorkerAttendance(user) && isReleasedApplication("projects", user.roleCodes);
   const today = new Date();
   const initials = user.displayName.trim().split(/\s+/).slice(-2).map((part) => part[0]).join("");
   const profileAllowed = can(user.permissions, "profile.view");
@@ -44,7 +44,7 @@ export default function PersonalPage() {
       <h2 className="personal-home__section-title" id="personal-services-title">Tiện ích cá nhân</h2>
       <nav aria-label="Thông tin của tôi" className={`personal-home__links ${styles.links}`}>
         {canViewAttendance ? <Link href="/attendance/history"><CalendarRange aria-hidden="true" size={20} /><span><span className="personal-home__label-desktop">Lịch công của tôi</span><span className="personal-home__label-mobile">Lịch công</span></span><ChevronRight aria-hidden="true" size={18} /></Link> : null}
-        {canViewPayslips ? <Link className={styles.pendingUtility} href="/personal/payslips">{attendanceOnlyRelease && !hasUnrestrictedReleaseAccess(user.roleCodes) ? <LockKeyhole className={styles.utilityLock} aria-label="Chưa mở" size={12}/> : null}<WalletCards aria-hidden="true" size={20} /><span><span className="personal-home__label-desktop">Phiếu lương của tôi</span><span className="personal-home__label-mobile">Phiếu lương</span></span><ChevronRight aria-hidden="true" size={18} /></Link> : null}
+        {canViewPayslips ? <Link href="/personal/payslips"><WalletCards aria-hidden="true" size={20} /><span><span className="personal-home__label-desktop">Phiếu lương của tôi</span><span className="personal-home__label-mobile">Phiếu lương</span></span><ChevronRight aria-hidden="true" size={18} /></Link> : null}
         {canUseLeave ? <Link href="/leave"><CalendarOff aria-hidden="true" size={20} /><span><span className="personal-home__label-desktop">Nghỉ phép của tôi</span><span className="personal-home__label-mobile">Nghỉ phép</span></span><ChevronRight aria-hidden="true" size={18} /></Link> : null}
       </nav>
       </section> : null}

@@ -11,6 +11,7 @@ import type { AuthenticatedUser, Permission } from "@/lib/auth/permissions";
 import { can } from "@/lib/auth/permissions";
 import { applicationPermissionSets } from "@/lib/auth/applicationAccess";
 import { moduleIconRegistry, type ApplicationId, type ModuleIconTone } from "@/config/moduleIconRegistry";
+import { releaseModuleSettings } from "@/config/featureRelease";
 
 export type { ApplicationId } from "@/config/moduleIconRegistry";
 
@@ -71,6 +72,7 @@ export function visibleApplications(
   user: AuthenticatedUser,
   modules?: ModuleSettings
 ): ApplicationDefinition[] {
+  if (modules) modules = releaseModuleSettings(modules, user.roleCodes);
   return applicationRegistry.filter((application) =>
     application.launcher &&
     (!application.moduleFlag || !modules || modules[application.moduleFlag]) &&
@@ -96,6 +98,7 @@ export function applicationsForLauncher(
   user: AuthenticatedUser,
   modules?: ModuleSettings
 ): LauncherApplication[] {
+  if (modules) modules = releaseModuleSettings(modules, user.roleCodes);
   return applicationRegistry
     .filter((application) => application.launcher && (!application.moduleFlag || !modules || modules[application.moduleFlag]))
     .map((application) => ({

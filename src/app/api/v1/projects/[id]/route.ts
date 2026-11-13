@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { getProject, renameProject } from "@/features/projects/services/projectRepository";
-import { projectNamePatchSchema } from "@/features/projects/schemas/projectSchemas";
+import { deleteProject, getProject, updateProject } from "@/features/projects/services/projectRepository";
+import { projectDeleteSchema, projectPatchSchema } from "@/features/projects/schemas/projectSchemas";
 import { errorResponse } from "@/lib/api/errors";
 import { successResponse } from "@/lib/api/responses";
 import { parseJsonBody, parseWithSchema } from "@/lib/api/validation";
@@ -18,6 +18,15 @@ export async function PATCH(request: Request, context: RouteContext<"/api/v1/pro
   try {
     const user = requirePermission(await getRequestUser(), "project.edit");
     const { id } = parseWithSchema(paramsSchema, await context.params);
-    return successResponse(await renameProject(user, id, await parseJsonBody(request, projectNamePatchSchema)));
+    return successResponse(await updateProject(user, id, await parseJsonBody(request, projectPatchSchema)));
+  } catch (error) { return errorResponse(error); }
+}
+
+export async function DELETE(request: Request, context: RouteContext<"/api/v1/projects/[id]">) {
+  try {
+    const user = requirePermission(await getRequestUser(), "project.edit");
+    const { id } = parseWithSchema(paramsSchema, await context.params);
+    const input = await parseJsonBody(request, projectDeleteSchema);
+    return successResponse(await deleteProject(user, id, input.rowVersion));
   } catch (error) { return errorResponse(error); }
 }

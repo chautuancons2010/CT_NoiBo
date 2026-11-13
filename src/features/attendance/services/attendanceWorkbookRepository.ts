@@ -5,6 +5,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/server";
 import { listWorkerSessions } from "@/features/worker-attendance/services/workerAttendanceRepository";
 import { listAttendanceExportEvents } from "./attendanceRepository";
 import { generateAttendanceWorkbook, type AttendanceCalculatedRow, type AttendanceAdjustmentRow } from "./attendanceWorkbook";
+import type { AttendanceExportEmployee } from "./attendanceWorkbookOverview";
 
 type Row = Record<string, unknown>;
 const joined=(value:unknown):Row => (Array.isArray(value)?value[0]:value) as Row ?? {};
@@ -28,12 +29,21 @@ export async function exportAttendanceWorkbook(user:AuthenticatedUser,month:stri
       if((data?.length??0)<1000)return rows;
     }
   }
-  const [events,sessions,daily,adjustments]=await Promise.all([
+  async function employeeRoster():Promise<AttendanceExportEmployee[]> {
+    const people:AttendanceExportEmployee[]=[];
+    for(let offset=0;;offset+=1000){
+      const {data,error}=await client!.from("employees").select("employee_code,full_name,join_date,termination_date,employment_types(worker_category),departments:departments!employees_department_id_fkey(name)").lte("join_date",to).or(`termination_date.is.null,termination_date.gte.${from}`).order("id").range(offset,offset+999);
+      if(error)throw new AppError("SERVER_ERROR","Không thể xác định nhóm công nhân và giám sát khi xuất công.");
+      people.push(...(data??[]).map(row=>({code:String(row.employee_code),name:String(row.full_name),category:text(joined(row.employment_types),"worker_category"),department:text(joined(row.departments),"name"),joinDate:row.join_date??undefined,terminationDate:row.termination_date??undefined})));
+      if((data?.length??0)<1000)return people;
+    }
+  }
+  const [events,sessions,daily,adjustments,employees]=await Promise.all([
     listAttendanceExportEvents(user,from,to),listWorkerSessions(user,{from,to}),
-    paged("daily_timesheets","id,work_date,employee_snapshot,effective_check_in,effective_check_out,work_minutes,work_fraction,status,hr_note,timesheet_periods(name)"),
-    paged("timesheet_adjustments","id,work_date,adjustment_type,effective_time,corrected_work_fraction,reason,created_at,employees(employee_code,full_name),timesheet_periods(name)")
+    paged("daily_timesheets","id,work_date,employee_snapshot,effective_check_in,effective_check_out,work_minutes,work_fraction,overtime_minutes,pending_overtime_minutes,rain_pause_minutes,arrival_late_minutes,late_minutes,early_leave_minutes,computed_at,status,hr_note,timesheet_periods(id,name,status)"),
+    paged("timesheet_adjustments","id,work_date,adjustment_type,effective_time,corrected_work_fraction,reason,created_at,employees(employee_code,full_name),timesheet_periods(name)"),employeeRoster()
   ]);
-  const calculated:AttendanceCalculatedRow[]=daily.map(row=>{const employee=joined(row.employee_snapshot);return {periodName:text(joined(row.timesheet_periods),"name"),employeeCode:text(employee,"code"),employeeName:text(employee,"name"),workDate:text(row,"work_date"),checkIn:text(row,"effective_check_in")||undefined,checkOut:text(row,"effective_check_out")||undefined,workMinutes:Number(row.work_minutes??0),workFraction:Number(row.work_fraction??0),status:text(row,"status"),note:text(row,"hr_note")};});
+  const calculated:AttendanceCalculatedRow[]=daily.map(row=>{const employee=joined(row.employee_snapshot);return {periodName:text(joined(row.timesheet_periods),"name"),periodId:text(joined(row.timesheet_periods),"id"),periodStatus:text(joined(row.timesheet_periods),"status"),computedAt:text(row,"computed_at"),lateMinutes:Number(row.late_minutes??0),earlyLeaveMinutes:Number(row.early_leave_minutes??0),employeeCode:text(employee,"code"),employeeName:text(employee,"name"),workDate:text(row,"work_date"),checkIn:text(row,"effective_check_in")||undefined,checkOut:text(row,"effective_check_out")||undefined,workMinutes:Number(row.work_minutes??0),overtimeMinutes:Number(row.overtime_minutes??0),pendingOvertimeMinutes:Number(row.pending_overtime_minutes??0),rainPauseMinutes:Number(row.rain_pause_minutes??0),arrivalLateMinutes:Number(row.arrival_late_minutes??0),workFraction:Number(row.work_fraction??0),status:text(row,"status"),note:text(row,"hr_note")};});
   const changes:AttendanceAdjustmentRow[]=adjustments.map(row=>({periodName:text(joined(row.timesheet_periods),"name"),employeeCode:text(joined(row.employees),"employee_code"),employeeName:text(joined(row.employees),"full_name"),workDate:text(row,"work_date"),type:text(row,"adjustment_type"),effectiveTime:text(row,"effective_time")||undefined,workFraction:row.corrected_work_fraction==null?undefined:Number(row.corrected_work_fraction),reason:text(row,"reason"),createdAt:text(row,"created_at")}));
-  return generateAttendanceWorkbook({month,baseUrl,events,sessions,calculated,adjustments:changes});
+  return generateAttendanceWorkbook({month,baseUrl,events,sessions,calculated,adjustments:changes,employees});
 }

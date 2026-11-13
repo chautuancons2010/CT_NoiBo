@@ -1,5 +1,7 @@
 export type WorkerEntryStatus = "unconfirmed" | "present" | "absent" | "leave" | "late" | "transferred";
 export type WorkerSessionStatus = "draft" | "in_progress" | "submitted" | "locked" | "needs_review";
+export type OvertimeCheckpoint = "start" | "middle" | "end";
+export interface WorkerWorkEvent { id: string; batchId?: string; evidencePending?: boolean; entryId: string; eventType: "start" | "pause" | "resume" | "finish"; effectiveAt: string; reason: string; }
 
 export interface WorkerAttendanceChecklistItem {
   id: string;
@@ -16,6 +18,7 @@ export interface WorkerAttendanceChecklistResponse {
 }
 
 export interface WorkerAttendanceEntry {
+  workEvents?: WorkerWorkEvent[];
   id: string;
   sessionId: string;
   workerId: string;
@@ -35,6 +38,10 @@ export interface WorkerAttendanceEntry {
 }
 
 export interface WorkerAttendancePhoto {
+  purpose?: "rain_pause";
+  workBatchId?: string;
+  accuracy?: number;
+  checkpoint?: OvertimeCheckpoint;
   evidenceStatus?: "available" | "expired";
   address?: string;
   latitude?: number;
@@ -63,6 +70,7 @@ export interface WorkerSafetyReport {
 }
 
 export interface WorkerAttendanceSession {
+  allowedAccuracyThresholdMeters?: number;
   id: string;
   clientSessionId: string;
   projectId: string;
@@ -76,7 +84,13 @@ export interface WorkerAttendanceSession {
   shiftStart?: string;
   shiftEnd?: string;
   shiftBreakMinutes?: number;
-  sessionType: "morning" | "end_of_day";
+  sessionType: "morning" | "end_of_day" | "overtime";
+  overtimeStatus?: "recording" | "pending" | "confirmed" | "rejected";
+  overtimeDayType?: "working_day" | "rest_day" | "holiday";
+  overtimeConsentConfirmed?: boolean;
+  overtimeReviewNote?: string;
+  overtimeRecordingMode?: "time_entry";
+  shiftScheduleRules?: import("@/features/timesheets/types/timesheetTypes").ShiftScheduleRules;
   supervisorEmployeeId: string;
   supervisorName: string;
   startedAt: string;
@@ -106,6 +120,12 @@ export interface WorkerAttendanceSession {
 }
 
 export interface WorkerAttendanceTask {
+  isWorkingDay?: boolean;
+  calendarDayType?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
+  shiftBreakMinutes?: number;
+  shiftScheduleRules?: import("@/features/timesheets/types/timesheetTypes").ShiftScheduleRules;
   projectId: string;
   projectName: string;
   worksiteId: string;

@@ -53,7 +53,7 @@
   .clear > :global(.button__icon) { width: 17px; height: 17px; }
   .workspace .table:global(.data-table-shell) { border: 0; border-radius: 0; background: transparent; }
   .workspace .table :global(.mobile-record-list) { gap: 12px; padding: 0; }
-  .workspace .table :global(.mobile-record.mobile-record) { gap: 10px; border: 1px solid var(--border-subtle); border-radius: 18px; padding: 14px; background: var(--surface); box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 4%, transparent); }
+  .workspace .table :global(.mobile-record.mobile-record) { gap: 12px; border: 1px solid var(--border-subtle); border-radius: 14px; padding: 16px; background: var(--surface); box-shadow: none; }
   .workspace .table :global(.mobile-record__header) { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: start; gap: 8px 6px; }
   .table :global(.mobile-record__identity) { grid-column: 1; }
   .workspace .table :global(.mobile-record__state) { grid-column: 1; grid-row: 2; justify-items: start; margin-left: 46px; }
@@ -65,7 +65,7 @@
   .workspace .table :global(.mobile-record__more) { margin: 0; border: 0; padding: 0; }
   .workspace .table :global(.mobile-record__more > summary) { min-height: 44px; gap: 6px; padding: 0; color: var(--primary); font-size: 12px; }
   .identity { gap: 10px; }
-  .identity strong { font-size: 14px; line-height: 1.45; }
+  .identity strong { font-size: 15px; line-height: 1.5; }
   .projectIcon { width: 36px; height: 36px; flex-basis: 36px; border-radius: 12px; }
   .identityCopy { gap: 4px; }
   .identity small { gap: 3px 6px; font-size: 11px; }

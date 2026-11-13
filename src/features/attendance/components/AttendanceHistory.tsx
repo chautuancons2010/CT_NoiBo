@@ -103,7 +103,7 @@ export function AttendanceHistory({ selectedDate }: { selectedDate?: string }) {
       const outside = key < dateKey(range.first) || key > dateKey(range.last);
       const meta = day ? statusMeta[day.status] : undefined;
       const label = `${formatBusinessDate(key)}${meta ? `, ${meta.label}` : ", chưa có lượt chấm"}`;
-      return { label, current: key === today, disabled: outside || loading, indicator: Boolean(meta && day?.status !== "rest_day"), tone: meta?.tone === "error" ? "danger" : meta?.tone ?? "neutral" };
+      return { label, current: key === today, disabled: outside || loading, tone: meta?.tone === "error" ? "danger" : meta?.tone ?? "neutral" };
     }} />
     <details className={styles.summary}><summary><span>Tổng kết tháng</span><ChevronDown aria-hidden="true" size={16} /></summary><dl className={styles.stats}>{monthStats.map((stat) => <div className={`is-${stat.status}`} key={stat.status}><dt>{stat.label}</dt><dd>{loading ? "—" : monthDays.filter((day) => day.status === stat.status).length}</dd></div>)}</dl></details>
   </Card>

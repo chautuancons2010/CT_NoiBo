@@ -168,6 +168,7 @@ export function PackageWorkspace({
   return (
     <div className={styles.packageWorkspace}>
       <PackageContextHeader
+        canEditProject={permissions.editProject}
         canManageWorksites={permissions.manageWorksites}
         canUpdateHealth={permissions.updateHealth}
         completionPercent={completionPercent}

@@ -1,11 +1,28 @@
 import { describe, it, expect } from "vitest";
 import ExcelJS from "exceljs";
-import { workerClock, workerClockLabel } from "./workerAttendanceClock";
+import { recordWorkerSelection, workerClock, workerClockLabel } from "./workerAttendanceClock";
 import { generateWorkerAttendanceExcel } from "./workerAttendanceExcel";
 import type { WorkerAttendanceEntry, WorkerAttendanceSession } from "../types/workerAttendanceTypes";
 
 const entry = { id: "1", workerId: "worker", employeeCode: "CN01", workerName: "Công nhân A", status: "present", isSelected: true, checkedInAt: "2026-11-09T00:00:00Z", checkedOutAt: "2026-11-09T10:00:00Z" } as WorkerAttendanceEntry;
 describe("worker time and Excel", () => {
+  it("keeps an offline arrival at 07:25 as five minutes late at the general port when synchronized at 09:00", () => {
+    const session = { date: "2026-11-13", shiftStart: "07:30", sessionType: "morning" as const };
+    const observed = "2026-11-13T07:25:00+07:00";
+    const selected = recordWorkerSelection({ ...entry, isSelected: false, status: "unconfirmed", checkedInAt: undefined }, { isSelected: true, status: "present" }, session, observed);
+    expect(selected).toMatchObject({ status: "late", checkedInAt: observed });
+    expect(recordWorkerSelection(selected, { note: "Synced" }, session, "2026-11-13T09:00:00+07:00").checkedInAt).toBe(observed);
+    expect(recordWorkerSelection(selected, { isSelected: false }, session).checkedInAt).toBeUndefined();
+  });
+  it("does not mark overtime as a late arrival to the regular shift", () => {
+    expect(recordWorkerSelection({ ...entry, isSelected: false }, { isSelected: true, status: "present" }, { date: "2026-11-13", shiftStart: "07:30", sessionType: "overtime" }, "2026-11-13T17:30:00+07:00").status).toBe("present");
+  });
+  it("credits a normal port day separately and respects the entire explicitly recorded overtime interval",()=>{
+    const current={...entry,checkedInAt:"2026-11-13T07:50:00+07:00",checkedOutAt:"2026-11-13T19:00:00+07:00"};
+    const schedule={date:"2026-11-13",shiftStart:"08:00",shiftEnd:"17:00",shiftBreakMinutes:90,shiftScheduleRules:{breakStartTime:"11:30",breakEndTime:"13:00",arrivalLeadMinutes:10}};
+    expect(workerClock(current,schedule).workMinutes).toBe(480);
+    expect(workerClock(current,{...schedule,sessionType:"overtime",overtimeDayType:"working_day"}).workMinutes).toBe(670);
+  });
   it("uses actual clocks and the HR shift break", () => {
     expect(workerClock(entry, { shiftBreakMinutes: 120 })).toMatchObject({ presenceMinutes: 600, breakMinutes: 120, workMinutes: 480 });
     expect(workerClockLabel(entry.checkedInAt)).toContain("07:00:00");

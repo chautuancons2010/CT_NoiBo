@@ -1,3 +1,4 @@
+vi.mock("next/navigation",()=>({useRouter:()=>({push:vi.fn()})}));
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Permission } from "@/lib/auth/permissions";
@@ -30,6 +31,13 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("worker attendance session actions", () => {
+  it("shows worker status and clock times together without repeating the roster", async () => {
+    render(<WorkerAttendanceSessionDetail sessionId="session-1" />);
+    const table = await screen.findByRole("table", { name: "Điểm danh và giờ công công nhân" });
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    for (const name of ["Trạng thái", "Giờ vào", "Giờ ra", "Giờ công"]) expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
+    expect(within(table).getAllByText("Công nhân 01")).toHaveLength(1);
+  });
   it("keeps embedded package evidence read-only even for a user with adjustment permission", async () => {
     state.permissions = ["worker_attendance.view", "worker_attendance.create", "worker_attendance.adjust"];
     vi.mocked(fetchWorkerSession).mockResolvedValue(fixture({ status: "submitted", submittedAt: "2026-10-15T01:15:00Z" }));
@@ -49,8 +57,8 @@ describe("worker attendance session actions", () => {
   it("offers end-of-day close only after morning attendance is complete", async () => {
     vi.mocked(fetchWorkerSession).mockResolvedValue(fixture({ status: "submitted", submittedAt: "2026-10-15T01:30:00Z" }));
     render(<WorkerAttendanceSessionDetail sessionId="session-1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Chốt công cuối ngày" }));
-    const drawer = await screen.findByRole("dialog", { name: "Chốt công cuối ngày" });
+    fireEvent.click(await screen.findByRole("button", { name: "Chấm ra công nhân" }));
+    const drawer = await screen.findByRole("dialog", { name: "Chấm ra công nhân" });
     expect(within(drawer).getByRole("combobox", { name: "Ngoại lệ" })).toHaveTextContent("Không có");
     expect(within(drawer).getByLabelText("Thời gian")).toBeDisabled();
     fireEvent.click(within(drawer).getByRole("combobox", { name: "Ngoại lệ" }));

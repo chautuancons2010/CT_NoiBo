@@ -128,7 +128,7 @@ export async function EmployeeListPage({ searchParams }: EmployeeListPageProps) 
           />
           <EmployeeListTable employees={result.items} filtered={Boolean(filters.q || filters.departmentId || filters.positionId || filters.employmentTypeId || filters.status)} permissions={user.permissions} />
           <footer className="employee-table-footer">
-            <span>{firstRecord}–{lastRecord} / {result.total} bản ghi</span>
+            <span>{firstRecord}–{lastRecord} / {result.total}</span>
             <nav aria-label="Phân trang" className="pagination">
               {result.page <= 1 ? <span aria-hidden="true" className="button button--secondary button--sm is-disabled"><ChevronLeft size={16} /></span> : <Link aria-label="Trang trước" className="button button--secondary button--sm" href={pageHref(filters, result.page - 1)}><ChevronLeft aria-hidden="true" size={16} /></Link>}
               <span>{result.page} / {result.pageCount}</span>

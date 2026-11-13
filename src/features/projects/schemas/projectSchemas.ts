@@ -14,10 +14,22 @@ export const projectInputSchema = z.object({
   summary: optionalText(500),
   startDate: z.string().date(),
   expectedEndDate: optionalDate,
-  status: z.enum(["preparing", "active", "paused", "completed", "closed"]).default("preparing"),
+  status: z.enum(["preparing", "active", "paused", "completed", "closed"]).default("active"),
   projectManagerEmployeeId: optionalUuid,
   note: optionalText(1000)
 }).refine((value) => !value.expectedEndDate || value.expectedEndDate >= value.startDate, { message: "Ngày kết thúc dự kiến không hợp lệ.", path: ["expectedEndDate"] });
+
+export const projectPatchSchema = z.object({
+  code: z.string().trim().min(2).max(40).optional(),
+  name: z.string().trim().min(3).max(180).optional(),
+  customerName: z.string().trim().max(160).optional(),
+  summary: z.string().trim().max(500).optional(),
+  startDate: z.string().date().optional(),
+  expectedEndDate: z.union([z.string().date(), z.literal("")]).optional(),
+  status: z.enum(["preparing", "active", "paused", "completed", "closed"]).optional(),
+  rowVersion: z.number().int().positive()
+}).strict().refine(value => Object.keys(value).some(key => key !== "rowVersion"), { message: "Chưa có thay đổi." });
+export const projectDeleteSchema = z.object({ rowVersion: z.number().int().positive() }).strict();
 
 export const worksiteInputSchema = z.object({
   name: z.string().trim().min(2).max(160),

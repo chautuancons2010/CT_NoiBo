@@ -5,6 +5,7 @@ export const TEST_GATE_COOKIE: string;
 export function assertTestEnvironment(env?: TestEnvironmentInput): TestEnvironment;
 export function configuredUrl(env: TestEnvironmentInput, key: string): URL;
 export function testToolsAvailable(env?: TestEnvironmentInput): TestEnvironment | null;
+export function testSupervisorLoginOnly(env?: TestEnvironmentInput): boolean;
 export function publicTesterAccess(env?: TestEnvironmentInput): boolean;
 export function safeEqual(left: string, right: string): boolean;
 export function createTesterToken(env?: TestEnvironmentInput, now?: number): string;

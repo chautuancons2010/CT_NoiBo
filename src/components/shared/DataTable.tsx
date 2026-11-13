@@ -91,7 +91,7 @@ export function DataTable<TData extends object>({
   error,
   onRetry,
   emptyTitle = "Chưa có dữ liệu",
-  emptyDescription = "Không có bản ghi phù hợp.",
+  emptyDescription = "",
   getRowId,
   selectedRowIds,
   onSelectRow,
@@ -269,7 +269,7 @@ export function DataTable<TData extends object>({
         </table>
       </div> : null}
       {isPhone && sortableColumns.length && !isEmpty ? <div className="mobile-record-sort">
-        {!size ? <span className="mobile-record-sort__count">{shownData.length} bản ghi</span> : null}
+        {!size ? <span className="mobile-record-sort__count">{shownData.length}</span> : null}
         <Select label="Sắp xếp" labelHidden onChange={(event) => {
           if (!event.target.value) return;
           const next: DataTableSort = { columnId: event.target.value, direction: activeSort?.direction ?? "ascending" };

@@ -1,0 +1,35 @@
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { WorkerAttendanceSession } from "../types/workerAttendanceTypes";
+const mocks = vi.hoisted(() => ({ save: vi.fn(), write: vi.fn(), process: vi.fn() }));
+vi.mock("@/components/providers/CurrentUserProvider", () => ({ useCurrentUser: () => ({ id: "actor", displayName: "Giám sát", username: "supervisor" }) }));
+vi.mock("../client/workerDraftStore", () => ({ saveWorkEvidence: mocks.save, listWorkEvidence: async () => [] }));
+vi.mock("../client/workerWorkQueue", () => ({ readWorkerWorkQueue: () => [], syncWorkerWorkQueue: async () => undefined, writeWorkerWorkQueue: mocks.write, withPendingWorkOperations: (session: unknown) => session }));
+vi.mock("@/features/attendance/client/imageProcessing", () => ({ processAttendanceImage: mocks.process }));
+vi.mock("./WorkerEvidencePhoto", () => ({ WorkerEvidencePhoto: () => <span>Ảnh mưa đã lưu</span> }));
+vi.mock("@/features/attendance/components/AttendanceLocationAddress", () => ({ AttendanceLocationAddress: () => <span>Vị trí</span> }));
+import { WorkerWorkControls } from "./WorkerWorkControls";
+const session = { id: "session", projectName: "Gói A", entries: [{ id: "entry", workerId: "worker", workerName: "Công nhân A", isSelected: true, status: "present", checkedInAt: "2026-11-13T00:30:00Z" }] } as WorkerAttendanceSession;
+beforeEach(() => {
+  vi.clearAllMocks(); vi.stubGlobal("isSecureContext", true);
+  Object.defineProperty(navigator,"onLine",{ configurable:true,value:false });
+  Object.defineProperty(navigator,"geolocation",{ configurable:true,value:{getCurrentPosition: (_ok: unknown, fail: (error: unknown)=>void) => fail({code:1})} });
+  Object.defineProperty(URL,"revokeObjectURL",{ configurable:true,value:vi.fn() });
+  mocks.save.mockResolvedValue(undefined);mocks.process.mockResolvedValue({ photo:new Blob(["full"]),thumbnail:new Blob(["thumb"]),width:640,height:480,previewUrl:"blob:test" });
+});
+afterEach(() => {cleanup();vi.unstubAllGlobals();});
+it("saves a stamped rain photo durably before queueing a pause, even offline with GPS denied", async () => {
+  render(<WorkerWorkControls session={session} onChanged={vi.fn()}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Tạm nghỉ mưa"}));
+  const dialog = screen.getByRole("dialog");
+  const save=within(dialog).getByRole("button",{name:"Tạm nghỉ mưa · 1 người"});
+  expect(save).toBeDisabled();
+  const input=within(dialog).getByLabelText("Chụp ảnh minh chứng mưa");
+  expect(input).toBeEnabled();fireEvent.change(input,{target:{files:[new File(["raw"],"rain.jpg",{type:"image/jpeg"})]}});
+  await waitFor(()=>expect(save).toBeEnabled());fireEvent.click(save);
+  await waitFor(()=>expect(mocks.write).toHaveBeenCalledOnce());
+  const evidence=mocks.save.mock.calls.at(-1)![0],operation=mocks.write.mock.calls[0][1][0];
+  expect(evidence).toMatchObject({ ownerAccountId:"actor",sessionId:"session",photos:[expect.objectContaining({purpose:"rain_pause",address:"Chưa có GPS · Cần đối soát"})] });
+  expect(operation).toMatchObject({reason:"rain",eventType:"pause",evidenceRequired:true,evidencePhotoIds:[evidence.photos[0].id],batchId:evidence.batchId,entryIds:["entry"]});
+  expect(mocks.save.mock.invocationCallOrder.at(-1)!).toBeLessThan(mocks.write.mock.invocationCallOrder[0]);
+});

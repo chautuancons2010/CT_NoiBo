@@ -12,7 +12,7 @@ export async function check(operation, label) {
   assert(!error, `${label}: ${error?.message}`);
   return data;
 }
-export async function seedAccounts(db, target) {
+export async function seedAccounts(db, target, selectedProfiles = profiles) {
   const [roles, permissions, departments, positions, types] = await Promise.all([
     check(db.from("roles").select("id,code,name,is_system"), "roles"), check(db.from("permissions").select("key"), "permissions"),
     check(db.from("departments").select("id,code"), "departments"), check(db.from("positions").select("id,code"), "positions"), check(db.from("employment_types").select("id,code"), "employment types")
@@ -23,7 +23,7 @@ export async function seedAccounts(db, target) {
     assert(!error, "Không đọc được Auth users"); authUsers.push(...data.users);
     if (data.users.length < 1000) break;
   }
-  for (const profile of profiles) {
+  for (const profile of selectedProfiles) {
     const id = fixedId(`account:${profile.username}`), employeeId = fixedId(`employee:${profile.username}`);
     const old = await check(db.from("app_accounts").select("id,username,auth_user_id,metadata").eq("username", profile.username).maybeSingle(), "account collision check");
     assert(!old || (old.id === id && old.metadata?.testOwner === TEST_OWNER && old.metadata?.testTarget === target.databaseUrl), `Từ chối ghi đè tài khoản không do bộ seed quản lý: ${profile.username}`);
@@ -68,8 +68,8 @@ export async function seedAccounts(db, target) {
     console.log(`READY ${profile.username} -> ${profile.roleCode}`);
   }
 }
-export async function verifyAccounts(db, target) {
-  for (const profile of profiles) {
+export async function verifyAccounts(db, target, selectedProfiles = profiles) {
+  for (const profile of selectedProfiles) {
     const row = await check(db.from("app_accounts").select("id,employee_id,auth_user_id,status,metadata,account_roles!account_roles_account_id_fkey(roles(code,role_permissions(permission_key)))").eq("username", profile.username).single(), profile.username);
     assert(row.id === fixedId(`account:${profile.username}`) && row.metadata?.testOwner === TEST_OWNER && row.metadata?.testTarget === target.databaseUrl && row.employee_id === fixedId(`employee:${profile.username}`) && row.auth_user_id && row.status === "active", `Account chưa hợp lệ: ${profile.username}`);
     assert.equal(row.account_roles.length, 1); assert.equal(row.account_roles[0].roles.code, profile.roleCode);

@@ -31,6 +31,10 @@ export interface AttendanceLocation {
 }
 
 export interface AttendancePolicy {
+  arrivalLeadMinutes?: number;
+  breakStartTime?: string;
+  breakEndTime?: string;
+  isWorkingDay?: boolean;
   id: string;
   name: string;
   attendanceEnabled: boolean;
@@ -75,6 +79,8 @@ export interface AttendanceEvent {
 
 export interface AttendancePhotoStampMetadata {
   version: 1;
+  capturedByName?: string;
+  capturedByUsername?: string;
   capturedAt: string;
   address: string;
   latitude?: number;

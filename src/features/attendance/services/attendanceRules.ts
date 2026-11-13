@@ -6,6 +6,8 @@ import type {
   AttendanceType,
   PendingAttendanceItem
 } from "@/features/attendance/types/attendanceTypes";
+import { getBusinessDateKey } from "@/lib/time/timezone";
+import { arrivalLatenessMinutes, usesWorkforceAttendancePolicy } from "@/features/timesheets/services/workforceAttendancePolicy";
 
 const EARTH_RADIUS_METERS = 6_371_000;
 
@@ -90,7 +92,9 @@ export function retryDelayMilliseconds(retryCount: number): number {
   return Math.min(60_000, 1_000 * 2 ** Math.min(Math.max(retryCount, 0), 6));
 }
 
-export function getAttendanceLateMinutes(effectiveAt: string, policy: Pick<AttendancePolicy, "timezone" | "shiftStart" | "lateThresholdMinutes">): number {
+export function getAttendanceLateMinutes(effectiveAt: string, policy: Pick<AttendancePolicy, "timezone" | "shiftStart" | "lateThresholdMinutes"> & Partial<Pick<AttendancePolicy,"isWorkingDay">>, attendanceDate = getBusinessDateKey(new Date(effectiveAt))): number {
+  if (policy.isWorkingDay === false) return 0;
+  if (usesWorkforceAttendancePolicy(attendanceDate)) return arrivalLatenessMinutes(attendanceDate, effectiveAt, policy.shiftStart);
   const time = new Intl.DateTimeFormat("en-GB", { timeZone: policy.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(new Date(effectiveAt));
   const parts = Object.fromEntries(time.map((part) => [part.type, part.value]));
   const [hour, minute] = policy.shiftStart.split(":").map(Number);

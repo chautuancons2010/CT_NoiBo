@@ -10,12 +10,19 @@ const validScope = <T extends { scopeType: string; scopeId?: string }>(value: T)
 export const shiftInputSchema = z.object({
   id: z.string().uuid().optional(), code: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,29}$/).optional(),
   name: z.string().trim().min(2).max(100), startTime: time, endTime: time,
+  scheduleRules: z.object({ breakStartTime: time, breakEndTime: time, arrivalLeadMinutes: z.number().int().min(0).max(120) }).optional(),
   breakMinutes: z.number().int().min(0).max(720), lateGraceMinutes: z.number().int().min(0).max(180),
   earlyLeaveGraceMinutes: z.number().int().min(0).max(180), checkInEarliestMinutes: z.number().int().min(0).max(720),
   checkInLatestMinutes: z.number().int().min(0).max(720), checkOutEarliestMinutes: z.number().int().min(0).max(720),
   checkOutLatestMinutes: z.number().int().min(0).max(720), crossMidnight: z.boolean(), active: z.boolean(),
   effectiveFrom: z.string().date().optional(), reason: z.string().trim().min(3).max(500).optional()
 }).superRefine((value, context) => {
+  if (value.scheduleRules) {
+    const { breakStartTime, breakEndTime } = value.scheduleRules;
+    const minutes = (text: string) => Number(text.slice(0, 2)) * 60 + Number(text.slice(3, 5));
+    if (value.crossMidnight || !(value.startTime < breakStartTime && breakStartTime < breakEndTime && breakEndTime < value.endTime)) context.addIssue({ code: "custom", path: ["scheduleRules"], message: "Giờ nghỉ phải nằm trong ca và kết thúc sau khi bắt đầu nghỉ." });
+    if (minutes(breakEndTime) - minutes(breakStartTime) !== value.breakMinutes) context.addIssue({ code: "custom", path: ["breakMinutes"], message: "Số phút nghỉ phải khớp khung giờ nghỉ." });
+  }
   if (value.id && !value.effectiveFrom) context.addIssue({ code: "custom", path: ["effectiveFrom"], message: "Cần chọn ngày áp dụng." });
   if (value.id && !value.reason) context.addIssue({ code: "custom", path: ["reason"], message: "Cần nhập lý do thay đổi." });
 });

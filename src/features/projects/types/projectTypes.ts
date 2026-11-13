@@ -1,4 +1,8 @@
 export type ProjectStatus = "preparing" | "active" | "paused" | "completed" | "closed";
+export interface ProjectPortOption {
+  code: string; name: string; startTime: string; endTime: string; breakStartTime?: string; breakEndTime?: string;
+  versions?: Array<{effectiveFrom:string;effectiveTo?:string;name:string;startTime:string;endTime:string;breakStartTime?:string;breakEndTime?:string}>;
+}
 export type AssignmentRole = "project_manager" | "engineer" | "supervisor_main" | "supervisor_replacement" | "worker" | "support";
 export type ProjectHealth = "on_track" | "at_risk" | "delayed" | "paused" | "completed";
 export type ProjectUpdateType = "progress" | "issue" | "material" | "safety" | "change" | "general";
@@ -143,6 +147,9 @@ export interface ProjectAssignment {
   shiftStart: string;
   shiftEnd: string;
   shiftBreakMinutes?: number;
+  shiftScheduleRules?: import("@/features/timesheets/types/timesheetTypes").ShiftScheduleRules;
+  isWorkingDay?: boolean;
+  calendarDayType?: string;
   status: "active" | "inactive" | "cancelled";
   rowVersion: number;
   approvedLeave?: { requestId: string; requestNumber: string; leaveTypeName: string; dayPart: string };
@@ -159,6 +166,7 @@ export interface EmployeeProjectAssignment {
 }
 
 export interface ProjectDetail extends ProjectSummary {
+  portSchedule?: { code: string; name: string; startTime: string; endTime: string; effectiveFrom: string };
   note?: string;
   worksites: Worksite[];
   assignments: ProjectAssignment[];

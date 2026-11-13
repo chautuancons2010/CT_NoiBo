@@ -37,6 +37,7 @@ function database(assignments: Row[] = [assignment]) {
       }
       const query = {
         select: () => query, order: () => query, limit: () => query,
+        is: (key: string, value: unknown) => { filters.push([key, value === null ? undefined : value]); return query; },
         eq: (key: string, value: unknown) => { filters.push([key, value]); return query; },
         update: (values: Row) => { update = values; return query; },
         insert: (values: Row) => { insert = values; return query; },

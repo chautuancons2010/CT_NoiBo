@@ -41,6 +41,8 @@ function mockDatabase(options: { accounts?: Row[]; accountError?: boolean } = {}
       const query = {
         select(columns: string) { entry.columns = columns; return query; },
         eq(column: string, value: unknown) { entry.filters.push([column, value]); return query; },
+        is(column: string, value: unknown) { entry.filters.push([column, value === null ? undefined : value]); return query; },
+        in(column: string, values: unknown[]) { const current = tables[table]; if (current) tables[table] = current.filter(row => values.includes(row[column])); return query; },
         order: () => query,
         limit: () => query,
         maybeSingle: async () => result(true),
@@ -104,5 +106,10 @@ describe("project read scope", () => {
     mockDatabase({ accountError: true });
 
     await expect(listProjects(user)).rejects.toMatchObject({ code: "SERVER_ERROR" });
+  });
+
+  it("lets attendance supervisors select active packages without preassigned projects", async () => {
+    mockDatabase({ accounts: [{ id: accountId, employee_id: "new-supervisor" }] });
+    expect(await listProjects({ ...user, permissions: ["project.view", "worker_attendance.create"] })).toHaveLength(5);
   });
 });

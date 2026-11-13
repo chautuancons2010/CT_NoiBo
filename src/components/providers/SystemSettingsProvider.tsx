@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useOptionalCurrentUser } from "./CurrentUserProvider";
+import { releaseModuleSettings } from "@/config/featureRelease";
 
 import {
   deriveBrandColorTokens,
@@ -64,10 +66,16 @@ export function SystemSettingsProvider({
   return <SystemSettingsContext.Provider value={value}>{children}</SystemSettingsContext.Provider>;
 }
 
-export function useSystemSettings(): SystemSettingsContextValue {
+export function useStoredSystemSettings(): SystemSettingsContextValue {
   const context = useContext(SystemSettingsContext);
   if (!context) throw new Error("useSystemSettings must be used inside SystemSettingsProvider");
   return context;
+}
+
+export function useSystemSettings(): SystemSettingsContextValue {
+  const context = useStoredSystemSettings();
+  const user = useOptionalCurrentUser();
+  return useMemo(() => user ? { ...context, settings: { ...context.settings, modules: releaseModuleSettings(context.settings.modules, user.roleCodes) } } : context, [context, user]);
 }
 
 export function useBranding() {
